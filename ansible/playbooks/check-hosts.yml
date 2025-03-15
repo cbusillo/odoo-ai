@@ -1,0 +1,17 @@
+---
+- name: Check hostnames and uptime
+  hosts: cluster
+  tasks:
+    - name: Get hostname
+      ansible.builtin.command: hostname
+      register: hostname_output
+      changed_when: false
+
+    - name: Get uptime
+      ansible.builtin.command: uptime -p
+      register: uptime_output
+      changed_when: false
+
+    - name: Display hostname and uptime
+      ansible.builtin.debug:
+        msg: "Host {{ inventory_hostname }} ({{ hostname_output.stdout }}) uptime: {{ uptime_output.stdout }}"

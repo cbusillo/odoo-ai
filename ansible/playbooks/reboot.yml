@@ -1,0 +1,11 @@
+---
+- name: Reboot node
+  hosts: cluster
+  become: true
+  tasks:
+    - name: Reboot the system
+      ansible.builtin.reboot:
+        reboot_timeout: 300
+        msg: "Reboot initiated by Ansible"
+        pre_reboot_delay: 5
+        post_reboot_delay: 30

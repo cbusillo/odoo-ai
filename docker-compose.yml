@@ -1,0 +1,39 @@
+services:
+  odoo:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:?error}
+        ODOO_VERSION: ${ODOO_VERSION:?error}
+        ODOO_ENTERPRISE_REPOSITORY: ${ODOO_ENTERPRISE_REPOSITORY:-}
+        GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+        DEV_MODE: ${DEV_MODE:-}
+    environment:
+      - FETCH_FROM_PROD=${FETCH_FROM_PROD-}
+    ports:
+      - "8069:8069"
+    env_file:
+      - .env
+    volumes:
+      - ./addons:/volumes/addons
+      - odoo_data:/volumes/data
+      - ./docker:/docker
+      - ./docker/scripts/hook_setup.sh:/hook_setup
+      - ~/.ssh:/home/ubuntu/.ssh:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  database:
+    image: postgres:17
+    restart: unless-stopped
+    volumes:
+      - odoo-db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_PASSWORD=${ODOO_DB_PASSWORD}
+      - POSTGRES_USER=${ODOO_DB_USER}
+    ports:
+      - "5432:5432"
+volumes:
+  odoo_data:
+  odoo-db-data:

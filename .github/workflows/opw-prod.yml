@@ -1,0 +1,65 @@
+name: Deploy to Prod
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Tailscale VPN
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          version: 1.70.0
+      - name: Wait for Tailscale
+        run: |
+          # Ping loop
+          host="${{ vars.PRODUCTION_SERVER }}"
+          count=0
+          max_attempts=30
+          while ! ping -c 1 -W 1 $host > /dev/null 2>&1; do
+            count=$((count+1))
+            echo "Attempt $count: Ping to $host failed, retrying..."
+            if [ $count -ge $max_attempts ]; then
+              echo "Failed to reach $host after $max_attempts attempts, stopping."
+              exit 1
+            fi
+            sleep 1
+          done
+          echo "Ping to $host successful."
+        shell: bash
+      - name: Create SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 700 ~/.ssh && chmod 600 ~/.ssh/id_ed25519  
+          ssh-keyscan -H ${{ vars.PRODUCTION_SERVER }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ vars.PROXMOX_SERVER }} >> ~/.ssh/known_hosts
+        shell: bash
+      - name: Trigger Backup on Proxmox
+        run: |
+          ssh ${{ vars.PRODUCTION_USER }}@${{ vars.PROXMOX_SERVER }} 'vzdump 109 --mailnotification failure --mode snapshot --mailto info@shinycomputers.com --quiet 1 --notes-template "{{guestname}}" --fleecing 0 --all 0 --storage PBS_OPW'
+        shell: bash
+      - name: Clone & Install
+        run: |
+          ssh ${{ vars.PRODUCTION_USER }}@${{ vars.PRODUCTION_SERVER }} 'cd /opt/odoo/odoo-addons; service odoo stop; sudo -u odoo git pull; ../odoo-base/odoo-bin -u product_connect --stop-after-init -c /etc/odoo.conf; service odoo start'
+        shell: bash
+      - name: Check if website is up
+        run: |
+          count=0
+          max_attempts=30
+          while true; do
+            status_code=$(curl --write-out "%{http_code}\n" --silent --output /dev/null ${{ vars.PRODUCTION_SERVER }}:8069 || echo "Curl failed")
+            if [ "$status_code" = "200" ]; then
+              break
+            else
+              count=$((count+1))
+              if [ $count -ge $max_attempts ]; then
+                exit 1
+              fi
+              sleep 5
+            fi
+          done
+        shell: bash

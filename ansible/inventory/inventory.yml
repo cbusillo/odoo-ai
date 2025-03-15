@@ -1,0 +1,33 @@
+all:
+  hosts:
+    cluster-macpro-0.shiny:
+      ansible_host: cluster-macpro-0.shiny
+      ansible_user: cbusillo
+    cluster-macbook-0.opw:
+      ansible_host: cluster-macbook-0.opw
+      ansible_user: cbusillo
+    cluster-spin-0.mike:
+      ansible_host: cluster-spin-0.mike
+      ansible_user: cbusillo
+    cluster-macbook-1.shiny:
+      ansible_host: cluster-macbook-1.shiny
+      ansible_user: cbusillo
+    cluster-macbook-1.opw:
+      ansible_host: cluster-macbook-1.opw
+      ansible_user: cbusillo
+    cluster-nuc-0.shiny:
+      ansible_host: cluster-nuc-0.shiny
+      ansible_user: cbusillo
+
+k3s_cluster:
+  children:
+    server:
+      hosts:
+        cluster-macpro-0.shiny:
+        cluster-macbook-0.opw:
+        cluster-acer-0.mike:
+    agent:
+      hosts:
+        cluster-macbook-1.shiny:
+        cluster-macbook-1.opw:
+        cluster-nuc-0.shiny:

@@ -1,4 +1,3 @@
----
 - name: Check hostnames and uptime
   hosts: cluster
   tasks:

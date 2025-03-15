@@ -1,4 +1,3 @@
----
 - name: Reboot node
   hosts: cluster
   become: true

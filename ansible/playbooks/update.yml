@@ -1,4 +1,3 @@
----
 - name: Update Debian packages on node
   hosts: cluster
   become: true  # runs with sudo privileges

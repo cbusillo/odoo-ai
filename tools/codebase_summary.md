@@ -267,7 +267,7 @@
 - **ansible.cfg**
 
 ## ansible/inventory
-- **hosts.ini**
+- **inventory.yml**
 
 ## ansible/playbooks
 - **check-hosts.yml**
@@ -298,6 +298,7 @@
   - Functions: sanitize_database
 
 ## tools
+- **codebase_summary.md**
 - **files_loc_and_size.py**
   - Functions: matches_pattern, calculate_loc_and_size
 - **overwrite_from_upstream.sh**

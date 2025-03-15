@@ -12,10 +12,7 @@ RUN if [[ -n "${ODOO_ENTERPRISE_REPOSITORY}" ]] ; then \
       mkdir -p /enterprise; \
     fi
 
-
-
-
-FROM ghcr.io/adomi-io/odoo:18.0
+FROM ghcr.io/adomi-io/odoo:18.0 as odoo-base
 USER root
 
 RUN apt-get update && \
@@ -38,6 +35,7 @@ ARG DEV_MODE=false
 WORKDIR /volumes/addons
 
 RUN /volumes/scripts/install_addon_requirements.sh
+RUN HOOK_SETUP_FILE=/volumes/scripts/hook_setup && if [ -f "$HOOK_SETUP_FILE" ]; then cp "$HOOK_SETUP_FILE" /; else echo "hook_setup file not found in /volumes/scrips, skipping"; fi
 
 WORKDIR /
 USER ubuntu

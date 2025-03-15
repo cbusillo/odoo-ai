@@ -5,6 +5,8 @@
 - Production site: https://odoo.outboardpartswarehouse.com/
 - Local development: http://localhost:8069/
 - Primary Business: Buying outboard motors, and parting them out on eBay and Shopify
+ - GitHub Repository: cbusillo/odoo-addons
+- Permanent Branches: opw-prod, opw-testing
 
 # Development Tools
 
@@ -14,6 +16,7 @@
 - Owl.js 2.0
 - Python 3.13
 - Shopify GraphQL API
+- Docker
 
 # Code Standards
 
@@ -54,9 +57,9 @@
 # Codebase Summary
 
 ## .
+- **.gitmodules**
 - **docker-compose.override.yml**
 - **docker-compose.yml**
-- **graphql.config.yml**
 - **mypy.ini**
 - **odoo.local.conf**
 - **odoo.prod.conf**
@@ -68,15 +71,26 @@
 - **opw-prod.yml**
 - **opw-testing.yml**
 
+## .run
+- **Odoo Recreate Local.run.xml**
+- **Odoo.run.xml**
+
 ## addons
 
 ## addons/product_connect
+- **.git**
 - **__init__.py**
 - **__manifest__.py**
 - **jsconfig.json**
 - **requirements-dev.txt**
 - **requirements.txt**
 - **tsconfig.json**
+
+## addons/product_connect/.github
+
+## addons/product_connect/.github/workflows
+- **opw-prod.yml**
+- **opw-testing.yml**
 
 ## addons/product_connect/controllers
 - **__init__.py**
@@ -94,6 +108,7 @@
 - **res_config_data.xml**
 
 ## addons/product_connect/graphql
+- **graphql.config.yml**
 - **shopify_product.graphql**
 
 ## addons/product_connect/mixins
@@ -248,6 +263,27 @@
 - **product_label_layout.py**
   - Class `ProductLabelLayout` with methods: _prepare_report_data, process
 
+## ansible
+- **ansible.cfg**
+
+## ansible/inventory
+- **hosts.ini**
+
+## ansible/playbooks
+- **check-hosts.yml**
+- **reboot.yml**
+- **update.yml**
+
+## ansible/roles
+
+## ansible/roles/host_management
+
+## ansible/roles/host_management/handlers
+
+## ansible/roles/host_management/tasks
+
+## ansible/roles/host_management/vars
+
 ## docker
 - **Dockerfile**
 
@@ -255,16 +291,15 @@
 - **odoo.conf**
 
 ## docker/scripts
-- **hook_setup.sh**
 - **install_addon_requirements.sh**
-- **pull_db_from_prod.sh**
-- **pull_filestore_from_prod.sh**
+- **overwrite_from_upstream.sh**
+- **overwrite_from_upstream_db.sh**
 - **sanitize_db.py**
   - Functions: sanitize_database
 
 ## tools
-- **codebase_summary.md**
 - **files_loc_and_size.py**
   - Functions: matches_pattern, calculate_loc_and_size
+- **overwrite_from_upstream.sh**
 - **project_indexer.py**
   - Functions: set_parents, parse_python_file, index_codebase, generate_markdown_summary, main

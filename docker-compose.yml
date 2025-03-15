@@ -1,26 +1,26 @@
+x-build-base: &build-base
+  dockerfile: docker/Dockerfile
+  args:
+    PYTHON_VERSION: ${PYTHON_VERSION:?error}
+    ODOO_VERSION: ${ODOO_VERSION:?error}
+    ODOO_ENTERPRISE_REPOSITORY: ${ODOO_ENTERPRISE_REPOSITORY:-}
+    GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    DEV_MODE: ${DEV_MODE:-}
+
 services:
-  odoo:
+  odoo: &odoo-base
     build:
-      context: .
-      dockerfile: docker/Dockerfile
-      args:
-        PYTHON_VERSION: ${PYTHON_VERSION:?error}
-        ODOO_VERSION: ${ODOO_VERSION:?error}
-        ODOO_ENTERPRISE_REPOSITORY: ${ODOO_ENTERPRISE_REPOSITORY:-}
-        GITHUB_TOKEN: ${GITHUB_TOKEN:-}
-        DEV_MODE: ${DEV_MODE:-}
-    environment:
-      - FETCH_FROM_PROD=${FETCH_FROM_PROD-}
-    ports:
-      - "8069:8069"
+      <<: *build-base
+      target: odoo-base
     env_file:
       - .env
+    ports:
+      - "8069:8069"
     volumes:
       - ./addons:/volumes/addons
-      - odoo_data:/volumes/data
       - ./docker:/docker
-      - ./docker/scripts/hook_setup.sh:/hook_setup
       - ~/.ssh:/home/ubuntu/.ssh:ro
+      - odoo_data:/volumes/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
   database:
@@ -34,6 +34,13 @@ services:
       - POSTGRES_USER=${ODOO_DB_USER}
     ports:
       - "5432:5432"
+  overwrite-from-upstream:
+    <<: *odoo-base
+    build:
+      <<: *build-base
+    command:
+      - /volumes/scripts/overwrite_from_upstream.sh
+
 volumes:
   odoo_data:
   odoo-db-data:

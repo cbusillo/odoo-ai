@@ -130,6 +130,8 @@ prompt_content = """
 - Production site: https://odoo.outboardpartswarehouse.com/
 - Local development: http://localhost:8069/
 - Primary Business: Buying outboard motors, and parting them out on eBay and Shopify
+ - GitHub Repository: cbusillo/odoo-addons
+- Permanent Branches: opw-prod, opw-testing
 
 # Development Tools
 
@@ -139,6 +141,7 @@ prompt_content = """
 - Owl.js 2.0
 - Python 3.13
 - Shopify GraphQL API
+- Docker
 
 # Code Standards
 

@@ -1,5 +1,5 @@
 - name: Check hostnames and uptime
-  hosts: cluster
+  hosts: all
   tasks:
     - name: Get hostname
       ansible.builtin.command: hostname

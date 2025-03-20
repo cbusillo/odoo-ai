@@ -1,0 +1,14 @@
+- name: Create temporary host groups for reset
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Add all cluster hosts to k3s_cluster and server groups
+      add_host:
+        name: "{{ item }}"
+        groups:
+          - k3s_cluster
+          - server
+      loop: "{{ groups['all'] }}"
+
+- name: Include the reset playbook
+  import_playbook: k3s.orchestration.reset

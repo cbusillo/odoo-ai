@@ -75,6 +75,2406 @@
 - **Odoo Recreate Local.run.xml**
 - **Odoo.run.xml**
 
+## .venv
+- **pyvenv.cfg**
+
+## .venv/bin
+- **activate**
+- **activate.csh**
+- **activate.fish**
+- **activate.nu**
+- **activate.ps1**
+- **activate_this.py**
+- **normalizer**
+- **pip**
+- **pip-3.12**
+- **pip3**
+- **pip3.12**
+- **python**
+- **python3**
+- **python3.12**
+
+## .venv/lib
+
+## .venv/lib/python3.12
+
+## .venv/lib/python3.12/site-packages
+- **_virtualenv.pth**
+- **_virtualenv.py**
+  - Functions: patch_dist
+  - Class `_Finder` with methods: find_spec, exec_module, load_module
+- **pip-23.2.1.virtualenv**
+
+## .venv/lib/python3.12/site-packages/certifi
+- **__init__.py**
+- **__main__.py**
+- **cacert.pem**
+- **core.py**
+  - Functions: exit_cacert_ctx
+- **py.typed**
+
+## .venv/lib/python3.12/site-packages/certifi-2025.1.31.dist-info
+- **INSTALLER**
+- **LICENSE**
+- **METADATA**
+- **RECORD**
+- **WHEEL**
+- **top_level.txt**
+
+## .venv/lib/python3.12/site-packages/charset_normalizer
+- **__init__.py**
+- **__main__.py**
+- **api.py**
+  - Functions: from_bytes, from_fp, from_path, is_binary
+- **cd.py**
+  - Functions: encoding_unicode_range, unicode_range_languages, encoding_languages, mb_encoding_languages, get_target_features, alphabet_languages, characters_popularity_compare, alpha_unicode_split, merge_coherence_ratios, filter_alt_coherence_matches, coherence_ratio
+- **constant.py**
+- **legacy.py**
+  - Functions: detect
+  - Class `ResultDict` (no methods)
+- **md.cpython-312-darwin.so**
+- **md.py**
+  - Functions: is_suspiciously_successive_range, mess_ratio
+  - Class `MessDetectorPlugin` with methods: eligible, feed, reset, ratio
+  - Class `TooManySymbolOrPunctuationPlugin` with methods: __init__, eligible, feed, reset, ratio
+  - Class `TooManyAccentuatedPlugin` with methods: __init__, eligible, feed, reset, ratio
+  - Class `UnprintablePlugin` with methods: __init__, eligible, feed, reset, ratio
+  - Class `SuspiciousDuplicateAccentPlugin` with methods: __init__, eligible, feed, reset, ratio
+  - Class `SuspiciousRange` with methods: __init__, eligible, feed, reset, ratio
+  - Class `SuperWeirdWordPlugin` with methods: __init__, eligible, feed, reset, ratio
+  - Class `CjkInvalidStopPlugin` with methods: __init__, eligible, feed, reset, ratio
+  - Class `ArchaicUpperLowerPlugin` with methods: __init__, eligible, feed, reset, ratio
+  - Class `ArabicIsolatedFormPlugin` with methods: __init__, reset, eligible, feed, ratio
+- **md__mypyc.cpython-312-darwin.so**
+- **models.py**
+  - Class `CharsetMatch` with methods: __init__, __eq__, __lt__, multi_byte_usage, __str__, __repr__, add_submatch, encoding, encoding_aliases, bom, byte_order_mark, languages, language, chaos, coherence, percent_chaos, percent_coherence, raw, submatch, has_submatch, alphabets, could_be_from_charset, output, fingerprint
+  - Class `CharsetMatches` with methods: __init__, __iter__, __getitem__, __len__, __bool__, append, best, first
+  - Class `CliDetectionResult` with methods: __init__, __dict__, to_json
+- **py.typed**
+- **utils.py**
+  - Functions: is_accentuated, remove_accent, unicode_range, is_latin, is_punctuation, is_symbol, is_emoticon, is_separator, is_case_variable, is_cjk, is_hiragana, is_katakana, is_hangul, is_thai, is_arabic, is_arabic_isolated_form, is_unicode_range_secondary, is_unprintable, any_specified_encoding, is_multi_byte_encoding, identify_sig_or_bom, should_strip_sig_or_bom, iana_name, cp_similarity, is_cp_similar, set_logging_handler, cut_sequence_chunks
+- **version.py**
+
+## .venv/lib/python3.12/site-packages/charset_normalizer-3.4.1.dist-info
+- **INSTALLER**
+- **LICENSE**
+- **METADATA**
+- **RECORD**
+- **WHEEL**
+- **entry_points.txt**
+- **top_level.txt**
+
+## .venv/lib/python3.12/site-packages/charset_normalizer/cli
+- **__init__.py**
+- **__main__.py**
+  - Functions: query_yes_no, cli_detect
+
+## .venv/lib/python3.12/site-packages/idna
+- **__init__.py**
+- **codec.py**
+  - Functions: search_function
+  - Class `Codec` with methods: encode, decode
+  - Class `IncrementalEncoder` with methods: _buffer_encode
+  - Class `IncrementalDecoder` with methods: _buffer_decode
+  - Class `StreamWriter` (no methods)
+  - Class `StreamReader` (no methods)
+- **compat.py**
+  - Functions: ToASCII, ToUnicode, nameprep
+- **core.py**
+  - Functions: _combining_class, _is_script, _punycode, _unot, valid_label_length, valid_string_length, check_bidi, check_initial_combiner, check_hyphen_ok, check_nfc, valid_contextj, valid_contexto, check_label, alabel, ulabel, uts46_remap, encode, decode
+  - Class `IDNAError` (no methods)
+  - Class `IDNABidiError` (no methods)
+  - Class `InvalidCodepoint` (no methods)
+  - Class `InvalidCodepointContext` (no methods)
+- **idnadata.py**
+- **intranges.py**
+  - Functions: intranges_from_list, _encode_range, _decode_range, intranges_contain
+- **package_data.py**
+- **py.typed**
+- **uts46data.py**
+  - Functions: _seg_0, _seg_1, _seg_2, _seg_3, _seg_4, _seg_5, _seg_6, _seg_7, _seg_8, _seg_9, _seg_10, _seg_11, _seg_12, _seg_13, _seg_14, _seg_15, _seg_16, _seg_17, _seg_18, _seg_19, _seg_20, _seg_21, _seg_22, _seg_23, _seg_24, _seg_25, _seg_26, _seg_27, _seg_28, _seg_29, _seg_30, _seg_31, _seg_32, _seg_33, _seg_34, _seg_35, _seg_36, _seg_37, _seg_38, _seg_39, _seg_40, _seg_41, _seg_42, _seg_43, _seg_44, _seg_45, _seg_46, _seg_47, _seg_48, _seg_49, _seg_50, _seg_51, _seg_52, _seg_53, _seg_54, _seg_55, _seg_56, _seg_57, _seg_58, _seg_59, _seg_60, _seg_61, _seg_62, _seg_63, _seg_64, _seg_65, _seg_66, _seg_67, _seg_68, _seg_69, _seg_70, _seg_71, _seg_72, _seg_73, _seg_74, _seg_75, _seg_76, _seg_77, _seg_78, _seg_79, _seg_80, _seg_81
+
+## .venv/lib/python3.12/site-packages/idna-3.10.dist-info
+- **INSTALLER**
+- **LICENSE.md**
+- **METADATA**
+- **RECORD**
+- **WHEEL**
+
+## .venv/lib/python3.12/site-packages/pip
+- **__init__.py**
+  - Functions: main
+- **__main__.py**
+- **__pip-runner__.py**
+  - Functions: version_str
+  - Class `PipImportRedirectingFinder` with methods: find_spec
+- **py.typed**
+
+## .venv/lib/python3.12/site-packages/pip-23.2.1.dist-info
+- **AUTHORS.txt**
+- **INSTALLER**
+- **LICENSE.txt**
+- **METADATA**
+- **RECORD**
+- **WHEEL**
+- **entry_points.txt**
+- **top_level.txt**
+
+## .venv/lib/python3.12/site-packages/pip/_internal
+- **__init__.py**
+  - Functions: main
+- **build_env.py**
+  - Functions: _dedup, get_runnable_pip, _get_system_sitepackages
+  - Class `_Prefix` with methods: __init__
+  - Class `BuildEnvironment` with methods: __init__, __enter__, __exit__, check_requirements, install_requirements, _install_requirements
+  - Class `NoOpBuildEnvironment` with methods: __init__, __enter__, __exit__, cleanup, install_requirements
+- **cache.py**
+  - Functions: _hash_dict
+  - Class `Cache` with methods: __init__, _get_cache_path_parts, _get_candidates, get_path_for_link, get
+  - Class `SimpleWheelCache` with methods: __init__, get_path_for_link, get
+  - Class `EphemWheelCache` with methods: __init__
+  - Class `CacheEntry` with methods: __init__
+  - Class `WheelCache` with methods: __init__, get_path_for_link, get_ephem_path_for_link, get, get_cache_entry, record_download_origin
+- **configuration.py**
+  - Functions: _normalize_name, _disassemble_key, get_configuration_files
+  - Class `Configuration` with methods: __init__, load, get_file_to_edit, items, get_value, set_value, unset_value, save, _ensure_have_load_only, _dictionary, _load_config_files, _load_file, _construct_parser, _load_environment_vars, _normalized_keys, get_environ_vars, iter_config_files, get_values_in_config, _get_parser_to_modify, _mark_as_modified, __repr__
+- **exceptions.py**
+  - Functions: _is_kebab_case, _prefix_with_indent
+  - Class `PipError` (no methods)
+  - Class `DiagnosticPipError` with methods: __init__, __repr__, __rich_console__
+  - Class `ConfigurationError` (no methods)
+  - Class `InstallationError` (no methods)
+  - Class `UninstallationError` (no methods)
+  - Class `MissingPyProjectBuildRequires` with methods: __init__
+  - Class `InvalidPyProjectBuildRequires` with methods: __init__
+  - Class `NoneMetadataError` with methods: __init__, __str__
+  - Class `UserInstallationInvalid` with methods: __str__
+  - Class `InvalidSchemeCombination` with methods: __str__
+  - Class `DistributionNotFound` (no methods)
+  - Class `RequirementsFileParseError` (no methods)
+  - Class `BestVersionAlreadyInstalled` (no methods)
+  - Class `BadCommand` (no methods)
+  - Class `CommandError` (no methods)
+  - Class `PreviousBuildDirError` (no methods)
+  - Class `NetworkConnectionError` with methods: __init__, __str__
+  - Class `InvalidWheelFilename` (no methods)
+  - Class `UnsupportedWheel` (no methods)
+  - Class `InvalidWheel` with methods: __init__, __str__
+  - Class `MetadataInconsistent` with methods: __init__, __str__
+  - Class `InstallationSubprocessError` with methods: __init__, __str__
+  - Class `MetadataGenerationFailed` with methods: __init__, __str__
+  - Class `HashErrors` with methods: __init__, append, __str__, __bool__
+  - Class `HashError` with methods: body, __str__, _requirement_name
+  - Class `VcsHashUnsupported` (no methods)
+  - Class `DirectoryUrlHashUnsupported` (no methods)
+  - Class `HashMissing` with methods: __init__, body
+  - Class `HashUnpinned` (no methods)
+  - Class `HashMismatch` with methods: __init__, body, _hash_comparison
+  - Class `UnsupportedPythonVersion` (no methods)
+  - Class `ConfigurationFileCouldNotBeLoaded` with methods: __init__, __str__
+  - Class `ExternallyManagedEnvironment` with methods: __init__, _iter_externally_managed_error_keys, from_config
+- **main.py**
+  - Functions: main
+- **pyproject.py**
+  - Functions: _is_list_of_str, make_pyproject_path, load_pyproject_toml
+- **self_outdated_check.py**
+  - Functions: _get_statefile_name, was_installed_by_pip, _get_current_remote_pip_version, _self_version_check_logic, pip_self_version_check
+  - Class `SelfCheckState` with methods: __init__, key, get, set
+  - Class `UpgradePrompt` with methods: __rich__
+- **wheel_builder.py**
+  - Functions: _contains_egg_info, _should_build, should_build_for_wheel_command, should_build_for_install_command, _should_cache, _get_cache_dir, _verify_one, _build_one, _build_one_inside_env, _clean_one_legacy, build
+
+## .venv/lib/python3.12/site-packages/pip/_internal/cli
+- **__init__.py**
+- **autocompletion.py**
+  - Functions: autocomplete, get_path_completion_type, auto_complete_paths
+- **base_command.py**
+  - Class `Command` with methods: __init__, add_options, handle_pip_version_check, run, parse_args, main, _main
+- **cmdoptions.py**
+  - Functions: raise_option_error, make_option_group, check_dist_restriction, _path_option_check, _package_name_option_check, exists_action, extra_index_url, find_links, trusted_host, constraints, requirements, editable, _handle_src, _get_format_control, _handle_no_binary, _handle_only_binary, no_binary, only_binary, _convert_python_version, _handle_python_version, add_target_python_options, make_target_python, prefer_binary, _handle_no_cache_dir, _handle_no_use_pep517, _handle_config_settings, _handle_merge_hash, check_list_path_option
+  - Class `PipOption` (no methods)
+- **command_context.py**
+  - Class `CommandContextMixIn` with methods: __init__, main_context, enter_context
+- **main.py**
+  - Functions: main
+- **main_parser.py**
+  - Functions: create_main_parser, identify_python_interpreter, parse_command
+- **parser.py**
+  - Class `PrettyHelpFormatter` with methods: __init__, format_option_strings, _format_option_strings, format_heading, format_usage, format_description, format_epilog, indent_lines
+  - Class `UpdatingDefaultsHelpFormatter` with methods: expand_default
+  - Class `CustomOptionParser` with methods: insert_option_group, option_list_all
+  - Class `ConfigOptionParser` with methods: __init__, check_default, _get_ordered_configuration_items, _update_defaults, get_default_values, error
+- **progress_bars.py**
+  - Functions: _rich_progress_bar, get_download_progress_renderer
+- **req_command.py**
+  - Functions: _create_truststore_ssl_context, warn_if_run_as_root, with_cleanup
+  - Class `SessionCommandMixin` with methods: __init__, _get_index_urls, get_default_session, _build_session
+  - Class `IndexGroupCommand` with methods: handle_pip_version_check
+  - Class `RequirementCommand` with methods: __init__, determine_resolver_variant, make_requirement_preparer, make_resolver, get_requirements, trace_basic_info, _build_package_finder
+- **spinners.py**
+  - Functions: open_spinner, hidden_cursor
+  - Class `SpinnerInterface` with methods: spin, finish
+  - Class `InteractiveSpinner` with methods: __init__, _write, spin, finish
+  - Class `NonInteractiveSpinner` with methods: __init__, _update, spin, finish
+  - Class `RateLimiter` with methods: __init__, ready, reset
+- **status_codes.py**
+
+## .venv/lib/python3.12/site-packages/pip/_internal/commands
+- **__init__.py**
+  - Functions: create_command, get_similar_commands
+- **cache.py**
+  - Class `CacheCommand` with methods: add_options, run, get_cache_dir, get_cache_info, list_cache_items, format_for_human, format_for_abspath, remove_cache_items, purge_cache, _cache_dir, _find_http_files, _find_wheels
+- **check.py**
+  - Class `CheckCommand` with methods: run
+- **completion.py**
+  - Class `CompletionCommand` with methods: add_options, run
+- **configuration.py**
+  - Class `ConfigurationCommand` with methods: add_options, run, _determine_file, list_values, get_name, set_name_value, unset_name, list_config_values, print_config_file_values, print_env_var_values, open_in_editor, _get_n_args, _save_configuration, _determine_editor
+- **debug.py**
+  - Functions: show_value, show_sys_implementation, create_vendor_txt_map, get_module_from_module_name, get_vendor_version_from_module, show_actual_vendor_versions, show_vendor_versions, show_tags, ca_bundle_info
+  - Class `DebugCommand` with methods: add_options, run
+- **download.py**
+  - Class `DownloadCommand` with methods: add_options, run
+- **freeze.py**
+  - Functions: _should_suppress_build_backends, _dev_pkgs
+  - Class `FreezeCommand` with methods: add_options, run
+- **hash.py**
+  - Functions: _hash_of_file
+  - Class `HashCommand` with methods: add_options, run
+- **help.py**
+  - Class `HelpCommand` with methods: run
+- **index.py**
+  - Class `IndexCommand` with methods: add_options, run, _build_package_finder, get_available_package_versions
+- **inspect.py**
+  - Class `InspectCommand` with methods: add_options, run, _dist_to_dict
+- **install.py**
+  - Functions: get_lib_location_guesses, site_packages_writable, decide_user_install, create_os_error_message
+  - Class `InstallCommand` with methods: add_options, run, _handle_target_dir, _determine_conflicts, _warn_about_conflicts
+- **list.py**
+  - Functions: format_for_columns, format_for_json
+  - Class `ListCommand` with methods: add_options, _build_package_finder, run, get_outdated, get_uptodate, get_not_required, iter_packages_latest_infos, output_package_listing, output_package_listing_columns
+  - Class `_DistWithLatestInfo` (no methods)
+- **search.py**
+  - Functions: transform_hits, print_dist_installation_info, print_results, highest_version
+  - Class `SearchCommand` with methods: add_options, run, search
+  - Class `TransformedHit` (no methods)
+- **show.py**
+  - Functions: search_packages_info, print_results
+  - Class `ShowCommand` with methods: add_options, run
+  - Class `_PackageInfo` (no methods)
+- **uninstall.py**
+  - Class `UninstallCommand` with methods: add_options, run
+- **wheel.py**
+  - Class `WheelCommand` with methods: add_options, run
+
+## .venv/lib/python3.12/site-packages/pip/_internal/distributions
+- **__init__.py**
+  - Functions: make_distribution_for_install_requirement
+- **base.py**
+  - Class `AbstractDistribution` with methods: __init__, get_metadata_distribution, prepare_distribution_metadata
+- **installed.py**
+  - Class `InstalledDistribution` with methods: get_metadata_distribution, prepare_distribution_metadata
+- **sdist.py**
+  - Class `SourceDistribution` with methods: get_metadata_distribution, prepare_distribution_metadata, _prepare_build_backend, _get_build_requires_wheel, _get_build_requires_editable, _install_build_reqs, _raise_conflicts, _raise_missing_reqs
+- **wheel.py**
+  - Class `WheelDistribution` with methods: get_metadata_distribution, prepare_distribution_metadata
+
+## .venv/lib/python3.12/site-packages/pip/_internal/index
+- **__init__.py**
+- **collector.py**
+  - Functions: _match_vcs_scheme, _ensure_api_header, _ensure_api_response, _get_simple_response, _get_encoding_from_headers, with_cached_index_content, parse_links, _handle_get_simple_fail, _make_index_content, _get_index_content
+  - Class `_NotAPIContent` with methods: __init__
+  - Class `_NotHTTP` (no methods)
+  - Class `CacheablePageContent` with methods: __init__, __eq__, __hash__
+  - Class `ParseLinks` with methods: __call__
+  - Class `IndexContent` with methods: __init__, __str__
+  - Class `HTMLLinkParser` with methods: __init__, handle_starttag, get_href
+  - Class `CollectedSources` (no methods)
+  - Class `LinkCollector` with methods: __init__, create, find_links, fetch_response, collect_sources
+- **package_finder.py**
+  - Functions: _check_link_requires_python, filter_unallowed_hashes, _find_name_version_sep, _extract_version_from_fragment
+  - Class `LinkType` (no methods)
+  - Class `LinkEvaluator` with methods: __init__, evaluate_link
+  - Class `CandidatePreferences` with methods: __init__
+  - Class `BestCandidateResult` with methods: __init__, iter_all, iter_applicable
+  - Class `CandidateEvaluator` with methods: create, __init__, get_applicable_candidates, _sort_key, sort_best_candidate, compute_best_candidate
+  - Class `PackageFinder` with methods: __init__, create, target_python, search_scope, search_scope, find_links, index_urls, trusted_hosts, allow_all_prereleases, set_allow_all_prereleases, prefer_binary, set_prefer_binary, requires_python_skipped_reasons, make_link_evaluator, _sort_links, _log_skipped_link, get_install_candidate, evaluate_links, process_project_url, find_all_candidates, make_candidate_evaluator, find_best_candidate, find_requirement
+- **sources.py**
+  - Functions: _is_html_file, build_source
+  - Class `LinkSource` with methods: link, page_candidates, file_links
+  - Class `_FlatDirectorySource` with methods: __init__, link, page_candidates, file_links
+  - Class `_LocalFileSource` with methods: __init__, link, page_candidates, file_links
+  - Class `_RemoteFileSource` with methods: __init__, link, page_candidates, file_links
+  - Class `_IndexDirectorySource` with methods: __init__, link, page_candidates, file_links
+
+## .venv/lib/python3.12/site-packages/pip/_internal/locations
+- **__init__.py**
+  - Functions: _should_use_sysconfig, _looks_like_bpo_44860, _looks_like_red_hat_patched_platlib_purelib, _looks_like_red_hat_lib, _looks_like_debian_scheme, _looks_like_red_hat_scheme, _looks_like_slackware_scheme, _looks_like_msys2_mingw_scheme, _fix_abiflags, _warn_mismatched, _warn_if_mismatch, _log_context, get_scheme, get_bin_prefix, get_bin_user, _looks_like_deb_system_dist_packages, get_purelib, get_platlib
+- **_distutils.py**
+  - Functions: distutils_scheme, get_scheme, get_bin_prefix, get_purelib, get_platlib
+- **_sysconfig.py**
+  - Functions: _should_use_osx_framework_prefix, _infer_prefix, _infer_user, _infer_home, get_scheme, get_bin_prefix, get_purelib, get_platlib
+- **base.py**
+  - Functions: get_major_minor_version, change_root, get_src_prefix, is_osx_framework
+
+## .venv/lib/python3.12/site-packages/pip/_internal/metadata
+- **__init__.py**
+  - Functions: _should_use_importlib_metadata, select_backend, get_default_environment, get_environment, get_directory_distribution, get_wheel_distribution, get_metadata_distribution
+  - Class `Backend` (no methods)
+- **_json.py**
+  - Functions: json_name, msg_to_json
+- **base.py**
+  - Functions: _convert_installed_files_path
+  - Class `BaseEntryPoint` with methods: name, value, group
+  - Class `RequiresEntry` (no methods)
+  - Class `BaseDistribution` with methods: from_directory, from_metadata_file_contents, from_wheel, __repr__, __str__, location, editable_project_location, installed_location, info_location, installed_by_distutils, installed_as_egg, installed_with_setuptools_egg_info, installed_with_dist_info, canonical_name, version, setuptools_filename, direct_url, installer, requested, editable, local, in_usersite, in_site_packages, is_file, iter_distutils_script_names, read_text, iter_entry_points, _metadata_impl, _metadata_cached, metadata, metadata_dict, metadata_version, raw_name, requires_python, iter_dependencies, iter_provided_extras, _iter_declared_entries_from_record, _iter_declared_entries_from_legacy, iter_declared_entries, _iter_requires_txt_entries, _iter_egg_info_extras, _iter_egg_info_dependencies, _add_egg_info_requires
+  - Class `BaseEnvironment` with methods: default, from_paths, get_distribution, _iter_distributions, iter_all_distributions, iter_installed_distributions
+  - Class `Wheel` with methods: as_zipfile
+  - Class `FilesystemWheel` with methods: __init__, as_zipfile
+  - Class `MemoryWheel` with methods: __init__, as_zipfile
+- **pkg_resources.py**
+  - Class `EntryPoint` (no methods)
+  - Class `InMemoryMetadata` with methods: __init__, has_metadata, get_metadata, get_metadata_lines, metadata_isdir, metadata_listdir, run_script
+  - Class `Distribution` with methods: __init__, from_directory, from_metadata_file_contents, from_wheel, location, installed_location, info_location, installed_by_distutils, canonical_name, version, is_file, iter_distutils_script_names, read_text, iter_entry_points, _metadata_impl, iter_dependencies, iter_provided_extras
+  - Class `Environment` with methods: __init__, default, from_paths, _iter_distributions, _search_distribution, get_distribution
+
+## .venv/lib/python3.12/site-packages/pip/_internal/metadata/importlib
+- **__init__.py**
+- **_compat.py**
+  - Functions: get_info_location, get_dist_name
+  - Class `BadMetadata` with methods: __init__, __str__
+  - Class `BasePath` with methods: name, parent
+- **_dists.py**
+  - Class `WheelDistribution` with methods: __init__, from_zipfile, iterdir, read_text
+  - Class `Distribution` with methods: __init__, from_directory, from_metadata_file_contents, from_wheel, location, info_location, installed_location, _get_dist_name_from_location, canonical_name, version, is_file, iter_distutils_script_names, read_text, iter_entry_points, _metadata_impl, iter_provided_extras, iter_dependencies
+- **_envs.py**
+  - Functions: _looks_like_wheel, _emit_egg_deprecation
+  - Class `_DistributionFinder` with methods: __init__, _find_impl, find, find_linked, _find_eggs_in_dir, _find_eggs_in_zip, find_eggs
+  - Class `Environment` with methods: __init__, default, from_paths, _iter_distributions, get_distribution
+
+## .venv/lib/python3.12/site-packages/pip/_internal/models
+- **__init__.py**
+- **candidate.py**
+  - Class `InstallationCandidate` with methods: __init__, __repr__, __str__
+- **direct_url.py**
+  - Functions: _get, _get_required, _exactly_one_of, _filter_none
+  - Class `DirectUrlValidationError` (no methods)
+  - Class `VcsInfo` with methods: __init__, _from_dict, _to_dict
+  - Class `ArchiveInfo` with methods: __init__, hash, hash, _from_dict, _to_dict
+  - Class `DirInfo` with methods: __init__, _from_dict, _to_dict
+  - Class `DirectUrl` with methods: __init__, _remove_auth_from_netloc, redacted_url, validate, from_dict, to_dict, from_json, to_json, is_local_editable
+- **format_control.py**
+  - Class `FormatControl` with methods: __init__, __eq__, __repr__, handle_mutual_excludes, get_allowed_formats, disallow_binaries
+- **index.py**
+  - Class `PackageIndex` with methods: __init__, _url_for_path
+- **installation_report.py**
+  - Class `InstallationReport` with methods: __init__, _install_req_to_dict, to_dict
+- **link.py**
+  - Functions: supported_hashes, _clean_url_path_part, _clean_file_url_path, _clean_url_path, _ensure_quoted_url, _clean_link, links_equivalent
+  - Class `LinkHash` with methods: __post_init__, find_hash_url_fragment, as_dict, as_hashes, is_hash_allowed
+  - Class `MetadataFile` with methods: __post_init__
+  - Class `Link` with methods: __init__, from_json, from_element, __str__, __repr__, url, filename, file_path, scheme, netloc, path, splitext, ext, url_without_fragment, _egg_fragment, subdirectory_fragment, metadata_link, as_hashes, hash, hash_name, show_url, is_file, is_existing_dir, is_wheel, is_vcs, is_yanked, has_hash, is_hash_allowed
+  - Class `_CleanResult` (no methods)
+- **scheme.py**
+  - Class `Scheme` with methods: __init__
+- **search_scope.py**
+  - Class `SearchScope` with methods: create, __init__, get_formatted_locations, get_index_urls_locations
+- **selection_prefs.py**
+  - Class `SelectionPreferences` with methods: __init__
+- **target_python.py**
+  - Class `TargetPython` with methods: __init__, format_given, get_tags
+- **wheel.py**
+  - Class `Wheel` with methods: __init__, get_formatted_file_tags, support_index_min, find_most_preferred_tag, supported
+
+## .venv/lib/python3.12/site-packages/pip/_internal/network
+- **__init__.py**
+- **auth.py**
+  - Functions: get_keyring_provider
+  - Class `Credentials` (no methods)
+  - Class `KeyRingBaseProvider` with methods: get_auth_info, save_auth_info
+  - Class `KeyRingNullProvider` with methods: get_auth_info, save_auth_info
+  - Class `KeyRingPythonProvider` with methods: __init__, get_auth_info, save_auth_info
+  - Class `KeyRingCliProvider` with methods: __init__, get_auth_info, save_auth_info, _get_password, _set_password
+  - Class `MultiDomainBasicAuth` with methods: __init__, keyring_provider, keyring_provider, use_keyring, _get_keyring_auth, _get_index_url, _get_new_credentials, _get_url_and_credentials, __call__, _prompt_for_password, _should_save_password_to_keyring, handle_401, warn_on_401, save_credentials
+- **cache.py**
+  - Functions: is_from_cache, suppressed_cache_errors
+  - Class `SafeFileCache` with methods: __init__, _get_cache_path, get, set, delete
+- **download.py**
+  - Functions: _get_http_response_size, _prepare_download, sanitize_content_filename, parse_content_disposition, _get_http_response_filename, _http_get_download
+  - Class `Downloader` with methods: __init__, __call__
+  - Class `BatchDownloader` with methods: __init__, __call__
+- **lazy_wheel.py**
+  - Functions: dist_from_wheel_url
+  - Class `HTTPRangeRequestUnsupported` (no methods)
+  - Class `LazyZipOverHTTP` with methods: __init__, mode, name, seekable, close, closed, read, readable, seek, tell, truncate, writable, __enter__, __exit__, _stay, _check_zip, _stream_response, _merge, _download
+- **session.py**
+  - Functions: looks_like_ci, user_agent
+  - Class `LocalFSAdapter` with methods: send, close
+  - Class `_SSLContextAdapterMixin` with methods: __init__, init_poolmanager
+  - Class `HTTPAdapter` (no methods)
+  - Class `CacheControlAdapter` (no methods)
+  - Class `InsecureHTTPAdapter` with methods: cert_verify
+  - Class `InsecureCacheControlAdapter` with methods: cert_verify
+  - Class `PipSession` with methods: __init__, update_index_urls, add_trusted_host, iter_secure_origins, is_secure_origin, request
+- **utils.py**
+  - Functions: raise_for_status, response_chunks
+- **xmlrpc.py**
+  - Class `PipXmlrpcTransport` with methods: __init__, request
+
+## .venv/lib/python3.12/site-packages/pip/_internal/operations
+- **__init__.py**
+- **check.py**
+  - Functions: create_package_set_from_installed, check_package_set, check_install_conflicts, _simulate_installation_of, _create_whitelist, warn_legacy_versions_and_specifiers
+  - Class `PackageDetails` (no methods)
+- **freeze.py**
+  - Functions: freeze, _format_as_name_version, _get_editable_info
+  - Class `_EditableInfo` (no methods)
+  - Class `FrozenRequirement` with methods: __init__, from_dist, __str__
+- **prepare.py**
+  - Functions: _get_prepared_distribution, unpack_vcs_link, get_http_url, get_file_url, unpack_url, _check_download_dir
+  - Class `File` with methods: __init__
+  - Class `RequirementPreparer` with methods: __init__, _log_preparing_link, _ensure_link_req_src_dir, _get_linked_req_hashes, _fetch_metadata_only, _fetch_metadata_using_link_data_attr, _fetch_metadata_using_lazy_wheel, _complete_partial_requirements, prepare_linked_requirement, prepare_linked_requirements_more, _prepare_linked_requirement, save_linked_requirement, prepare_editable_requirement, prepare_installed_requirement
+
+## .venv/lib/python3.12/site-packages/pip/_internal/operations/install
+- **__init__.py**
+- **editable_legacy.py**
+  - Functions: install_editable
+- **wheel.py**
+  - Functions: rehash, csv_io_kwargs, fix_script, wheel_root_is_purelib, get_entrypoints, message_about_scripts_not_on_PATH, _normalized_outrows, _record_to_fs_path, _fs_to_record_path, get_csv_rows_for_installed, get_console_script_specs, _raise_for_invalid_entrypoint, _install_wheel, req_error_context, install_wheel
+  - Class `ZipBackedFile` with methods: __init__, _getinfo, save
+  - Class `ScriptFile` with methods: __init__, save
+  - Class `MissingCallableSuffix` with methods: __init__
+  - Class `PipScriptMaker` with methods: make
+  - Class `File` with methods: save
+
+## .venv/lib/python3.12/site-packages/pip/_internal/req
+- **__init__.py**
+  - Functions: _validate_requirements, install_given_reqs
+  - Class `InstallationResult` with methods: __init__, __repr__
+- **constructors.py**
+  - Functions: _strip_extras, convert_extras, parse_editable, check_first_requirement_in_file, deduce_helpful_msg, parse_req_from_editable, install_req_from_editable, _looks_like_path, _get_url_from_path, parse_req_from_line, install_req_from_line, install_req_from_req_string, install_req_from_parsed_requirement, install_req_from_link_and_ireq
+  - Class `RequirementParts` with methods: __init__
+- **req_file.py**
+  - Functions: parse_requirements, preprocess, handle_requirement_line, handle_option_line, handle_line, get_line_parser, break_args_options, build_parser, join_lines, ignore_comments, expand_env_variables, get_file_content
+  - Class `ParsedRequirement` with methods: __init__
+  - Class `ParsedLine` with methods: __init__
+  - Class `RequirementsFileParser` with methods: __init__, parse, _parse_and_recurse, _parse_file
+  - Class `OptionParsingError` with methods: __init__
+- **req_install.py**
+  - Functions: check_invalid_constraint_type, _has_option, check_legacy_setup_py_options
+  - Class `InstallRequirement` with methods: __init__, __str__, __repr__, format_debug, name, supports_pyproject_editable, specifier, is_direct, is_pinned, match_markers, has_hash_options, hashes, from_path, ensure_build_location, _set_requirement, warn_on_mismatching_name, check_if_exists, is_wheel, is_wheel_from_cache, unpacked_source_directory, setup_py_path, setup_cfg_path, pyproject_toml_path, load_pyproject_toml, isolated_editable_sanity_check, prepare_metadata, metadata, get_dist, assert_source_matches_version, ensure_has_source_dir, update_editable, uninstall, _get_archive_name, archive, install
+- **req_set.py**
+  - Class `RequirementSet` with methods: __init__, __str__, __repr__, add_unnamed_requirement, add_named_requirement, has_requirement, get_requirement, all_requirements, requirements_to_install, warn_legacy_versions_and_specifiers
+- **req_uninstall.py**
+  - Functions: _script_names, _unique, uninstallation_paths, compact, compress_for_rename, compress_for_output_listing
+  - Class `StashedUninstallPathSet` with methods: __init__, _get_directory_stash, _get_file_stash, stash, commit, rollback, can_rollback
+  - Class `UninstallPathSet` with methods: __init__, _permitted, add, add_pth, remove, _allowed_to_proceed, rollback, commit, from_dist
+  - Class `UninstallPthEntries` with methods: __init__, add, remove, rollback
+
+## .venv/lib/python3.12/site-packages/pip/_internal/resolution
+- **__init__.py**
+- **base.py**
+  - Class `BaseResolver` with methods: resolve, get_installation_order
+
+## .venv/lib/python3.12/site-packages/pip/_internal/resolution/legacy
+- **__init__.py**
+- **resolver.py**
+  - Functions: _check_dist_requires_python
+  - Class `Resolver` with methods: __init__, resolve, _add_requirement_to_set, _is_upgrade_allowed, _set_req_to_reinstall, _check_skip_installed, _find_requirement_link, _populate_link, _get_dist_for, _resolve_one, get_installation_order
+
+## .venv/lib/python3.12/site-packages/pip/_internal/resolution/resolvelib
+- **__init__.py**
+- **base.py**
+  - Functions: format_name, _match_link
+  - Class `Constraint` with methods: __init__, empty, from_ireq, __bool__, __and__, is_satisfied_by
+  - Class `Requirement` with methods: project_name, name, is_satisfied_by, get_candidate_lookup, format_for_error
+  - Class `Candidate` with methods: project_name, name, version, is_installed, is_editable, source_link, iter_dependencies, get_install_requirement, format_for_error
+- **candidates.py**
+  - Functions: as_base_candidate, make_install_req_from_link, make_install_req_from_editable, _make_install_req_from_dist
+  - Class `_InstallRequirementBackedCandidate` with methods: __init__, __str__, __repr__, __hash__, __eq__, source_link, project_name, name, version, format_for_error, _prepare_distribution, _check_metadata_consistency, _prepare, iter_dependencies, get_install_requirement
+  - Class `LinkCandidate` with methods: __init__, _prepare_distribution
+  - Class `EditableCandidate` with methods: __init__, _prepare_distribution
+  - Class `AlreadyInstalledCandidate` with methods: __init__, __str__, __repr__, __hash__, __eq__, project_name, name, version, is_editable, format_for_error, iter_dependencies, get_install_requirement
+  - Class `ExtrasCandidate` with methods: __init__, __str__, __repr__, __hash__, __eq__, project_name, name, version, format_for_error, is_installed, is_editable, source_link, iter_dependencies, get_install_requirement
+  - Class `RequiresPythonCandidate` with methods: __init__, __str__, project_name, name, version, format_for_error, iter_dependencies, get_install_requirement
+- **factory.py**
+  - Class `CollectedRootRequirements` (no methods)
+  - Class `Factory` with methods: __init__, force_reinstall, _fail_if_link_is_unsupported_wheel, _make_extras_candidate, _make_candidate_from_dist, _make_candidate_from_link, _iter_found_candidates, _iter_explicit_candidates_from_base, _iter_candidates_from_constraints, find_candidates, _make_requirement_from_install_req, collect_root_requirements, make_requirement_from_candidate, make_requirement_from_spec, make_requires_python_requirement, get_wheel_cache_entry, get_dist_to_uninstall, _report_requires_python_error, _report_single_requirement_conflict, get_installation_error
+  - Class `ConflictCause` (no methods)
+- **found_candidates.py**
+  - Functions: _iter_built, _iter_built_with_prepended, _iter_built_with_inserted
+  - Class `FoundCandidates` with methods: __init__, __getitem__, __iter__, __len__, __bool__
+- **provider.py**
+  - Functions: _get_with_identifier
+  - Class `PipProvider` with methods: __init__, identify, get_preference, find_matches, is_satisfied_by, get_dependencies, is_backtrack_cause
+- **reporter.py**
+  - Class `PipReporter` with methods: __init__, rejecting_candidate
+  - Class `PipDebuggingReporter` with methods: starting, starting_round, ending_round, ending, adding_requirement, rejecting_candidate, pinning
+- **requirements.py**
+  - Class `ExplicitRequirement` with methods: __init__, __str__, __repr__, project_name, name, format_for_error, get_candidate_lookup, is_satisfied_by
+  - Class `SpecifierRequirement` with methods: __init__, __str__, __repr__, project_name, name, format_for_error, get_candidate_lookup, is_satisfied_by
+  - Class `RequiresPythonRequirement` with methods: __init__, __str__, __repr__, project_name, name, format_for_error, get_candidate_lookup, is_satisfied_by
+  - Class `UnsatisfiableRequirement` with methods: __init__, __str__, __repr__, project_name, name, format_for_error, get_candidate_lookup, is_satisfied_by
+- **resolver.py**
+  - Functions: get_topological_weights, _req_set_item_sorter
+  - Class `Resolver` with methods: __init__, resolve, get_installation_order
+
+## .venv/lib/python3.12/site-packages/pip/_internal/utils
+- **__init__.py**
+- **_jaraco_text.py**
+  - Functions: _nonblank, yield_lines, _, drop_comment, join_continuation
+- **_log.py**
+  - Functions: getLogger, init_logging
+  - Class `VerboseLogger` with methods: verbose
+- **appdirs.py**
+  - Functions: user_cache_dir, _macos_user_config_dir, user_config_dir, site_config_dirs
+- **compat.py**
+  - Functions: has_tls, get_path_uid
+- **compatibility_tags.py**
+  - Functions: version_info_to_nodot, _mac_platforms, _custom_manylinux_platforms, _get_custom_platforms, _expand_allowed_platforms, _get_python_version, _get_custom_interpreter, get_supported
+- **datetime.py**
+  - Functions: today_is_later_than
+- **deprecation.py**
+  - Functions: _showwarning, install_warning_logger, deprecated
+  - Class `PipDeprecationWarning` (no methods)
+- **direct_url_helpers.py**
+  - Functions: direct_url_as_pep440_direct_reference, direct_url_for_editable, direct_url_from_link
+- **egg_link.py**
+  - Functions: _egg_link_name, egg_link_path_from_sys_path, egg_link_path_from_location
+- **encoding.py**
+  - Functions: auto_decode
+- **entrypoints.py**
+  - Functions: _wrapper, get_best_invocation_for_this_pip, get_best_invocation_for_this_python
+- **filesystem.py**
+  - Functions: check_path_owner, adjacent_tmp_file, test_writable_dir, _test_writable_dir_win, find_files, file_size, format_file_size, directory_size, format_directory_size
+- **filetypes.py**
+  - Functions: is_archive_file
+- **glibc.py**
+  - Functions: glibc_version_string, glibc_version_string_confstr, glibc_version_string_ctypes, libc_ver
+- **hashes.py**
+  - Class `Hashes` with methods: __init__, __and__, digest_count, is_hash_allowed, check_against_chunks, _raise, check_against_file, check_against_path, has_one_of, __bool__, __eq__, __hash__
+  - Class `MissingHashes` with methods: __init__, _raise
+- **inject_securetransport.py**
+  - Functions: inject_securetransport
+- **logging.py**
+  - Functions: _is_broken_pipe_error, indent_log, get_indentation, setup_logging
+  - Class `BrokenStdoutLoggingError` (no methods)
+  - Class `IndentingFormatter` with methods: __init__, get_message_start, format
+  - Class `IndentedRenderable` with methods: __rich_console__
+  - Class `RichPipStreamHandler` with methods: __init__, emit, handleError
+  - Class `BetterRotatingFileHandler` with methods: _open
+  - Class `MaxLevelFilter` with methods: __init__, filter
+  - Class `ExcludeLoggerFilter` with methods: filter
+- **misc.py**
+  - Functions: get_pip_version, normalize_version_info, ensure_dir, get_prog, rmtree, rmtree_errorhandler, display_path, backup_dir, ask_path_exists, _check_no_input, ask, ask_input, ask_password, strtobool, format_size, tabulate, is_installable_dir, read_chunks, normalize_path, splitext, renames, is_local, write_output, captured_output, captured_stdout, captured_stderr, enum, build_netloc, build_url_from_netloc, parse_netloc, split_auth_from_netloc, redact_netloc, _transform_url, _get_netloc, _redact_netloc, split_auth_netloc_from_url, remove_auth_from_url, redact_auth_from_url, hide_value, hide_url, protect_pip_from_modification_on_windows, check_externally_managed, is_console_interactive, hash_file, pairwise, partition
+  - Class `StreamWrapper` with methods: from_stream, encoding
+  - Class `HiddenText` with methods: __init__, __repr__, __str__, __eq__
+  - Class `ConfiguredBuildBackendHookCaller` with methods: __init__, build_wheel, build_sdist, build_editable, get_requires_for_build_wheel, get_requires_for_build_sdist, get_requires_for_build_editable, prepare_metadata_for_build_wheel, prepare_metadata_for_build_editable
+- **models.py**
+  - Class `KeyBasedCompareMixin` with methods: __init__, __hash__, __lt__, __le__, __gt__, __ge__, __eq__, _compare
+- **packaging.py**
+  - Functions: check_requires_python, get_requirement, safe_extra
+- **setuptools_build.py**
+  - Functions: make_setuptools_shim_args, make_setuptools_bdist_wheel_args, make_setuptools_clean_args, make_setuptools_develop_args, make_setuptools_egg_info_args
+- **subprocess.py**
+  - Functions: make_command, format_command_args, reveal_command_args, call_subprocess, runner_with_spinner_message
+- **temp_dir.py**
+  - Functions: global_tempdir_manager, tempdir_registry
+  - Class `TempDirectoryTypeRegistry` with methods: __init__, set_delete, get_delete
+  - Class `_Default` (no methods)
+  - Class `TempDirectory` with methods: __init__, path, __repr__, __enter__, __exit__, _create, cleanup
+  - Class `AdjacentTempDirectory` with methods: __init__, _generate_names, _create
+- **unpacking.py**
+  - Functions: current_umask, split_leading_dir, has_leading_dir, is_within_directory, set_extracted_file_to_default_mode_plus_executable, zip_item_is_executable, unzip_file, untar_file, unpack_file
+- **urls.py**
+  - Functions: get_url_scheme, path_to_url, url_to_path
+- **virtualenv.py**
+  - Functions: _running_under_venv, _running_under_legacy_virtualenv, running_under_virtualenv, _get_pyvenv_cfg_lines, _no_global_under_venv, _no_global_under_legacy_virtualenv, virtualenv_no_global
+- **wheel.py**
+  - Functions: parse_wheel, wheel_dist_info_dir, read_wheel_metadata_file, wheel_metadata, wheel_version, check_compatibility
+
+## .venv/lib/python3.12/site-packages/pip/_internal/vcs
+- **__init__.py**
+- **bazaar.py**
+  - Class `Bazaar` with methods: get_base_rev_args, fetch_new, switch, update, get_url_rev_and_auth, get_remote_url, get_revision, is_commit_id_equal
+- **git.py**
+  - Functions: looks_like_hash
+  - Class `Git` with methods: get_base_rev_args, is_immutable_rev_checkout, get_git_version, get_current_branch, get_revision_sha, _should_fetch, resolve_revision, is_commit_id_equal, fetch_new, switch, update, get_remote_url, _git_remote_to_pip_url, has_commit, get_revision, get_subdirectory, get_url_rev_and_auth, update_submodules, get_repository_root, should_add_vcs_url_prefix
+- **mercurial.py**
+  - Class `Mercurial` with methods: get_base_rev_args, fetch_new, switch, update, get_remote_url, get_revision, get_requirement_revision, is_commit_id_equal, get_subdirectory, get_repository_root
+- **subversion.py**
+  - Class `Subversion` with methods: should_add_vcs_url_prefix, get_base_rev_args, get_revision, get_netloc_and_auth, get_url_rev_and_auth, make_rev_args, get_remote_url, _get_svn_url_rev, is_commit_id_equal, __init__, call_vcs_version, get_vcs_version, get_remote_call_options, fetch_new, switch, update
+- **versioncontrol.py**
+  - Functions: is_url, make_vcs_requirement_url, find_path_to_project_root_from_repo_root
+  - Class `RemoteNotFoundError` (no methods)
+  - Class `RemoteNotValidError` with methods: __init__
+  - Class `RevOptions` with methods: __init__, __repr__, arg_rev, to_args, to_display, make_new
+  - Class `VcsSupport` with methods: __init__, __iter__, backends, dirnames, all_schemes, register, unregister, get_backend_for_dir, get_backend_for_scheme, get_backend
+  - Class `VersionControl` with methods: should_add_vcs_url_prefix, get_subdirectory, get_requirement_revision, get_src_requirement, get_base_rev_args, is_immutable_rev_checkout, make_rev_options, _is_local_repository, get_netloc_and_auth, get_url_rev_and_auth, make_rev_args, get_url_rev_options, normalize_url, compare_urls, fetch_new, switch, update, is_commit_id_equal, obtain, unpack, get_remote_url, get_revision, run_command, is_repository_directory, get_repository_root
+
+## .venv/lib/python3.12/site-packages/pip/_vendor
+- **__init__.py**
+  - Functions: vendored
+- **six.py**
+  - Functions: _add_doc, _import_module, add_move, remove_move, assertCountEqual, assertRaisesRegex, assertRegex, assertNotRegex, with_metaclass, add_metaclass, ensure_binary, ensure_str, ensure_text, python_2_unicode_compatible
+  - Class `_LazyDescr` with methods: __init__, __get__
+  - Class `MovedModule` with methods: __init__, _resolve, __getattr__
+  - Class `_LazyModule` with methods: __init__, __dir__
+  - Class `MovedAttribute` with methods: __init__, _resolve
+  - Class `_SixMetaPathImporter` with methods: __init__, _add_module, _get_module, find_module, find_spec, __get_module, load_module, is_package, get_code, create_module, exec_module
+  - Class `_MovedItems` (no methods)
+  - Class `Module_six_moves_urllib_parse` (no methods)
+  - Class `Module_six_moves_urllib_error` (no methods)
+  - Class `Module_six_moves_urllib_request` (no methods)
+  - Class `Module_six_moves_urllib_response` (no methods)
+  - Class `Module_six_moves_urllib_robotparser` (no methods)
+  - Class `Module_six_moves_urllib` with methods: __dir__
+  - Class `Iterator` with methods: next
+  - Class `metaclass` with methods: __new__, __prepare__
+  - Class `X` with methods: __len__
+- **typing_extensions.py**
+  - Functions: _check_generic, _collect_type_vars, IntVar, _get_protocol_attrs, _maybe_adjust_parameters, _caller, _ensure_subclassable, _set_default, _set_module, _concatenate_getitem
+  - Class `_Sentinel` with methods: __repr__
+  - Class `_ExtensionsSpecialForm` with methods: __repr__
+  - Class `_DefaultMixin` (no methods)
+  - Class `_TypeVarLikeMeta` with methods: __instancecheck__
+  - Class `TypeVar` with methods: __new__, __init_subclass__
+  - Class `_SpecialForm` with methods: __init__, __getattr__, __mro_entries__, __repr__, __reduce__, __call__, __or__, __ror__, __instancecheck__, __subclasscheck__, __getitem__
+  - Class `_AnyMeta` with methods: __instancecheck__, __repr__
+  - Class `Any` with methods: __new__
+  - Class `_FinalForm` with methods: __getitem__
+  - Class `_LiteralGenericAlias` with methods: __eq__, __hash__
+  - Class `_LiteralForm` with methods: __init__, __getitem__
+  - Class `_ProtocolMeta` with methods: __new__, __init__, __subclasscheck__, __instancecheck__, __eq__, __hash__
+  - Class `SupportsInt` with methods: __int__
+  - Class `SupportsFloat` with methods: __float__
+  - Class `SupportsComplex` with methods: __complex__
+  - Class `SupportsBytes` with methods: __bytes__
+  - Class `SupportsIndex` with methods: __index__
+  - Class `SupportsAbs` with methods: __abs__
+  - Class `SupportsRound` with methods: __round__
+  - Class `_TypedDictMeta` with methods: __new__, __subclasscheck__
+  - Class `_AnnotatedAlias` with methods: __init__, copy_with, __repr__, __reduce__, __eq__, __hash__
+  - Class `Annotated` with methods: __new__, __class_getitem__, __init_subclass__
+  - Class `_Immutable` with methods: __copy__, __deepcopy__
+  - Class `ParamSpecArgs` with methods: __init__, __repr__, __eq__
+  - Class `ParamSpecKwargs` with methods: __init__, __repr__, __eq__
+  - Class `ParamSpec` with methods: args, kwargs, __init__, __repr__, __hash__, __eq__, __reduce__, __call__
+  - Class `_ConcatenateGenericAlias` with methods: __init__, __repr__, __hash__, __call__, __parameters__
+  - Class `TypeVarTuple` with methods: __iter__, __init__, __repr__, __hash__, __eq__, __reduce__, __init_subclass__
+  - Class `_NamedTupleMeta` with methods: __new__
+  - Class `Buffer` (no methods)
+  - Class `NewType` with methods: __call__, __init__, __mro_entries__, __repr__, __reduce__
+  - Class `TypeAliasType` with methods: __init__, __setattr__, __delattr__, _raise_attribute_error, __repr__, __getitem__, __reduce__, __init_subclass__, __call__
+  - Class `Protocol` with methods: __new__, __class_getitem__, __init_subclass__
+  - Class `_ConcatenateForm` with methods: __getitem__
+  - Class `_TypeGuardForm` with methods: __getitem__
+  - Class `_RequiredForm` with methods: __getitem__
+  - Class `_UnpackSpecialForm` with methods: __init__
+  - Class `_UnpackAlias` (no methods)
+  - Class `_UnpackForm` with methods: __getitem__
+  - Class `Dummy` with methods: __init_subclass__
+- **vendor.txt**
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/cachecontrol
+- **__init__.py**
+- **_cmd.py**
+  - Functions: setup_logging, get_session, get_args, main
+- **adapter.py**
+  - Class `CacheControlAdapter` with methods: __init__, send, build_response, close
+- **cache.py**
+  - Class `BaseCache` with methods: get, set, delete, close
+  - Class `DictCache` with methods: __init__, get, set, delete
+  - Class `SeparateBodyBaseCache` with methods: set_body, get_body
+- **compat.py**
+- **controller.py**
+  - Functions: parse_uri
+  - Class `CacheController` with methods: __init__, _urlnorm, cache_url, parse_cache_control, cached_request, conditional_headers, _cache_set, cache_response, update_cached_response
+- **filewrapper.py**
+  - Class `CallbackFileWrapper` with methods: __init__, __getattr__, __is_fp_closed, _close, read, _safe_read
+- **heuristics.py**
+  - Functions: expire_after, datetime_to_header
+  - Class `BaseHeuristic` with methods: warning, update_headers, apply
+  - Class `OneDayCache` with methods: update_headers
+  - Class `ExpiresAfter` with methods: __init__, update_headers, warning
+  - Class `LastModified` with methods: update_headers, warning
+- **serialize.py**
+  - Functions: _b64_decode_bytes, _b64_decode_str
+  - Class `Serializer` with methods: dumps, loads, prepare_response, _loads_v0, _loads_v1, _loads_v2, _loads_v3, _loads_v4
+- **wrapper.py**
+  - Functions: CacheControl
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/cachecontrol/caches
+- **__init__.py**
+- **file_cache.py**
+  - Functions: _secure_open_write, url_to_file_path
+  - Class `_FileCacheMixin` with methods: __init__, encode, _fn, get, set, _write, _delete
+  - Class `FileCache` with methods: delete
+  - Class `SeparateBodyFileCache` with methods: get_body, set_body, delete
+- **redis_cache.py**
+  - Class `RedisCache` with methods: __init__, get, set, delete, clear, close
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/certifi
+- **__init__.py**
+- **__main__.py**
+- **cacert.pem**
+- **core.py**
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/chardet
+- **__init__.py**
+  - Functions: detect, detect_all
+- **big5freq.py**
+- **big5prober.py**
+  - Class `Big5Prober` with methods: __init__, charset_name, language
+- **chardistribution.py**
+  - Class `CharDistributionAnalysis` with methods: __init__, reset, feed, get_confidence, got_enough_data, get_order
+  - Class `EUCTWDistributionAnalysis` with methods: __init__, get_order
+  - Class `EUCKRDistributionAnalysis` with methods: __init__, get_order
+  - Class `JOHABDistributionAnalysis` with methods: __init__, get_order
+  - Class `GB2312DistributionAnalysis` with methods: __init__, get_order
+  - Class `Big5DistributionAnalysis` with methods: __init__, get_order
+  - Class `SJISDistributionAnalysis` with methods: __init__, get_order
+  - Class `EUCJPDistributionAnalysis` with methods: __init__, get_order
+- **charsetgroupprober.py**
+  - Class `CharSetGroupProber` with methods: __init__, reset, charset_name, language, feed, get_confidence
+- **charsetprober.py**
+  - Class `CharSetProber` with methods: __init__, reset, charset_name, language, feed, state, get_confidence, filter_high_byte_only, filter_international_words, remove_xml_tags
+- **codingstatemachine.py**
+  - Class `CodingStateMachine` with methods: __init__, reset, next_state, get_current_charlen, get_coding_state_machine, language
+- **codingstatemachinedict.py**
+  - Class `CodingStateMachineDict` (no methods)
+- **cp949prober.py**
+  - Class `CP949Prober` with methods: __init__, charset_name, language
+- **enums.py**
+  - Class `InputState` (no methods)
+  - Class `LanguageFilter` (no methods)
+  - Class `ProbingState` (no methods)
+  - Class `MachineState` (no methods)
+  - Class `SequenceLikelihood` with methods: get_num_categories
+  - Class `CharacterCategory` (no methods)
+- **escprober.py**
+  - Class `EscCharSetProber` with methods: __init__, reset, charset_name, language, get_confidence, feed
+- **escsm.py**
+- **eucjpprober.py**
+  - Class `EUCJPProber` with methods: __init__, reset, charset_name, language, feed, get_confidence
+- **euckrfreq.py**
+- **euckrprober.py**
+  - Class `EUCKRProber` with methods: __init__, charset_name, language
+- **euctwfreq.py**
+- **euctwprober.py**
+  - Class `EUCTWProber` with methods: __init__, charset_name, language
+- **gb2312freq.py**
+- **gb2312prober.py**
+  - Class `GB2312Prober` with methods: __init__, charset_name, language
+- **hebrewprober.py**
+  - Class `HebrewProber` with methods: __init__, reset, set_model_probers, is_final, is_non_final, feed, charset_name, language, state
+- **jisfreq.py**
+- **johabfreq.py**
+- **johabprober.py**
+  - Class `JOHABProber` with methods: __init__, charset_name, language
+- **jpcntx.py**
+  - Class `JapaneseContextAnalysis` with methods: __init__, reset, feed, got_enough_data, get_confidence, get_order
+  - Class `SJISContextAnalysis` with methods: __init__, charset_name, get_order
+  - Class `EUCJPContextAnalysis` with methods: get_order
+- **langbulgarianmodel.py**
+- **langgreekmodel.py**
+- **langhebrewmodel.py**
+- **langhungarianmodel.py**
+- **langrussianmodel.py**
+- **langthaimodel.py**
+- **langturkishmodel.py**
+- **latin1prober.py**
+  - Class `Latin1Prober` with methods: __init__, reset, charset_name, language, feed, get_confidence
+- **macromanprober.py**
+  - Class `MacRomanProber` with methods: __init__, reset, charset_name, language, feed, get_confidence
+- **mbcharsetprober.py**
+  - Class `MultiByteCharSetProber` with methods: __init__, reset, feed, get_confidence
+- **mbcsgroupprober.py**
+  - Class `MBCSGroupProber` with methods: __init__
+- **mbcssm.py**
+- **resultdict.py**
+  - Class `ResultDict` (no methods)
+- **sbcharsetprober.py**
+  - Class `SingleByteCharSetModel` (no methods)
+  - Class `SingleByteCharSetProber` with methods: __init__, reset, charset_name, language, feed, get_confidence
+- **sbcsgroupprober.py**
+  - Class `SBCSGroupProber` with methods: __init__
+- **sjisprober.py**
+  - Class `SJISProber` with methods: __init__, reset, charset_name, language, feed, get_confidence
+- **universaldetector.py**
+  - Class `UniversalDetector` with methods: __init__, input_state, has_win_bytes, charset_probers, reset, feed, close
+- **utf1632prober.py**
+  - Class `UTF1632Prober` with methods: __init__, reset, charset_name, language, approx_32bit_chars, approx_16bit_chars, is_likely_utf32be, is_likely_utf32le, is_likely_utf16be, is_likely_utf16le, validate_utf32_characters, validate_utf16_characters, feed, state, get_confidence
+- **utf8prober.py**
+  - Class `UTF8Prober` with methods: __init__, reset, charset_name, language, feed, get_confidence
+- **version.py**
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/chardet/cli
+- **__init__.py**
+- **chardetect.py**
+  - Functions: description_of, main
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/chardet/metadata
+- **__init__.py**
+- **languages.py**
+  - Class `Language` with methods: __init__, __repr__
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/colorama
+- **__init__.py**
+- **ansi.py**
+  - Functions: code_to_chars, set_title, clear_screen, clear_line
+  - Class `AnsiCodes` with methods: __init__
+  - Class `AnsiCursor` with methods: UP, DOWN, FORWARD, BACK, POS
+  - Class `AnsiFore` (no methods)
+  - Class `AnsiBack` (no methods)
+  - Class `AnsiStyle` (no methods)
+- **ansitowin32.py**
+  - Class `StreamWrapper` with methods: __init__, __getattr__, __enter__, __exit__, __setstate__, __getstate__, write, isatty, closed
+  - Class `AnsiToWin32` with methods: __init__, should_wrap, get_win32_calls, write, reset_all, write_and_convert, write_plain_text, convert_ansi, extract_params, call_win32, convert_osc, flush
+- **initialise.py**
+  - Functions: _wipe_internal_state_for_tests, reset_all, init, deinit, just_fix_windows_console, colorama_text, reinit, wrap_stream
+- **win32.py**
+  - Class `CONSOLE_SCREEN_BUFFER_INFO` with methods: __str__
+- **winterm.py**
+  - Functions: enable_vt_processing
+  - Class `WinColor` (no methods)
+  - Class `WinStyle` (no methods)
+  - Class `WinTerm` with methods: __init__, get_attrs, set_attrs, reset_all, fore, back, style, set_console, get_position, set_cursor_position, cursor_adjust, erase_screen, erase_line, set_title
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/colorama/tests
+- **__init__.py**
+- **ansi_test.py**
+  - Class `AnsiTest` with methods: setUp, tearDown, testForeAttributes, testBackAttributes, testStyleAttributes
+- **ansitowin32_test.py**
+  - Class `StreamWrapperTest` with methods: testIsAProxy, testDelegatesWrite, testDelegatesContext, testProxyNoContextManager, test_closed_shouldnt_raise_on_closed_stream, test_closed_shouldnt_raise_on_detached_stream
+  - Class `AnsiToWin32Test` with methods: testInit, testStripIsTrueOnWindows, testStripIsFalseOffWindows, testWriteStripsAnsi, testWriteDoesNotStripAnsi, assert_autoresets, testWriteAutoresets, testWriteAndConvertWritesPlainText, testWriteAndConvertStripsAllValidAnsi, testWriteAndConvertSkipsEmptySnippets, testWriteAndConvertCallsWin32WithParamsAndCommand, test_reset_all_shouldnt_raise_on_closed_orig_stdout, test_wrap_shouldnt_raise_on_closed_orig_stdout, test_wrap_shouldnt_raise_on_missing_closed_attr, testExtractParams, testCallWin32UsesLookup, test_osc_codes, test_native_windows_ansi
+- **initialise_test.py**
+  - Class `InitTest` with methods: setUp, tearDown, assertWrapped, assertNotWrapped, testInitWrapsOnWindows, testInitDoesntWrapOnEmulatedWindows, testInitDoesntWrapOnNonWindows, testInitDoesntWrapIfNone, testInitAutoresetOnWrapsOnAllPlatforms, testInitWrapOffDoesntWrapOnWindows, testInitWrapOffIncompatibleWithAutoresetOn, testAutoResetPassedOn, testAutoResetChangeable, testAtexitRegisteredOnlyOnce
+  - Class `JustFixWindowsConsoleTest` with methods: _reset, tearDown, testJustFixWindowsConsole
+- **isatty_test.py**
+  - Functions: is_a_tty
+  - Class `IsattyTest` with methods: test_TTY, test_nonTTY, test_withPycharm, test_withPycharmTTYOverride, test_withPycharmNonTTYOverride, test_withPycharmNoneOverride, test_withPycharmStreamWrapped
+- **utils.py**
+  - Functions: osname, replace_by, replace_original_by, pycharm
+  - Class `StreamTTY` with methods: isatty
+  - Class `StreamNonTTY` with methods: isatty
+- **winterm_test.py**
+  - Class `WinTermTest` with methods: testInit, testGetAttrs, testResetAll, testFore, testBack, testStyle, testSetConsole, testSetConsoleOnStderr
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/distlib
+- **__init__.py**
+  - Class `DistlibException` (no methods)
+  - Class `NullHandler` with methods: handle, emit, createLock
+- **compat.py**
+  - Class `ZipExtFile` with methods: __init__, __enter__, __exit__
+  - Class `ZipFile` with methods: __enter__, __exit__, open
+  - Class `CertificateError` (no methods)
+  - Class `Container` with methods: __init__
+  - Class `ChainMap` with methods: __init__, __missing__, __getitem__, get, __len__, __iter__, __contains__, __bool__, __repr__, fromkeys, copy, new_child, parents, __setitem__, __delitem__, popitem, pop, clear
+  - Class `OrderedDict` with methods: __init__, __setitem__, __delitem__, __iter__, __reversed__, clear, popitem, keys, values, items, iterkeys, itervalues, iteritems, update, pop, setdefault, __repr__, __reduce__, copy, fromkeys, __eq__, __ne__, viewkeys, viewvalues, viewitems
+  - Class `ConvertingDict` with methods: __getitem__, get
+  - Class `ConvertingList` with methods: __getitem__, pop
+  - Class `ConvertingTuple` with methods: __getitem__
+  - Class `BaseConfigurator` with methods: __init__, resolve, ext_convert, cfg_convert, convert, configure_custom, as_tuple
+- **database.py**
+  - Functions: make_graph, get_dependent_dists, get_required_dists, make_dist
+  - Class `_Cache` with methods: __init__, clear, add
+  - Class `DistributionPath` with methods: __init__, _get_cache_enabled, _set_cache_enabled, clear_cache, _yield_distributions, _generate_cache, distinfo_dirname, get_distributions, get_distribution, provides_distribution, get_file_path, get_exported_entries
+  - Class `Distribution` with methods: __init__, source_url, name_and_version, provides, _get_requirements, run_requires, meta_requires, build_requires, test_requires, dev_requires, matches_requirement, __repr__, __eq__, __hash__
+  - Class `BaseInstalledDistribution` with methods: __init__, get_hash
+  - Class `InstalledDistribution` with methods: __init__, __repr__, __str__, _get_records, exports, read_exports, write_exports, get_resource_path, list_installed_files, write_installed_files, check_installed_files, shared_locations, write_shared_locations, get_distinfo_resource, get_distinfo_file, list_distinfo_files, __eq__
+  - Class `EggInfoDistribution` with methods: __init__, _get_metadata, __repr__, __str__, check_installed_files, list_installed_files, list_distinfo_files, __eq__
+  - Class `DependencyGraph` with methods: __init__, add_distribution, add_edge, add_missing, _repr_dist, repr_node, to_dot, topological_sort, __repr__
+- **index.py**
+  - Class `PackageIndex` with methods: __init__, _get_pypirc_command, read_configuration, save_configuration, check_credentials, register, _reader, get_sign_command, run_command, sign_file, upload_file, upload_documentation, get_verify_command, verify_signature, download_file, send_request, encode_request, search
+- **locators.py**
+  - Functions: get_all_distribution_names
+  - Class `RedirectHandler` with methods: http_error_302
+  - Class `Locator` with methods: __init__, get_errors, clear_errors, clear_cache, _get_scheme, _set_scheme, _get_project, get_distribution_names, get_project, score_url, prefer_url, split_filename, convert_url_to_download_info, _get_digest, _update_version_data, locate
+  - Class `PyPIRPCLocator` with methods: __init__, get_distribution_names, _get_project
+  - Class `PyPIJSONLocator` with methods: __init__, get_distribution_names, _get_project
+  - Class `Page` with methods: __init__, links
+  - Class `SimpleScrapingLocator` with methods: __init__, _prepare_threads, _wait_threads, _get_project, _is_platform_dependent, _process_download, _should_queue, _fetch, get_page, get_distribution_names
+  - Class `DirectoryLocator` with methods: __init__, should_include, _get_project, get_distribution_names
+  - Class `JSONLocator` with methods: get_distribution_names, _get_project
+  - Class `DistPathLocator` with methods: __init__, _get_project
+  - Class `AggregatingLocator` with methods: __init__, clear_cache, _set_scheme, _get_project, get_distribution_names
+  - Class `DependencyFinder` with methods: __init__, add_distribution, remove_distribution, get_matcher, find_providers, try_to_replace, find
+- **manifest.py**
+  - Class `Manifest` with methods: __init__, findall, add, add_many, sorted, clear, process_directive, _parse_directive, _include_pattern, _exclude_pattern, _translate_pattern, _glob_to_re
+- **markers.py**
+  - Functions: _is_literal, _get_versions, default_context, interpret
+  - Class `Evaluator` with methods: evaluate
+- **metadata.py**
+  - Functions: _version2fieldlist, _best_version, _get_name_and_version
+  - Class `MetadataMissingError` (no methods)
+  - Class `MetadataConflictError` (no methods)
+  - Class `MetadataUnrecognizedVersionError` (no methods)
+  - Class `MetadataInvalidError` (no methods)
+  - Class `LegacyMetadata` with methods: __init__, set_metadata_version, _write_field, __getitem__, __setitem__, __delitem__, __contains__, _convert_name, _default_value, _remove_line_prefix, __getattr__, get_fullname, is_field, is_multi_field, read, read_file, write, write_file, update, set, get, check, todict, add_requirements, keys, __iter__, values, items, __repr__
+  - Class `Metadata` with methods: __init__, __getattribute__, _validate_value, __setattr__, name_and_version, provides, provides, get_requirements, dictionary, dependencies, dependencies, _validate_mapping, validate, todict, _from_legacy, _to_legacy, write, add_requirements, __repr__
+- **resources.py**
+  - Functions: register_finder, finder, finder_for_path
+  - Class `ResourceCache` with methods: __init__, is_stale, get
+  - Class `ResourceBase` with methods: __init__
+  - Class `Resource` with methods: as_stream, file_path, bytes, size
+  - Class `ResourceContainer` with methods: resources
+  - Class `ResourceFinder` with methods: __init__, _adjust_path, _make_path, _find, get_cache_info, find, get_stream, get_bytes, get_size, get_resources, is_container, iterator
+  - Class `ZipResourceFinder` with methods: __init__, _adjust_path, _find, get_cache_info, get_bytes, get_stream, get_size, get_resources, _is_directory
+- **scripts.py**
+  - Functions: enquote_executable
+  - Class `ScriptMaker` with methods: __init__, _get_alternate_executable, _build_shebang, _get_shebang, _get_script_text, get_manifest, _write_script, get_script_filenames, _make_script, _copy_script, dry_run, dry_run, make, make_multiple
+- **t32.exe**
+- **t64-arm.exe**
+- **t64.exe**
+- **util.py**
+  - Functions: parse_marker, parse_requirement, get_resources_dests, in_venv, get_executable, proceed, extract_by_key, read_exports, write_exports, tempdir, chdir, socket_timeout, convert_path, resolve, get_export_entry, get_cache_base, path_to_cache_dir, ensure_slash, parse_credentials, get_process_umask, is_string_sequence, split_filename, parse_name_and_version, get_extras, _get_external_data, get_project_data, get_package_data, unarchive, zip_dir, iglob, _iglob, _csv_open, normalize_name, _load_pypirc, _store_pypirc, get_host_platform, get_platform
+  - Class `cached_property` with methods: __init__, __get__
+  - Class `FileOperator` with methods: __init__, _init_record, record_as_written, newer, copy_file, copy_stream, write_binary_file, write_text_file, set_mode, ensure_dir, byte_compile, ensure_removed, is_writable, commit, rollback
+  - Class `ExportEntry` with methods: __init__, value, __repr__, __eq__
+  - Class `Cache` with methods: __init__, prefix_to_dir, clear
+  - Class `EventMixin` with methods: __init__, add, remove, get_subscribers, publish
+  - Class `Sequencer` with methods: __init__, add_node, remove_node, add, remove, is_step, get_steps, strong_connections, dot
+  - Class `Progress` with methods: __init__, update, increment, start, stop, maximum, percentage, format_duration, ETA, speed
+  - Class `Transport` with methods: __init__, make_connection
+  - Class `ServerProxy` with methods: __init__
+  - Class `CSVBase` with methods: __enter__, __exit__
+  - Class `CSVReader` with methods: __init__, __iter__, next
+  - Class `CSVWriter` with methods: __init__, writerow
+  - Class `Configurator` with methods: __init__, configure_custom, __getitem__, inc_convert
+  - Class `SubprocessMixin` with methods: __init__, reader, run_command
+  - Class `PyPIRCFile` with methods: __init__, read, update
+  - Class `HTTPSConnection` with methods: connect
+  - Class `HTTPSHandler` with methods: __init__, _conn_maker, https_open
+  - Class `HTTPSOnlyHandler` with methods: http_open
+  - Class `SafeTransport` with methods: __init__, make_connection
+- **version.py**
+  - Functions: _pep_440_key, _match_prefix, _suggest_semantic_version, _suggest_normalized_version, _legacy_key, is_semver, _semantic_key, get_scheme
+  - Class `UnsupportedVersionError` (no methods)
+  - Class `Version` with methods: __init__, parse, _check_compatible, __eq__, __ne__, __lt__, __gt__, __le__, __ge__, __hash__, __repr__, __str__, is_prerelease
+  - Class `Matcher` with methods: parse_requirement, __init__, match, exact_version, _check_compatible, __eq__, __ne__, __hash__, __repr__, __str__
+  - Class `NormalizedVersion` with methods: parse, is_prerelease
+  - Class `NormalizedMatcher` with methods: _adjust_local, _match_lt, _match_gt, _match_le, _match_ge, _match_eq, _match_arbitrary, _match_ne, _match_compatible
+  - Class `LegacyVersion` with methods: parse, is_prerelease
+  - Class `LegacyMatcher` with methods: _match_compatible
+  - Class `SemanticVersion` with methods: parse, is_prerelease
+  - Class `SemanticMatcher` (no methods)
+  - Class `VersionScheme` with methods: __init__, is_valid_version, is_valid_matcher, is_valid_constraint_list, suggest
+- **w32.exe**
+- **w64-arm.exe**
+- **w64.exe**
+- **wheel.py**
+  - Functions: _get_suffixes, _load_dynamic, _get_glibc_version, compatible_tags, is_compatible
+  - Class `Mounter` with methods: __init__, add, remove, find_module, load_module
+  - Class `Wheel` with methods: __init__, filename, exists, tags, metadata, get_wheel_metadata, info, process_shebang, get_hash, write_record, write_records, build_zip, build, skip_entry, install, _get_dylib_cache, _get_extensions, is_compatible, is_mountable, mount, unmount, verify, update
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/distro
+- **__init__.py**
+- **__main__.py**
+- **distro.py**
+  - Functions: linux_distribution, id, name, version, version_parts, major_version, minor_version, build_number, like, codename, info, os_release_info, lsb_release_info, distro_release_info, uname_info, os_release_attr, lsb_release_attr, distro_release_attr, uname_attr, main
+  - Class `VersionDict` (no methods)
+  - Class `InfoDict` (no methods)
+  - Class `LinuxDistribution` with methods: __init__, __repr__, linux_distribution, id, name, version, version_parts, major_version, minor_version, build_number, like, codename, info, os_release_info, lsb_release_info, distro_release_info, uname_info, oslevel_info, os_release_attr, lsb_release_attr, distro_release_attr, uname_attr, _os_release_info, _parse_os_release_content, _lsb_release_info, _parse_lsb_release_content, _uname_info, _oslevel_info, _debian_version, _parse_uname_content, _to_str, _distro_release_info, _parse_distro_release_file, _parse_distro_release_content
+  - Class `cached_property` with methods: __init__, __get__
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/idna
+- **__init__.py**
+- **codec.py**
+  - Functions: getregentry
+  - Class `Codec` with methods: encode, decode
+  - Class `IncrementalEncoder` with methods: _buffer_encode
+  - Class `IncrementalDecoder` with methods: _buffer_decode
+  - Class `StreamWriter` (no methods)
+  - Class `StreamReader` (no methods)
+- **compat.py**
+  - Functions: ToASCII, ToUnicode, nameprep
+- **core.py**
+  - Functions: _combining_class, _is_script, _punycode, _unot, valid_label_length, valid_string_length, check_bidi, check_initial_combiner, check_hyphen_ok, check_nfc, valid_contextj, valid_contexto, check_label, alabel, ulabel, uts46_remap, encode, decode
+  - Class `IDNAError` (no methods)
+  - Class `IDNABidiError` (no methods)
+  - Class `InvalidCodepoint` (no methods)
+  - Class `InvalidCodepointContext` (no methods)
+- **idnadata.py**
+- **intranges.py**
+  - Functions: intranges_from_list, _encode_range, _decode_range, intranges_contain
+- **package_data.py**
+- **uts46data.py**
+  - Functions: _seg_0, _seg_1, _seg_2, _seg_3, _seg_4, _seg_5, _seg_6, _seg_7, _seg_8, _seg_9, _seg_10, _seg_11, _seg_12, _seg_13, _seg_14, _seg_15, _seg_16, _seg_17, _seg_18, _seg_19, _seg_20, _seg_21, _seg_22, _seg_23, _seg_24, _seg_25, _seg_26, _seg_27, _seg_28, _seg_29, _seg_30, _seg_31, _seg_32, _seg_33, _seg_34, _seg_35, _seg_36, _seg_37, _seg_38, _seg_39, _seg_40, _seg_41, _seg_42, _seg_43, _seg_44, _seg_45, _seg_46, _seg_47, _seg_48, _seg_49, _seg_50, _seg_51, _seg_52, _seg_53, _seg_54, _seg_55, _seg_56, _seg_57, _seg_58, _seg_59, _seg_60, _seg_61, _seg_62, _seg_63, _seg_64, _seg_65, _seg_66, _seg_67, _seg_68, _seg_69, _seg_70, _seg_71, _seg_72, _seg_73, _seg_74, _seg_75, _seg_76, _seg_77, _seg_78, _seg_79, _seg_80, _seg_81
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/msgpack
+- **__init__.py**
+  - Functions: pack, packb, unpack
+- **exceptions.py**
+  - Class `UnpackException` (no methods)
+  - Class `BufferFull` (no methods)
+  - Class `OutOfData` (no methods)
+  - Class `FormatError` (no methods)
+  - Class `StackError` (no methods)
+  - Class `ExtraData` with methods: __init__, __str__
+- **ext.py**
+  - Class `ExtType` with methods: __new__
+  - Class `Timestamp` with methods: __init__, __repr__, __eq__, __ne__, __hash__, from_bytes, to_bytes, from_unix, to_unix, from_unix_nano, to_unix_nano, to_datetime, from_datetime
+- **fallback.py**
+  - Functions: _check_type_strict, _get_data_from_buffer, unpackb
+  - Class `Unpacker` with methods: __init__, feed, _consume, _got_extradata, _get_extradata, read_bytes, _read, _reserve, _read_header, _unpack, __iter__, __next__, skip, unpack, read_array_header, read_map_header, tell
+  - Class `Packer` with methods: __init__, _pack, pack, pack_map_pairs, pack_array_header, pack_map_header, pack_ext_type, _pack_array_header, _pack_map_header, _pack_map_pairs, _pack_raw_header, _pack_bin_header, bytes, reset, getbuffer
+  - Class `StringIO` with methods: __init__, write, getvalue
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/packaging
+- **__about__.py**
+- **__init__.py**
+- **_manylinux.py**
+  - Functions: _get_elf_header, _is_linux_armhf, _is_linux_i686, _have_compatible_abi, _glibc_version_string_confstr, _glibc_version_string_ctypes, _glibc_version_string, _parse_glibc_version, _get_glibc_version, _is_compatible, platform_tags
+  - Class `_ELFFileHeader` with methods: __init__
+  - Class `_GLibCVersion` (no methods)
+  - Class `_InvalidELFFileHeader` (no methods)
+- **_musllinux.py**
+  - Functions: _read_unpacked, _parse_ld_musl_from_elf, _parse_musl_version, _get_musl_version, platform_tags
+  - Class `_MuslVersion` (no methods)
+- **_structures.py**
+  - Class `InfinityType` with methods: __repr__, __hash__, __lt__, __le__, __eq__, __gt__, __ge__, __neg__
+  - Class `NegativeInfinityType` with methods: __repr__, __hash__, __lt__, __le__, __eq__, __gt__, __ge__, __neg__
+- **markers.py**
+  - Functions: _coerce_parse_result, _format_marker, _eval_op, _get_env, _evaluate_markers, format_full_version, default_environment
+  - Class `InvalidMarker` (no methods)
+  - Class `UndefinedComparison` (no methods)
+  - Class `UndefinedEnvironmentName` (no methods)
+  - Class `Node` with methods: __init__, __str__, __repr__, serialize
+  - Class `Variable` with methods: serialize
+  - Class `Value` with methods: serialize
+  - Class `Op` with methods: serialize
+  - Class `Undefined` (no methods)
+  - Class `Marker` with methods: __init__, __str__, __repr__, evaluate
+- **requirements.py**
+  - Class `InvalidRequirement` (no methods)
+  - Class `Requirement` with methods: __init__, __str__, __repr__
+- **specifiers.py**
+  - Functions: _require_version_compare, _version_split, _is_not_suffix, _pad_version
+  - Class `InvalidSpecifier` (no methods)
+  - Class `BaseSpecifier` with methods: __str__, __hash__, __eq__, prereleases, prereleases, contains, filter
+  - Class `_IndividualSpecifier` with methods: __init__, __repr__, __str__, _canonical_spec, __hash__, __eq__, _get_operator, _coerce_version, operator, version, prereleases, prereleases, __contains__, contains, filter
+  - Class `LegacySpecifier` with methods: __init__, _coerce_version, _compare_equal, _compare_not_equal, _compare_less_than_equal, _compare_greater_than_equal, _compare_less_than, _compare_greater_than
+  - Class `Specifier` with methods: _compare_compatible, _compare_equal, _compare_not_equal, _compare_less_than_equal, _compare_greater_than_equal, _compare_less_than, _compare_greater_than, _compare_arbitrary, prereleases, prereleases
+  - Class `SpecifierSet` with methods: __init__, __repr__, __str__, __hash__, __and__, __eq__, __len__, __iter__, prereleases, prereleases, __contains__, contains, filter
+- **tags.py**
+  - Functions: parse_tag, _get_config_var, _normalize_string, _abi3_applies, _cpython_abis, cpython_tags, _generic_abi, generic_tags, _py_interpreter_range, compatible_tags, _mac_arch, _mac_binary_formats, mac_platforms, _linux_platforms, _generic_platforms, platform_tags, interpreter_name, interpreter_version, _version_nodot, sys_tags
+  - Class `Tag` with methods: __init__, interpreter, abi, platform, __eq__, __hash__, __str__, __repr__
+- **utils.py**
+  - Functions: canonicalize_name, canonicalize_version, parse_wheel_filename, parse_sdist_filename
+  - Class `InvalidWheelFilename` (no methods)
+  - Class `InvalidSdistFilename` (no methods)
+- **version.py**
+  - Functions: parse, _parse_version_parts, _legacy_cmpkey, _parse_letter_version, _parse_local_version, _cmpkey
+  - Class `InvalidVersion` (no methods)
+  - Class `_BaseVersion` with methods: __hash__, __lt__, __le__, __eq__, __ge__, __gt__, __ne__
+  - Class `LegacyVersion` with methods: __init__, __str__, __repr__, public, base_version, epoch, release, pre, post, dev, local, is_prerelease, is_postrelease, is_devrelease
+  - Class `Version` with methods: __init__, __repr__, __str__, epoch, release, pre, post, dev, local, public, base_version, is_prerelease, is_postrelease, is_devrelease, major, minor, micro
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/pkg_resources
+- **__init__.py**
+  - Functions: _declare_state, __getstate__, __setstate__, _sget_dict, _sset_dict, _sget_object, _sset_object, get_supported_platform, register_loader_type, get_provider, _macos_vers, _macos_arch, get_build_platform, compatible_platforms, run_script, get_distribution, load_entry_point, get_entry_map, get_entry_info, get_default_cache, safe_name, safe_version, _forgiving_version, _safe_segment, safe_extra, to_filename, invalid_marker, evaluate_marker, _parents, register_finder, find_distributions, find_eggs_in_zip, find_nothing, find_on_path, dist_factory, safe_listdir, distributions_from_metadata, non_empty_lines, resolve_egg_link, register_namespace_handler, _handle_ns, _rebuild_mod_path, declare_namespace, fixup_namespace_packages, file_ns_handler, null_ns_handler, normalize_path, _cygwin_patch, _normalize_cached, _is_egg_path, _is_zip_egg, _is_unpacked_egg, _set_parent_ns, _version_from_file, issue_warning, parse_requirements, _always_object, _find_adapter, ensure_directory, _bypass_ensure_directory, split_sections, _mkstemp, _call_aside, _initialize, _initialize_master_working_set
+  - Class `PEP440Warning` (no methods)
+  - Class `ResolutionError` with methods: __repr__
+  - Class `VersionConflict` with methods: dist, req, report, with_context
+  - Class `ContextualVersionConflict` with methods: required_by
+  - Class `DistributionNotFound` with methods: req, requirers, requirers_str, report, __str__
+  - Class `UnknownExtra` (no methods)
+  - Class `IMetadataProvider` with methods: has_metadata, get_metadata, get_metadata_lines, metadata_isdir, metadata_listdir, run_script
+  - Class `IResourceProvider` with methods: get_resource_filename, get_resource_stream, get_resource_string, has_resource, resource_isdir, resource_listdir
+  - Class `WorkingSet` with methods: __init__, _build_master, _build_from_requirements, add_entry, __contains__, find, iter_entry_points, run_script, __iter__, add, resolve, _resolve_dist, find_plugins, require, subscribe, _added_new, __getstate__, __setstate__
+  - Class `_ReqExtras` with methods: markers_pass
+  - Class `Environment` with methods: __init__, can_add, remove, scan, __getitem__, add, best_match, obtain, __iter__, __iadd__, __add__
+  - Class `ExtractionError` (no methods)
+  - Class `ResourceManager` with methods: __init__, resource_exists, resource_isdir, resource_filename, resource_stream, resource_string, resource_listdir, extraction_error, get_cache_path, _warn_unsafe_extraction_path, postprocess, set_extraction_path, cleanup_resources
+  - Class `NullProvider` with methods: __init__, get_resource_filename, get_resource_stream, get_resource_string, has_resource, _get_metadata_path, has_metadata, get_metadata, get_metadata_lines, resource_isdir, metadata_isdir, resource_listdir, metadata_listdir, run_script, _has, _isdir, _listdir, _fn, _validate_resource_path, _get
+  - Class `EggProvider` with methods: __init__, _setup_prefix, _set_egg
+  - Class `DefaultProvider` with methods: _has, _isdir, _listdir, get_resource_stream, _get, _register
+  - Class `EmptyProvider` with methods: _get, _listdir, __init__
+  - Class `ZipManifests` with methods: build
+  - Class `MemoizedZipManifests` with methods: load
+  - Class `ZipProvider` with methods: __init__, _zipinfo_name, _parts, zipinfo, get_resource_filename, _get_date_and_size, _extract_resource, _is_current, _get_eager_resources, _index, _has, _isdir, _listdir, _eager_to_zip, _resource_to_zip
+  - Class `FileMetadata` with methods: __init__, _get_metadata_path, has_metadata, get_metadata, _warn_on_replacement, get_metadata_lines
+  - Class `PathMetadata` with methods: __init__
+  - Class `EggMetadata` with methods: __init__
+  - Class `NoDists` with methods: __bool__, __call__
+  - Class `EntryPoint` with methods: __init__, __str__, __repr__, load, resolve, require, parse, _parse_extras, parse_group, parse_map
+  - Class `Distribution` with methods: __init__, from_location, _reload_version, hashcmp, __hash__, __lt__, __le__, __gt__, __ge__, __eq__, __ne__, key, parsed_version, _forgiving_parsed_version, version, _dep_map, _filter_extras, _build_dep_map, requires, _get_metadata_path_for_display, _get_metadata, _get_version, activate, egg_name, __repr__, __str__, __getattr__, __dir__, from_filename, as_requirement, load_entry_point, get_entry_map, get_entry_info, insert_on, check_version_conflict, has_version, clone, extras
+  - Class `EggInfoDistribution` with methods: _reload_version
+  - Class `DistInfoDistribution` with methods: _parsed_pkg_info, _dep_map, _compute_dependencies
+  - Class `RequirementParseError` (no methods)
+  - Class `Requirement` with methods: __init__, __eq__, __ne__, __contains__, __hash__, __repr__, parse
+  - Class `PkgResourcesDeprecationWarning` (no methods)
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/platformdirs
+- **__init__.py**
+  - Functions: _set_platform_dir_class, user_data_dir, site_data_dir, user_config_dir, site_config_dir, user_cache_dir, site_cache_dir, user_state_dir, user_log_dir, user_documents_dir, user_downloads_dir, user_pictures_dir, user_videos_dir, user_music_dir, user_runtime_dir, user_data_path, site_data_path, user_config_path, site_config_path, site_cache_path, user_cache_path, user_state_path, user_log_path, user_documents_path, user_downloads_path, user_pictures_path, user_videos_path, user_music_path, user_runtime_path
+- **__main__.py**
+  - Functions: main
+- **android.py**
+  - Functions: _android_folder, _android_documents_folder, _android_downloads_folder, _android_pictures_folder, _android_videos_folder, _android_music_folder
+  - Class `Android` with methods: user_data_dir, site_data_dir, user_config_dir, site_config_dir, user_cache_dir, site_cache_dir, user_state_dir, user_log_dir, user_documents_dir, user_downloads_dir, user_pictures_dir, user_videos_dir, user_music_dir, user_runtime_dir
+- **api.py**
+  - Class `PlatformDirsABC` with methods: __init__, _append_app_name_and_version, _optionally_create_directory, user_data_dir, site_data_dir, user_config_dir, site_config_dir, user_cache_dir, site_cache_dir, user_state_dir, user_log_dir, user_documents_dir, user_downloads_dir, user_pictures_dir, user_videos_dir, user_music_dir, user_runtime_dir, user_data_path, site_data_path, user_config_path, site_config_path, user_cache_path, site_cache_path, user_state_path, user_log_path, user_documents_path, user_downloads_path, user_pictures_path, user_videos_path, user_music_path, user_runtime_path
+- **macos.py**
+  - Class `MacOS` with methods: user_data_dir, site_data_dir, user_config_dir, site_config_dir, user_cache_dir, site_cache_dir, user_state_dir, user_log_dir, user_documents_dir, user_downloads_dir, user_pictures_dir, user_videos_dir, user_music_dir, user_runtime_dir
+- **unix.py**
+  - Functions: _get_user_media_dir, _get_user_dirs_folder
+  - Class `Unix` with methods: user_data_dir, site_data_dir, _with_multi_path, user_config_dir, site_config_dir, user_cache_dir, site_cache_dir, user_state_dir, user_log_dir, user_documents_dir, user_downloads_dir, user_pictures_dir, user_videos_dir, user_music_dir, user_runtime_dir, site_data_path, site_config_path, site_cache_path, _first_item_as_path_if_multipath
+- **version.py**
+- **windows.py**
+  - Functions: get_win_folder_from_env_vars, get_win_folder_if_csidl_name_not_env_var, get_win_folder_from_registry, get_win_folder_via_ctypes, _pick_get_win_folder
+  - Class `Windows` with methods: user_data_dir, _append_parts, site_data_dir, user_config_dir, site_config_dir, user_cache_dir, site_cache_dir, user_state_dir, user_log_dir, user_documents_dir, user_downloads_dir, user_pictures_dir, user_videos_dir, user_music_dir, user_runtime_dir
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/pygments
+- **__init__.py**
+  - Functions: lex, format, highlight
+- **__main__.py**
+- **cmdline.py**
+  - Functions: _parse_options, _parse_filters, _print_help, _print_list, _print_list_as_json, main_inner, main
+  - Class `HelpFormatter` with methods: __init__
+- **console.py**
+  - Functions: reset_color, colorize, ansiformat
+- **filter.py**
+  - Functions: apply_filters, simplefilter
+  - Class `Filter` with methods: __init__, filter
+  - Class `FunctionFilter` with methods: __init__, filter
+- **formatter.py**
+  - Functions: _lookup_style
+  - Class `Formatter` with methods: __init__, get_style_defs, format
+- **lexer.py**
+  - Functions: bygroups, using, do_insertions
+  - Class `LexerMeta` with methods: __new__
+  - Class `Lexer` with methods: __init__, __repr__, add_filter, analyse_text, get_tokens, get_tokens_unprocessed
+  - Class `DelegatingLexer` with methods: __init__, get_tokens_unprocessed
+  - Class `include` (no methods)
+  - Class `_inherit` with methods: __repr__
+  - Class `combined` with methods: __new__, __init__
+  - Class `_PseudoMatch` with methods: __init__, start, end, group, groups, groupdict
+  - Class `_This` (no methods)
+  - Class `default` with methods: __init__
+  - Class `words` with methods: __init__, get
+  - Class `RegexLexerMeta` with methods: _process_regex, _process_token, _process_new_state, _process_state, process_tokendef, get_tokendefs, __call__
+  - Class `RegexLexer` with methods: get_tokens_unprocessed
+  - Class `LexerContext` with methods: __init__, __repr__
+  - Class `ExtendedRegexLexer` with methods: get_tokens_unprocessed
+  - Class `ProfilingRegexLexerMeta` with methods: _process_regex
+  - Class `ProfilingRegexLexer` with methods: get_tokens_unprocessed
+- **modeline.py**
+  - Functions: get_filetype_from_line, get_filetype_from_buffer
+- **plugin.py**
+  - Functions: iter_entry_points, find_plugin_lexers, find_plugin_formatters, find_plugin_styles, find_plugin_filters
+- **regexopt.py**
+  - Functions: make_charset, regex_opt_inner, regex_opt
+- **scanner.py**
+  - Class `EndOfText` (no methods)
+  - Class `Scanner` with methods: __init__, eos, check, test, scan, get_char, __repr__
+- **sphinxext.py**
+  - Functions: setup
+  - Class `PygmentsDoc` with methods: run, document_lexers_overview, document_lexers, document_formatters, document_filters
+- **style.py**
+  - Class `StyleMeta` with methods: __new__, style_for_token, list_styles, styles_token, __iter__, __len__
+  - Class `Style` (no methods)
+- **token.py**
+  - Functions: is_token_subtype, string_to_tokentype
+  - Class `_TokenType` with methods: split, __init__, __contains__, __getattr__, __repr__, __copy__, __deepcopy__
+- **unistring.py**
+  - Functions: combine, allexcept, _handle_runs
+- **util.py**
+  - Functions: get_choice_opt, get_bool_opt, get_int_opt, get_list_opt, docstring_headline, make_analysator, shebang_matches, doctype_matches, html_doctype_matches, looks_like_xml, surrogatepair, format_lines, duplicates_removed, guess_decode, guess_decode_from_terminal, terminal_encoding
+  - Class `ClassNotFound` (no methods)
+  - Class `OptionError` (no methods)
+  - Class `Future` with methods: get
+  - Class `UnclosingTextIOWrapper` with methods: close
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/pygments/filters
+- **__init__.py**
+  - Functions: find_filter_class, get_filter_by_name, get_all_filters, _replace_special
+  - Class `CodeTagFilter` with methods: __init__, filter
+  - Class `SymbolFilter` with methods: __init__, filter
+  - Class `KeywordCaseFilter` with methods: __init__, filter
+  - Class `NameHighlightFilter` with methods: __init__, filter
+  - Class `ErrorToken` (no methods)
+  - Class `RaiseOnErrorTokenFilter` with methods: __init__, filter
+  - Class `VisibleWhitespaceFilter` with methods: __init__, filter
+  - Class `GobbleFilter` with methods: __init__, gobble, filter
+  - Class `TokenMergeFilter` with methods: __init__, filter
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/pygments/formatters
+- **__init__.py**
+  - Functions: _fn_matches, _load_formatters, get_all_formatters, find_formatter_class, get_formatter_by_name, load_formatter_from_file, get_formatter_for_filename
+  - Class `_automodule` with methods: __getattr__
+- **_mapping.py**
+- **bbcode.py**
+  - Class `BBCodeFormatter` with methods: __init__, _make_styles, format_unencoded
+- **groff.py**
+  - Class `GroffFormatter` with methods: __init__, _make_styles, _define_colors, _write_lineno, _wrap_line, _escape_chars, format_unencoded
+- **html.py**
+  - Functions: escape_html, webify, _get_ttype_class
+  - Class `HtmlFormatter` with methods: __init__, _get_css_class, _get_css_classes, _get_css_inline_styles, _create_stylesheet, get_style_defs, get_token_style_defs, get_background_style_defs, get_linenos_style_defs, get_css_prefix, _pre_style, _linenos_style, _linenos_special_style, _decodeifneeded, _wrap_full, _wrap_tablelinenos, _wrap_inlinelinenos, _wrap_lineanchors, _wrap_linespans, _wrap_div, _wrap_pre, _wrap_code, _translate_parts, _format_lines, _lookup_ctag, _highlight_lines, wrap, format_unencoded
+- **img.py**
+  - Class `PilNotAvailable` (no methods)
+  - Class `FontNotFound` (no methods)
+  - Class `FontManager` with methods: __init__, _get_nix_font_path, _create_nix, _get_mac_font_path, _create_mac, _lookup_win, _create_win, get_char_size, get_text_size, get_font
+  - Class `ImageFormatter` with methods: __init__, get_style_defs, _get_line_height, _get_line_y, _get_char_width, _get_char_x, _get_text_pos, _get_linenumber_pos, _get_text_color, _get_text_bg_color, _get_style_font, _get_image_size, _draw_linenumber, _draw_text, _create_drawables, _draw_line_numbers, _paint_line_number_bg, format
+  - Class `GifImageFormatter` (no methods)
+  - Class `JpgImageFormatter` (no methods)
+  - Class `BmpImageFormatter` (no methods)
+- **irc.py**
+  - Functions: ircformat
+  - Class `IRCFormatter` with methods: __init__, _write_lineno, format_unencoded
+- **latex.py**
+  - Functions: escape_tex, _get_ttype_name
+  - Class `LatexFormatter` with methods: __init__, _create_stylesheet, get_style_defs, format_unencoded
+  - Class `LatexEmbeddedLexer` with methods: __init__, get_tokens_unprocessed, _find_safe_escape_tokens, _filter_to, _find_escape_tokens
+- **other.py**
+  - Class `NullFormatter` with methods: format
+  - Class `RawTokenFormatter` with methods: __init__, format
+  - Class `TestcaseFormatter` with methods: __init__, format
+- **pangomarkup.py**
+  - Functions: escape_special_chars
+  - Class `PangoMarkupFormatter` with methods: __init__, format_unencoded
+- **rtf.py**
+  - Class `RtfFormatter` with methods: __init__, _escape, _escape_text, format_unencoded
+- **svg.py**
+  - Functions: escape_html
+  - Class `SvgFormatter` with methods: __init__, format_unencoded, _get_style
+- **terminal.py**
+  - Class `TerminalFormatter` with methods: __init__, format, _write_lineno, _get_color, format_unencoded
+- **terminal256.py**
+  - Class `EscapeSequence` with methods: __init__, escape, color_string, true_color_string, reset_string
+  - Class `Terminal256Formatter` with methods: __init__, _build_color_table, _closest_color, _color_index, _setup_styles, _write_lineno, format, format_unencoded
+  - Class `TerminalTrueColorFormatter` with methods: _build_color_table, _color_tuple, _setup_styles
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/pygments/lexers
+- **__init__.py**
+  - Functions: _fn_matches, _load_lexers, get_all_lexers, find_lexer_class, find_lexer_class_by_name, get_lexer_by_name, load_lexer_from_file, find_lexer_class_for_filename, get_lexer_for_filename, get_lexer_for_mimetype, _iter_lexerclasses, guess_lexer_for_filename, guess_lexer
+  - Class `_automodule` with methods: __getattr__
+- **_mapping.py**
+- **python.py**
+  - Class `PythonLexer` with methods: innerstring_rules, fstring_rules, analyse_text
+  - Class `Python2Lexer` with methods: innerstring_rules, analyse_text
+  - Class `_PythonConsoleLexerBase` (no methods)
+  - Class `PythonConsoleLexer` with methods: __init__
+  - Class `PythonTracebackLexer` (no methods)
+  - Class `Python2TracebackLexer` (no methods)
+  - Class `CythonLexer` (no methods)
+  - Class `DgLexer` (no methods)
+  - Class `NumPyLexer` with methods: get_tokens_unprocessed, analyse_text
+  - Class `_ReplaceInnerCode` with methods: __init__
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/pygments/styles
+- **__init__.py**
+  - Functions: get_style_by_name, get_all_styles
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/pyparsing
+- **__init__.py**
+  - Class `version_info` with methods: __version__, __str__, __repr__
+- **actions.py**
+  - Functions: match_only_at_col, replace_with, remove_quotes, with_attribute, with_class, replaceWith, removeQuotes, withAttribute, withClass, matchOnlyAtCol
+  - Class `OnlyOnce` with methods: __init__, __call__, reset
+- **common.py**
+  - Class `pyparsing_common` with methods: convert_to_date, convert_to_datetime, strip_html_tags
+- **core.py**
+  - Functions: enable_diag, disable_diag, enable_all_warnings, _should_enable_warnings, _trim_arity, condition_as_parse_action, _default_start_debug_action, _default_success_debug_action, _default_exception_debug_action, null_debug_action, trace_parse_action, srange, token_map, autoname_elements, nullDebugAction, traceParseAction, conditionAsParseAction, tokenMap
+  - Class `__compat__` (no methods)
+  - Class `__diag__` with methods: enable_all_warnings
+  - Class `Diagnostics` (no methods)
+  - Class `ParserElement` with methods: set_default_whitespace_chars, inline_literals_using, using_each, __init__, suppress_warning, visit_all, copy, set_results_name, _setResultsName, set_break, set_parse_action, add_parse_action, add_condition, set_fail_action, _skipIgnorables, preParse, parseImpl, postParse, _parseNoCache, try_parse, can_parse_next, _parseCache, reset_cache, disable_memoization, enable_left_recursion, enable_packrat, parse_string, scan_string, transform_string, search_string, split, __add__, __radd__, __sub__, __rsub__, __mul__, __rmul__, __or__, __ror__, __xor__, __rxor__, __and__, __rand__, __invert__, __getitem__, __call__, suppress, ignore_whitespace, leave_whitespace, set_whitespace_chars, parse_with_tabs, ignore, set_debug_actions, set_debug, default_name, _generateDefaultName, set_name, name, __str__, __repr__, streamline, recurse, _checkRecursion, validate, parse_file, __eq__, __hash__, matches, run_tests, create_diagram, inlineLiteralsUsing, setDefaultWhitespaceChars, setResultsName, setBreak, setParseAction, addParseAction, addCondition, setFailAction, tryParse, enableLeftRecursion, enablePackrat, parseString, scanString, transformString, searchString, ignoreWhitespace, leaveWhitespace, setWhitespaceChars, parseWithTabs, setDebugActions, setDebug, setName, parseFile, runTests
+  - Class `_PendingSkip` with methods: __init__, _generateDefaultName, __add__, __repr__, parseImpl
+  - Class `Token` with methods: __init__, _generateDefaultName
+  - Class `NoMatch` with methods: __init__, parseImpl
+  - Class `Literal` with methods: __new__, __getnewargs__, __init__, _generateDefaultName, parseImpl
+  - Class `Empty` with methods: __init__, _generateDefaultName, parseImpl
+  - Class `_SingleCharLiteral` with methods: parseImpl
+  - Class `Keyword` with methods: __init__, _generateDefaultName, parseImpl, set_default_keyword_chars
+  - Class `CaselessLiteral` with methods: __init__, parseImpl
+  - Class `CaselessKeyword` with methods: __init__
+  - Class `CloseMatch` with methods: __init__, _generateDefaultName, parseImpl
+  - Class `Word` with methods: __init__, _generateDefaultName, parseImpl, parseImpl_regex
+  - Class `Char` with methods: __init__
+  - Class `Regex` with methods: __init__, re, re_match, mayReturnEmpty, _generateDefaultName, parseImpl, parseImplAsGroupList, parseImplAsMatch, sub
+  - Class `QuotedString` with methods: __init__, _generateDefaultName, parseImpl
+  - Class `CharsNotIn` with methods: __init__, _generateDefaultName, parseImpl
+  - Class `White` with methods: __init__, _generateDefaultName, parseImpl
+  - Class `PositionToken` with methods: __init__
+  - Class `GoToColumn` with methods: __init__, preParse, parseImpl
+  - Class `LineStart` with methods: __init__, preParse, parseImpl
+  - Class `LineEnd` with methods: __init__, parseImpl
+  - Class `StringStart` with methods: __init__, parseImpl
+  - Class `StringEnd` with methods: __init__, parseImpl
+  - Class `WordStart` with methods: __init__, parseImpl
+  - Class `WordEnd` with methods: __init__, parseImpl
+  - Class `ParseExpression` with methods: __init__, recurse, append, leave_whitespace, ignore_whitespace, ignore, _generateDefaultName, streamline, validate, copy, _setResultsName, leaveWhitespace, ignoreWhitespace
+  - Class `And` with methods: __init__, streamline, parseImpl, __iadd__, _checkRecursion, _generateDefaultName
+  - Class `Or` with methods: __init__, streamline, parseImpl, __ixor__, _generateDefaultName, _setResultsName
+  - Class `MatchFirst` with methods: __init__, streamline, parseImpl, __ior__, _generateDefaultName, _setResultsName
+  - Class `Each` with methods: __init__, __iand__, streamline, parseImpl, _generateDefaultName
+  - Class `ParseElementEnhance` with methods: __init__, recurse, parseImpl, leave_whitespace, ignore_whitespace, ignore, streamline, _checkRecursion, validate, _generateDefaultName, leaveWhitespace, ignoreWhitespace
+  - Class `IndentedBlock` with methods: __init__, parseImpl
+  - Class `AtStringStart` with methods: __init__, parseImpl
+  - Class `AtLineStart` with methods: __init__, parseImpl
+  - Class `FollowedBy` with methods: __init__, parseImpl
+  - Class `PrecededBy` with methods: __init__, parseImpl
+  - Class `Located` with methods: parseImpl
+  - Class `NotAny` with methods: __init__, parseImpl, _generateDefaultName
+  - Class `_MultipleMatch` with methods: __init__, stopOn, parseImpl, _setResultsName
+  - Class `OneOrMore` with methods: _generateDefaultName
+  - Class `ZeroOrMore` with methods: __init__, parseImpl, _generateDefaultName
+  - Class `DelimitedList` with methods: __init__, _generateDefaultName
+  - Class `_NullToken` with methods: __bool__, __str__
+  - Class `Opt` with methods: __init__, parseImpl, _generateDefaultName
+  - Class `SkipTo` with methods: __init__, parseImpl
+  - Class `Forward` with methods: __init__, __lshift__, __ilshift__, __or__, __del__, parseImpl, leave_whitespace, ignore_whitespace, streamline, validate, _generateDefaultName, copy, _setResultsName, leaveWhitespace, ignoreWhitespace
+  - Class `TokenConverter` with methods: __init__
+  - Class `Combine` with methods: __init__, ignore, postParse
+  - Class `Group` with methods: __init__, postParse
+  - Class `Dict` with methods: __init__, postParse
+  - Class `Suppress` with methods: __init__, __add__, __sub__, postParse, suppress
+  - Class `cached_property` with methods: __init__, __get__
+  - Class `DebugActions` (no methods)
+  - Class `_CacheType` with methods: get, set
+  - Class `_ErrorStop` with methods: __init__, _generateDefaultName
+  - Class `_Indent` with methods: __init__
+  - Class `_IndentGreater` with methods: __init__
+- **exceptions.py**
+  - Class `ExceptionWordUnicode` (no methods)
+  - Class `ParseBaseException` with methods: __init__, explain_exception, _from_exception, line, lineno, col, column, parserElement, parserElement, __str__, __repr__, mark_input_line, explain, markInputline
+  - Class `ParseException` (no methods)
+  - Class `ParseFatalException` (no methods)
+  - Class `ParseSyntaxException` (no methods)
+  - Class `RecursiveGrammarException` with methods: __init__, __str__
+- **helpers.py**
+  - Functions: counted_array, match_previous_literal, match_previous_expr, one_of, dict_of, original_text_for, ungroup, locatedExpr, nested_expr, _makeTags, make_html_tags, make_xml_tags, replace_html_entity, infix_notation, indentedBlock, delimited_list, delimitedList, delimited_list, countedArray, matchPreviousLiteral, matchPreviousExpr, oneOf, dictOf, originalTextFor, nestedExpr, makeHTMLTags, makeXMLTags, replaceHTMLEntity, infixNotation
+  - Class `OpAssoc` (no methods)
+  - Class `_FB` with methods: parseImpl
+- **results.py**
+  - Class `_ParseResultsWithOffset` with methods: __init__, __getitem__, __getstate__, __setstate__
+  - Class `ParseResults` with methods: __new__, __init__, __getitem__, __setitem__, __delitem__, __contains__, __len__, __bool__, __iter__, __reversed__, keys, values, items, haskeys, pop, get, insert, append, extend, clear, __getattr__, __add__, __iadd__, __radd__, __repr__, __str__, _asStringList, as_list, as_dict, copy, deepcopy, get_name, dump, pprint, __getstate__, __setstate__, __getnewargs__, __dir__, from_dict
+  - Class `List` with methods: __new__
+- **testing.py**
+  - Class `pyparsing_test` with methods: with_line_numbers
+  - Class `reset_pyparsing_context` with methods: __init__, save, restore, copy, __enter__, __exit__
+  - Class `TestParseResultsAsserts` with methods: assertParseResultsEquals, assertParseAndCheckList, assertParseAndCheckDict, assertRunTestResults, assertRaisesParseException
+- **unicode.py**
+  - Class `_lazyclassproperty` with methods: __init__, __get__
+  - Class `unicode_set` with methods: _chars_for_ranges, printables, alphas, nums, alphanums, identchars, identbodychars, identifier
+  - Class `pyparsing_unicode` (no methods)
+  - Class `BasicMultilingualPlane` (no methods)
+  - Class `Latin1` (no methods)
+  - Class `LatinA` (no methods)
+  - Class `LatinB` (no methods)
+  - Class `Greek` (no methods)
+  - Class `Cyrillic` (no methods)
+  - Class `Chinese` (no methods)
+  - Class `Japanese` (no methods)
+  - Class `Hangul` (no methods)
+  - Class `CJK` (no methods)
+  - Class `Thai` (no methods)
+  - Class `Arabic` (no methods)
+  - Class `Hebrew` (no methods)
+  - Class `Devanagari` (no methods)
+  - Class `Kanji` (no methods)
+  - Class `Hiragana` (no methods)
+  - Class `Katakana` (no methods)
+- **util.py**
+  - Functions: col, lineno, line, _escape_regex_range_chars, _collapse_string_to_ranges, _flatten, _make_synonym_function, replaced_by_pep8
+  - Class `__config_flags` with methods: _set
+  - Class `_UnboundedCache` with methods: __init__
+  - Class `_FifoCache` with methods: __init__
+  - Class `LRUMemo` with methods: __init__, __getitem__, __setitem__, __delitem__, clear
+  - Class `UnboundedMemo` with methods: __delitem__
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/pyparsing/diagram
+- **__init__.py**
+  - Functions: railroad_to_html, resolve_partial, to_railroad, _should_vertical, _worth_extracting, _apply_diagram_item_enhancements, _visible_exprs, _to_diagram_element
+  - Class `EachItem` with methods: __init__
+  - Class `AnnotatedItem` with methods: __init__
+  - Class `EditablePartial` with methods: __init__, from_call, name, __call__
+  - Class `ElementState` with methods: __init__, mark_for_extraction
+  - Class `ConverterState` with methods: __init__, __setitem__, __getitem__, __delitem__, __contains__, generate_unnamed, generate_index, extract_into_diagram
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/pyproject_hooks
+- **__init__.py**
+- **_compat.py**
+- **_impl.py**
+  - Functions: write_json, read_json, default_subprocess_runner, quiet_subprocess_runner, norm_and_check
+  - Class `BackendUnavailable` with methods: __init__
+  - Class `BackendInvalid` with methods: __init__
+  - Class `HookMissing` with methods: __init__
+  - Class `UnsupportedOperation` with methods: __init__
+  - Class `BuildBackendHookCaller` with methods: __init__, subprocess_runner, _supported_features, get_requires_for_build_wheel, prepare_metadata_for_build_wheel, build_wheel, get_requires_for_build_editable, prepare_metadata_for_build_editable, build_editable, get_requires_for_build_sdist, build_sdist, _call_hook
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/pyproject_hooks/_in_process
+- **__init__.py**
+- **_in_process.py**
+  - Functions: write_json, read_json, contained_in, _build_backend, _supported_features, get_requires_for_build_wheel, get_requires_for_build_editable, prepare_metadata_for_build_wheel, prepare_metadata_for_build_editable, _dist_info_files, _get_wheel_metadata_from_wheel, _find_already_built_wheel, build_wheel, build_editable, get_requires_for_build_sdist, build_sdist, main
+  - Class `BackendUnavailable` with methods: __init__
+  - Class `BackendInvalid` with methods: __init__
+  - Class `HookMissing` with methods: __init__
+  - Class `_DummyException` (no methods)
+  - Class `GotUnsupportedOperation` with methods: __init__
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/requests
+- **__init__.py**
+  - Functions: check_compatibility, _check_cryptography
+- **__version__.py**
+- **_internal_utils.py**
+  - Functions: to_native_string, unicode_is_ascii
+- **adapters.py**
+  - Class `BaseAdapter` with methods: __init__, send, close
+  - Class `HTTPAdapter` with methods: __init__, __getstate__, __setstate__, init_poolmanager, proxy_manager_for, cert_verify, build_response, get_connection, close, request_url, add_headers, proxy_headers, send
+- **api.py**
+  - Functions: request, get, options, head, post, put, patch, delete
+- **auth.py**
+  - Functions: _basic_auth_str
+  - Class `AuthBase` with methods: __call__
+  - Class `HTTPBasicAuth` with methods: __init__, __eq__, __ne__, __call__
+  - Class `HTTPProxyAuth` with methods: __call__
+  - Class `HTTPDigestAuth` with methods: __init__, init_per_thread_state, build_digest_header, handle_redirect, handle_401, __call__, __eq__, __ne__
+- **certs.py**
+- **compat.py**
+- **cookies.py**
+  - Functions: extract_cookies_to_jar, get_cookie_header, remove_cookie_by_name, _copy_cookie_jar, create_cookie, morsel_to_cookie, cookiejar_from_dict, merge_cookies
+  - Class `MockRequest` with methods: __init__, get_type, get_host, get_origin_req_host, get_full_url, is_unverifiable, has_header, get_header, add_header, add_unredirected_header, get_new_headers, unverifiable, origin_req_host, host
+  - Class `MockResponse` with methods: __init__, info, getheaders
+  - Class `CookieConflictError` (no methods)
+  - Class `RequestsCookieJar` with methods: get, set, iterkeys, keys, itervalues, values, iteritems, items, list_domains, list_paths, multiple_domains, get_dict, __contains__, __getitem__, __setitem__, __delitem__, set_cookie, update, _find, _find_no_duplicates, __getstate__, __setstate__, copy, get_policy
+- **exceptions.py**
+  - Class `RequestException` with methods: __init__
+  - Class `InvalidJSONError` (no methods)
+  - Class `JSONDecodeError` with methods: __init__
+  - Class `HTTPError` (no methods)
+  - Class `ConnectionError` (no methods)
+  - Class `ProxyError` (no methods)
+  - Class `SSLError` (no methods)
+  - Class `Timeout` (no methods)
+  - Class `ConnectTimeout` (no methods)
+  - Class `ReadTimeout` (no methods)
+  - Class `URLRequired` (no methods)
+  - Class `TooManyRedirects` (no methods)
+  - Class `MissingSchema` (no methods)
+  - Class `InvalidSchema` (no methods)
+  - Class `InvalidURL` (no methods)
+  - Class `InvalidHeader` (no methods)
+  - Class `InvalidProxyURL` (no methods)
+  - Class `ChunkedEncodingError` (no methods)
+  - Class `ContentDecodingError` (no methods)
+  - Class `StreamConsumedError` (no methods)
+  - Class `RetryError` (no methods)
+  - Class `UnrewindableBodyError` (no methods)
+  - Class `RequestsWarning` (no methods)
+  - Class `FileModeWarning` (no methods)
+  - Class `RequestsDependencyWarning` (no methods)
+- **help.py**
+  - Functions: _implementation, info, main
+- **hooks.py**
+  - Functions: default_hooks, dispatch_hook
+- **models.py**
+  - Class `RequestEncodingMixin` with methods: path_url, _encode_params, _encode_files
+  - Class `RequestHooksMixin` with methods: register_hook, deregister_hook
+  - Class `Request` with methods: __init__, __repr__, prepare
+  - Class `PreparedRequest` with methods: __init__, prepare, __repr__, copy, prepare_method, _get_idna_encoded_host, prepare_url, prepare_headers, prepare_body, prepare_content_length, prepare_auth, prepare_cookies, prepare_hooks
+  - Class `Response` with methods: __init__, __enter__, __exit__, __getstate__, __setstate__, __repr__, __bool__, __nonzero__, __iter__, ok, is_redirect, is_permanent_redirect, next, apparent_encoding, iter_content, iter_lines, content, text, json, links, raise_for_status, close
+- **packages.py**
+- **sessions.py**
+  - Functions: merge_setting, merge_hooks, session
+  - Class `SessionRedirectMixin` with methods: get_redirect_target, should_strip_auth, resolve_redirects, rebuild_auth, rebuild_proxies, rebuild_method
+  - Class `Session` with methods: __init__, __enter__, __exit__, prepare_request, request, get, options, head, post, put, patch, delete, send, merge_environment_settings, get_adapter, close, mount, __getstate__, __setstate__
+- **status_codes.py**
+  - Functions: _init
+- **structures.py**
+  - Class `CaseInsensitiveDict` with methods: __init__, __setitem__, __getitem__, __delitem__, __iter__, __len__, lower_items, __eq__, copy, __repr__
+  - Class `LookupDict` with methods: __init__, __repr__, __getitem__, get
+- **utils.py**
+  - Functions: dict_to_sequence, super_len, get_netrc_auth, guess_filename, extract_zipped_paths, atomic_open, from_key_val_list, to_key_val_list, parse_list_header, parse_dict_header, unquote_header_value, dict_from_cookiejar, add_dict_to_cookiejar, get_encodings_from_content, _parse_content_type_header, get_encoding_from_headers, stream_decode_response_unicode, iter_slices, get_unicode_from_response, unquote_unreserved, requote_uri, address_in_network, dotted_netmask, is_ipv4_address, is_valid_cidr, set_environ, should_bypass_proxies, get_environ_proxies, select_proxy, resolve_proxies, default_user_agent, default_headers, parse_header_links, guess_json_utf, prepend_scheme_if_needed, get_auth_from_url, check_header_validity, _validate_header_part, urldefragauth, rewind_body
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/resolvelib
+- **__init__.py**
+- **providers.py**
+  - Class `AbstractProvider` with methods: identify, get_preference, find_matches, is_satisfied_by, get_dependencies
+  - Class `AbstractResolver` with methods: __init__, resolve
+- **reporters.py**
+  - Class `BaseReporter` with methods: starting, starting_round, ending_round, ending, adding_requirement, resolving_conflicts, rejecting_candidate, pinning
+- **resolvers.py**
+  - Functions: _has_route_to_root, _build_result
+  - Class `ResolverException` (no methods)
+  - Class `RequirementsConflicted` with methods: __init__, __str__
+  - Class `InconsistentCandidate` with methods: __init__, __str__
+  - Class `Criterion` with methods: __init__, __repr__, iter_requirement, iter_parent
+  - Class `ResolutionError` (no methods)
+  - Class `ResolutionImpossible` with methods: __init__
+  - Class `ResolutionTooDeep` with methods: __init__
+  - Class `Resolution` with methods: __init__, state, _push_new_state, _add_to_criteria, _remove_information_from_criteria, _get_preference, _is_current_pin_satisfying, _get_updated_criteria, _attempt_to_pin_criterion, _backjump, resolve
+  - Class `Resolver` with methods: resolve
+- **structs.py**
+  - Functions: build_iter_view
+  - Class `DirectedGraph` with methods: __init__, __iter__, __len__, __contains__, copy, add, remove, connected, connect, iter_edges, iter_children, iter_parents
+  - Class `IteratorMapping` with methods: __init__, __repr__, __bool__, __contains__, __getitem__, __iter__, __len__
+  - Class `_FactoryIterableView` with methods: __init__, __repr__, __bool__, __iter__
+  - Class `_SequenceIterableView` with methods: __init__, __repr__, __bool__, __iter__
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/resolvelib/compat
+- **__init__.py**
+- **collections_abc.py**
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/rich
+- **__init__.py**
+  - Functions: get_console, reconfigure, print, print_json, inspect
+- **__main__.py**
+  - Functions: make_test_card
+  - Class `ColorBox` with methods: __rich_console__, __rich_measure__
+- **_cell_widths.py**
+- **_emoji_codes.py**
+- **_emoji_replace.py**
+  - Functions: _emoji_replace
+- **_export_format.py**
+- **_extension.py**
+  - Functions: load_ipython_extension
+- **_fileno.py**
+  - Functions: get_fileno
+- **_inspect.py**
+  - Functions: _first_paragraph, get_object_types_mro, get_object_types_mro_as_strings, is_object_one_of_types
+  - Class `Inspect` with methods: __init__, _make_title, __rich__, _get_signature, _render, _get_formatted_doc
+- **_log_render.py**
+  - Class `LogRender` with methods: __init__, __call__
+- **_loop.py**
+  - Functions: loop_first, loop_last, loop_first_last
+- **_null_file.py**
+  - Class `NullFile` with methods: close, isatty, read, readable, readline, readlines, seek, seekable, tell, truncate, writable, writelines, __next__, __iter__, __enter__, __exit__, write, flush, fileno
+- **_palettes.py**
+- **_pick.py**
+  - Functions: pick_bool
+- **_ratio.py**
+  - Functions: ratio_resolve, ratio_reduce, ratio_distribute
+  - Class `Edge` (no methods)
+  - Class `E` (no methods)
+- **_spinners.py**
+- **_stack.py**
+  - Class `Stack` with methods: top, push
+- **_timer.py**
+  - Functions: timer
+- **_win32_console.py**
+  - Functions: GetStdHandle, GetConsoleMode, FillConsoleOutputCharacter, FillConsoleOutputAttribute, SetConsoleTextAttribute, GetConsoleScreenBufferInfo, SetConsoleCursorPosition, GetConsoleCursorInfo, SetConsoleCursorInfo, SetConsoleTitle
+  - Class `LegacyWindowsError` (no methods)
+  - Class `WindowsCoordinates` with methods: from_param
+  - Class `CONSOLE_SCREEN_BUFFER_INFO` (no methods)
+  - Class `CONSOLE_CURSOR_INFO` (no methods)
+  - Class `LegacyWindowsTerm` with methods: __init__, cursor_position, screen_size, write_text, write_styled, move_cursor_to, erase_line, erase_end_of_line, erase_start_of_line, move_cursor_up, move_cursor_down, move_cursor_forward, move_cursor_to_column, move_cursor_backward, hide_cursor, show_cursor, set_title, _get_cursor_size
+- **_windows.py**
+  - Class `WindowsConsoleFeatures` (no methods)
+- **_windows_renderer.py**
+  - Functions: legacy_windows_render
+- **_wrap.py**
+  - Functions: words, divide_line
+- **abc.py**
+  - Class `RichRenderable` with methods: __subclasshook__
+  - Class `Foo` (no methods)
+- **align.py**
+  - Class `Align` with methods: __init__, __repr__, left, center, right, __rich_console__, __rich_measure__
+  - Class `VerticalCenter` with methods: __init__, __repr__, __rich_console__, __rich_measure__
+- **ansi.py**
+  - Functions: _ansi_tokenize
+  - Class `_AnsiToken` (no methods)
+  - Class `AnsiDecoder` with methods: __init__, decode, decode_line
+- **bar.py**
+  - Class `Bar` with methods: __init__, __repr__, __rich_console__, __rich_measure__
+- **box.py**
+  - Class `Box` with methods: __init__, __repr__, __str__, substitute, get_plain_headed_box, get_top, get_row, get_bottom
+- **cells.py**
+  - Functions: cached_cell_len, cell_len, get_character_cell_size, _get_codepoint_cell_size, set_cell_size, chop_cells
+- **color.py**
+  - Functions: parse_rgb_hex, blend_rgb
+  - Class `ColorSystem` with methods: __repr__, __str__
+  - Class `ColorType` with methods: __repr__
+  - Class `ColorParseError` (no methods)
+  - Class `Color` with methods: __rich__, __rich_repr__, system, is_system_defined, is_default, get_truecolor, from_ansi, from_triplet, from_rgb, default, parse, get_ansi_codes, downgrade
+- **color_triplet.py**
+  - Class `ColorTriplet` with methods: hex, rgb, normalized
+- **columns.py**
+  - Class `Columns` with methods: __init__, add_renderable, __rich_console__
+- **console.py**
+  - Functions: group, _is_jupyter, get_windows_console_features, detect_legacy_windows, _svg_hash
+  - Class `NoChange` (no methods)
+  - Class `ConsoleDimensions` (no methods)
+  - Class `ConsoleOptions` with methods: ascii_only, copy, update, update_width, update_height, reset_height, update_dimensions
+  - Class `RichCast` with methods: __rich__
+  - Class `ConsoleRenderable` with methods: __rich_console__
+  - Class `CaptureError` (no methods)
+  - Class `NewLine` with methods: __init__, __rich_console__
+  - Class `ScreenUpdate` with methods: __init__, __rich_console__
+  - Class `Capture` with methods: __init__, __enter__, __exit__, get
+  - Class `ThemeContext` with methods: __init__, __enter__, __exit__
+  - Class `PagerContext` with methods: __init__, __enter__, __exit__
+  - Class `ScreenContext` with methods: __init__, update, __enter__, __exit__
+  - Class `Group` with methods: __init__, renderables, __rich_measure__, __rich_console__
+  - Class `ConsoleThreadLocals` (no methods)
+  - Class `RenderHook` with methods: process_renderables
+  - Class `Console` with methods: __init__, __repr__, file, file, _buffer, _buffer_index, _buffer_index, _theme_stack, _detect_color_system, _enter_buffer, _exit_buffer, set_live, clear_live, push_render_hook, pop_render_hook, __enter__, __exit__, begin_capture, end_capture, push_theme, pop_theme, use_theme, color_system, encoding, is_terminal, is_dumb_terminal, options, size, size, width, width, height, height, bell, capture, pager, line, clear, status, show_cursor, set_alt_screen, is_alt_screen, set_window_title, screen, measure, render, render_lines, render_str, get_style, _collect_renderables, rule, control, out, print, print_json, update_screen, update_screen_lines, print_exception, _caller_frame_info, log, _check_buffer, _render_buffer, input, export_text, save_text, export_html, save_html, export_svg, save_svg
+- **constrain.py**
+  - Class `Constrain` with methods: __init__, __rich_console__, __rich_measure__
+- **containers.py**
+  - Class `Renderables` with methods: __init__, __rich_console__, __rich_measure__, append, __iter__
+  - Class `Lines` with methods: __init__, __repr__, __iter__, __getitem__, __getitem__, __getitem__, __setitem__, __len__, __rich_console__, append, extend, pop, justify
+- **control.py**
+  - Functions: strip_control_codes, escape_control_codes
+  - Class `Control` with methods: __init__, bell, home, move, move_to_column, move_to, clear, show_cursor, alt_screen, title, __str__, __rich_console__
+- **default_styles.py**
+- **diagnose.py**
+  - Functions: report
+- **emoji.py**
+  - Class `NoEmoji` (no methods)
+  - Class `Emoji` with methods: __init__, replace, __repr__, __str__, __rich_console__
+- **errors.py**
+  - Class `ConsoleError` (no methods)
+  - Class `StyleError` (no methods)
+  - Class `StyleSyntaxError` (no methods)
+  - Class `MissingStyle` (no methods)
+  - Class `StyleStackError` (no methods)
+  - Class `NotRenderableError` (no methods)
+  - Class `MarkupError` (no methods)
+  - Class `LiveError` (no methods)
+  - Class `NoAltScreen` (no methods)
+- **file_proxy.py**
+  - Class `FileProxy` with methods: __init__, rich_proxied_file, __getattr__, write, flush, fileno
+- **filesize.py**
+  - Functions: _to_str, pick_unit_and_suffix, decimal
+- **highlighter.py**
+  - Functions: _combine_regex
+  - Class `Highlighter` with methods: __call__, highlight
+  - Class `NullHighlighter` with methods: highlight
+  - Class `RegexHighlighter` with methods: highlight
+  - Class `ReprHighlighter` (no methods)
+  - Class `JSONHighlighter` with methods: highlight
+  - Class `ISO8601Highlighter` (no methods)
+- **json.py**
+  - Class `JSON` with methods: __init__, from_data, __rich__
+- **jupyter.py**
+  - Functions: _render_segments, display, print
+  - Class `JupyterRenderable` with methods: __init__, _repr_mimebundle_
+  - Class `JupyterMixin` with methods: _repr_mimebundle_
+- **layout.py**
+  - Class `LayoutRender` (no methods)
+  - Class `LayoutError` (no methods)
+  - Class `NoSplitter` (no methods)
+  - Class `_Placeholder` with methods: __init__, __rich_console__
+  - Class `Splitter` with methods: get_tree_icon, divide
+  - Class `RowSplitter` with methods: get_tree_icon, divide
+  - Class `ColumnSplitter` with methods: get_tree_icon, divide
+  - Class `Layout` with methods: __init__, __rich_repr__, renderable, children, map, get, __getitem__, tree, split, add_split, split_row, split_column, unsplit, update, refresh_screen, _make_region_map, render, __rich_console__
+- **live.py**
+  - Class `_RefreshThread` with methods: __init__, stop, run
+  - Class `Live` with methods: __init__, is_started, get_renderable, start, stop, __enter__, __exit__, _enable_redirect_io, _disable_redirect_io, renderable, update, refresh, process_renderables
+- **live_render.py**
+  - Class `LiveRender` with methods: __init__, set_renderable, position_cursor, restore_cursor, __rich_console__
+- **logging.py**
+  - Class `RichHandler` with methods: __init__, get_level_text, emit, render_message, render
+- **markup.py**
+  - Functions: escape, _parse, render
+  - Class `Tag` with methods: __str__, markup
+- **measure.py**
+  - Functions: measure_renderables
+  - Class `Measurement` with methods: span, normalize, with_maximum, with_minimum, clamp, get
+- **padding.py**
+  - Class `Padding` with methods: __init__, indent, unpack, __repr__, __rich_console__, __rich_measure__
+- **pager.py**
+  - Class `Pager` with methods: show
+  - Class `SystemPager` with methods: _pager, show
+- **palette.py**
+  - Class `Palette` with methods: __init__, __getitem__, __rich__, match
+  - Class `ColorBox` with methods: __rich_console__
+- **panel.py**
+  - Class `Panel` with methods: __init__, fit, _title, _subtitle, __rich_console__, __rich_measure__
+- **pretty.py**
+  - Functions: _is_attr_object, _get_attr_fields, _is_dataclass_repr, _has_default_namedtuple_repr, _ipy_display_hook, _safe_isinstance, install, _get_braces_for_defaultdict, _get_braces_for_array, is_expandable, _is_namedtuple, traverse, pretty_repr, pprint
+  - Class `Pretty` with methods: __init__, __rich_console__, __rich_measure__
+  - Class `Node` with methods: iter_tokens, check_length, __str__, render
+  - Class `_Line` with methods: expandable, check_length, expand, __str__
+  - Class `BrokenRepr` with methods: __repr__
+  - Class `StockKeepingUnit` (no methods)
+  - Class `Thing` with methods: __repr__
+  - Class `RichFormatter` with methods: __call__
+- **progress.py**
+  - Functions: track, wrap_file, open, open, open
+  - Class `_TrackThread` with methods: __init__, run, __enter__, __exit__
+  - Class `_Reader` with methods: __init__, __enter__, __exit__, __iter__, __next__, closed, fileno, isatty, mode, name, readable, seekable, writable, read, readinto, readline, readlines, close, seek, tell, write
+  - Class `_ReadContext` with methods: __init__, __enter__, __exit__
+  - Class `ProgressColumn` with methods: __init__, get_table_column, __call__, render
+  - Class `RenderableColumn` with methods: __init__, render
+  - Class `SpinnerColumn` with methods: __init__, set_spinner, render
+  - Class `TextColumn` with methods: __init__, render
+  - Class `BarColumn` with methods: __init__, render
+  - Class `TimeElapsedColumn` with methods: render
+  - Class `TaskProgressColumn` with methods: __init__, render_speed, render
+  - Class `TimeRemainingColumn` with methods: __init__, render
+  - Class `FileSizeColumn` with methods: render
+  - Class `TotalFileSizeColumn` with methods: render
+  - Class `MofNCompleteColumn` with methods: __init__, render
+  - Class `DownloadColumn` with methods: __init__, render
+  - Class `TransferSpeedColumn` with methods: render
+  - Class `ProgressSample` (no methods)
+  - Class `Task` with methods: get_time, started, remaining, elapsed, finished, percentage, speed, time_remaining, _reset
+  - Class `Progress` with methods: __init__, get_default_columns, console, tasks, task_ids, finished, start, stop, __enter__, __exit__, track, wrap_file, open, open, open, start_task, stop_task, update, reset, advance, refresh, get_renderable, get_renderables, make_tasks_table, __rich__, add_task, remove_task
+- **progress_bar.py**
+  - Class `ProgressBar` with methods: __init__, __repr__, percentage_completed, _get_pulse_segments, update, _render_pulse, __rich_console__, __rich_measure__
+- **prompt.py**
+  - Class `PromptError` (no methods)
+  - Class `InvalidResponse` with methods: __init__, __rich__
+  - Class `PromptBase` with methods: __init__, ask, ask, ask, render_default, make_prompt, get_input, check_choice, process_response, on_validate_error, pre_prompt, __call__, __call__, __call__
+  - Class `Prompt` (no methods)
+  - Class `IntPrompt` (no methods)
+  - Class `FloatPrompt` (no methods)
+  - Class `Confirm` with methods: render_default, process_response
+- **protocol.py**
+  - Functions: is_renderable, rich_cast
+- **region.py**
+  - Class `Region` (no methods)
+- **repr.py**
+  - Functions: auto, auto, auto, rich_repr, rich_repr, rich_repr
+  - Class `ReprError` (no methods)
+  - Class `Foo` with methods: __rich_repr__
+- **rule.py**
+  - Class `Rule` with methods: __init__, __repr__, __rich_console__, _rule_line, __rich_measure__
+- **scope.py**
+  - Functions: render_scope
+- **screen.py**
+  - Class `Screen` with methods: __init__, __rich_console__
+- **segment.py**
+  - Class `ControlType` (no methods)
+  - Class `Segment` with methods: cell_length, __rich_repr__, __bool__, is_control, _split_cells, split_cells, line, apply_style, filter_control, split_lines, split_and_crop_lines, adjust_line_length, get_line_length, get_shape, set_shape, align_top, align_bottom, align_middle, simplify, strip_links, strip_styles, remove_color, divide
+  - Class `Segments` with methods: __init__, __rich_console__
+  - Class `SegmentLines` with methods: __init__, __rich_console__
+- **spinner.py**
+  - Class `Spinner` with methods: __init__, __rich_console__, __rich_measure__, render, update
+- **status.py**
+  - Class `Status` with methods: __init__, renderable, console, update, start, stop, __rich__, __enter__, __exit__
+- **style.py**
+  - Class `_Bit` with methods: __init__, __get__
+  - Class `Style` with methods: __init__, null, from_color, from_meta, on, link_id, __str__, __bool__, _make_ansi_codes, normalize, pick_first, __rich_repr__, __eq__, __ne__, __hash__, color, bgcolor, link, transparent_background, background_style, meta, without_color, parse, get_html_style, combine, chain, copy, clear_meta_and_links, update_link, render, test, _add, __add__
+  - Class `StyleStack` with methods: __init__, __repr__, current, push, pop
+- **styled.py**
+  - Class `Styled` with methods: __init__, __rich_console__, __rich_measure__
+- **syntax.py**
+  - Functions: _get_code_index_for_syntax_position
+  - Class `SyntaxTheme` with methods: get_style_for_token, get_background_style
+  - Class `PygmentsSyntaxTheme` with methods: __init__, get_style_for_token, get_background_style
+  - Class `ANSISyntaxTheme` with methods: __init__, get_style_for_token, get_background_style
+  - Class `_SyntaxHighlightRange` (no methods)
+  - Class `Syntax` with methods: get_theme, __init__, from_path, guess_lexer, _get_base_style, _get_token_color, lexer, highlight, stylize_range, _get_line_numbers_color, _numbers_column_width, _get_number_styles, __rich_measure__, __rich_console__, _get_syntax, _apply_stylized_ranges, _process_code
+- **table.py**
+  - Class `Column` with methods: copy, cells, flexible
+  - Class `Row` (no methods)
+  - Class `_Cell` (no methods)
+  - Class `Table` with methods: __init__, grid, expand, expand, _extra_width, row_count, get_row_style, __rich_measure__, padding, padding, add_column, add_row, add_section, __rich_console__, _calculate_column_widths, _collapse_widths, _get_cells, _get_padding_width, _measure_column, _render
+- **terminal_theme.py**
+  - Class `TerminalTheme` with methods: __init__
+- **text.py**
+  - Class `Span` with methods: __repr__, __bool__, split, move, right_crop
+  - Class `Text` with methods: __init__, __len__, __bool__, __str__, __repr__, __add__, __eq__, __contains__, __getitem__, cell_len, markup, from_markup, from_ansi, styled, assemble, plain, plain, spans, spans, blank_copy, copy, stylize, stylize_before, apply_meta, on, remove_suffix, get_style_at_offset, highlight_regex, highlight_words, rstrip, rstrip_end, set_length, __rich_console__, __rich_measure__, render, join, expand_tabs, truncate, _trim_spans, pad, pad_left, pad_right, align, append, append_text, append_tokens, copy_styles, split, divide, right_crop, wrap, fit, detect_indentation, with_indent_guides
+- **theme.py**
+  - Class `Theme` with methods: __init__, config, from_file, read
+  - Class `ThemeStackError` (no methods)
+  - Class `ThemeStack` with methods: __init__, push_theme, pop_theme
+- **themes.py**
+- **traceback.py**
+  - Functions: install
+  - Class `Frame` (no methods)
+  - Class `_SyntaxError` (no methods)
+  - Class `Stack` (no methods)
+  - Class `Trace` (no methods)
+  - Class `PathHighlighter` (no methods)
+  - Class `Traceback` with methods: __init__, from_exception, extract, __rich_console__, _render_syntax_error, _guess_lexer, _render_stack
+- **tree.py**
+  - Class `Tree` with methods: __init__, add, __rich_console__, __rich_measure__
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/tenacity
+- **__init__.py**
+  - Functions: _first_set, retry, retry, retry
+  - Class `TryAgain` (no methods)
+  - Class `DoAttempt` (no methods)
+  - Class `DoSleep` (no methods)
+  - Class `BaseAction` with methods: __repr__, __str__
+  - Class `RetryAction` with methods: __init__
+  - Class `RetryError` with methods: __init__, reraise, __str__
+  - Class `AttemptManager` with methods: __init__, __enter__, __exit__
+  - Class `BaseRetrying` with methods: __init__, copy, __repr__, statistics, wraps, begin, iter, __iter__, __call__
+  - Class `Retrying` with methods: __call__
+  - Class `Future` with methods: __init__, failed, construct
+  - Class `RetryCallState` with methods: __init__, seconds_since_start, prepare_for_next_attempt, set_result, set_exception, __repr__
+- **_asyncio.py**
+  - Class `AsyncRetrying` with methods: __init__, __iter__, __aiter__, wraps
+- **_utils.py**
+  - Functions: find_ordinal, to_ordinal, get_callback_name, to_seconds
+- **after.py**
+  - Functions: after_nothing, after_log
+- **before.py**
+  - Functions: before_nothing, before_log
+- **before_sleep.py**
+  - Functions: before_sleep_nothing, before_sleep_log
+- **nap.py**
+  - Functions: sleep
+  - Class `sleep_using_event` with methods: __init__, __call__
+- **retry.py**
+  - Class `retry_base` with methods: __call__, __and__, __or__
+  - Class `_retry_never` with methods: __call__
+  - Class `_retry_always` with methods: __call__
+  - Class `retry_if_exception` with methods: __init__, __call__
+  - Class `retry_if_exception_type` with methods: __init__
+  - Class `retry_if_not_exception_type` with methods: __init__
+  - Class `retry_unless_exception_type` with methods: __init__, __call__
+  - Class `retry_if_exception_cause_type` with methods: __init__, __call__
+  - Class `retry_if_result` with methods: __init__, __call__
+  - Class `retry_if_not_result` with methods: __init__, __call__
+  - Class `retry_if_exception_message` with methods: __init__
+  - Class `retry_if_not_exception_message` with methods: __init__, __call__
+  - Class `retry_any` with methods: __init__, __call__
+  - Class `retry_all` with methods: __init__, __call__
+- **stop.py**
+  - Class `stop_base` with methods: __call__, __and__, __or__
+  - Class `stop_any` with methods: __init__, __call__
+  - Class `stop_all` with methods: __init__, __call__
+  - Class `_stop_never` with methods: __call__
+  - Class `stop_when_event_set` with methods: __init__, __call__
+  - Class `stop_after_attempt` with methods: __init__, __call__
+  - Class `stop_after_delay` with methods: __init__, __call__
+- **tornadoweb.py**
+  - Class `TornadoRetrying` with methods: __init__, __call__
+- **wait.py**
+  - Class `wait_base` with methods: __call__, __add__, __radd__
+  - Class `wait_fixed` with methods: __init__, __call__
+  - Class `wait_none` with methods: __init__
+  - Class `wait_random` with methods: __init__, __call__
+  - Class `wait_combine` with methods: __init__, __call__
+  - Class `wait_chain` with methods: __init__, __call__
+  - Class `wait_incrementing` with methods: __init__, __call__
+  - Class `wait_exponential` with methods: __init__, __call__
+  - Class `wait_random_exponential` with methods: __call__
+  - Class `wait_exponential_jitter` with methods: __init__, __call__
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/tomli
+- **__init__.py**
+- **_parser.py**
+  - Functions: load, loads, skip_chars, skip_until, skip_comment, skip_comments_and_array_ws, create_dict_rule, create_list_rule, key_value_rule, parse_key_value_pair, parse_key, parse_key_part, parse_one_line_basic_str, parse_array, parse_inline_table, parse_basic_str_escape, parse_basic_str_escape_multiline, parse_hex_char, parse_literal_str, parse_multiline_str, parse_basic_str, parse_value, suffixed_err, is_unicode_scalar_value, make_safe_parse_float
+  - Class `TOMLDecodeError` (no methods)
+  - Class `Flags` with methods: __init__, add_pending, finalize_pending, unset_all, set, is_
+  - Class `NestedDict` with methods: __init__, get_or_create_nest, append_nest_to_list
+  - Class `Output` (no methods)
+- **_re.py**
+  - Functions: match_to_datetime, cached_tz, match_to_localtime, match_to_number
+- **_types.py**
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/urllib3
+- **__init__.py**
+  - Functions: add_stderr_logger, disable_warnings
+- **_collections.py**
+  - Class `RecentlyUsedContainer` with methods: __init__, __getitem__, __setitem__, __delitem__, __len__, __iter__, clear, keys
+  - Class `HTTPHeaderDict` with methods: __init__, __setitem__, __getitem__, __delitem__, __contains__, __eq__, __ne__, __len__, __iter__, pop, discard, add, extend, getlist, __repr__, _copy_from, copy, iteritems, itermerged, items, from_httplib
+  - Class `RLock` with methods: __enter__, __exit__
+- **_version.py**
+- **connection.py**
+  - Functions: _match_hostname, _get_default_user_agent
+  - Class `HTTPConnection` with methods: __init__, host, host, _new_conn, _is_using_tunnel, _prepare_conn, connect, putrequest, putheader, request, request_chunked
+  - Class `HTTPSConnection` with methods: __init__, set_cert, connect, _connect_tls_proxy
+  - Class `DummyConnection` (no methods)
+  - Class `BaseSSLError` (no methods)
+  - Class `ConnectionError` (no methods)
+  - Class `BrokenPipeError` (no methods)
+- **connectionpool.py**
+  - Functions: connection_from_url, _normalize_host, _close_pool_connections
+  - Class `ConnectionPool` with methods: __init__, __str__, __enter__, __exit__, close
+  - Class `HTTPConnectionPool` with methods: __init__, _new_conn, _get_conn, _put_conn, _validate_conn, _prepare_proxy, _get_timeout, _raise_timeout, _make_request, _absolute_url, close, is_same_host, urlopen
+  - Class `HTTPSConnectionPool` with methods: __init__, _prepare_conn, _prepare_proxy, _new_conn, _validate_conn
+- **exceptions.py**
+  - Class `HTTPError` (no methods)
+  - Class `HTTPWarning` (no methods)
+  - Class `PoolError` with methods: __init__, __reduce__
+  - Class `RequestError` with methods: __init__, __reduce__
+  - Class `SSLError` (no methods)
+  - Class `ProxyError` with methods: __init__
+  - Class `DecodeError` (no methods)
+  - Class `ProtocolError` (no methods)
+  - Class `MaxRetryError` with methods: __init__
+  - Class `HostChangedError` with methods: __init__
+  - Class `TimeoutStateError` (no methods)
+  - Class `TimeoutError` (no methods)
+  - Class `ReadTimeoutError` (no methods)
+  - Class `ConnectTimeoutError` (no methods)
+  - Class `NewConnectionError` (no methods)
+  - Class `EmptyPoolError` (no methods)
+  - Class `ClosedPoolError` (no methods)
+  - Class `LocationValueError` (no methods)
+  - Class `LocationParseError` with methods: __init__
+  - Class `URLSchemeUnknown` with methods: __init__
+  - Class `ResponseError` (no methods)
+  - Class `SecurityWarning` (no methods)
+  - Class `SubjectAltNameWarning` (no methods)
+  - Class `InsecureRequestWarning` (no methods)
+  - Class `SystemTimeWarning` (no methods)
+  - Class `InsecurePlatformWarning` (no methods)
+  - Class `SNIMissingWarning` (no methods)
+  - Class `DependencyWarning` (no methods)
+  - Class `ResponseNotChunked` (no methods)
+  - Class `BodyNotHttplibCompatible` (no methods)
+  - Class `IncompleteRead` with methods: __init__, __repr__
+  - Class `InvalidChunkLength` with methods: __init__, __repr__
+  - Class `InvalidHeader` (no methods)
+  - Class `ProxySchemeUnknown` with methods: __init__
+  - Class `ProxySchemeUnsupported` (no methods)
+  - Class `HeaderParsingError` with methods: __init__
+  - Class `UnrewindableBodyError` (no methods)
+- **fields.py**
+  - Functions: guess_content_type, format_header_param_rfc2231, _replace_multiple, format_header_param_html5
+  - Class `RequestField` with methods: __init__, from_tuples, _render_part, _render_parts, render_headers, make_multipart
+- **filepost.py**
+  - Functions: choose_boundary, iter_field_objects, iter_fields, encode_multipart_formdata
+- **poolmanager.py**
+  - Functions: _default_key_normalizer, proxy_from_url
+  - Class `PoolManager` with methods: __init__, __enter__, __exit__, _new_pool, clear, connection_from_host, connection_from_context, connection_from_pool_key, connection_from_url, _merge_pool_kwargs, _proxy_requires_url_absolute_form, _validate_proxy_scheme_url_selection, urlopen
+  - Class `ProxyManager` with methods: __init__, connection_from_host, _set_proxy_headers, urlopen
+- **request.py**
+  - Class `RequestMethods` with methods: __init__, urlopen, request, request_encode_url, request_encode_body
+- **response.py**
+  - Functions: _get_decoder
+  - Class `DeflateDecoder` with methods: __init__, __getattr__, decompress
+  - Class `GzipDecoderState` (no methods)
+  - Class `GzipDecoder` with methods: __init__, __getattr__, decompress
+  - Class `MultiDecoder` with methods: __init__, flush, decompress
+  - Class `HTTPResponse` with methods: __init__, get_redirect_location, release_conn, drain_conn, data, connection, isclosed, tell, _init_length, _init_decoder, _decode, _flush_decoder, _error_catcher, _fp_read, read, stream, from_httplib, getheaders, getheader, info, close, closed, fileno, flush, readable, readinto, supports_chunked_reads, _update_chunk_length, _handle_chunk, read_chunked, geturl, __iter__
+  - Class `BrotliDecoder` with methods: __init__, flush
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/urllib3/contrib
+- **__init__.py**
+- **_appengine_environ.py**
+  - Functions: is_appengine, is_appengine_sandbox, is_local_appengine, is_prod_appengine, is_prod_appengine_mvms
+- **appengine.py**
+  - Class `AppEnginePlatformWarning` (no methods)
+  - Class `AppEnginePlatformError` (no methods)
+  - Class `AppEngineManager` with methods: __init__, __enter__, __exit__, urlopen, _urlfetch_response_to_http_response, _get_absolute_timeout, _get_retries
+- **ntlmpool.py**
+  - Class `NTLMConnectionPool` with methods: __init__, _new_conn, urlopen
+- **pyopenssl.py**
+  - Functions: inject_into_urllib3, extract_from_urllib3, _validate_dependencies_met, _dnsname_to_stdlib, get_subj_alt_name, _verify_callback
+  - Class `WrappedSocket` with methods: __init__, fileno, _decref_socketios, recv, recv_into, settimeout, _send_until_done, sendall, shutdown, close, getpeercert, version, _reuse, _drop
+  - Class `PyOpenSSLContext` with methods: __init__, options, options, verify_mode, verify_mode, set_default_verify_paths, set_ciphers, load_verify_locations, load_cert_chain, set_alpn_protocols, wrap_socket
+  - Class `UnsupportedExtension` (no methods)
+- **securetransport.py**
+  - Functions: inject_into_urllib3, extract_from_urllib3, _read_callback, _write_callback
+  - Class `WrappedSocket` with methods: __init__, _raise_on_error, _set_ciphers, _set_alpn_protocols, _custom_validate, _evaluate_trust, handshake, fileno, _decref_socketios, recv, recv_into, settimeout, gettimeout, send, sendall, shutdown, close, getpeercert, version, _reuse, _drop
+  - Class `SecureTransportContext` with methods: __init__, check_hostname, check_hostname, options, options, verify_mode, verify_mode, set_default_verify_paths, load_default_certs, set_ciphers, load_verify_locations, load_cert_chain, set_alpn_protocols, wrap_socket
+- **socks.py**
+  - Class `SOCKSConnection` with methods: __init__, _new_conn
+  - Class `SOCKSHTTPSConnection` (no methods)
+  - Class `SOCKSHTTPConnectionPool` (no methods)
+  - Class `SOCKSHTTPSConnectionPool` (no methods)
+  - Class `SOCKSProxyManager` with methods: __init__
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/urllib3/contrib/_securetransport
+- **__init__.py**
+- **bindings.py**
+  - Functions: load_cdll
+  - Class `CFConst` (no methods)
+  - Class `SecurityConst` (no methods)
+- **low_level.py**
+  - Functions: _cf_data_from_bytes, _cf_dictionary_from_tuples, _cfstr, _create_cfstring_array, _cf_string_to_unicode, _assert_no_error, _cert_array_from_pem, _is_cert, _is_identity, _temporary_keychain, _load_items_from_file, _load_client_cert_chain, _build_tls_unknown_ca_alert
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/urllib3/packages
+- **__init__.py**
+- **six.py**
+  - Functions: _add_doc, _import_module, add_move, remove_move, assertCountEqual, assertRaisesRegex, assertRegex, assertNotRegex, with_metaclass, add_metaclass, ensure_binary, ensure_str, ensure_text, python_2_unicode_compatible
+  - Class `_LazyDescr` with methods: __init__, __get__
+  - Class `MovedModule` with methods: __init__, _resolve, __getattr__
+  - Class `_LazyModule` with methods: __init__, __dir__
+  - Class `MovedAttribute` with methods: __init__, _resolve
+  - Class `_SixMetaPathImporter` with methods: __init__, _add_module, _get_module, find_module, find_spec, __get_module, load_module, is_package, get_code, create_module, exec_module
+  - Class `_MovedItems` (no methods)
+  - Class `Module_six_moves_urllib_parse` (no methods)
+  - Class `Module_six_moves_urllib_error` (no methods)
+  - Class `Module_six_moves_urllib_request` (no methods)
+  - Class `Module_six_moves_urllib_response` (no methods)
+  - Class `Module_six_moves_urllib_robotparser` (no methods)
+  - Class `Module_six_moves_urllib` with methods: __dir__
+  - Class `Iterator` with methods: next
+  - Class `metaclass` with methods: __new__, __prepare__
+  - Class `X` with methods: __len__
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/urllib3/packages/backports
+- **__init__.py**
+- **makefile.py**
+  - Functions: backport_makefile
+- **weakref_finalize.py**
+  - Class `weakref_finalize` with methods: __init__, __call__, detach, peek, alive, atexit, atexit, __repr__, _select_for_exit, _exitfunc
+  - Class `_Info` (no methods)
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/urllib3/util
+- **__init__.py**
+- **connection.py**
+  - Functions: is_connection_dropped, create_connection, _set_socket_options, allowed_gai_family, _has_ipv6
+- **proxy.py**
+  - Functions: connection_requires_http_tunnel, create_proxy_ssl_context
+- **queue.py**
+  - Class `LifoQueue` with methods: _init, _qsize, _put, _get
+- **request.py**
+  - Functions: make_headers, set_file_position, rewind_body
+- **response.py**
+  - Functions: is_fp_closed, assert_header_parsing, is_response_to_head
+- **retry.py**
+  - Class `_RetryMeta` with methods: DEFAULT_METHOD_WHITELIST, DEFAULT_METHOD_WHITELIST, DEFAULT_REDIRECT_HEADERS_BLACKLIST, DEFAULT_REDIRECT_HEADERS_BLACKLIST, BACKOFF_MAX, BACKOFF_MAX
+  - Class `Retry` with methods: __init__, new, from_int, get_backoff_time, parse_retry_after, get_retry_after, sleep_for_retry, _sleep_backoff, sleep, _is_connection_error, _is_read_error, _is_method_retryable, is_retry, is_exhausted, increment, __repr__, __getattr__
+- **ssl_.py**
+  - Functions: _const_compare_digest_backport, assert_fingerprint, resolve_cert_reqs, resolve_ssl_version, create_urllib3_context, ssl_wrap_socket, is_ipaddress, _is_key_file_encrypted, _ssl_wrap_socket_impl
+  - Class `SSLContext` with methods: __init__, load_cert_chain, load_verify_locations, set_ciphers, wrap_socket
+- **ssl_match_hostname.py**
+  - Functions: _dnsname_match, _to_unicode, _ipaddress_match, match_hostname
+  - Class `CertificateError` (no methods)
+- **ssltransport.py**
+  - Class `SSLTransport` with methods: _validate_ssl_context_for_tls_in_tls, __init__, __enter__, __exit__, fileno, read, recv, recv_into, sendall, send, makefile, unwrap, close, getpeercert, version, cipher, selected_alpn_protocol, selected_npn_protocol, shared_ciphers, compression, settimeout, gettimeout, _decref_socketios, _wrap_ssl_read, _ssl_io_loop
+- **timeout.py**
+  - Class `Timeout` with methods: __init__, __repr__, resolve_default_timeout, _validate_timeout, from_float, clone, start_connect, get_connect_duration, connect_timeout, read_timeout
+- **url.py**
+  - Functions: split_first, _encode_invalid_chars, _remove_path_dot_segments, _normalize_host, _idna_encode, _encode_target, parse_url, get_host
+  - Class `Url` with methods: __new__, hostname, request_uri, netloc, url, __str__
+- **wait.py**
+  - Functions: select_wait_for_socket, poll_wait_for_socket, null_wait_for_socket, _have_working_poll, wait_for_socket, wait_for_read, wait_for_write
+  - Class `NoWayToWaitForSocketError` (no methods)
+
+## .venv/lib/python3.12/site-packages/pip/_vendor/webencodings
+- **__init__.py**
+  - Functions: ascii_lower, lookup, _get_encoding, decode, _detect_bom, encode, iter_decode, _iter_decode_generator, iter_encode, _iter_encode_generator
+  - Class `Encoding` with methods: __init__, __repr__
+  - Class `IncrementalDecoder` with methods: __init__, decode
+  - Class `IncrementalEncoder` with methods: __init__
+- **labels.py**
+- **mklabels.py**
+  - Functions: assert_lower, generate
+- **tests.py**
+  - Functions: assert_raises, test_labels, test_all_labels, test_invalid_label, test_decode, test_encode, test_iter_decode, test_iter_encode, test_x_user_defined
+- **x_user_defined.py**
+  - Class `Codec` with methods: encode, decode
+  - Class `IncrementalEncoder` with methods: encode
+  - Class `IncrementalDecoder` with methods: decode
+  - Class `StreamWriter` (no methods)
+  - Class `StreamReader` (no methods)
+
+## .venv/lib/python3.12/site-packages/requests
+- **__init__.py**
+  - Functions: check_compatibility, _check_cryptography
+- **__version__.py**
+- **_internal_utils.py**
+  - Functions: to_native_string, unicode_is_ascii
+- **adapters.py**
+  - Functions: _urllib3_request_context
+  - Class `BaseAdapter` with methods: __init__, send, close
+  - Class `HTTPAdapter` with methods: __init__, __getstate__, __setstate__, init_poolmanager, proxy_manager_for, cert_verify, build_response, build_connection_pool_key_attributes, get_connection_with_tls_context, get_connection, close, request_url, add_headers, proxy_headers, send
+- **api.py**
+  - Functions: request, get, options, head, post, put, patch, delete
+- **auth.py**
+  - Functions: _basic_auth_str
+  - Class `AuthBase` with methods: __call__
+  - Class `HTTPBasicAuth` with methods: __init__, __eq__, __ne__, __call__
+  - Class `HTTPProxyAuth` with methods: __call__
+  - Class `HTTPDigestAuth` with methods: __init__, init_per_thread_state, build_digest_header, handle_redirect, handle_401, __call__, __eq__, __ne__
+- **certs.py**
+- **compat.py**
+  - Functions: _resolve_char_detection
+- **cookies.py**
+  - Functions: extract_cookies_to_jar, get_cookie_header, remove_cookie_by_name, _copy_cookie_jar, create_cookie, morsel_to_cookie, cookiejar_from_dict, merge_cookies
+  - Class `MockRequest` with methods: __init__, get_type, get_host, get_origin_req_host, get_full_url, is_unverifiable, has_header, get_header, add_header, add_unredirected_header, get_new_headers, unverifiable, origin_req_host, host
+  - Class `MockResponse` with methods: __init__, info, getheaders
+  - Class `CookieConflictError` (no methods)
+  - Class `RequestsCookieJar` with methods: get, set, iterkeys, keys, itervalues, values, iteritems, items, list_domains, list_paths, multiple_domains, get_dict, __contains__, __getitem__, __setitem__, __delitem__, set_cookie, update, _find, _find_no_duplicates, __getstate__, __setstate__, copy, get_policy
+- **exceptions.py**
+  - Class `RequestException` with methods: __init__
+  - Class `InvalidJSONError` (no methods)
+  - Class `JSONDecodeError` with methods: __init__, __reduce__
+  - Class `HTTPError` (no methods)
+  - Class `ConnectionError` (no methods)
+  - Class `ProxyError` (no methods)
+  - Class `SSLError` (no methods)
+  - Class `Timeout` (no methods)
+  - Class `ConnectTimeout` (no methods)
+  - Class `ReadTimeout` (no methods)
+  - Class `URLRequired` (no methods)
+  - Class `TooManyRedirects` (no methods)
+  - Class `MissingSchema` (no methods)
+  - Class `InvalidSchema` (no methods)
+  - Class `InvalidURL` (no methods)
+  - Class `InvalidHeader` (no methods)
+  - Class `InvalidProxyURL` (no methods)
+  - Class `ChunkedEncodingError` (no methods)
+  - Class `ContentDecodingError` (no methods)
+  - Class `StreamConsumedError` (no methods)
+  - Class `RetryError` (no methods)
+  - Class `UnrewindableBodyError` (no methods)
+  - Class `RequestsWarning` (no methods)
+  - Class `FileModeWarning` (no methods)
+  - Class `RequestsDependencyWarning` (no methods)
+- **help.py**
+  - Functions: _implementation, info, main
+- **hooks.py**
+  - Functions: default_hooks, dispatch_hook
+- **models.py**
+  - Class `RequestEncodingMixin` with methods: path_url, _encode_params, _encode_files
+  - Class `RequestHooksMixin` with methods: register_hook, deregister_hook
+  - Class `Request` with methods: __init__, __repr__, prepare
+  - Class `PreparedRequest` with methods: __init__, prepare, __repr__, copy, prepare_method, _get_idna_encoded_host, prepare_url, prepare_headers, prepare_body, prepare_content_length, prepare_auth, prepare_cookies, prepare_hooks
+  - Class `Response` with methods: __init__, __enter__, __exit__, __getstate__, __setstate__, __repr__, __bool__, __nonzero__, __iter__, ok, is_redirect, is_permanent_redirect, next, apparent_encoding, iter_content, iter_lines, content, text, json, links, raise_for_status, close
+- **packages.py**
+- **sessions.py**
+  - Functions: merge_setting, merge_hooks, session
+  - Class `SessionRedirectMixin` with methods: get_redirect_target, should_strip_auth, resolve_redirects, rebuild_auth, rebuild_proxies, rebuild_method
+  - Class `Session` with methods: __init__, __enter__, __exit__, prepare_request, request, get, options, head, post, put, patch, delete, send, merge_environment_settings, get_adapter, close, mount, __getstate__, __setstate__
+- **status_codes.py**
+  - Functions: _init
+- **structures.py**
+  - Class `CaseInsensitiveDict` with methods: __init__, __setitem__, __getitem__, __delitem__, __iter__, __len__, lower_items, __eq__, copy, __repr__
+  - Class `LookupDict` with methods: __init__, __repr__, __getitem__, get
+- **utils.py**
+  - Functions: dict_to_sequence, super_len, get_netrc_auth, guess_filename, extract_zipped_paths, atomic_open, from_key_val_list, to_key_val_list, parse_list_header, parse_dict_header, unquote_header_value, dict_from_cookiejar, add_dict_to_cookiejar, get_encodings_from_content, _parse_content_type_header, get_encoding_from_headers, stream_decode_response_unicode, iter_slices, get_unicode_from_response, unquote_unreserved, requote_uri, address_in_network, dotted_netmask, is_ipv4_address, is_valid_cidr, set_environ, should_bypass_proxies, get_environ_proxies, select_proxy, resolve_proxies, default_user_agent, default_headers, parse_header_links, guess_json_utf, prepend_scheme_if_needed, get_auth_from_url, check_header_validity, _validate_header_part, urldefragauth, rewind_body
+
+## .venv/lib/python3.12/site-packages/requests-2.32.3.dist-info
+- **INSTALLER**
+- **LICENSE**
+- **METADATA**
+- **RECORD**
+- **REQUESTED**
+- **WHEEL**
+- **top_level.txt**
+
+## .venv/lib/python3.12/site-packages/tftpy
+- **TftpClient.py**
+  - Class `TftpClient` with methods: __init__, download, upload
+- **TftpContexts.py**
+  - Class `TftpMetrics` with methods: __init__, compute, add_dup
+  - Class `TftpContext` with methods: __init__, getBlocksize, __del__, checkTimeout, start, end, gethost, sethost, setNextBlock, getNextBlock, cycle
+  - Class `TftpContextServer` with methods: __init__, __str__, start, end
+  - Class `TftpContextClientUpload` with methods: __init__, __str__, start, end
+  - Class `TftpContextClientDownload` with methods: __init__, __str__, start, end
+- **TftpPacketFactory.py**
+  - Class `TftpPacketFactory` with methods: __init__, parse, __create
+- **TftpPacketTypes.py**
+  - Class `TftpSession` (no methods)
+  - Class `TftpPacketWithOptions` with methods: __init__, setoptions, getoptions, decode_options
+  - Class `TftpPacket` with methods: __init__, encode, decode
+  - Class `TftpPacketInitial` with methods: __init__, encode, decode
+  - Class `TftpPacketRRQ` with methods: __init__, __str__
+  - Class `TftpPacketWRQ` with methods: __init__, __str__
+  - Class `TftpPacketDAT` with methods: __init__, __str__, encode, decode
+  - Class `TftpPacketACK` with methods: __init__, __str__, encode, decode
+  - Class `TftpPacketERR` with methods: __init__, __str__, encode, decode
+  - Class `TftpPacketOACK` with methods: __init__, __str__, encode, decode, match_options
+- **TftpServer.py**
+  - Class `TftpServer` with methods: __init__, listen, stop
+- **TftpShared.py**
+  - Functions: tftpassert
+  - Class `TftpErrors` (no methods)
+  - Class `TftpException` (no methods)
+  - Class `TftpTimeout` (no methods)
+  - Class `TftpTimeoutExpectACK` (no methods)
+  - Class `TftpFileNotFoundError` (no methods)
+- **TftpStates.py**
+  - Class `TftpState` with methods: __init__, handle, handleOACK, returnSupportedOptions, sendDAT, sendACK, sendError, sendOACK, resendLast, handleDat
+  - Class `TftpServerState` with methods: __init__, serverInitial
+  - Class `TftpStateServerRecvRRQ` with methods: handle
+  - Class `TftpStateServerRecvWRQ` with methods: make_subdirs, handle
+  - Class `TftpStateServerStart` with methods: handle
+  - Class `TftpStateExpectACK` with methods: handle
+  - Class `TftpStateExpectDAT` with methods: handle
+  - Class `TftpStateSentWRQ` with methods: handle
+  - Class `TftpStateSentRRQ` with methods: handle
+- **__init__.py**
+
+## .venv/lib/python3.12/site-packages/tftpy-0.8.5.dist-info
+- **INSTALLER**
+- **LICENSE**
+- **METADATA**
+- **RECORD**
+- **REQUESTED**
+- **WHEEL**
+- **top_level.txt**
+
+## .venv/lib/python3.12/site-packages/urllib3
+- **__init__.py**
+  - Functions: add_stderr_logger, disable_warnings, request
+- **_base_connection.py**
+  - Class `ProxyConfig` (no methods)
+  - Class `_ResponseOptions` (no methods)
+  - Class `BaseHTTPConnection` with methods: __init__, set_tunnel, connect, request, getresponse, close, is_closed, is_connected, has_connected_to_proxy
+  - Class `BaseHTTPSConnection` with methods: __init__
+- **_collections.py**
+  - Functions: ensure_can_construct_http_header_dict
+  - Class `_Sentinel` (no methods)
+  - Class `RecentlyUsedContainer` with methods: __init__, __getitem__, __setitem__, __delitem__, __len__, __iter__, clear, keys
+  - Class `HTTPHeaderDictItemView` with methods: __init__, __len__, __iter__, __contains__
+  - Class `HTTPHeaderDict` with methods: __init__, __setitem__, __getitem__, __delitem__, __contains__, setdefault, __eq__, __ne__, __len__, __iter__, discard, add, extend, getlist, getlist, getlist, _prepare_for_method_change, __repr__, _copy_from, copy, iteritems, itermerged, items, _has_value_for_header, __ior__, __or__, __ror__
+  - Class `HasGettableStringKeys` with methods: keys, __getitem__
+- **_request_methods.py**
+  - Class `RequestMethods` with methods: __init__, urlopen, request, request_encode_url, request_encode_body
+- **_version.py**
+- **connection.py**
+  - Functions: _ssl_wrap_socket_and_match_hostname, _match_hostname, _wrap_proxy_error, _get_default_user_agent, _url_from_connection
+  - Class `HTTPConnection` with methods: __init__, host, host, _new_conn, set_tunnel, connect, is_closed, is_connected, has_connected_to_proxy, proxy_is_forwarding, proxy_is_tunneling, close, putrequest, putheader, request, request_chunked, getresponse
+  - Class `HTTPSConnection` with methods: __init__, set_cert, connect, _connect_tls_proxy
+  - Class `_WrappedAndVerifiedSocket` (no methods)
+  - Class `DummyConnection` (no methods)
+  - Class `BaseSSLError` (no methods)
+- **connectionpool.py**
+  - Functions: connection_from_url, _normalize_host, _normalize_host, _normalize_host, _url_from_pool, _close_pool_connections
+  - Class `ConnectionPool` with methods: __init__, __str__, __enter__, __exit__, close
+  - Class `HTTPConnectionPool` with methods: __init__, _new_conn, _get_conn, _put_conn, _validate_conn, _prepare_proxy, _get_timeout, _raise_timeout, _make_request, close, is_same_host, urlopen
+  - Class `HTTPSConnectionPool` with methods: __init__, _prepare_proxy, _new_conn, _validate_conn
+- **exceptions.py**
+  - Class `HTTPError` (no methods)
+  - Class `HTTPWarning` (no methods)
+  - Class `PoolError` with methods: __init__, __reduce__
+  - Class `RequestError` with methods: __init__, __reduce__
+  - Class `SSLError` (no methods)
+  - Class `ProxyError` with methods: __init__
+  - Class `DecodeError` (no methods)
+  - Class `ProtocolError` (no methods)
+  - Class `MaxRetryError` with methods: __init__
+  - Class `HostChangedError` with methods: __init__
+  - Class `TimeoutStateError` (no methods)
+  - Class `TimeoutError` (no methods)
+  - Class `ReadTimeoutError` (no methods)
+  - Class `ConnectTimeoutError` (no methods)
+  - Class `NewConnectionError` with methods: __init__, __reduce__, pool
+  - Class `NameResolutionError` with methods: __init__, __reduce__
+  - Class `EmptyPoolError` (no methods)
+  - Class `FullPoolError` (no methods)
+  - Class `ClosedPoolError` (no methods)
+  - Class `LocationValueError` (no methods)
+  - Class `LocationParseError` with methods: __init__
+  - Class `URLSchemeUnknown` with methods: __init__
+  - Class `ResponseError` (no methods)
+  - Class `SecurityWarning` (no methods)
+  - Class `InsecureRequestWarning` (no methods)
+  - Class `NotOpenSSLWarning` (no methods)
+  - Class `SystemTimeWarning` (no methods)
+  - Class `InsecurePlatformWarning` (no methods)
+  - Class `DependencyWarning` (no methods)
+  - Class `ResponseNotChunked` (no methods)
+  - Class `BodyNotHttplibCompatible` (no methods)
+  - Class `IncompleteRead` with methods: __init__, __repr__
+  - Class `InvalidChunkLength` with methods: __init__, __repr__
+  - Class `InvalidHeader` (no methods)
+  - Class `ProxySchemeUnknown` with methods: __init__
+  - Class `ProxySchemeUnsupported` (no methods)
+  - Class `HeaderParsingError` with methods: __init__
+  - Class `UnrewindableBodyError` (no methods)
+- **fields.py**
+  - Functions: guess_content_type, format_header_param_rfc2231, format_multipart_header_param, format_header_param_html5, format_header_param
+  - Class `RequestField` with methods: __init__, from_tuples, _render_part, _render_parts, render_headers, make_multipart
+- **filepost.py**
+  - Functions: choose_boundary, iter_field_objects, encode_multipart_formdata
+- **poolmanager.py**
+  - Functions: _default_key_normalizer, proxy_from_url
+  - Class `PoolKey` (no methods)
+  - Class `PoolManager` with methods: __init__, __enter__, __exit__, _new_pool, clear, connection_from_host, connection_from_context, connection_from_pool_key, connection_from_url, _merge_pool_kwargs, _proxy_requires_url_absolute_form, urlopen
+  - Class `ProxyManager` with methods: __init__, connection_from_host, _set_proxy_headers, urlopen
+- **py.typed**
+- **response.py**
+  - Functions: _get_decoder
+  - Class `ContentDecoder` with methods: decompress, flush
+  - Class `DeflateDecoder` with methods: __init__, decompress, flush
+  - Class `GzipDecoderState` (no methods)
+  - Class `GzipDecoder` with methods: __init__, decompress, flush
+  - Class `MultiDecoder` with methods: __init__, flush, decompress
+  - Class `BytesQueueBuffer` with methods: __init__, __len__, put, get, get_all
+  - Class `BaseHTTPResponse` with methods: __init__, get_redirect_location, data, json, url, url, connection, retries, retries, stream, read, read1, read_chunked, release_conn, drain_conn, shutdown, close, _init_decoder, _decode, _flush_decoder, readinto, getheaders, getheader, info, geturl
+  - Class `HTTPResponse` with methods: __init__, release_conn, drain_conn, data, connection, isclosed, tell, _init_length, _error_catcher, _fp_read, _raw_read, read, read1, stream, readable, shutdown, close, closed, fileno, flush, supports_chunked_reads, _update_chunk_length, _handle_chunk, read_chunked, url, url, __iter__
+  - Class `BrotliDecoder` with methods: __init__, flush
+  - Class `ZstdDecoder` with methods: __init__, decompress, flush
+
+## .venv/lib/python3.12/site-packages/urllib3-2.3.0.dist-info
+- **INSTALLER**
+- **METADATA**
+- **RECORD**
+- **WHEEL**
+
+## .venv/lib/python3.12/site-packages/urllib3-2.3.0.dist-info/licenses
+- **LICENSE.txt**
+
+## .venv/lib/python3.12/site-packages/urllib3/contrib
+- **__init__.py**
+- **pyopenssl.py**
+  - Functions: inject_into_urllib3, extract_from_urllib3, _validate_dependencies_met, _dnsname_to_stdlib, get_subj_alt_name, _verify_callback
+  - Class `WrappedSocket` with methods: __init__, fileno, _decref_socketios, recv, recv_into, settimeout, _send_until_done, sendall, shutdown, close, _real_close, getpeercert, version, selected_alpn_protocol
+  - Class `PyOpenSSLContext` with methods: __init__, options, options, verify_mode, verify_mode, set_default_verify_paths, set_ciphers, load_verify_locations, load_cert_chain, set_alpn_protocols, wrap_socket, _set_ctx_options, minimum_version, minimum_version, maximum_version, maximum_version
+  - Class `UnsupportedExtension` (no methods)
+- **socks.py**
+  - Class `_TYPE_SOCKS_OPTIONS` (no methods)
+  - Class `SOCKSConnection` with methods: __init__, _new_conn
+  - Class `SOCKSHTTPSConnection` (no methods)
+  - Class `SOCKSHTTPConnectionPool` (no methods)
+  - Class `SOCKSHTTPSConnectionPool` (no methods)
+  - Class `SOCKSProxyManager` with methods: __init__
+
+## .venv/lib/python3.12/site-packages/urllib3/contrib/emscripten
+- **__init__.py**
+  - Functions: inject_into_urllib3
+- **connection.py**
+  - Class `EmscriptenHTTPConnection` with methods: __init__, set_tunnel, connect, request, getresponse, close, is_closed, is_connected, has_connected_to_proxy
+  - Class `EmscriptenHTTPSConnection` with methods: __init__, set_cert
+- **emscripten_fetch_worker.js**
+- **fetch.py**
+  - Functions: _obj_from_dict, is_in_browser_main_thread, is_cross_origin_isolated, is_in_node, is_worker_available, send_streaming_request, _show_timeout_warning, _show_streaming_warning, send_request, send_jspi_request, _run_sync_with_timeout, has_jspi, streaming_ready
+  - Class `_RequestError` with methods: __init__
+  - Class `_StreamingError` (no methods)
+  - Class `_TimeoutError` (no methods)
+  - Class `_ReadStream` with methods: __init__, __del__, is_closed, closed, close, readable, writable, seekable, readinto
+  - Class `_StreamingFetcher` with methods: __init__, send
+  - Class `_JSPIReadStream` with methods: __init__, __del__, is_closed, closed, close, readable, writable, seekable, _get_next_buffer, readinto
+- **request.py**
+  - Class `EmscriptenRequest` with methods: set_header, set_body
+- **response.py**
+  - Class `EmscriptenResponse` (no methods)
+  - Class `EmscriptenHttpResponseWrapper` with methods: __init__, url, url, connection, retries, retries, stream, _init_length, read, read_chunked, release_conn, drain_conn, data, json, close, _error_catcher
+
+## .venv/lib/python3.12/site-packages/urllib3/http2
+- **__init__.py**
+  - Functions: inject_into_urllib3, extract_from_urllib3
+- **connection.py**
+  - Functions: _is_legal_header_name, _is_illegal_header_value
+  - Class `_LockedObject` with methods: __init__, __enter__, __exit__
+  - Class `HTTP2Connection` with methods: __init__, _new_h2_conn, connect, putrequest, putheader, endheaders, send, set_tunnel, getresponse, request, close
+  - Class `HTTP2Response` with methods: __init__, data, get_redirect_location, close
+- **probe.py**
+  - Class `_HTTP2ProbeCache` with methods: __init__, acquire_and_get, set_and_release, _values, _reset
+
+## .venv/lib/python3.12/site-packages/urllib3/util
+- **__init__.py**
+- **connection.py**
+  - Functions: is_connection_dropped, create_connection, _set_socket_options, allowed_gai_family, _has_ipv6
+- **proxy.py**
+  - Functions: connection_requires_http_tunnel
+- **request.py**
+  - Functions: make_headers, set_file_position, rewind_body, body_to_chunks
+  - Class `_TYPE_FAILEDTELL` (no methods)
+  - Class `ChunksAndContentLength` (no methods)
+- **response.py**
+  - Functions: is_fp_closed, assert_header_parsing, is_response_to_head
+- **retry.py**
+  - Class `RequestHistory` (no methods)
+  - Class `Retry` with methods: __init__, new, from_int, get_backoff_time, parse_retry_after, get_retry_after, sleep_for_retry, _sleep_backoff, sleep, _is_connection_error, _is_read_error, _is_method_retryable, is_retry, is_exhausted, increment, __repr__
+- **ssl_.py**
+  - Functions: _is_bpo_43522_fixed, _is_has_never_check_common_name_reliable, assert_fingerprint, resolve_cert_reqs, resolve_ssl_version, create_urllib3_context, ssl_wrap_socket, ssl_wrap_socket, ssl_wrap_socket, is_ipaddress, _is_key_file_encrypted, _ssl_wrap_socket_impl
+  - Class `_TYPE_PEER_CERT_RET_DICT` (no methods)
+- **ssl_match_hostname.py**
+  - Functions: _dnsname_match, _ipaddress_match, match_hostname
+  - Class `CertificateError` (no methods)
+- **ssltransport.py**
+  - Class `SSLTransport` with methods: _validate_ssl_context_for_tls_in_tls, __init__, __enter__, __exit__, fileno, read, recv, recv_into, sendall, send, makefile, unwrap, close, getpeercert, getpeercert, getpeercert, version, cipher, selected_alpn_protocol, shared_ciphers, compression, settimeout, gettimeout, _decref_socketios, _wrap_ssl_read, _ssl_io_loop, _ssl_io_loop, _ssl_io_loop, _ssl_io_loop
+- **timeout.py**
+  - Class `_TYPE_DEFAULT` (no methods)
+  - Class `Timeout` with methods: __init__, __repr__, resolve_default_timeout, _validate_timeout, from_float, clone, start_connect, get_connect_duration, connect_timeout, read_timeout
+- **url.py**
+  - Functions: _encode_invalid_chars, _encode_invalid_chars, _encode_invalid_chars, _remove_path_dot_segments, _normalize_host, _normalize_host, _normalize_host, _idna_encode, _encode_target, parse_url
+  - Class `Url` with methods: __new__, hostname, request_uri, authority, netloc, url, __str__
+- **util.py**
+  - Functions: to_bytes, to_str, reraise
+- **wait.py**
+  - Functions: select_wait_for_socket, poll_wait_for_socket, _have_working_poll, wait_for_socket, wait_for_read, wait_for_write
+
 ## addons
 
 ## addons/product_connect
@@ -265,32 +2665,38 @@
 
 ## ansible
 - **ansible.cfg**
+- **node_install_server.py**
+  - Class `ProxyTftpServer` with methods: __init__, get_file, handle_rrq
+  - Class `CustomHandler` with methods: return_file, do_GET
+- **requirements.txt**
+
+## ansible/configs
+- **dhcp.conf**
+- **install.conf**
 
 ## ansible/inventory
 - **inventory.yml**
 
+## ansible/inventory/group_vars
+- **all.yml**
+
 ## ansible/playbooks
 - **check-hosts.yml**
+- **clean-k3s.yml**
+- **debug-token.yml**
 - **reboot.yml**
+- **set-power-saving.yml**
 - **update.yml**
 
-## ansible/roles
+## ansible/tftproot
 
-## ansible/roles/host_management
-
-## ansible/roles/host_management/handlers
-
-## ansible/roles/host_management/tasks
-
-## ansible/roles/host_management/vars
-
-## docker
+## docker-old
 - **Dockerfile**
 
-## docker/config
+## docker-old/config
 - **odoo.conf**
 
-## docker/scripts
+## docker-old/scripts
 - **install_addon_requirements.sh**
 - **overwrite_from_upstream.sh**
 - **overwrite_from_upstream_db.sh**

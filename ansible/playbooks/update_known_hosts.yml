@@ -1,0 +1,47 @@
+- name: Refresh known_hosts
+  hosts: all
+  become: false
+  gather_facts: false
+  tasks:
+    - name: Remove known_hosts backup file
+      delegate_to: localhost
+      ansible.builtin.file:
+        path: "{{ lookup('env', 'HOME') }}/.ssh/known_hosts.old"
+        state: absent
+      failed_when: false
+
+    - name: Remove hosts from known_hosts by inventory name
+      delegate_to: localhost
+      ansible.builtin.known_hosts:
+        name: "{{ inventory_hostname }}"
+        state: absent
+      failed_when: false
+
+    - name: Remove hosts from known_hosts by hostname
+      delegate_to: localhost
+      ansible.builtin.known_hosts:
+        name: "{{ ansible_host }}"
+        state: absent
+      failed_when: false
+
+    - name: Remove hosts from known_hosts by IP
+      delegate_to: localhost
+      ansible.builtin.known_hosts:
+        name: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] | default(ansible_host) }}"
+        state: absent
+      failed_when: false
+
+#    - name: Add hosts to known_hosts by inventory name
+#      delegate_to: localhost
+#      ansible.builtin.known_hosts:
+#        name: "{{ inventory_hostname }}"
+#        key: "{{ lookup('pipe', 'ssh-keyscan -T 10 ' + inventory_hostname) }}"
+#        state: present
+#
+#    - name: Add hosts to known_hosts by IP address (if different from hostname)
+#      delegate_to: localhost
+#      ansible.builtin.known_hosts:
+#        name: "{{ ansible_host }}"
+#        key: "{{ lookup('pipe', 'ssh-keyscan -T 10 ' + ansible_host) }}"
+#        state: present
+#      when: inventory_hostname != ansible_host

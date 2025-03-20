@@ -1,5 +1,5 @@
 - name: Reboot node
-  hosts: cluster
+  hosts: all
   become: true
   tasks:
     - name: Reboot the system

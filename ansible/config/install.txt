@@ -1,0 +1,99 @@
+### Debian Preseed Configuration File ###
+
+# Localization
+d-i debian-installer/locale string en_US.UTF-8
+d-i keyboard-configuration/xkb-keymap select us
+
+# Network configuration
+d-i netcfg/choose_interface select auto
+d-i netcfg/get_hostname string debian
+d-i netcfg/get_domain string local
+d-i netcfg/hostname string debian
+
+d-i netcfg/wireless_wep string
+# For WPA-PSK networks:
+d-i netcfg/wireless_essid string ShinyComputers-Home
+d-i netcfg/wireless_essid_again string ShinyComputers-Home
+d-i netcfg/wireless_security_type select wpa
+d-i netcfg/wireless_wpa_psk string 3f4e386e59815db169778affd229b02bba4c5331ed3130ccf4c42c694186cc57
+
+# Mirror settings
+d-i mirror/country string manual
+d-i mirror/http/hostname string deb.debian.org
+d-i mirror/http/directory string /debian
+d-i mirror/http/proxy string
+
+# Account setup
+d-i passwd/user-fullname string Chris Busillo
+d-i passwd/username string cbusillo
+d-i passwd/user-password-crypted password $6$HOSrby.1QjN67dpl$fYZ.w7gia2ceb5J8JUtAoj/k7wafF2QTtiBMDkXOo0l3uHaV13kWui/C.TFWFLU6SYjcifKSNz9CQmyLAiVU90
+
+# Skip creation of a root account (normal user account will be able to use sudo)
+d-i passwd/root-login boolean false
+
+# Clock and time zone setup
+d-i clock-setup/utc boolean true
+d-i time/zone string UTC
+d-i clock-setup/ntp boolean true
+
+d-i partman-basicfilesystems/no_swap boolean false
+
+d-i partman-auto/expert_recipe string \
+      root :: \
+              538 538 1075 free \
+                      $iflabel{ gpt } \
+                      $reusemethod{ } \
+                      method{ efi } \
+                      format{ } \
+              . \
+              1000 10000 -1 ext4 \
+                      method{ format } \
+                      format{ } \
+                      use_filesystem{ } \
+                      filesystem{ ext4 } \
+                      mountpoint{ / } \
+              .
+
+d-i partman-auto/choose_recipe select root
+d-i partman/default_filesystem string ext4
+d-i partman-auto/method string regular
+d-i    partman-lvm/device_remove_lvm string boolean true
+d-i    partman-md/device_remove_md string boolean true
+d-i    partman-lvm/confirm string boolean true
+
+d-i    partman/confirm_write_new_label string boolean true
+d-i    partman/choose_partition select finish
+d-i    partman/confirm string boolean true
+d-i    partman/confirm_nooverwrite string boolean true
+
+# Base system installation
+d-i base-installer/install-recommends boolean true
+d-i base-installer/kernel/image string linux-image-amd64
+
+# Package selection
+tasksel tasksel/first multiselect standard, ssh-server
+d-i pkgsel/include string sudo openssh-server curl wget
+
+# Package installation
+d-i pkgsel/upgrade select full-upgrade
+d-i pkgsel/update-policy select none
+
+# Grub bootloader installation for EFI
+d-i grub-installer/only_debian boolean true
+d-i grub-installer/with_other_os boolean true
+#d-i grub-installer/bootdev string default
+d-i grub-installer/force-efi-extra-removable boolean true
+
+# Avoid that last message about the install being complete
+d-i finish-install/reboot_in_progress note
+
+# Custom commands
+d-i preseed/late_command string \
+    wget -O /target/tmp/authorized_keys http://cluster-install.shiny/id_rsa.pub; \
+    mkdir -p /target/home/cbusillo/.ssh; \
+    mv /target/tmp/authorized_keys /target/home/cbusillo/.ssh/authorized_keys; \
+    chown -R 1000:1000 /target/home/cbusillo/.ssh; \
+    chmod 700 /target/home/cbusillo/.ssh; \
+    chmod 600 /target/home/cbusillo/.ssh/authorized_keys; \
+    echo "cbusillo ALL=(ALL) NOPASSWD:ALL" > /target/etc/sudoers.d/cbusillo; \
+    chmod 440 /target/etc/sudoers.d/cbusillo

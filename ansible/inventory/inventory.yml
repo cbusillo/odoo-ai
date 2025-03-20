@@ -1,33 +1,62 @@
 all:
   hosts:
     cluster-macpro-0.shiny:
-      ansible_host: cluster-macpro-0.shiny
-      ansible_user: cbusillo
-    cluster-macbook-0.opw:
-      ansible_host: cluster-macbook-0.opw
-      ansible_user: cbusillo
-    cluster-spin-0.mike:
-      ansible_host: cluster-spin-0.mike
-      ansible_user: cbusillo
-    cluster-macbook-1.shiny:
-      ansible_host: cluster-macbook-1.shiny
-      ansible_user: cbusillo
-    cluster-macbook-1.opw:
-      ansible_host: cluster-macbook-1.opw
-      ansible_user: cbusillo
     cluster-nuc-0.shiny:
-      ansible_host: cluster-nuc-0.shiny
-      ansible_user: cbusillo
+    cluster-macbook-0.opw:
+    cluster-macbook-1.opw:
+    cluster-macbook-2.shiny:
+    cluster-spin-0.mike:
 
-k3s_cluster:
+shiny_cluster:
+  vars:
+    token: token1
   children:
-    server:
+    shiny_servers:
       hosts:
         cluster-macpro-0.shiny:
-        cluster-macbook-0.opw:
-        cluster-acer-0.mike:
-    agent:
-      hosts:
-        cluster-macbook-1.shiny:
-        cluster-macbook-1.opw:
         cluster-nuc-0.shiny:
+        cluster-macbook-2.shiny:
+      vars:
+        k3s_control_node: true
+        k3s_etcd_datastore: true
+
+    shiny_agents:
+      hosts:
+      vars:
+        k3s_control_node: false
+        k3s_etcd_datastore: false
+
+opw_cluster:
+  vars:
+    token: token2
+  children:
+    opw_servers:
+      hosts:
+        cluster-macbook-0.opw:
+      vars:
+        k3s_control_node: true
+        k3s_etcd_datastore: false
+
+    opw_agents:
+      hosts:
+        cluster-macbook-1.opw:
+      vars:
+        k3s_control_node: false
+        k3s_etcd_datastore: false
+
+mike_cluster:
+  vars:
+    token: token3
+  children:
+    mike_servers:
+      hosts:
+        cluster-spin-0.mike:
+      vars:
+        k3s_control_node: true
+        k3s_etcd_datastore: false
+
+    mike_agents:
+      hosts:
+      vars:
+        k3s_control_node: false
+        k3s_etcd_datastore: false

@@ -1,0 +1,122 @@
+- name: Install GPU drivers for K3s nodes
+  hosts: all
+  become: true
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install CPU microcode based on processor
+      block:
+        - name: Check CPU vendor
+          shell: lscpu | grep "Vendor ID" | awk '{print $3}'
+          register: cpu_vendor
+          changed_when: false
+
+        - name: Install Intel microcode
+          apt:
+            name: intel-microcode
+            state: present
+          when: cpu_vendor.stdout == "GenuineIntel"
+
+        - name: Install AMD microcode
+          apt:
+            name: amd64-microcode
+            state: present
+          when: cpu_vendor.stdout == "AuthenticAMD"
+
+    - name: Detect GPU hardware
+      shell: lspci -nn | grep -i 'vga\|3d\|display'
+      register: gpu_info
+      changed_when: false
+      failed_when: false
+
+    - name: Set GPU type facts
+      set_fact:
+        has_nvidia: "{{ gpu_info.stdout | regex_search('NVIDIA', ignorecase=True) | default('', true) | length > 0 }}"
+        has_amd: "{{ gpu_info.stdout | regex_search('AMD/ATI', ignorecase=True) | default('', true) | length > 0 }}"
+        has_intel: "{{ gpu_info.stdout | regex_search('Intel', ignorecase=True) | default('', true) | length > 0 }}"
+
+    - name: Install common packages
+      apt:
+        name:
+          - firmware-misc-nonfree
+        state: present
+
+    - name: Install AMD GPU drivers
+      apt:
+        name:
+          - firmware-amd-graphics
+          - mesa-opencl-icd
+        state: present
+      when: has_amd | bool
+
+    - name: Install Intel GPU drivers
+      apt:
+        name:
+          - intel-gpu-tools
+          - intel-media-va-driver
+          - intel-opencl-icd
+        state: present
+      when: has_intel | bool
+
+    - name: Install NVIDIA GPU drivers
+      block:
+        - name: Install NVIDIA drivers
+          apt:
+            name:
+              - nvidia-driver
+            state: present
+          register: nvidia_driver_install
+
+        - name: Add NVIDIA Container Toolkit repository key
+          get_url:
+            url: https://nvidia.github.io/libnvidia-container/gpgkey
+            dest: /tmp/nvidia-gpgkey
+          register: nvidia_key
+
+        - name: Add NVIDIA GPG key to apt keyring
+          shell: cat /tmp/nvidia-gpgkey | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+          args:
+            creates: /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+          when: nvidia_key is changed
+
+        - name: Add NVIDIA Container Toolkit repository
+          get_url:
+            url: https://nvidia.github.io/libnvidia-container/debian12/libnvidia-container.list
+            dest: /tmp/nvidia-container.list
+          register: nvidia_repo
+
+        - name: Prepare NVIDIA repository with apt signing key
+          shell: >
+            cat /tmp/nvidia-container.list | 
+            sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' > 
+            /etc/apt/sources.list.d/nvidia-container-toolkit.list
+          args:
+            creates: /etc/apt/sources.list.d/nvidia-container-toolkit.list
+          when: nvidia_repo is changed
+
+        - name: Update apt cache after adding NVIDIA repository
+          apt:
+            update_cache: yes
+          when: nvidia_repo is changed
+
+        - name: Install NVIDIA Container Toolkit
+          apt:
+            name:
+              - nvidia-container-toolkit
+            state: present
+
+        - name: Configure NVIDIA Container Toolkit for containerd
+          command: nvidia-ctk runtime configure --runtime=containerd
+          register: nvidia_ctk_result
+          changed_when: "'Written config' in nvidia_ctk_result.stdout"
+
+        - name: Restart K3s service
+          systemd:
+            name: k3s
+            state: restarted
+          when: nvidia_ctk_result is changed
+      when: has_nvidia | bool
+

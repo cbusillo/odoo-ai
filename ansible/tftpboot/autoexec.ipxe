@@ -1,7 +1,0 @@
-#!ipxe
-dhcp
-
-echo Booting Debian Installer...
-kernel http://cluster-install.shiny/debian12/linux initrd=initrd.gz auto=true priority=critical url=http://cluster-install.shiny/install.txt
-initrd http://cluster-install.shiny/debian12/initrd.gz
-boot

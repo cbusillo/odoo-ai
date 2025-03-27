@@ -39,7 +39,7 @@ services:
     build:
       <<: *build-base
     command:
-      - /volumes/scripts/overwrite_from_upstream.sh
+      - /volumes/scripts/docker_overwrite_from_upstream.sh
 
 volumes:
   odoo_data:

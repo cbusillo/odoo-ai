@@ -42,6 +42,12 @@ services:
     command:
       - /volumes/scripts/overwrite_from_upstream.sh
 
+  shell:
+    <<: *odoo-base
+    command: odoo shell -d ${ODOO_DB}
+    tty: true
+    ports: [ ]
+
 volumes:
   odoo_data:
   odoo-db-data:

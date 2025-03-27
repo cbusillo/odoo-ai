@@ -23,6 +23,7 @@ services:
       - odoo_data:/volumes/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
   database:
     image: postgres:17
     restart: unless-stopped
@@ -39,7 +40,7 @@ services:
     build:
       <<: *build-base
     command:
-      - /volumes/scripts/docker_overwrite_from_upstream.sh
+      - /volumes/scripts/overwrite_from_upstream.sh
 
 volumes:
   odoo_data:

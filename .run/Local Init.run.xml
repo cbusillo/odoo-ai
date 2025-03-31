@@ -1,17 +1,24 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Local Init" type="ShConfigurationType">
-    <option name="SCRIPT_TEXT" value="" />
-    <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
-    <option name="SCRIPT_PATH" value="$PROJECT_DIR$/tools/docker_overwrite_from_upstream.sh" />
-    <option name="SCRIPT_OPTIONS" value="" />
-    <option name="INDEPENDENT_SCRIPT_WORKING_DIRECTORY" value="true" />
-    <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$/tools" />
-    <option name="INDEPENDENT_INTERPRETER_PATH" value="true" />
-    <option name="INTERPRETER_PATH" value="/bin/zsh" />
-    <option name="INTERPRETER_OPTIONS" value="" />
-    <option name="EXECUTE_IN_TERMINAL" value="true" />
-    <option name="EXECUTE_SCRIPT_FILE" value="true" />
-    <envs />
+  <configuration default="false" name="Local Init" type="docker-deploy" factoryName="docker-compose.yml" server-name="Docker">
+    <deployment type="docker-compose.yml">
+      <settings>
+        <option name="envFilePath" value="" />
+        <option name="commandLineOptions" value="--build" />
+        <option name="secondarySourceFiles">
+          <list>
+            <option value="docker-compose.override.yml" />
+          </list>
+        </option>
+        <option name="services">
+          <list>
+            <option value="overwrite-from-upstream" />
+          </list>
+        </option>
+        <option name="sourceFilePath" value="docker-compose.yml" />
+        <option name="upAbortOnContainerExit" value="true" />
+        <option name="upDetach" value="false" />
+      </settings>
+    </deployment>
     <method v="2" />
   </configuration>
 </component>

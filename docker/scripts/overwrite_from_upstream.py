@@ -8,11 +8,9 @@ from pathlib import Path
 
 import psycopg2
 
-from odoo.exceptions import UserError
 from psycopg2 import sql
-from psycopg2._psycopg import connection
+from psycopg2.extensions import connection
 from pydantic import Field, SecretStr
-from pydantic_core import ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logging.basicConfig(level=logging.INFO)
@@ -68,7 +66,7 @@ class UpstreamServerSettings(BaseSettings):
 
 class ShopifySettings(BaseSettings):
     model_config = SettingsConfigDict(case_sensitive=False)
-    shop_url: str = Field(..., alias="SHOPIFY_STORE_URL")
+    shop_url_key: str = Field(..., alias="SHOPIFY_STORE_URL_KEY")
     api_token: SecretStr = Field(..., alias="SHOPIFY_API_TOKEN")
     api_version: str = Field(..., alias="SHOPIFY_API_VERSION")
 
@@ -200,7 +198,7 @@ class OdooUpstreamRestorer:
         # noinspection PyArgumentList
         settings = ShopifySettings()
         sql_calls: list[SqlCall] = [
-            SqlCall("ir.config_parameter", KeyValuePair("value", settings.shop_url), KeyValuePair("key", "shopify.shop_url")),
+            SqlCall("ir.config_parameter", KeyValuePair("value", settings.shop_url_key), KeyValuePair("key", "shopify.shop_url")),
             SqlCall(
                 "ir.config_parameter",
                 KeyValuePair("value", settings.api_token.get_secret_value()),
@@ -243,8 +241,14 @@ class OdooUpstreamRestorer:
             raise OdooRestorerError("Filestore rsync failed.")
         _logger.info("Filestore overwrite completed.")
         if do_sanitize:
-            self.sanitize_database()
-            self.update_shopify_config()
+            try:
+                self.sanitize_database()
+                self.update_shopify_config()
+                self.local.db_conn.commit()
+            except OdooDatabaseUpdateError:
+                self.drop_database()
+                raise
+
         self.update_addons()
         _logger.info("Upstream overwrite completed successfully.")
 
@@ -255,8 +259,4 @@ if __name__ == "__main__":
     # noinspection PyArgumentList
     upstream_settings = UpstreamServerSettings()
     restore_upstream_to_local = OdooUpstreamRestorer(local_settings, upstream_settings)
-    try:
-        restore_upstream_to_local.run()
-    except OdooDatabaseUpdateError as exc:
-        restore_upstream_to_local.drop_database()
-        raise
+    restore_upstream_to_local.run()

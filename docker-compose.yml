@@ -7,8 +7,9 @@ x-build-base: &build-base
     GITHUB_TOKEN: ${GITHUB_TOKEN:-}
     DEV_MODE: ${DEV_MODE:-}
 
+name: odoo-opw
 services:
-  odoo: &odoo-base
+  web: &odoo-base
     build:
       <<: *build-base
       target: odoo-base
@@ -17,8 +18,6 @@ services:
     ports:
       - "8069:8069"
     volumes:
-      - ./addons:/volumes/addons
-      - ./docker:/docker
       - ~/.ssh:/home/ubuntu/.ssh:ro
       - odoo_data:/volumes/data
     extra_hosts:
@@ -40,11 +39,11 @@ services:
     build:
       <<: *build-base
     command:
-      - /volumes/scripts/overwrite_from_upstream.sh
+      - /volumes/scripts/overwrite_from_upstream.py
 
   shell:
     <<: *odoo-base
-    command: odoo shell -d ${ODOO_DB}
+    command: odoo shell -d ${ODOO_DB_NAME}
     tty: true
     ports: [ ]
 

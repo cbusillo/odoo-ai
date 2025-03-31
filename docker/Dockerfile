@@ -5,7 +5,8 @@ ARG ODOO_ENTERPRISE_REPOSITORY
 ARG GITHUB_TOKEN
 ARG ODOO_VERSION
 
-RUN if [[ -n "${ODOO_ENTERPRISE_REPOSITORY}" ]] ; then \
+RUN echo "Cloning Enterprise Addons from ${ODOO_ENTERPRISE_REPOSITORY} branch ${ODOO_VERSION}" && \
+    if [[ -n "${ODOO_ENTERPRISE_REPOSITORY}" ]] ; then \
       git clone --branch ${ODOO_VERSION} --single-branch --depth 1 https://${GITHUB_TOKEN}@github.com/${ODOO_ENTERPRISE_REPOSITORY} /enterprise; \
     else \
       echo "ODOO_ENTERPRISE_REPOSITORY is empty; skipping clone."; \
@@ -26,9 +27,9 @@ RUN echo "/odoo" > /venv/lib/python${PYTHON_VERSION}/site-packages/odoo_local.pt
     && echo "/opt/odoo-upgrade" > /venv/lib/python${PYTHON_VERSION}/site-packages/upgrade_utils.pth
 
 COPY --from=enterprise /enterprise /volumes/enterprise
-COPY docker/config/odoo.conf /volumes/config/odoo.conf
-COPY docker/scripts /volumes/scripts
-COPY addons /volumes/addons
+COPY /docker/config /volumes/config
+COPY /docker/scripts /volumes/scripts
+COPY /addons /volumes/addons
 
 ARG DEV_MODE=false
 

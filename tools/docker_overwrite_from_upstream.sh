@@ -2,7 +2,7 @@
 set -e
 
 echo "Overwriting from production..."
-docker compose stop odoo database
+docker compose stop web database
 docker compose run --rm overwrite-from-upstream
 echo "Finished pulling from prod."
 

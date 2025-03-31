@@ -70,7 +70,9 @@
 - **Dev Pull.run.xml**
 - **Index Project.run.xml**
 - **Local Init.run.xml**
+- **Odoo Shell.run.xml**
 - **Odoo.run.xml**
+- **Testing Init.run.xml**
 
 ## addons
 
@@ -157,7 +159,8 @@
 - **product_product.py**
   - Class `ProductProduct` with methods: update_quantity
 - **product_template.py**
-  - Class `ProductTemplate` with methods: read_group, create, write, _track_template, _compute_is_ready_for_sale_last_enabled_date, _compute_name_with_tags_length, _compute_repairs, _compute_open_repair_count, _compute_repair_state, _compute_image_1920, _inverse_image_1920, _compute_shopify_urls, _check_sku, get_next_sku, _check_dimension_values, _compute_first_mpn, get_list_of_mpns, _compute_image_count, _compute_has_recent_messages, name_get, _check_mpn_bin, _onchange_format_mpn_upper, _onchange_format_bin_upper, find_new_products_with_same_mpn, check_for_conflicting_products, _check_fields_and_images, _check_missing_fields, _check_missing_images_or_small_images, _post_missing_data_message, print_bin_labels, print_product_labels, enable_ready_for_sale, _compute_reference_product, _compute_template_name_with_dismantle_notes, _compute_display_name, _compute_motor_product_computed_name, _compute_ready_to_list, reset_name, replace_template_tags, _resolve_tag_value, _apply_tag_values, create_repair_order, action_open_repairs
+  - Class `ProductTemplateGraphPriceCost` with methods: init
+  - Class `ProductTemplate` with methods: read_group, create, write, _track_template, _compute_initial_price_total, _compute_initial_cost_total, _compute_is_ready_for_sale_last_enabled_date, _compute_name_with_tags_length, _compute_repairs, _compute_open_repair_count, _compute_repair_state, _compute_image_1920, _inverse_image_1920, _compute_shopify_urls, _check_sku, get_next_sku, _check_dimension_values, _compute_first_mpn, get_list_of_mpns, _compute_image_count, _compute_has_recent_messages, name_get, _check_mpn_bin, _onchange_format_mpn_upper, _onchange_format_bin_upper, find_new_products_with_same_mpn, check_for_conflicting_products, _check_fields_and_images, _check_missing_fields, _check_missing_images_or_small_images, _post_missing_data_message, print_bin_labels, print_product_labels, enable_ready_for_sale, _compute_reference_product, _compute_template_name_with_dismantle_notes, _compute_display_name, _compute_motor_product_computed_name, _compute_ready_to_list, reset_name, replace_template_tags, _resolve_tag_value, _apply_tag_values, create_repair_order, action_open_repairs
 - **repair_order.py**
   - Class `RepairOrder` with methods: _compute_total_estimated_cost, action_repair_done
 - **res_users.py**
@@ -251,6 +254,7 @@
 - **product_type_views.xml**
 - **repair_order_views.xml**
 - **res_users_views.xml**
+- **stock_picking_type.xml**
 
 ## addons/product_connect/wizards
 - **__init__.py**
@@ -264,10 +268,18 @@
 - **Dockerfile**
 
 ## docker/config
+- **_generated.conf**
 - **odoo.conf**
 
 ## docker/scripts
 - **install_addon_requirements.sh**
+- **override_from_upstream.py**
+  - Class `ServerType` (no methods)
+  - Class `OdooServer` with methods: __init__, __repr__
+  - Class `OdooBackup` with methods: __init__, __repr__
+  - Class `Server` with methods: __init__, __repr__, get_from_env, create_ssh_tunnel
+  - Class `DbServer` with methods: __init__, __repr__, get_db_url, open_db_connection, check_db_exists
+  - Class `FileStoreServer` with methods: __init__, __repr__
 - **overwrite_from_upstream.sh**
 - **overwrite_from_upstream_db.sh**
 - **sanitize_db.py**

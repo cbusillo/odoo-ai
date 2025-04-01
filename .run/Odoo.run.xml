@@ -8,14 +8,21 @@
       <env name="PYTHONUNBUFFERED" value="1" />
     </envs>
     <option name="SDK_HOME" value="" />
-    <option name="SDK_NAME" value="Remote Python 3.12.3 Docker Compose (odoo)" />
+    <option name="SDK_NAME" value="Remote Python 3.12.3 Docker Compose (web)" />
     <option name="WORKING_DIRECTORY" value="" />
     <option name="IS_MODULE_SDK" value="false" />
     <option name="ADD_CONTENT_ROOTS" value="true" />
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+    <PathMappingSettings>
+      <option name="pathMappings">
+        <list>
+          <mapping local-root="$PROJECT_DIR$/addons" remote-root="/volumes/addons" />
+        </list>
+      </option>
+    </PathMappingSettings>
     <option name="SCRIPT_NAME" value="/odoo/odoo-bin" />
-    <option name="PARAMETERS" value="--dev all --update product_connect" />
+    <option name="PARAMETERS" value="--update product_connect --dev all" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="true" />
     <method v="2" />

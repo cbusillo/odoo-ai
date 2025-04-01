@@ -46,7 +46,7 @@ class SqlCall:
 
 
 class LocalServerSettings(BaseSettings):
-    model_config = SettingsConfigDict(case_sensitive=False)
+    model_config = SettingsConfigDict(case_sensitive=False, env_file=".env")
     host: str = Field(..., alias="ODOO_DB_HOST")
     port: int = Field(5432, alias="ODOO_DB_PORT")
     db_user: str = Field(..., alias="ODOO_DB_USER")
@@ -56,7 +56,7 @@ class LocalServerSettings(BaseSettings):
 
 
 class UpstreamServerSettings(BaseSettings):
-    model_config = SettingsConfigDict(case_sensitive=False)
+    model_config = SettingsConfigDict(case_sensitive=False, env_file=".env")
     host: str = Field(..., alias="ODOO_UPSTREAM_HOST")
     user: str = Field(..., alias="ODOO_UPSTREAM_USER")
     db_name: str = Field(..., alias="ODOO_UPSTREAM_DB_NAME")
@@ -65,7 +65,7 @@ class UpstreamServerSettings(BaseSettings):
 
 
 class ShopifySettings(BaseSettings):
-    model_config = SettingsConfigDict(case_sensitive=False)
+    model_config = SettingsConfigDict(case_sensitive=False, env_file=".env")
     shop_url_key: str = Field(..., alias="SHOPIFY_STORE_URL_KEY")
     api_token: SecretStr = Field(..., alias="SHOPIFY_API_TOKEN")
     api_version: str = Field(..., alias="SHOPIFY_API_VERSION")
@@ -197,6 +197,7 @@ class OdooUpstreamRestorer:
     def update_shopify_config(self) -> None:
         # noinspection PyArgumentList
         settings = ShopifySettings()
+
         sql_calls: list[SqlCall] = [
             # TODO: Remove this first SQL call after pushing the new version
             SqlCall(
@@ -228,6 +229,22 @@ class OdooUpstreamRestorer:
             except psycopg2.Error as error:
                 raise OdooDatabaseUpdateError(f"Failed to update Shopify configuration: {error}") from error
 
+    def clear_shopify_ids(self) -> None:
+        model = "product.product"
+        fields = [
+            "shopify_created_at",
+            "shopify_last_exported",
+            "shopify_condition_id",
+            "shopify_variant_id",
+            "shopify_product_id",
+        ]
+        for field in fields:
+            sql_call = SqlCall(model, KeyValuePair(field))
+            try:
+                self.call_odoo_sql(sql_call, SqlCallType.UPDATE)
+            except psycopg2.Error as error:
+                raise OdooDatabaseUpdateError(f"Failed to clear Shopify IDs: {error}") from error
+
     def drop_database(self) -> None:
         _logger.info("Rolling back database update: dropping database")
         self.terminate_all_db_connections()
@@ -256,6 +273,7 @@ class OdooUpstreamRestorer:
             try:
                 self.sanitize_database()
                 self.update_shopify_config()
+                self.clear_shopify_ids()
                 self.local.db_conn.commit()
             except OdooDatabaseUpdateError:
                 self.drop_database()

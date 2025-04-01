@@ -198,14 +198,26 @@ class OdooUpstreamRestorer:
         # noinspection PyArgumentList
         settings = ShopifySettings()
         sql_calls: list[SqlCall] = [
-            SqlCall("ir.config_parameter", KeyValuePair("value", settings.shop_url_key), KeyValuePair("key", "shopify.shop_url")),
+            # TODO: Remove this first SQL call after pushing the new version
+            SqlCall(
+                "ir.config_parameter",
+                KeyValuePair("value", settings.shop_url_key),
+                KeyValuePair("key", "shopify.shop_url"),
+            ),
+            SqlCall(
+                "ir.config_parameter",
+                KeyValuePair("value", settings.shop_url_key),
+                KeyValuePair("key", "shopify.shop_url_key"),
+            ),
             SqlCall(
                 "ir.config_parameter",
                 KeyValuePair("value", settings.api_token.get_secret_value()),
                 KeyValuePair("key", "shopify.api_token"),
             ),
             SqlCall(
-                "ir.config_parameter", KeyValuePair("value", settings.api_version), KeyValuePair("key", "shopify.api_version")
+                "ir.config_parameter",
+                KeyValuePair("value", settings.api_version),
+                KeyValuePair("key", "shopify.api_version"),
             ),
         ]
         _logger.info("Updating Shopify configuration...")

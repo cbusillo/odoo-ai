@@ -3,7 +3,6 @@
     <deployment type="docker-compose.yml">
       <settings>
         <option name="envFilePath" value="" />
-        <option name="commandLineOptions" value="--build" />
         <option name="secondarySourceFiles">
           <list>
             <option value="docker-compose.override.yml" />

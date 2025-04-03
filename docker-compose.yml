@@ -34,12 +34,11 @@ services:
       - POSTGRES_USER=${ODOO_DB_USER}
     ports:
       - "5432:5432"
-  overwrite-from-upstream:
+  script-runner:
     <<: *odoo-base
     build:
       <<: *build-base
-    command:
-      - /volumes/scripts/overwrite_from_upstream.py
+    command: [ ]
     ports: [ ]
 
   shell:

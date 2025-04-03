@@ -237,6 +237,7 @@ class OdooUpstreamRestorer:
             "shopify_condition_id",
             "shopify_variant_id",
             "shopify_product_id",
+            "shopify_ebay_category_id",
         ]
         for field in fields:
             sql_call = SqlCall(model, KeyValuePair(field))

@@ -40,6 +40,7 @@ services:
       <<: *build-base
     command: [ ]
     ports: [ ]
+    working_dir: /opt/project
 
   shell:
     <<: *odoo-base

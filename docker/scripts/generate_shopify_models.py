@@ -72,8 +72,8 @@ def main() -> None:
         "queries_path": str(schema_path),
         "target_package_name": client_name,
         "target_package_path": str(services_path),
-        "async_client": True,
         "convert_to_snake_case": True,
+        "async_client": False,
     }
     codegen_client({"tool": {"ariadne-codegen": config_dict}})
 
@@ -88,7 +88,7 @@ def main() -> None:
 # noinspection PyMethodMayBeStatic
 """
 
-    for file in services_path.rglob("*.py"):
+    for file in (services_path / client_name).rglob("*.py"):
         content = file.read_text()
         if not content.startswith(ignore_header):
             content = ignore_header + content

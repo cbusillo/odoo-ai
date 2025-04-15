@@ -37,8 +37,10 @@ sudo -u odoo git pull origin $CURRENT_BRANCH
 
 if [ "$FLAG" = "init" ]; then
     cd ..
-    rm -f init-done.flag
-    ./init-and-run-odoo-dev.sh sync-prod testing
+    set -a
+    source ../.env
+    set +a
+    ./overwrite_from_upstream.py
 fi
 EOF
 

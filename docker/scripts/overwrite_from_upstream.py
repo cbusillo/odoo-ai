@@ -54,7 +54,7 @@ class LocalServerSettings(BaseSettings):
     db_name: str = Field(..., alias="ODOO_DB_NAME")
     db_conn: connection | None = None
     filestore_path: Path = Field(..., alias="ODOO_FILESTORE_PATH")
-    base_url: str = Field(..., alias="ODOO_BASE_URL")
+    base_url: str = Field(None, alias="ODOO_BASE_URL")
 
 
 class UpstreamServerSettings(BaseSettings):
@@ -182,13 +182,16 @@ class OdooUpstreamRestorer:
             SqlCall("ir.config_parameter", KeyValuePair("value", "False"), KeyValuePair("key", "mail.catchall.domain")),
             SqlCall("ir.config_parameter", KeyValuePair("value", "False"), KeyValuePair("key", "mail.catchall.alias")),
             SqlCall("ir.config_parameter", KeyValuePair("value", "False"), KeyValuePair("key", "mail.bounce.alias")),
-            SqlCall(
-                "ir.config_parameter",
-                KeyValuePair("value", self.local.base_url),
-                KeyValuePair("key", "web.base.url"),
-            ),
             SqlCall("ir.cron", KeyValuePair("active", "False")),
         ]
+        if self.local.base_url:
+            sql_calls.append(
+                SqlCall(
+                    "ir.config_parameter",
+                    KeyValuePair("value", self.local.base_url),
+                    KeyValuePair("key", "web.base.url"),
+                )
+            )
 
         _logger.info("Sanitizing database...")
         for sql_call in sql_calls:

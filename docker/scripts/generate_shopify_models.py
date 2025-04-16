@@ -48,7 +48,8 @@ def main() -> None:
         raise RuntimeError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
     addon_path = Path("/volumes/addons/product_connect")
-    schema_path = addon_path / "graphql"
+    queries_path = addon_path / "graphql"
+    schema_path = addon_path / "graphql" / "schema"
     schema_path.mkdir(parents=True, exist_ok=True)
     introspection_file_path = schema_path / f"shopify_schema_{shopify_api_version}.json"
     sdl_file_path = schema_path / f"shopify_schema_{shopify_api_version}.sdl"
@@ -69,7 +70,7 @@ def main() -> None:
 
     config_dict = {
         "schema_path": str(sdl_file_path),
-        "queries_path": str(schema_path),
+        "queries_path": str(queries_path),
         "target_package_name": client_name,
         "target_package_path": str(services_path),
         "convert_to_snake_case": True,

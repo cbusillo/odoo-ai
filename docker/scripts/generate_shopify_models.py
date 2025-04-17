@@ -31,6 +31,7 @@ def save_introspection_json(data: dict, file_path: Path) -> None:
 
 
 def save_schema_sdl(json_data: dict, output_file_path: Path) -> None:
+    # noinspection PyTypeChecker
     schema = build_client_schema(json_data)
     sdl = print_schema(schema)
     sdl = re.sub(r'""".*?"""', '""', sdl, flags=re.DOTALL)

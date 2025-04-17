@@ -4,6 +4,7 @@ from pathlib import Path
 
 # noinspection PyPackageRequirements
 from rich.console import Console
+
 # noinspection PyPackageRequirements
 from rich.table import Table
 
@@ -55,7 +56,7 @@ def calculate_loc_and_size(start_dir: str = ".") -> None:
             try:
                 file_size = file.stat().st_size / 1024
 
-                with file.open("r", encoding="utf-8", errors="ignore") as f:
+                with file.open(encoding="utf-8", errors="ignore") as f:
                     line_count = sum(1 for _ in f)
 
                 results.append((file.stem, line_count, file_size))

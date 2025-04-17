@@ -4,8 +4,8 @@
 - Outboard Parts Warehouse
 - Production site: https://odoo.outboardpartswarehouse.com/
 - Local development: http://localhost:8069/
-- Primary Business: Buying outboard motors, and parting them out on eBay and Shopify
- - GitHub Repository: cbusillo/odoo-addons
+- Primary Business: Buying outboard motors and parting them out on eBay and Shopify
+- GitHub Repository: cbusillo/odoo-addons
 - Permanent Branches: opw-prod, opw-testing
 
 # Development Tools
@@ -21,7 +21,7 @@
 # Code Standards
 
 - Pythonic, clean, and elegant code
-- Follow Odoo core development patterns and best practices
+- Follow Odoo's core development patterns and best practices
 - Proper use of inheritance and extension mechanisms
 - Follow standard Odoo project structure and logging patterns
 - PEP 8 compliance

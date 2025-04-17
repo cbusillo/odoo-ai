@@ -75,6 +75,9 @@ def main() -> None:
         "target_package_path": str(services_path),
         "convert_to_snake_case": True,
         "async_client": False,
+        "generate_variables": True,
+        "group_operations": True,
+        "package_root_init": True,
     }
     codegen_client({"tool": {"ariadne-codegen": config_dict}})
 

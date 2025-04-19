@@ -9,7 +9,7 @@ from graphql import get_introspection_query, build_client_schema, print_schema
 from ariadne_codegen.main import client as codegen_client
 
 
-def fetch_shopify_introspection(endpoint: str, token: str) -> dict:
+def fetch_shopify_introspection(endpoint: str, token: str) -> dict[str, dict[str, str]]:
     introspection_query = get_introspection_query()
     headers = {
         "Content-Type": "application/json",
@@ -25,12 +25,12 @@ def fetch_shopify_introspection(endpoint: str, token: str) -> dict:
     return result["data"]
 
 
-def save_introspection_json(data: dict, file_path: Path) -> None:
+def save_introspection_json(data: dict[str, dict[str, str]], file_path: Path) -> None:
     file_path.write_text(json.dumps(data, indent=2))
     print(f"Saved introspection JSON schema to {file_path}")
 
 
-def save_schema_sdl(json_data: dict, output_file_path: Path) -> None:
+def save_schema_sdl(json_data: dict[str, dict[str, str]], output_file_path: Path) -> None:
     # noinspection PyTypeChecker
     schema = build_client_schema(json_data)
     sdl = print_schema(schema)
@@ -79,6 +79,29 @@ def main() -> None:
         "generate_variables": True,
         "group_operations": True,
         "package_root_init": True,
+        "plugins": [
+            "ariadne_codegen.contrib.shorter_results.ShorterResultsPlugin",
+            "ariadne_codegen.contrib.extract_operations.ExtractOperationsPlugin",
+        ],
+        "scalars": {
+            "DateTime": {
+                "type": "datetime.datetime",
+                "parse": "odoo.addons.product_connect.utils.shopify_helpers.parse_shopify_datetime_to_utc",
+                "serialize": "odoo.addons.product_connect.utils.shopify_helpers.format_datetime_for_shopify",
+            },
+            "Date": {"type": "datetime.date"},
+            "Money": {"type": "decimal.Decimal"},
+            "Decimal": {"type": "decimal.Decimal"},
+            "UnsignedInt64": {"type": "int"},
+            "BigInt": {"type": "int"},
+            "JSON": {"type": "str"},
+            "URL": {"type": "pydantic.AnyUrl"},
+            "HTML": {"type": "str"},
+            "Color": {"type": "str"},
+            "ARN": {"type": "str"},
+            "UtcOffset": {"type": "datetime.timedelta"},
+            "FormattedString": {"type": "str"},
+        },
     }
     codegen_client({"tool": {"ariadne-codegen": config_dict}})
 

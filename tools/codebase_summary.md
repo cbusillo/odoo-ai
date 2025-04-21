@@ -4,8 +4,8 @@
 - Outboard Parts Warehouse
 - Production site: https://odoo.outboardpartswarehouse.com/
 - Local development: http://localhost:8069/
-- Primary Business: Buying outboard motors and parting them out on eBay and Shopify
-- GitHub Repository: cbusillo/odoo-addons
+- Primary Business: Buying outboard motors, and parting them out on eBay and Shopify
+ - GitHub Repository: cbusillo/odoo-addons
 - Permanent Branches: opw-prod, opw-testing
 
 # Development Tools
@@ -21,7 +21,7 @@
 # Code Standards
 
 - Pythonic, clean, and elegant code
-- Follow Odoo's core development patterns and best practices
+- Follow Odoo core development patterns and best practices
 - Proper use of inheritance and extension mechanisms
 - Follow standard Odoo project structure and logging patterns
 - PEP 8 compliance
@@ -57,7 +57,6 @@
 # Codebase Summary
 
 ## .
-- **.gitmodules**
 - **docker-compose.override.yml**
 - **docker-compose.yml**
 - **mypy.ini**
@@ -65,19 +64,9 @@
 - **odoo.prod.conf**
 - **odoo.testing.conf**
 
-## .run
-- **Dev Init.run.xml**
-- **Dev Pull.run.xml**
-- **Index Project.run.xml**
-- **Local Init.run.xml**
-- **Odoo Shell.run.xml**
-- **Odoo.run.xml**
-- **Testing Init.run.xml**
-
 ## addons
 
 ## addons/product_connect
-- **.git**
 - **__init__.py**
 - **__manifest__.py**
 - **jsconfig.json**
@@ -95,6 +84,8 @@
 - **__init__.py**
 - **download_controllers.py**
   - Class `SingleDownloadController` with methods: download_single
+- **shopify_webhook.py**
+  - Class `ShopifyWebhook` with methods: webhook
 
 ## addons/product_connect/data
 - **mail_templates.xml**
@@ -108,18 +99,23 @@
 
 ## addons/product_connect/graphql
 - **graphql.config.yml**
+- **shopify_bulk_operation.graphql**
 - **shopify_product.graphql**
+
+## addons/product_connect/graphql/schema
+- **shopify_schema_2025-04.json**
+- **shopify_schema_2025-04.sdl**
 
 ## addons/product_connect/mixins
 - **__init__.py**
 - **image_mixin.py**
-  - Class `ImageMixin` with methods: _compute_attachment, _compute_file_size_kb, _compute_image_dimensions, _reset_image_details, action_open_full_image
+  - Class `ImageMixin` with methods: _mark_for_shopify_product_export, create, write, unlink, _compute_attachment, _compute_file_size_kb, _compute_image_dimensions, _reset_image_details, action_open_full_image
 - **label_mixin.py**
   - Class `LabelMixin` with methods: _print_labels, wrap_text, generate_label_base64, combine_labels_base64
 - **motor_test_condition_mixin.py**
   - Class `MotorTestConditionMixin` with methods: is_condition_met
 - **notification_manager_mixin.py**
-  - Class `NotificationHistory` with methods: cleanup, count_of_recent_notifications, recent_notifications
+  - Class `NotificationHistory` with methods: create, cleanup, count_of_recent_notifications, recent_notifications
   - Class `NotificationManagerMixin` with methods: notify_channel, notify_channel_on_error, send_email_notification_to_admin
 
 ## addons/product_connect/models
@@ -159,16 +155,13 @@
 - **product_product.py**
   - Class `ProductProduct` with methods: update_quantity
 - **product_template.py**
-  - Class `ProductTemplateGraphPriceCost` with methods: init
   - Class `ProductTemplate` with methods: read_group, create, write, _track_template, _compute_initial_price_total, _compute_initial_cost_total, _compute_is_ready_for_sale_last_enabled_date, _compute_name_with_tags_length, _compute_repairs, _compute_open_repair_count, _compute_repair_state, _compute_image_1920, _inverse_image_1920, _compute_shopify_urls, _check_sku, get_next_sku, _check_dimension_values, _compute_first_mpn, get_list_of_mpns, _compute_image_count, _compute_has_recent_messages, name_get, _check_mpn_bin, _onchange_format_mpn_upper, _onchange_format_bin_upper, find_new_products_with_same_mpn, check_for_conflicting_products, _check_fields_and_images, _check_missing_fields, _check_missing_images_or_small_images, _post_missing_data_message, print_bin_labels, print_product_labels, enable_ready_for_sale, _compute_reference_product, _compute_template_name_with_dismantle_notes, _compute_display_name, _compute_motor_product_computed_name, _compute_ready_to_list, reset_name, replace_template_tags, _resolve_tag_value, _apply_tag_values, create_repair_order, action_open_repairs
 - **repair_order.py**
   - Class `RepairOrder` with methods: _compute_total_estimated_cost, action_repair_done
 - **res_users.py**
   - Class `Users` with methods: __str__
 - **shopify_sync.py**
-  - Functions: apply_rate_limit_patch_to_shopify_execute, parse_to_utc, current_utc_time
-  - Class `ShopifySync` with methods: now_in_localtime_formatted, sync_with_shopify, initialize_shopify_session, fetch_import_timestamps, extract_id_from_gid, fetch_shopify_product_edges, execute_graphql_query, extract_sku_bin_from_shopify_product, import_or_update_shopify_product, determine_latest_product_modification_time, finalize_import_and_commit_changes, import_from_shopify, parse_shopify_product_data, map_shopify_to_odoo_product_data, import_product_images_from_shopify, update_product_stock_in_odoo, create_or_update_odoo_product, find_or_add_manufacturer, find_or_add_part_type, update_product_quantity_in_odoo, fetch_and_store_product_image, convert_to_shopify_gid, fetch_first_store_location_id, prepare_odoo_product_image_data_for_export, check_for_shopify_errors, parse_and_validate_shopify_response, setup_sync_environment, fetch_start_timestamp, export_to_shopify
-  - Class `ThrottledError` (no methods)
+  - Class `ShopifySync` with methods: create, _compute_progress_percent, _compute_start_time_human, _compute_end_time_human, _compute_run_time, _fail_stale_runs, _cron_dispatch_next, _execute_mode, _mark_failed, _run_guard, completed_str, is_success, _run_reset_shopify, _run_import_all, _run_export_all, _run_import_then_export, _run_import_changed, _run_export_changed, _run_import_one, _run_export_batch, _run_import_since, _run_export_since
 - **stock_move.py**
   - Class `StockMove` with methods: _compute_line_cost_price
 
@@ -179,6 +172,14 @@
 
 ## addons/product_connect/security
 - **ir.model.access.csv**
+
+## addons/product_connect/services
+- **shopify_product_exporter.py**
+  - Class `ProductExporter` with methods: __init__, export_products_since_last_export, export_products_since_datetime, _find_products_to_export, _find_products_to_export_by_datetime, export_products, export_product, _update_odoo_product, _sync_images_after_export, is_published_on_all_channels, is_published_on_channel, _publish_product, metafield_from_id_value_key, _map_odoo_product_to_shopify_product_set_input
+- **shopify_product_importer.py**
+  - Class `ProductImporter` with methods: __init__, get_last_import_time, import_products_since_last_import, import_products_from_query, import_product_by_id, import_products, import_product, _images_are_in_sync, get_or_create_manufacturer, get_or_create_part_type, import_images_from_shopify, fetch_image_data, _ordered_odoo_media_ids, _ordered_shopify_media_ids, _sync_images_bidirectional, save_odoo_product
+- **shopify_service.py**
+  - Class `ShopifyService` with methods: __init__, client, get_first_location_gid, _create_client, _create_http_client
 
 ## addons/product_connect/static
 
@@ -233,6 +234,13 @@
 ## addons/product_connect/utils
 - **__init__.py**
 - **constants.py**
+- **shopify_helpers.py**
+  - Functions: parse_shopify_datetime_to_utc, format_datetime_for_shopify, parse_shopify_id_from_gid, format_shopify_gid_from_id, parse_shopify_sku_field_to_sku_and_bin, format_sku_bin_for_shopify, determine_latest_odoo_product_modification_time
+  - Class `ShopifyApiError` with methods: __init__
+  - Class `ShopifyDataError` (no methods)
+  - Class `ShopifyMissingSkuFieldError` (no methods)
+  - Class `OdooDataError` with methods: __init__, __str__
+  - Class `OdooMissingSkuError` (no methods)
 
 ## addons/product_connect/views
 - **motor_part_template_views.xml**
@@ -254,7 +262,7 @@
 - **product_type_views.xml**
 - **repair_order_views.xml**
 - **res_users_views.xml**
-- **stock_picking_type.xml**
+- **shopify_sync_views.xml**
 
 ## addons/product_connect/wizards
 - **__init__.py**
@@ -268,26 +276,27 @@
 - **Dockerfile**
 
 ## docker/config
-- **_generated.conf**
 - **odoo.conf**
 
 ## docker/scripts
+- **generate_shopify_models.py**
+  - Functions: fetch_shopify_introspection, save_introspection_json, save_schema_sdl, main
 - **install_addon_requirements.sh**
-- **override_from_upstream.py**
-  - Class `ServerType` (no methods)
-  - Class `OdooServer` with methods: __init__, __repr__
-  - Class `OdooBackup` with methods: __init__, __repr__
-  - Class `Server` with methods: __init__, __repr__, get_from_env, create_ssh_tunnel
-  - Class `DbServer` with methods: __init__, __repr__, get_db_url, open_db_connection, check_db_exists
-  - Class `FileStoreServer` with methods: __init__, __repr__
-- **overwrite_from_upstream.sh**
-- **overwrite_from_upstream_db.sh**
-- **sanitize_db.py**
-  - Functions: sanitize_database
+- **overwrite_from_upstream.py**
+  - Class `OdooRestorerError` (no methods)
+  - Class `OdooDatabaseUpdateError` (no methods)
+  - Class `SqlCallType` (no methods)
+  - Class `KeyValuePair` (no methods)
+  - Class `SqlCall` (no methods)
+  - Class `LocalServerSettings` (no methods)
+  - Class `UpstreamServerSettings` (no methods)
+  - Class `ShopifySettings` (no methods)
+  - Class `OdooUpstreamRestorer` with methods: __init__, run_command, overwrite_filestore, overwrite_database, connect_to_db, terminate_all_db_connections, call_odoo_sql, sanitize_database, update_shopify_config, clear_shopify_ids, drop_database, update_addons, run
+
+## pyproject.toml
 
 ## tools
 - **codebase_summary.md**
-- **docker_overwrite_from_upstream.sh**
 - **files_loc_and_size.py**
   - Functions: matches_pattern, calculate_loc_and_size
 - **init-and-run-odoo-dev-server.sh**

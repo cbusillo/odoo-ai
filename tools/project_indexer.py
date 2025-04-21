@@ -14,6 +14,9 @@ EXCLUDE_DIRS: set[str] = {
     "dist",
     ".mypy_cache",
     "migrations",
+    ".venv",
+    "shopify_client",
+    ".run",
 }
 
 EXCLUDE_FILES: set[str] = {
@@ -26,6 +29,8 @@ EXCLUDE_FILES: set[str] = {
     "*.mmdb",
     "pluralize.js",
     ".DS_Store",
+    ".gitmodules",
+    ".git",
 }
 
 

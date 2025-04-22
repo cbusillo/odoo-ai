@@ -21,7 +21,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 ARG PYTHON_VERSION
-RUN pip install --no-deps --target=/opt/odoo-cleanup odoo-addon-database-cleanup>=18.0.0.0 --extra-index-url https://wheelhouse.odoo-community.org/oca-simple/
+RUN pip install --no-deps --target=/opt/odoo-cleanup odoo-addon-database-cleanup --extra-index-url https://wheelhouse.odoo-community.org/oca-simple/
 RUN pip install --target=/opt/odoo-upgrade git+https://github.com/odoo/upgrade-util
 
 RUN echo "/odoo" > /venv/lib/python${PYTHON_VERSION}/site-packages/odoo_local.pth \

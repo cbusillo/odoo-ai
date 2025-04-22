@@ -71,6 +71,7 @@ class ShopifySettings(BaseSettings):
     shop_url_key: str = Field(..., alias="SHOPIFY_STORE_URL_KEY")
     api_token: SecretStr = Field(..., alias="SHOPIFY_API_TOKEN")
     api_version: str = Field(..., alias="SHOPIFY_API_VERSION")
+    webhook_key: str = Field(..., alias="SHOPIFY_WEBHOOK_KEY")
 
 
 class OdooUpstreamRestorer:
@@ -218,6 +219,11 @@ class OdooUpstreamRestorer:
                 "ir.config_parameter",
                 KeyValuePair("value", settings.api_token.get_secret_value()),
                 KeyValuePair("key", "shopify.api_token"),
+            ),
+            SqlCall(
+                "ir.config_parameter",
+                KeyValuePair("value", settings.webhook_key),
+                KeyValuePair("key", "shopify.webhook_key"),
             ),
         ]
         _logger.info("Updating Shopify configuration...")

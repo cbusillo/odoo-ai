@@ -25,6 +25,7 @@ EXCLUDE_DIRS = {
     ".venv",
     "node_modules",
     ".idea",
+    "shopify_client",
 }
 EXCLUDE_FILES = {
     "*.min.js",

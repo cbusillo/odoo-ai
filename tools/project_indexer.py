@@ -134,8 +134,8 @@ prompt_content = """
 - Outboard Parts Warehouse
 - Production site: https://odoo.outboardpartswarehouse.com/
 - Local development: http://localhost:8069/
-- Primary Business: Buying outboard motors, and parting them out on eBay and Shopify
- - GitHub Repository: cbusillo/odoo-addons
+- Primary Business: Buying outboard motors and parting them out on eBay and Shopify
+- GitHub Repository: cbusillo/odoo-addons
 - Permanent Branches: opw-prod, opw-testing
 
 # Development Tools

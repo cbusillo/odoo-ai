@@ -4,8 +4,8 @@
 - Outboard Parts Warehouse
 - Production site: https://odoo.outboardpartswarehouse.com/
 - Local development: http://localhost:8069/
-- Primary Business: Buying outboard motors, and parting them out on eBay and Shopify
- - GitHub Repository: cbusillo/odoo-addons
+- Primary Business: Buying outboard motors and parting them out on eBay and Shopify
+- GitHub Repository: cbusillo/odoo-addons
 - Permanent Branches: opw-prod, opw-testing
 
 # Development Tools
@@ -161,7 +161,7 @@
 - **res_users.py**
   - Class `Users` with methods: __str__
 - **shopify_sync.py**
-  - Class `ShopifySync` with methods: create, _compute_progress_percent, _compute_start_time_human, _compute_end_time_human, _compute_run_time, _fail_stale_runs, _cron_dispatch_next, _execute_mode, _mark_failed, _run_guard, completed_str, is_success, _run_reset_shopify, _run_import_all, _run_export_all, _run_import_then_export, _run_import_changed, _run_export_changed, _run_import_one, _run_export_batch, _run_import_since, _run_export_since
+  - Class `ShopifySync` with methods: create, unlink, _compute_progress_percent, _compute_start_time_human, _compute_end_time_human, _compute_run_time, _fail_stale_runs, _cron_dispatch_next, _execute_mode, _mark_failed, _run_guard, completed_str, _run_reset_shopify, _run_import_all, _run_export_all, _run_import_then_export, _run_import_changed, _run_export_changed, _run_import_one, _run_export_batch, _run_import_since, _run_export_since
 - **stock_move.py**
   - Class `StockMove` with methods: _compute_line_cost_price
 
@@ -193,6 +193,9 @@
 
 ## addons/product_connect/static/src/js/forms
 - **motor_form.js**
+
+## addons/product_connect/static/src/js/lists
+- **list_autorefresh.js**
 
 ## addons/product_connect/static/src/js/types
 - **qr-scanner.d.ts**
@@ -236,6 +239,7 @@
 - **constants.py**
 - **shopify_helpers.py**
   - Functions: parse_shopify_datetime_to_utc, format_datetime_for_shopify, parse_shopify_id_from_gid, format_shopify_gid_from_id, parse_shopify_sku_field_to_sku_and_bin, format_sku_bin_for_shopify, determine_latest_odoo_product_modification_time
+  - Class `ShopifySyncRunFailed` (no methods)
   - Class `ShopifyApiError` with methods: __init__
   - Class `ShopifyDataError` (no methods)
   - Class `ShopifyMissingSkuFieldError` (no methods)

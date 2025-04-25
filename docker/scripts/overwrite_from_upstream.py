@@ -294,7 +294,14 @@ class OdooUpstreamRestorer:
             if not addon_list:
                 _logger.info("No addons found to update.")
                 return
-            self.run_command(f"odoo --stop-after-init -d {self.local.db_name} --no-http -u {addon_list}")
+            odoo_bin = Path("/odoo/odoo-bin")
+            if not odoo_bin.exists():
+                odoo_bin = Path("/opt/odoo/odoo-base/odoo-bin")
+            command = f"{odoo_bin} --stop-after-init -d {self.local.db_name} --no-http -u {addon_list}"
+            conf = Path("/etc/odoo.conf")
+            if conf.exists():
+                command += f" --config {conf}"
+            self.run_command(command)
         except subprocess.CalledProcessError as update_error:
             raise OdooRestorerError(f"Failed to update addons: {update_error}") from update_error
 

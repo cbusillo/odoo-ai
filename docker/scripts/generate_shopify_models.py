@@ -48,7 +48,7 @@ def main() -> None:
     if missing_vars:
         raise RuntimeError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
-    addon_path = Path("/volumes/addons/product_connect")
+    addon_path = Path("/opt/project/addons/product_connect")
     queries_path = addon_path / "graphql"
     schema_path = addon_path / "graphql" / "schema"
     schema_path.mkdir(parents=True, exist_ok=True)
@@ -76,9 +76,6 @@ def main() -> None:
         "target_package_path": str(services_path),
         "convert_to_snake_case": True,
         "async_client": False,
-        "generate_variables": True,
-        "group_operations": True,
-        "package_root_init": True,
         "plugins": [
             "ariadne_codegen.contrib.shorter_results.ShorterResultsPlugin",
             "ariadne_codegen.contrib.extract_operations.ExtractOperationsPlugin",
@@ -104,24 +101,6 @@ def main() -> None:
         },
     }
     codegen_client({"tool": {"ariadne-codegen": config_dict}})
-
-    ignore_header = """# type: ignore
-# noinspection PyUnreachableCode
-# noinspection PyUnresolvedReferences
-# noinspection PyPackageRequirements
-# noinspection SpellCheckingInspection
-# noinspection PyMissingTypeHints
-# noinspection PyUnusedLocal
-# noinspection PyPep8Naming
-# noinspection PyMethodMayBeStatic
-"""
-
-    for file in (services_path / client_name).rglob("*.py"):
-        content = file.read_text()
-        if not content.startswith(ignore_header):
-            content = ignore_header + content
-            file.write_text(content)
-            print(f"Added ignore header to {file}")
 
     print("\nGeneration complete.")
     print("You should now have a generated client package (e.g., 'shopify_client')")

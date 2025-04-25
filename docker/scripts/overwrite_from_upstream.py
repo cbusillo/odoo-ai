@@ -46,6 +46,7 @@ class SqlCall:
 
 
 class LocalServerSettings(BaseSettings):
+    # noinspection Pydantic
     model_config = SettingsConfigDict(case_sensitive=False, env_file=".env")
     host: str = Field(..., alias="ODOO_DB_HOST")
     port: int = Field(5432, alias="ODOO_DB_PORT")
@@ -58,6 +59,7 @@ class LocalServerSettings(BaseSettings):
 
 
 class UpstreamServerSettings(BaseSettings):
+    # noinspection Pydantic
     model_config = SettingsConfigDict(case_sensitive=False, env_file=".env")
     host: str = Field(..., alias="ODOO_UPSTREAM_HOST")
     user: str = Field(..., alias="ODOO_UPSTREAM_USER")
@@ -67,6 +69,7 @@ class UpstreamServerSettings(BaseSettings):
 
 
 class ShopifySettings(BaseSettings):
+    # noinspection Pydantic
     model_config = SettingsConfigDict(case_sensitive=False, env_file=".env")
     shop_url_key: str = Field(..., alias="SHOPIFY_STORE_URL_KEY")
     api_token: SecretStr = Field(..., alias="SHOPIFY_API_TOKEN")
@@ -141,15 +144,32 @@ class OdooUpstreamRestorer:
         self.connect_to_db()
 
         table = sql_call.model.replace(".", "_")
-        if call_type == SqlCallType.UPDATE:
+        if call_type == SqlCallType.UPDATE or call_type == SqlCallType.INSERT:
             if sql_call.data is None:
                 raise ValueError("Data must be provided for UPDATE SQL call.")
 
-            query = sql.SQL("UPDATE {table} SET {key} = {value}").format(
-                table=sql.Identifier(table),
-                key=sql.Identifier(sql_call.data.key),
-                value=sql.Literal(sql_call.data.value),
-            )
+            if sql_call.where:
+                if sql_call.where.value is None:
+                    raise ValueError("Value must be provided for WHERE clause.")
+
+                query = sql.SQL(
+                    "INSERT INTO {table} ({where_col}, {data_col}) "
+                    "VALUES ({where_val}, {data_val}) "
+                    "ON CONFLICT ({where_col}) DO UPDATE "
+                    "SET {data_col} = EXCLUDED.{data_col}"
+                ).format(
+                    table=sql.Identifier(table),
+                    where_col=sql.Identifier(sql_call.where.key),
+                    data_col=sql.Identifier(sql_call.data.key),
+                    where_val=sql.Literal(sql_call.where.value),
+                    data_val=sql.Literal(sql_call.data.value),
+                )
+            else:
+                query = sql.SQL("UPDATE {table} SET {key} = {value}").format(
+                    table=sql.Identifier(table),
+                    key=sql.Identifier(sql_call.data.key),
+                    value=sql.Literal(sql_call.data.value),
+                )
         elif call_type == SqlCallType.SELECT:
             if sql_call.data and sql_call.data.key:
                 query = sql.SQL("SELECT {key} FROM {table}").format(
@@ -161,7 +181,7 @@ class OdooUpstreamRestorer:
         else:
             raise ValueError(f"Unsupported SQL call type: {call_type}")
 
-        if sql_call.where:
+        if call_type == SqlCallType.SELECT and sql_call.where:
             if sql_call.where.value is None:
                 raise ValueError("Value must be provided for WHERE clause.")
 
@@ -225,6 +245,11 @@ class OdooUpstreamRestorer:
                 KeyValuePair("value", settings.webhook_key),
                 KeyValuePair("key", "shopify.webhook_key"),
             ),
+            SqlCall(
+                "ir.config_parameter",
+                KeyValuePair("value", True),
+                KeyValuePair("key", "shopify.test_store"),
+            ),
         ]
         _logger.info("Updating Shopify configuration...")
         for sql_call in sql_calls:
@@ -260,6 +285,11 @@ class OdooUpstreamRestorer:
     def update_addons(self) -> None:
         try:
             addons_folder = Path("/volumes/addons")
+            if not addons_folder.exists():
+                addons_folder = Path("/opt/project/addons")
+            if not addons_folder.exists():
+                addons_folder = Path("/opt/odoo/odoo-addons")
+
             addon_list = ",".join(d.name for d in addons_folder.iterdir() if d.is_dir())
             if not addon_list:
                 _logger.info("No addons found to update.")

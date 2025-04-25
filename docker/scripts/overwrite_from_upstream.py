@@ -298,7 +298,7 @@ class OdooUpstreamRestorer:
             if not odoo_bin.exists():
                 odoo_bin = Path("/opt/odoo/odoo-base/odoo-bin")
             if odoo_bin.exists():
-                odoo_bin = f"'{odoo_bin}' {Path('/opt/odoo/odoo-base/odoo-bin')}"
+                odoo_bin = f"{Path('/opt/odoo/venv/bin/python')} {odoo_bin}"
             command = f"{odoo_bin} --stop-after-init -d {self.local.db_name} --no-http -u {addon_list}"
             conf = Path("/etc/odoo.conf")
             if conf.exists():

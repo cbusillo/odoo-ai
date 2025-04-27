@@ -33,7 +33,7 @@ RUN echo "/odoo" > /venv/lib/python${PYTHON_VERSION}/site-packages/odoo_local.pt
     && echo "/opt/odoo-upgrade" > /venv/lib/python${PYTHON_VERSION}/site-packages/upgrade_utils.pth \
     && echo "/opt/odoo-cleanup" > /venv/lib/python${PYTHON_VERSION}/site-packages/database_cleanup.pth \
     && echo "/opt/odoo-stubs" > /venv/lib/python${PYTHON_VERSION}/site-packages/odoostubs.pth \
-    && echo "/opt/odoo-json-logging" > /venv/lib/python${PYTHON_VERSION}/site-packages/odoojson_logging.pth \
+    && echo "/opt/odoo-json-logging" > /venv/lib/python${PYTHON_VERSION}/site-packages/odoojson_logging.pth
 
 
 COPY --from=enterprise /enterprise /volumes/enterprise

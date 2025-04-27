@@ -1,3 +1,6 @@
 [submodule "addons/product_connect"]
 	path = addons/product_connect
 	url = https://github.com/cbusillo/product_connect
+[submodule "addons/disable_odoo_online"]
+	path = addons/disable_odoo_online
+	url = git@github.com:cbusillo/disable_odoo_online

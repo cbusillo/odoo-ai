@@ -23,7 +23,7 @@ RUN apt-get update && \
 
 RUN pip install --no-deps --target=/opt/odoo-cleanup odoo-addon-database-cleanup --extra-index-url https://wheelhouse.odoo-community.org/oca-simple/
 RUN pip install --target=/opt/odoo-upgrade git+https://github.com/odoo/upgrade-util
-RUN pip install --target=/opt/odoo-stubs odoo-stubs
+RUN pip install --target=/opt/odoo-stubs git+https://github.com/odoo-ide/odoo-stubs@18.0
 
 
 
@@ -38,6 +38,13 @@ COPY --from=enterprise /enterprise /volumes/enterprise
 COPY /docker/config /volumes/config
 COPY /docker/scripts /volumes/scripts
 COPY /addons /volumes/addons
+
+RUN mkdir -p /tmp/enterprise_stub/src && \
+    printf "[project]\nname = \"odoo18-enterprise\"\nversion = \"18.0.0\"\n" \
+        > /tmp/enterprise_stub/pyproject.toml && \
+    echo "/volumes/enterprise" > /tmp/enterprise_stub/src/odoo_enterprise.pth && \
+    pip install --no-build-isolation --no-deps /tmp/enterprise_stub && \
+    rm -rf /tmp/enterprise_stub
 
 ARG DEV_MODE=false
 

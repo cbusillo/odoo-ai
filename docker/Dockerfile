@@ -33,7 +33,6 @@ RUN echo "/odoo" > /venv/lib/python${PYTHON_VERSION}/site-packages/odoo_local.pt
     && echo "/opt/odoo-cleanup" > /venv/lib/python${PYTHON_VERSION}/site-packages/database_cleanup.pth \
     && echo "/opt/odoo-stubs" > /venv/lib/python${PYTHON_VERSION}/site-packages/odoostubs.pth
 
-
 COPY --from=enterprise /enterprise /volumes/enterprise
 COPY /docker/config /volumes/config
 COPY /docker/scripts /volumes/scripts

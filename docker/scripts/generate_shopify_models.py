@@ -4,9 +4,11 @@ import re
 from pathlib import Path
 
 import requests
-from graphql import get_introspection_query, build_client_schema, print_schema
+from graphql import get_introspection_query, build_client_schema, print_schema, IntrospectionQuery
 
 from ariadne_codegen.main import client as codegen_client
+
+ADDONS_PATH = Path("/opt/project/addons/product_connect")
 
 
 def fetch_shopify_introspection(endpoint: str, token: str) -> dict[str, dict[str, str]]:
@@ -30,8 +32,7 @@ def save_introspection_json(data: dict[str, dict[str, str]], file_path: Path) ->
     print(f"Saved introspection JSON schema to {file_path}")
 
 
-def save_schema_sdl(json_data: dict[str, dict[str, str]], output_file_path: Path) -> None:
-    # noinspection PyTypeChecker
+def save_schema_sdl(json_data: IntrospectionQuery, output_file_path: Path) -> None:
     schema = build_client_schema(json_data)
     sdl = print_schema(schema)
     sdl = re.sub(r'""".*?"""', '""', sdl, flags=re.DOTALL)
@@ -48,14 +49,14 @@ def main() -> None:
     if missing_vars:
         raise RuntimeError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
-    addon_path = Path("/opt/project/addons/product_connect")
-    queries_path = addon_path / "graphql"
+    addon_path = Path(ADDONS_PATH)
+    queries_path = addon_path / "graphql" / "shopify"
     schema_path = addon_path / "graphql" / "schema"
     schema_path.mkdir(parents=True, exist_ok=True)
     introspection_file_path = schema_path / f"shopify_schema_{shopify_api_version}.json"
     sdl_file_path = schema_path / f"shopify_schema_{shopify_api_version}.sdl"
-    services_path = addon_path / "services"
-    client_name = "shopify_client"
+    services_path = addon_path / "services" / "shopify"
+    client_name = "gql"
 
     endpoint = f"https://{shopify_store_key}.myshopify.com/admin/api/{shopify_api_version}/graphql.json"
     print(f"Using Shopify endpoint: {endpoint}")
@@ -83,8 +84,8 @@ def main() -> None:
         "scalars": {
             "DateTime": {
                 "type": "datetime.datetime",
-                "parse": "odoo.addons.product_connect.utils.shopify_helpers.parse_shopify_datetime_to_utc",
-                "serialize": "odoo.addons.product_connect.utils.shopify_helpers.format_datetime_for_shopify",
+                "parse": "odoo.addons.product_connect.services.shopify.helpers.parse_shopify_datetime_to_utc",
+                "serialize": "odoo.addons.product_connect.services.shopify.helpers.format_datetime_for_shopify",
             },
             "Date": {"type": "datetime.date"},
             "Money": {"type": "decimal.Decimal"},

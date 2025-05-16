@@ -17,6 +17,7 @@ EXCLUDE_DIRS: set[str] = {
     ".venv",
     "shopify_client",
     ".run",
+    "gql",
 }
 
 EXCLUDE_FILES: set[str] = {
@@ -129,6 +130,8 @@ def main() -> None:
 
 
 prompt_content = """
+You are an expert Odoo 18 core developer with extensive experience in Odoo 18 Enterprise and the Owl.js 2.0 framework.
+
 # Company Details
 
 - Outboard Parts Warehouse

@@ -84,8 +84,8 @@ def main() -> None:
         "scalars": {
             "DateTime": {
                 "type": "datetime.datetime",
-                "parse": "odoo.addons.product_connect.services.shopify.helpers.parse_shopify_datetime_to_utc",
-                "serialize": "odoo.addons.product_connect.services.shopify.helpers.format_datetime_for_shopify",
+                "parse": "..helpers.parse_shopify_datetime_to_utc",
+                "serialize": "..helpers.format_datetime_for_shopify",
             },
             "Date": {"type": "datetime.date"},
             "Money": {"type": "decimal.Decimal"},

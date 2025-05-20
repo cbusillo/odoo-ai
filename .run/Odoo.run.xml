@@ -15,7 +15,7 @@
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
     <option name="SCRIPT_NAME" value="/odoo/odoo-bin" />
-    <option name="PARAMETERS" value="--update=product_connect --dev=all --log-level=warn --log-handler=odoo.addons.product_connect:DEBUG" />
+    <option name="PARAMETERS" value="--update=product_connect --dev=all --log-level=warn --log-handler=odoo.addons.product_connect:INFO" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="true" />
     <method v="2" />

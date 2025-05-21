@@ -1,19 +1,3 @@
-import os
-
-addons_path = os.getenv("ODOO_ADDONS_PATH") or "/odoo/addons,/enterprise,/workspace"
-os.environ["ODOO_ADDONS_PATH"] = addons_path
-
-import odoo
-from odoo.modules.module import initialize_sys_path
-
-odoo.tools.config["addons_path"] = addons_path
-initialize_sys_path()
-
-database_name = os.getenv("ODOO_DATABASE")
-odoo.tools.config["db_name"] = database_name
-odoo.tools.config["test_enable"] = True
-odoo.tools.config["test_tags"] = ["-at_install", "-post_install"]
-
 from types import MethodType
 from typing import Any
 

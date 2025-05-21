@@ -10,9 +10,9 @@ odoo.tools.config["addons_path"] = addons_path
 initialize_sys_path()
 
 database_name = os.getenv("ODOO_DATABASE")
-if database_name:
-    odoo.tools.config["db_name"] = database_name
-    odoo.tools.config["test_enable"] = True
+odoo.tools.config["db_name"] = database_name
+odoo.tools.config["test_enable"] = True
+odoo.tools.config["test_tags"] = ["-at_install", "-post_install"]
 
 from types import MethodType
 from typing import Any

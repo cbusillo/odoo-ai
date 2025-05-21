@@ -1,13 +1,13 @@
 import os
 
-addons_path = os.getenv("ODOO_ADDONS_PATH")
-if addons_path:
-    os.environ.setdefault("ODOO_ADDONS_PATH", addons_path)
+addons_path = os.getenv("ODOO_ADDONS_PATH") or "/odoo/addons,/enterprise,/workspace"
+os.environ["ODOO_ADDONS_PATH"] = addons_path
 
 import odoo
+from odoo.modules.module import initialize_sys_path
 
-if addons_path:
-    odoo.tools.config["addons_path"] = addons_path
+odoo.tools.config["addons_path"] = addons_path
+initialize_sys_path()
 
 database_name = os.getenv("ODOO_DATABASE")
 if database_name:

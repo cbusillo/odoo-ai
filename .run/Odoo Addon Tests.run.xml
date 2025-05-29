@@ -1,24 +1,24 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Odoo Addon Tests" type="tests" factoryName="py.test">
-    <module name="odoo-opw" />
-    <option name="ENV_FILES" value="" />
-    <option name="INTERPRETER_OPTIONS" value="" />
-    <option name="PARENT_ENVS" value="true" />
-    <envs>
-      <env name="ODOO_RC" value="/volumes/config/_generated.conf " />
-    </envs>
-    <option name="SDK_HOME" value="" />
-    <option name="SDK_NAME" value="Remote Python 3.12.3 Docker Compose (web)" />
-    <option name="WORKING_DIRECTORY" value="/opt/project" />
-    <option name="IS_MODULE_SDK" value="false" />
-    <option name="ADD_CONTENT_ROOTS" value="true" />
-    <option name="ADD_SOURCE_ROOTS" value="true" />
-    <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-    <option name="_new_keywords" value="&quot;&quot;" />
-    <option name="_new_parameters" value="&quot;&quot;" />
-    <option name="_new_additionalArguments" value="&quot;--odoo-database\u003dodoo-test --cov\u003d/opt/project/addons --cov-report\u003dterm-missing -q -s&quot;" />
-    <option name="_new_target" value="&quot;/opt/project/addons&quot;" />
-    <option name="_new_targetType" value="&quot;CUSTOM&quot;" />
-    <method v="2" />
-  </configuration>
+    <configuration default="false" name="Odoo Addon Tests" type="tests" factoryName="py.test">
+        <module name="odoo-opw"/>
+        <option name="ENV_FILES" value=""/>
+        <option name="INTERPRETER_OPTIONS" value=""/>
+        <option name="PARENT_ENVS" value="true"/>
+        <envs>
+            <env name="ODOO_RC" value="/volumes/config/_generated.conf "/>
+        </envs>
+        <option name="SDK_HOME" value=""/>
+        <option name="SDK_NAME" value="Remote Python 3.12.3 Docker Compose (script-runner)"/>
+        <option name="WORKING_DIRECTORY" value="/opt/project"/>
+        <option name="IS_MODULE_SDK" value="false"/>
+        <option name="ADD_CONTENT_ROOTS" value="true"/>
+        <option name="ADD_SOURCE_ROOTS" value="true"/>
+        <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py"/>
+        <option name="_new_keywords" value="&quot;&quot;"/>
+        <option name="_new_parameters" value="&quot;&quot;"/>
+        <option name="_new_additionalArguments" value="&quot;--odoo-http&quot;"/>
+        <option name="_new_target" value="&quot;/opt/project/&quot;"/>
+        <option name="_new_targetType" value="&quot;CUSTOM&quot;"/>
+        <method v="2"/>
+    </configuration>
 </component>

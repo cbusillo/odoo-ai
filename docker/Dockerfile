@@ -18,14 +18,22 @@ USER root
 ARG PYTHON_VERSION
 
 RUN apt-get update && \
-    apt-get install -y git openssh-client rsync && \
+    apt-get install -y git openssh-client rsync software-properties-common && \
+    add-apt-repository -y ppa:xtradeb/apps && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends chromium chromium-driver fonts-liberation libu2f-udev && \
     rm -rf /var/lib/apt/lists/*
+
+# allow Odoo’s HttpCase to locate the browser
+ENV CHROME_BIN=/usr/bin/chromium
+
+# JS tour tests also need this python dependency
+RUN pip install --no-cache-dir websocket-client
+
 
 RUN pip install --no-deps --target=/opt/odoo-cleanup odoo-addon-database-cleanup --extra-index-url https://wheelhouse.odoo-community.org/oca-simple/
 RUN pip install --target=/opt/odoo-upgrade git+https://github.com/odoo/upgrade-util
 RUN pip install --target=/opt/odoo-stubs git+https://github.com/odoo-ide/odoo-stubs@18.0
-
-
 
 RUN echo "/odoo" > /venv/lib/python${PYTHON_VERSION}/site-packages/odoo_local.pth \
     && echo "/volumes/enterprise" > /venv/lib/python${PYTHON_VERSION}/site-packages/odoo_enterprise.pth \

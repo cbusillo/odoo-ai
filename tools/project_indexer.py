@@ -12,7 +12,6 @@ EXCLUDE_DIRS: set[str] = {
     "venv",
     "build",
     "dist",
-    ".mypy_cache",
     "migrations",
     ".venv",
     "shopify_client",

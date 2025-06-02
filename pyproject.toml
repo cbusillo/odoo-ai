@@ -1,0 +1,7 @@
+[tool.black]
+line-length = 133
+
+[tool.ruff]
+line-length = 133
+select = ["ANN"]
+#ignore = ["ANN401"]

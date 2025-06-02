@@ -41,7 +41,6 @@ services:
     command: [ ]
     ports: [ ]
     working_dir: /opt/project
-
   shell:
     <<: *odoo-base
     command: odoo shell -d ${ODOO_DB_NAME}

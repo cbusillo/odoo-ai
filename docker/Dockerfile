@@ -19,8 +19,10 @@ ARG PYTHON_VERSION
 
 RUN apt-get update && \
     apt-get install -y git openssh-client rsync software-properties-common && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && \
     add-apt-repository -y ppa:xtradeb/apps && \
-    apt-get update && \
     apt-get install -y --no-install-recommends chromium chromium-driver fonts-liberation libu2f-udev && \
     rm -rf /var/lib/apt/lists/*
 

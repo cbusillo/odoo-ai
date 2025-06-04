@@ -19,18 +19,14 @@ ARG PYTHON_VERSION
 
 RUN apt-get update && \
     apt-get install -y git openssh-client rsync software-properties-common && \
+    add-apt-repository -y ppa:xtradeb/apps && \
+    apt-get install -y --no-install-recommends chromium fonts-liberation libu2f-udev && \
     rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && \
-    add-apt-repository -y ppa:xtradeb/apps && \
-    apt-get install -y --no-install-recommends chromium chromium-driver fonts-liberation libu2f-udev && \
-    rm -rf /var/lib/apt/lists/*
 
 # allow Odoo’s HttpCase to locate the browser
 ENV CHROME_BIN=/usr/bin/chromium
 
-# JS tour tests also need this python dependency
-RUN pip install --no-cache-dir websocket-client
 
 
 RUN pip install --no-deps --target=/opt/odoo-cleanup odoo-addon-database-cleanup --extra-index-url https://wheelhouse.odoo-community.org/oca-simple/

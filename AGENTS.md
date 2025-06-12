@@ -11,13 +11,18 @@ from `CLAUDE.md` and apply to the entire repository.
   `docker compose run --rm --remove-orphans web /odoo/odoo-bin --log-level=warn --stop-after-init --test-tags=product_connect --addons-path=/volumes/addons,/odoo/addons,/volumes/enterprise`
 - **Odoo shell** (use `echo |` piping instead of heredoc):
   `echo "env['motor.product'].search_count([])" | docker compose run --rm --remove-orphans web /odoo/odoo-bin shell --addons-path=/volumes/addons,/odoo/addons,/volumes/enterprise --database=opw`
+- **Update modules**:
+  `/odoo/odoo-bin -u product_connect --stop-after-init --addons-path=/workspace,/odoo/addons,/volumes/enterprise`
+- **Run tests**:
+  `/odoo/odoo-bin --log-level=warn --stop-after-init --test-tags=product_connect --addons-path=/workspace,/odoo/addons,/volumes/enterprise -d odoo`
+- **Odoo shell** (use `echo |` piping instead of heredoc):
+  `echo "env['motor.product'].search_count([])" | /odoo/odoo-bin shell --addons-path=/workspace,/odoo/addons,/volumes/enterprise --database=odoo`
 - **Code quality**: `ruff format . && ruff check . --fix`
 
 ## Bug Detection Priority
 
-1. `mcp__ide__getDiagnostics("file:///path/to/file.py")`
-2. Runtime validation using `--stop-after-init`
-3. PyCharm inspections (results in `./inspection-results/`)
+1. Runtime validation using `--stop-after-init`
+2. PyCharm inspections (results in `./inspection-results/`)
 
 ## Code Standards
 
@@ -30,9 +35,8 @@ from `CLAUDE.md` and apply to the entire repository.
 
 1. Inspect existing code and follow its patterns.
 2. Write code like an experienced Odoo core engineer; check similar features first.
-3. Run `mcp__ide__getDiagnostics` before committing changes.
-4. Execute tests with `--test-tags`.
-5. Format code with `ruff`.
+3. Execute tests with `--test-tags`.
+4. Format code with `ruff`.
 
 ## Architecture Notes
 

@@ -32,11 +32,6 @@ else
     mkdir -p /volumes/enterprise
 fi
 
-pip install --break-system-packages -r /odoo/requirements.txt
-if [ -f /odoo/requirements-dev.txt ]; then
-    pip install --break-system-packages -r /odoo/requirements-dev.txt
-fi
-
 pip install --break-system-packages --no-deps --target=/opt/odoo-cleanup \
     odoo-addon-database-cleanup --extra-index-url https://wheelhouse.odoo-community.org/oca-simple/
 pip install --break-system-packages --target=/opt/odoo-upgrade git+https://github.com/odoo/upgrade-util
@@ -45,6 +40,11 @@ pip install --break-system-packages --target=/opt/odoo-stubs git+https://github.
 ODOO_VERSION=${ODOO_VERSION:-18.0}
 if [ ! -d /odoo ]; then
     git clone --depth 1 --branch "${ODOO_VERSION}" https://github.com/odoo/odoo /odoo
+fi
+
+pip install --break-system-packages -r /odoo/requirements.txt
+if [ -f /odoo/requirements-dev.txt ]; then
+    pip install --break-system-packages -r /odoo/requirements-dev.txt
 fi
 
 PYTHON_VERSION=${PYTHON_VERSION:-$(python3 - <<'PY'

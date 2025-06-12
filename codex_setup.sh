@@ -4,7 +4,7 @@ set -euo pipefail
 apt-get update
 apt-get install -y git openssh-client rsync software-properties-common
 add-apt-repository -y ppa:xtradeb/apps
-apt-get install -y --no-install-recommends chromium fonts-liberation libu2f-udev
+apt-get install -y --no-install-recommends chromium fonts-liberation libu2f-udev build-essential libldap2-dev libsasl2-dev libssl-dev
 rm -rf /var/lib/apt/lists/*
 
 git config submodule.addons/product_connect.url \

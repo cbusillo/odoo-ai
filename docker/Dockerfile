@@ -23,11 +23,8 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends chromium fonts-liberation libu2f-udev && \
     rm -rf /var/lib/apt/lists/*
 
-
 # allow Odoo’s HttpCase to locate the browser
 ENV CHROME_BIN=/usr/bin/chromium
-
-
 
 RUN pip install --no-deps --target=/opt/odoo-cleanup odoo-addon-database-cleanup --extra-index-url https://wheelhouse.odoo-community.org/oca-simple/
 RUN pip install --target=/opt/odoo-upgrade git+https://github.com/odoo/upgrade-util

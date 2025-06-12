@@ -32,9 +32,9 @@ else
     mkdir -p /volumes/enterprise
 fi
 
-pip install --break-system-packages -r requirements.txt
-if [ -f requirements-dev.txt ]; then
-    pip install --break-system-packages -r requirements-dev.txt
+pip install --break-system-packages -r /odoo/requirements.txt
+if [ -f /odoo/requirements-dev.txt ]; then
+    pip install --break-system-packages -r /odoo/requirements-dev.txt
 fi
 
 pip install --break-system-packages --no-deps --target=/opt/odoo-cleanup \

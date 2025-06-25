@@ -76,9 +76,21 @@ class ShopifySettings(BaseSettings):
     api_version: str = Field(..., alias="SHOPIFY_API_VERSION")
     webhook_key: str = Field(..., alias="SHOPIFY_WEBHOOK_KEY")
 
+    def validate_safe_environment(self) -> None:
+        production_indicators = ["yps-your-part-supplier", "outboardpartswarehouse", "opw-prod", "production", "live"]
+
+        shop_url_lower = self.shop_url_key.lower()
+        for indicator in production_indicators:
+            if indicator in shop_url_lower:
+                raise OdooDatabaseUpdateError(
+                    f"SAFETY CHECK FAILED: shop_url_key '{self.shop_url_key}' appears to be production. "
+                    f"This script should only run on development/test environments. "
+                    f"Found production indicator: '{indicator}'. Database will be dropped for safety."
+                )
+
 
 class OdooUpstreamRestorer:
-    def __init__(self, local: LocalServerSettings, upstream: UpstreamServerSettings):
+    def __init__(self, local: LocalServerSettings, upstream: UpstreamServerSettings) -> None:
         self.local = local
         self.upstream = upstream
         self.os_env = os.environ.copy()
@@ -229,6 +241,31 @@ class OdooUpstreamRestorer:
         # noinspection PyArgumentList
         settings = ShopifySettings()
 
+        # Safety check: prevent setting production values, allow replacing production with development
+        production_indicators = ["yps-your-part-supplier", "outboardpartswarehouse", "opw-prod", "production", "live"]
+
+        # Check if we're trying to SET a production value (dangerous)
+        new_value_lower = settings.shop_url_key.lower()
+        for indicator in production_indicators:
+            if indicator in new_value_lower:
+                raise OdooDatabaseUpdateError(
+                    f"SAFETY CHECK FAILED: Attempting to set shop_url_key to '{settings.shop_url_key}' which appears to be production. "
+                    f"Found production indicator: '{indicator}'. Database will be dropped for safety."
+                )
+
+        # Log what we're doing for transparency
+        current_shop_url = self.call_odoo_sql(
+            SqlCall("ir.config_parameter", KeyValuePair("value"), KeyValuePair("key", "shopify.shop_url_key")), SqlCallType.SELECT
+        )
+
+        if current_shop_url and current_shop_url[0]:
+            current_value = current_shop_url[0][0]
+            _logger.info(f"Replacing shop_url_key: '{current_value}' → '{settings.shop_url_key}'")
+        else:
+            _logger.info(f"Setting shop_url_key to: '{settings.shop_url_key}'")
+
+        settings.validate_safe_environment()
+
         sql_calls: list[SqlCall] = [
             SqlCall(
                 "ir.config_parameter",
@@ -260,21 +297,32 @@ class OdooUpstreamRestorer:
                 raise OdooDatabaseUpdateError(f"Failed to update Shopify configuration: {error}") from error
 
     def clear_shopify_ids(self) -> None:
-        model = "product.product"
-        fields = [
+        with self.local.db_conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'product_product' AND column_name LIKE 'shopify%'"
+            )
+            existing_fields = [row[0] for row in cursor.fetchall()]
+
+        fields_to_clear = [
             "shopify_created_at",
             "shopify_last_exported",
+            "shopify_last_exported_at",
             "shopify_condition_id",
             "shopify_variant_id",
             "shopify_product_id",
             "shopify_ebay_category_id",
         ]
-        for field in fields:
-            sql_call = SqlCall(model, KeyValuePair(field))
-            try:
-                self.call_odoo_sql(sql_call, SqlCallType.UPDATE)
-            except psycopg2.Error as error:
-                raise OdooDatabaseUpdateError(f"Failed to clear Shopify IDs: {error}") from error
+
+        for field in fields_to_clear:
+            if field in existing_fields:
+                sql_call = SqlCall("product.product", KeyValuePair(field))
+                try:
+                    self.call_odoo_sql(sql_call, SqlCallType.UPDATE)
+                except psycopg2.Error as error:
+                    raise OdooDatabaseUpdateError(f"Failed to clear Shopify ID {field}: {error}") from error
+            else:
+                _logger.info(f"Skipping field {field} - does not exist in database")
 
     def drop_database(self) -> None:
         _logger.info("Rolling back database update: dropping database")
@@ -296,8 +344,6 @@ class OdooUpstreamRestorer:
                 return
             odoo_bin = Path("/odoo/odoo-bin")
             if not odoo_bin.exists():
-                odoo_bin = Path("/opt/odoo/odoo-base/odoo-bin")
-            if odoo_bin.exists():
                 odoo_bin = f"{Path('/opt/odoo/venv/bin/python')} {odoo_bin}"
             command = f"{odoo_bin} --stop-after-init -d {self.local.db_name} --no-http -u {addon_list}"
             conf = Path("/etc/odoo.conf")
@@ -317,6 +363,15 @@ class OdooUpstreamRestorer:
         if do_sanitize:
             try:
                 self.sanitize_database()
+                self.local.db_conn.commit()
+            except OdooDatabaseUpdateError:
+                self.drop_database()
+                raise
+
+        self.update_addons()
+
+        if do_sanitize:
+            try:
                 self.update_shopify_config()
                 self.clear_shopify_ids()
                 self.local.db_conn.commit()
@@ -324,7 +379,6 @@ class OdooUpstreamRestorer:
                 self.drop_database()
                 raise
 
-        self.update_addons()
         _logger.info("Upstream overwrite completed successfully.")
 
 

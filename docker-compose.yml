@@ -5,14 +5,13 @@ x-build-base: &build-base
     ODOO_VERSION: ${ODOO_VERSION:?error}
     ODOO_ENTERPRISE_REPOSITORY: ${ODOO_ENTERPRISE_REPOSITORY:-}
     GITHUB_TOKEN: ${GITHUB_TOKEN:-}
-    DEV_MODE: ${DEV_MODE:-}
+  target: ${COMPOSE_BUILD_TARGET:-production}
 
 name: odoo-opw
 services:
   web: &odoo-base
     build:
       <<: *build-base
-      target: odoo-base
     env_file:
       - .env
     ports:
@@ -36,11 +35,10 @@ services:
       - "5432:5432"
   script-runner:
     <<: *odoo-base
-    build:
-      <<: *build-base
-    command: [ ]
+    command: tail -f /dev/null
     ports: [ ]
     working_dir: /opt/project
+    restart: unless-stopped
   shell:
     <<: *odoo-base
     command: odoo shell -d ${ODOO_DB_NAME}

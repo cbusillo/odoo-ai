@@ -197,3 +197,5 @@ odoo.*.conf
 inspection-results/
 test_*
 temp_*
+
+docs

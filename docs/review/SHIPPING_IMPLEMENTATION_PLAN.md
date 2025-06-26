@@ -1,5 +1,22 @@
 # Shipping Implementation Plan for Odoo 18
 
+## STATUS: CORE IMPLEMENTATION COMPLETED ✓
+
+### What's Done
+- ✅ All delivery products and carriers created
+- ✅ 100% shipping method mapping coverage (11,632 orders)
+- ✅ Order importer updated with shipping fields
+- ✅ Sale order views created
+- ✅ Security access configured
+- ✅ No catch-all - errors on unknown methods as designed
+
+### What's Pending
+- ⚠️ Inventory sync issue (documented in INVENTORY_SYNC_CONCERN.md)
+- 📝 Migration scripts for existing orders
+- 📊 Analytics views and reports
+- 🔧 Performance optimizations
+- 🧪 Comprehensive test suite
+
 ## Overview
 Complete plan for implementing shipping functionality with Odoo 18's new delivery modules, based on historical order data analysis.
 
@@ -121,6 +138,40 @@ class SaleOrder(models.Model):
 - Import shipping charge from CSV
 - Handle all shipping method variants
 
+## Critical Implementation Details
+
+### Delivery Products Structure
+Each carrier service needs:
+- **Unique product ID** (e.g., `product_delivery_ups_ground`, `product_delivery_ups_2day`)
+- These are service products that back the delivery carriers
+- They show up as line items on orders
+- MUST have unique IDs to avoid conflicts
+
+### Delivery Carrier Mappings
+Key understanding about `_normalise_carrier_name()` in order_importer.py:
+- Already converts to lowercase
+- Removes punctuation (except hyphens and spaces)
+- Strips whitespace
+- Uses casefold() for unicode handling
+
+Examples of normalization:
+- "UPS Ground" → "ups ground"
+- "UPS® Ground™" → "ups ground" 
+- "UPS Ground - Crate" → "ups ground crate"
+- "USPS Priority Mail®" → "usps priority mail"
+- "Free Shipping!" → "free shipping"
+
+**Important**: Since normalization is consistent across platforms, we may only need ONE mapping per unique normalized name, not separate mappings for each platform.
+
+### Testing Before Implementation
+Before creating all XML data files:
+1. Test on dev database to verify delivery module behavior
+2. Validate normalization logic with real shipping names
+3. Check if platform-specific mappings are needed
+4. Ensure no conflicts with existing data
+5. Test with sample orders from CSV
+6. Verify carrier → product → order line relationship works correctly
+
 ## ShipStation Integration Preparation
 - Orders need unique identifiers for matching
 - Track both quoted and actual shipping costs
@@ -140,3 +191,136 @@ class SaleOrder(models.Model):
   - Update shipping_paid with actual costs
   - Add tracking numbers
   - Preserve original shipping_charge
+
+## Additional Implementation Requirements
+
+### Security & Access Control
+- Add `delivery.carrier.service.map` to `security/ir.model.access.csv`
+- Define access rights: 
+  - Sales User: read only
+  - Sales Manager: full access
+  - System Admin: full access including mappings
+- Field-level permissions for sensitive shipping cost data
+
+### Data Migration Strategy
+- Create migration script `migrations/18.0.6.3/post-migrate.py`
+- Backfill `source_platform` field:
+  - Orders with `shopify_order_id` → 'shopify'
+  - Orders with note containing "eBay" → 'ebay'
+  - Others → 'manual'
+- Extract eBay order IDs from existing order notes
+- Import historical shipping costs if available in external data
+
+### Reporting & Analytics Views
+Create `views/shipping_reports.xml` with:
+- Shipping margin analysis by platform
+- Carrier usage statistics
+- Cost trends over time
+- Platform comparison dashboard
+- Negative margin alerts
+
+### Performance Optimizations
+```xml
+<!-- data/shipping_indexes.xml -->
+<record id="idx_delivery_carrier_service_map_lookup" model="ir.model.constraint">
+    <field name="name">idx_delivery_carrier_service_map_lookup</field>
+    <field name="model_id" ref="model_delivery_carrier_service_map"/>
+    <field name="type">u</field>
+    <field name="definition">CREATE INDEX idx_delivery_carrier_service_map_lookup 
+        ON delivery_carrier_service_map(platform, external_name);</field>
+</record>
+```
+
+### Data Validation
+```python
+# In sale.order model
+@api.constrains('shipping_charge', 'shipping_paid')
+def _check_shipping_costs(self):
+    for order in self:
+        if order.shipping_paid > order.shipping_charge * 1.5:
+            raise ValidationError("Shipping paid exceeds charge by more than 50%")
+        if order.shipping_margin < -100:
+            raise ValidationError("Shipping loss exceeds $100")
+
+@api.constrains('ebay_order_id')
+def _check_ebay_order_format(self):
+    pattern = re.compile(r'^\d{2}-\d{5}-\d{5}$')
+    for order in self:
+        if order.ebay_order_id and not pattern.match(order.ebay_order_id):
+            raise ValidationError("Invalid eBay order ID format")
+```
+
+### Audit Trail Configuration
+Add to shipping cost fields:
+```python
+shipping_charge = fields.Monetary(
+    string="Shipping Charged to Customer",
+    track_visibility='onchange'
+)
+shipping_paid = fields.Monetary(
+    string="Shipping Paid to Carrier", 
+    track_visibility='onchange'
+)
+```
+
+### Multi-Currency Handling
+- Shipping costs must use order's currency
+- Margin calculation considers exchange rates
+- Add currency_id to shipping cost fields if needed
+
+### Returns & Refunds
+Additional fields needed:
+```python
+return_shipping_charge = fields.Monetary(string="Return Shipping Charged")
+return_shipping_paid = fields.Monetary(string="Return Shipping Paid")
+shipping_refunded = fields.Monetary(string="Shipping Refunded to Customer")
+```
+
+### Error Recovery Mechanism
+- Create `shipping.import.error` model to queue failed mappings
+- Cron job to retry failed imports
+- Email notification when new unmapped methods appear
+- Admin interface to bulk-map similar methods
+
+### Comprehensive Testing Strategy
+1. **Unit Tests** (`tests/test_shipping.py`):
+   - Test all 50+ carrier name normalizations
+   - Validate shipping margin calculations
+   - Test currency conversions
+   - Verify constraint validations
+
+2. **Integration Tests** (`tests/test_shipping_import.py`):
+   - Import sample CSV with all shipping variants
+   - Verify no duplicate carriers created
+   - Test error handling for unknown methods
+   - Validate eBay data extraction
+
+3. **Performance Tests**:
+   - Import 10,000 orders with varied shipping
+   - Measure lookup performance
+   - Test bulk operations
+
+4. **Edge Cases**:
+   - Zero shipping costs
+   - Negative shipping (discounts)
+   - Missing shipping methods
+   - Malformed data
+
+### Implementation Priority
+1. **High Priority** (Week 1):
+   - Core fields and models
+   - Basic carrier mappings
+   - Order importer updates
+   - Security configuration
+
+2. **Medium Priority** (Week 2):
+   - Views and reports
+   - Migration scripts
+   - Validation constraints
+   - Basic tests
+
+3. **Low Priority** (Week 3):
+   - Advanced analytics
+   - Error recovery
+   - Return shipping
+   - Performance optimization

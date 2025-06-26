@@ -77,6 +77,13 @@ FROM base AS development
 WORKDIR /volumes/addons
 RUN /volumes/scripts/install_dev_requirements.sh
 
+# Apply development patches for --dev mode issues
+COPY patches/fix_dev_mode_validation.patch /tmp/
+RUN cd / && \
+    patch -p0 < /tmp/fix_dev_mode_validation.patch && \
+    rm /tmp/fix_dev_mode_validation.patch && \
+    echo "✓ Applied --dev mode validation fix"
+
 # Common final steps
 ENV HOOK_SETUP_FILE=/volumes/scripts/hook_setup
 RUN if [ -f "$HOOK_SETUP_FILE" ]; then cp "$HOOK_SETUP_FILE" /; else echo "hook_setup file not found in /volumes/scrips, skipping"; fi

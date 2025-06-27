@@ -12,6 +12,9 @@
         <option value="Scratches and Consoles" />
       </list>
     </option>
+    <inspection_tool class="Annotator" enabled="true" level="ERROR" enabled_by_default="true">
+      <scope name="Docs" level="ERROR" enabled="false" />
+    </inspection_tool>
     <inspection_tool class="CssUnusedSymbol" enabled="true" level="WARNING" enabled_by_default="false">
       <scope name="Odoo SCSS" level="WARNING" enabled="false" />
     </inspection_tool>
@@ -33,6 +36,9 @@
         <option name="m_onlyWhenTypesAreKnown" value="false" />
       </scope>
       <option name="m_onlyWhenTypesAreKnown" value="false" />
+    </inspection_tool>
+    <inspection_tool class="PyRedeclarationInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <scope name="Docs" level="WARNING" enabled="false" />
     </inspection_tool>
     <inspection_tool class="PyUnresolvedReferencesInspection" enabled="true" level="WARNING" enabled_by_default="true">
       <scope name="Docs" level="WARNING" enabled="false" />

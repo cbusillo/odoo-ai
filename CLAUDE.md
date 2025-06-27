@@ -8,6 +8,14 @@ Odoo 18 Enterprise project for Outboard Parts Warehouse (OPW). Custom addons for
 integration.
 **Stack**: Python 3.12+, PostgreSQL 17, Owl.js 2.0, Docker, GraphQL
 
+## Documentation
+
+Key project documentation is in the `docs/` folder:
+
+- `docs/TESTING.md` - Testing guide and requirements
+- `docs/STYLE_GUIDE.md` - Project-specific code style preferences
+- `docs/todo/` - Transient work-in-progress documents (in gitignore)
+
 ## Docker MCP Tools (Use These First!)
 
 **Container Management** (prefer over bash):
@@ -108,7 +116,7 @@ docker container prune -f
     - Never use `Any`/`object`
     - Python 3.12+ `type` statements supported (set `target-version = "py312"` in ruff)
 - **Line length**: 133 chars
-- **Tests**: 80% coverage minimum (see Testing Requirements)
+- **Tests**: 80% coverage minimum (see `docs/TESTING.md`)
 - **F-strings preferred**: Use f-strings for all string formatting, including logging and exceptions
 - **Early returns preferred**: No else after return (ignore TRY300 ruff rule)
 
@@ -134,49 +142,6 @@ docker container prune -f
     - Note: ruff-odoo plugin exists but PyCharm's Odoo plugin is more mature
 6. **Test and format** - See Quick Command Reference
 7. **Check logs if tests fail** - Use `mcp__docker__get-logs`
-
-## Testing Requirements
-
-**Philosophy**: TDD - failing tests first, then implement.
-
-### Test Categories Required
-
-1. **Unit Tests**: Test individual methods and business logic
-    - All public methods must have tests
-    - Test edge cases, error conditions, and boundary values
-    - Mock external dependencies (Shopify API, database queries)
-
-2. **Integration Tests**: Test component interactions
-    - Test model relationships and data flow
-    - Test API integrations with realistic data
-    - Test UI components with backend services
-
-### Test Standards
-
-- **Coverage**: 80% minimum for new code
-- **Naming**: `test_method_name_condition_expected_result()`
-- **Structure**: Arrange-Act-Assert pattern
-- **Data**: Use factories/fixtures, never hardcoded values
-- **Isolation**: Each test must be independent and repeatable
-
-### Test Organization
-
-- `addons/*/tests/` - Python unit and integration tests
-- `addons/*/static/tests/` - JavaScript tests (Hoot framework)
-- `addons/*/static/tests/tours/` - Browser tour tests
-- `addons/*/services/tests/` - Service layer tests
-
-**Before Committing**: All tests must pass.
-
-### Temporary Files
-
-**Naming**: Use prefixes for temp files in project root:
-
-- `test_*.py` - Test scripts and temporary test files
-- `temp_*.py` - Temporary scripts and investigation files
-- `temp_*.*` - Any other temporary files
-
-Prefixes are in gitignore for easy cleanup.
 
 ## Architecture
 

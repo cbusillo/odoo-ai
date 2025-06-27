@@ -30,6 +30,14 @@ python tools/test_runner.py -t 300 all                  # Custom timeout (5 minu
 
 ```
 
+### Test Tags
+
+Tests in Odoo require proper tagging for discovery:
+
+- **`post_install`** - Python unit tests (run after all modules installed)
+- **`product_connect_js`** - JavaScript tests
+- **`product_connect_tour`** - Tour/workflow tests
+
 ### Test Commands
 
 All tests run through Docker using `odoo-bin`:

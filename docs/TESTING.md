@@ -77,6 +77,40 @@ addons/product_connect/
 
 ## Writing Tests
 
+### Base Test Classes
+
+Use the provided base classes for consistent test setup:
+
+```python
+from odoo.addons.product_connect.tests.test_base import (
+    ProductConnectTransactionCase,
+    ProductConnectHttpCase,
+    ProductConnectIntegrationCase
+)
+
+
+# For unit tests
+class TestExample(ProductConnectTransactionCase):
+    @classmethod
+    def _setup_test_data(cls):
+        # Override to add test-specific data
+        pass
+
+
+# For HTTP/browser tests needing authentication
+class TestBrowser(ProductConnectHttpCase):
+    def test_feature(self):
+        # test_user and test_user_password are automatically created
+        self.browser_js(url, code, login=self.test_user.login)
+
+
+# For integration tests with motor data
+class TestIntegration(ProductConnectIntegrationCase):
+    def test_workflow(self):
+        # test_user, test_user_password, and test_motor are available
+        pass
+```
+
 ### Python Tests
 
 ```python
@@ -100,6 +134,7 @@ For tests requiring authentication (JavaScript tests, tours), create temporary t
 ```python
 import secrets
 from odoo.tests import HttpCase, tagged
+
 
 @tagged("post_install", "-at_install")
 class TestWithAuth(HttpCase):

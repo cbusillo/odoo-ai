@@ -119,7 +119,21 @@ class TestRunner:
             "failures": [],
             "errors_list": [],
             "summary": "",
+            "loading_failed": False,
+            "loading_error": "",
         }
+
+        # Check for module loading failures first
+        if "Failed to load registry" in output or "Failed to initialize database" in output:
+            results["loading_failed"] = True
+            # Extract the specific error
+            error_match = re.search(r"(TypeError: Model.*|AttributeError:.*|ImportError:.*|.*Error:.*)", output)
+            if error_match:
+                results["loading_error"] = error_match.group(1).strip()
+            else:
+                results["loading_error"] = "Module loading failed (check logs for details)"
+            results["summary"] = f"❌ Module loading failed: {results['loading_error']}"
+            return results
 
         # Extract overall summary - handle different Odoo output formats
         # First try Odoo's test result line (match both with and without "when loading database")
@@ -372,9 +386,19 @@ def main() -> None:
         # Human readable output
         if "error" in results:
             print(f"\n❌ Error: {results['error']}")
+        elif results.get("loading_failed"):
+            print(f"\n=== Test Results ===")
+            print(f"❌ Module Loading Failed!")
+            print(f"Error: {results.get('loading_error', 'Unknown loading error')}")
+            print(f"\nThis means 0 tests were found due to module loading failure, not because there are no tests.")
+            print(f"Check the error above and fix the module before running tests.")
         else:
             print(f"\n=== Test Results ===")
-            print(f"Total:  {results.get('total', 0)}")
+            total = results.get('total', 0)
+            if total == 0:
+                print(f"⚠️  No tests found - this may indicate a configuration issue")
+                print(f"   Check that test tags are correct and module is properly loaded")
+            print(f"Total:  {total}")
             print(f"Passed: {results.get('passed', 0)} ✅")
             print(f"Failed: {results.get('failed', 0)} ❌")
             print(f"Errors: {results.get('errors', 0)} 💥")

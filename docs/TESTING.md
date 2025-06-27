@@ -93,6 +93,37 @@ class TestExample(TransactionCase):
         self.assertEqual(actual, expected)
 ```
 
+### HttpCase Tests (Browser/Tour Tests)
+
+For tests requiring authentication (JavaScript tests, tours), create temporary test users:
+
+```python
+import secrets
+from odoo.tests import HttpCase, tagged
+
+@tagged("post_install", "-at_install")
+class TestWithAuth(HttpCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # Create temporary test user with secure password (rolled back after tests)
+        secure_password = secrets.token_urlsafe(32)
+        cls.test_user = cls.env['res.users'].create({
+            'name': 'Test User',
+            'login': 'test_user_unique',
+            'password': secure_password,
+            'groups_id': [(6, 0, [cls.env.ref('base.group_user').id])],
+        })
+        # Store password if needed for authentication
+        cls.test_user_password = secure_password
+
+    def test_browser_feature(self):
+        self.browser_js(url, code, login=cls.test_user.login)
+```
+
+**Important**: Always use cryptographically secure passwords via `secrets.token_urlsafe()`. Test users are automatically
+rolled back.
+
 ### JavaScript Tests (Hoot)
 
 ```javascript

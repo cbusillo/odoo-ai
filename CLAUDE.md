@@ -31,10 +31,17 @@ docker container prune -f
 
 ## Quick Command Reference
 
-**Tests**: `./scripts/run_tests.sh` (all) or `./scripts/run_tests.sh [python|js|tour]`, `./scripts/list_tests.sh`
+**Tests**: `python tools/test_runner.py` - Enhanced test runner for Claude Code
 
-- Test runner uses random ports (8080-18079) to avoid conflicts with main Odoo instance
-  **Format**: `ruff format . && ruff check . --fix`
+- `python tools/test_runner.py summary` - Quick test summary (default)
+- `python tools/test_runner.py all` - Run all tests
+- `python tools/test_runner.py python` - Python tests only
+- `python tools/test_runner.py failing` - List currently failing tests
+- `python tools/test_runner.py -v` - Verbose output with error details
+- `python tools/test_runner.py --test-tags TestOrderImporter` - Run specific test class
+- `python tools/test_runner.py -j` - JSON output for parsing
+
+**Format**: `ruff format . && ruff check . --fix`
 
 ## Bug Detection
 
@@ -47,9 +54,9 @@ docker container prune -f
 1. **Trigger inspection**: `mcp__inspection-pycharm__inspection_trigger()`
 2. **Check status**: `mcp__inspection-pycharm__inspection_get_status()` until complete
 3. **Key**: The status response will clearly tell you:
-   - `clean_inspection: true` → Inspection passed with no problems (stop here!)
-   - `has_inspection_results: true` → Problems found, call `inspection_get_problems`
-   - Otherwise → No recent inspection, trigger one first
+    - `clean_inspection: true` → Inspection passed with no problems (stop here!)
+    - `has_inspection_results: true` → Problems found, call `inspection_get_problems`
+    - Otherwise → No recent inspection, trigger one first
 
 **Usage Examples**:
 
@@ -59,10 +66,12 @@ docker container prune -f
 - `mcp__inspection-pycharm__inspection_get_problems(severity="grammar")` - Get grammar issues
 - `mcp__inspection-pycharm__inspection_get_problems(severity="typo")` - Get spelling issues
 - `mcp__inspection-pycharm__inspection_get_problems(problem_type="PyUnresolvedReferences")` - Filter by inspection type
-- `mcp__inspection-pycharm__inspection_get_problems(file_pattern="*.py", limit=50)` - Filter by file pattern with pagination
+- `mcp__inspection-pycharm__inspection_get_problems(file_pattern="*.py", limit=50)` - Filter by file pattern with
+  pagination
 - `mcp__inspection-pycharm__inspection_get_problems(scope="addons/product_connect/")` - Scope to specific directory
 
 **Parameters**:
+
 - `scope`: `whole_project` (default) | `current_file` | custom path
 - `severity`: `error` | `warning` (default) | `weak_warning` | `info` | `grammar` | `typo` | `all`
 - `problem_type`: Filter by inspection name (e.g., "PyUnresolvedReferences", "PyTypeChecker")
@@ -71,6 +80,7 @@ docker container prune -f
 - `offset`: Skip problems for pagination
 
 **Handling Large Results**: When you encounter token limit errors:
+
 - Start with errors only: `severity="error"`
 - Filter by problem type: `problem_type="PyTypeChecker"`
 - Use pagination: `limit=50, offset=0`

@@ -13,14 +13,21 @@ This project uses Odoo 18's testing framework with three test layers:
 ### Quick Start
 
 ```bash
-# Universal test runner (auto-detects environment)
-./scripts/run_tests.sh           # All tests
-./scripts/run_tests.sh python    # Python tests only
-./scripts/run_tests.sh js        # JavaScript tests only
-./scripts/run_tests.sh tour      # Tour tests only
+# Enhanced Python test runner - optimized for CI/CD and Claude Code
+python tools/test_runner.py           # Summary of test results (default)
+python tools/test_runner.py all       # Run all tests
+python tools/test_runner.py python    # Python tests only
+python tools/test_runner.py js        # JavaScript tests only
+python tools/test_runner.py tour      # Tour tests only
+python tools/test_runner.py failing   # List currently failing tests
 
-# List all available tests
-./scripts/list_tests.sh
+# Advanced options
+python tools/test_runner.py -v                          # Verbose output with error details
+python tools/test_runner.py --test-tags TestOrderImporter  # Run specific test class
+python tools/test_runner.py -j                          # JSON output
+python tools/test_runner.py -u all                      # Update module before tests
+python tools/test_runner.py -t 300 all                  # Custom timeout (5 minutes)
+
 ```
 
 ### Test Commands
@@ -132,6 +139,29 @@ Tests are organized using tags:
 4. **Tests auto-discovery** - New tests are picked up automatically
 5. **Use descriptive names** following the pattern `test_<feature>_<scenario>`
 
+## Testing Against Production Database
+
+Our tests run against a copy of the production database (`opw`) rather than a clean test database. This approach:
+
+**Benefits:**
+
+- Catches real-world edge cases with existing data
+- Tests integration with actual business data patterns
+- Validates that changes work with current state
+
+**Challenges:**
+
+- Tests must handle existing data (e.g., delivery mappings already loaded from `data.xml`)
+- Constraint violations possible when creating test data that already exists
+- Tests may need to check for existing records before creating
+
+**Best Practices:**
+
+- Check for existing records before creating test data
+- Use unique identifiers where possible
+- Make tests defensive against existing data state
+- Consider test order dependencies when data is shared
+
 ## Code Quality Testing
 
 ### JetBrains Inspection API
@@ -143,6 +173,7 @@ Use the inspection API for comprehensive code quality checks:
 - `inspection_pycharm__get_categories()` - Get summary by category
 
 **Integration with CI/CD**:
+
 - Run before test execution to catch code quality issues
 - Useful for detecting issues across the entire codebase
 

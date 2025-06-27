@@ -1,6 +1,8 @@
 #!/bin/bash
 set -eux
 
+uv pip install docker
+
 # First, install all production requirements
 /volumes/scripts/install_prod_requirements.sh
 

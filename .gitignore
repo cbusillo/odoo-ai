@@ -195,7 +195,7 @@ odoo.*.conf
 /docker/config/_generated.conf
 
 inspection-results/
-test_*
-temp_*
+/test_*
+/temp_*
 
 docs

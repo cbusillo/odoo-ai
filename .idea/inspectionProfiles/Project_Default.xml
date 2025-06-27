@@ -3,6 +3,8 @@
     <option name="myName" value="Project Default" />
     <option name="scopesOrder">
       <list>
+        <option value="Docs" />
+        <option value="odoo_intelligence_mcp" />
         <option value="Conf" />
         <option value="All Changed Files" />
         <option value="Open Files" />
@@ -27,7 +29,16 @@
       </option>
     </inspection_tool>
     <inspection_tool class="PyMissingTypeHintsInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true">
+      <scope name="Docs" level="WEAK WARNING" enabled="false">
+        <option name="m_onlyWhenTypesAreKnown" value="false" />
+      </scope>
       <option name="m_onlyWhenTypesAreKnown" value="false" />
+    </inspection_tool>
+    <inspection_tool class="PyUnresolvedReferencesInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <scope name="Docs" level="WARNING" enabled="false" />
+    </inspection_tool>
+    <inspection_tool class="PyUnusedLocalInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true">
+      <scope name="Docs" level="WEAK WARNING" enabled="false" />
     </inspection_tool>
     <inspection_tool class="SpellCheckingInspection" enabled="true" level="TYPO" enabled_by_default="true">
       <scope name="Conf" level="TYPO" enabled="false">

@@ -28,7 +28,7 @@ class TestRunner:
         except DockerException as e:
             print(f"Error connecting to Docker: {e}")
             sys.exit(1)
-            
+
     def restart_container(self) -> bool:
         """Restart the test container to clean up all zombie processes."""
         try:
@@ -42,7 +42,6 @@ class TestRunner:
         except Exception as e:
             print(f"Failed to restart container: {e}")
             return False
-
 
     def run_command(self, args: list[str], timeout: int = 180) -> tuple[int, str]:
         port = random.randint(8080, 18079)
@@ -81,7 +80,7 @@ class TestRunner:
                         # CHROME_BIN is already set in Dockerfile
                     }
                     # Run with stderr merged to stdout to capture all output
-                    container_result.result = container.exec_run(cmd, stderr=True, stdout=True, demux=False, environment=env)
+                    container_result.result = container.exec_run(cmd, environment=env)
                 except Exception as exec_error:
                     container_result.error = exec_error
 
@@ -230,7 +229,7 @@ class TestRunner:
         else:
             # Need at least info level to get test results in Odoo 18
             args.append("--log-level=info")
-            
+
         if self.verbose:
             print(f"Test type: {test_type}, Specific test: {specific_test}")
 
@@ -293,9 +292,9 @@ class TestRunner:
         if self.verbose:
             results["raw_output"] = output
             # Also save last 100 lines for debugging
-            lines = output.split('\n')
-            results["output_tail"] = '\n'.join(lines[-100:])
-        
+            lines = output.split("\n")
+            results["output_tail"] = "\n".join(lines[-100:])
+
         # Restart container after browser tests to clean up zombie Chrome processes
         # This leaves a clean environment for the next test run
         if test_type in ["js", "tour", "all"]:
@@ -361,7 +360,7 @@ def main() -> None:
     args = parser.parse_args()
 
     runner = TestRunner(verbose=args.verbose, container=args.container, database=args.database, addons_path=args.addons_path)
-    
+
     # Update module if requested
     if args.update:
         if not runner.update_module():
@@ -370,7 +369,7 @@ def main() -> None:
     # Handle special commands
     if args.test_type == "summary":
         # Just run all tests and show summary
-        results = runner.run_tests(test_type="all", specific_test=args.test_tags, timeout=args.timeout)
+        results = runner.run_tests(specific_test=args.test_tags, timeout=args.timeout)
     elif args.test_type == "failing":
         # Show only failing tests
         failing = runner.get_failing_tests()
@@ -394,7 +393,7 @@ def main() -> None:
             print(f"Check the error above and fix the module before running tests.")
         else:
             print(f"\n=== Test Results ===")
-            total = results.get('total', 0)
+            total = results.get("total", 0)
             if total == 0:
                 print(f"⚠️  No tests found - this may indicate a configuration issue")
                 print(f"   Check that test tags are correct and module is properly loaded")

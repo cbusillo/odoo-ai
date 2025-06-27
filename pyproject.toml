@@ -12,4 +12,5 @@ ignore = [
     "TRY300", # Unnecessary else after return - prefer early returns
     "ARG001", # Unused function argument - PyCharm handles this better with context awareness
     "ARG002", # Unused method argument - PyCharm handles this better with context awareness
+    "ANN201", # Missing type annotation for function - PyCharm handles this better with context awareness
 ]

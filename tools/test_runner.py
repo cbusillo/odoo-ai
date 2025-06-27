@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 import re
 import sys
 import time
@@ -28,6 +28,21 @@ class TestRunner:
         except DockerException as e:
             print(f"Error connecting to Docker: {e}")
             sys.exit(1)
+            
+    def restart_container(self) -> bool:
+        """Restart the test container to clean up all zombie processes."""
+        try:
+            container = self.docker_client.containers.get(self.container_name)
+            print(f"Restarting container {self.container_name} to clean up zombie processes...")
+            container.restart(timeout=30)
+            # Wait for container to be ready
+            time.sleep(5)
+            print("Container restarted successfully")
+            return True
+        except Exception as e:
+            print(f"Failed to restart container: {e}")
+            return False
+
 
     def run_command(self, args: list[str], timeout: int = 180) -> tuple[int, str]:
         port = random.randint(8080, 18079)
@@ -60,7 +75,13 @@ class TestRunner:
 
             def run_exec() -> None:
                 try:
-                    container_result.result = container.exec_run(cmd, demux=True, environment={"PYTHONUNBUFFERED": "1"})
+                    # Set environment for test execution
+                    env = {
+                        "PYTHONUNBUFFERED": "1",
+                        # CHROME_BIN is already set in Dockerfile
+                    }
+                    # Run with stderr merged to stdout to capture all output
+                    container_result.result = container.exec_run(cmd, stderr=True, stdout=True, demux=False, environment=env)
                 except Exception as exec_error:
                     container_result.error = exec_error
 
@@ -78,12 +99,7 @@ class TestRunner:
             result = container_result.result
 
             # Get output
-            stdout, stderr = result.output
-            output = ""
-            if stdout:
-                output += stdout.decode("utf-8", errors="replace")
-            if stderr:
-                output += "\n" + stderr.decode("utf-8", errors="replace")
+            output = result.output.decode("utf-8", errors="replace")
 
             return result.exit_code, output
 
@@ -105,7 +121,8 @@ class TestRunner:
             "summary": "",
         }
 
-        # Extract overall summary
+        # Extract overall summary - handle different Odoo output formats
+        # First try Odoo's test result line (match both with and without "when loading database")
         summary_match = re.search(r"(\d+) failed, (\d+) error\(s\) of (\d+) tests", output)
         if summary_match:
             results["failed"] = int(summary_match.group(1))
@@ -113,6 +130,22 @@ class TestRunner:
             results["total"] = int(summary_match.group(3))
             results["passed"] = results["total"] - results["failed"] - results["errors"]
             results["summary"] = summary_match.group()
+        else:
+            # Try alternative format: "Ran X tests in Y.Z seconds"
+            ran_match = re.search(r"Ran (\d+) tests? in", output)
+            if ran_match:
+                results["total"] = int(ran_match.group(1))
+                # Look for failure/error counts
+                if "FAILED" in output:
+                    fail_match = re.search(r"FAILED \(.*?failures=(\d+)", output)
+                    error_match = re.search(r"errors=(\d+)", output)
+                    results["failed"] = int(fail_match.group(1)) if fail_match else 0
+                    results["errors"] = int(error_match.group(1)) if error_match else 0
+                else:
+                    results["failed"] = 0
+                    results["errors"] = 0
+                results["passed"] = results["total"] - results["failed"] - results["errors"]
+                results["summary"] = f"{results['failed']} failed, {results['errors']} error(s) of {results['total']} tests"
 
         # Extract individual failures/errors
         failure_pattern = r"(FAIL|ERROR): (Test\w+\.test_\w+)"
@@ -174,15 +207,20 @@ class TestRunner:
     def run_tests(
         self, test_type: str = "all", specific_test: str | None = None, timeout: int = 180, show_details: bool = False
     ) -> dict[str, int | str | list[str] | dict[str, str] | float]:
-        args = ["--test-enable", "--stop-after-init", "--max-cron-threads=0"]
+        # CRITICAL: Odoo requires module update to run tests
+        args = ["-u", "product_connect", "--test-enable", "--stop-after-init", "--max-cron-threads=0"]
 
         # Adjust log level based on what we need
         if show_details:
             args.append("--log-level=info")
         else:
-            args.append("--log-level=error")
+            # Need at least info level to get test results in Odoo 18
+            args.append("--log-level=info")
+            
+        if self.verbose:
+            print(f"Test type: {test_type}, Specific test: {specific_test}")
 
-        # Determine test tags
+        # Determine test tags based on our actual test structure
         if specific_test:
             # Handle specific test class or method
             # Odoo format is: [-][tag][/module][:class][.method]
@@ -202,13 +240,16 @@ class TestRunner:
                 # Assume it's a test tag
                 args.append(f"--test-tags={specific_test}")
         elif test_type == "python":
-            args.append("--test-tags=product_connect")
+            # Run all post_install tests (our Python tests)
+            args.append("--test-tags=post_install")
         elif test_type == "js":
             args.append("--test-tags=product_connect_js")
         elif test_type == "tour":
             args.append("--test-tags=product_connect_tour")
         elif test_type == "all":
-            args.append("--test-tags=product_connect")
+            # Run all our tests - Odoo doesn't support comma-separated tags well
+            # Instead, we use the module tag which should run all tests
+            args.append("--test-tags=product_connect,post_install,product_connect_js,product_connect_tour")
         else:
             args.append(f"--test-tags={test_type}")
 
@@ -237,6 +278,15 @@ class TestRunner:
         # Save raw output if verbose
         if self.verbose:
             results["raw_output"] = output
+            # Also save last 100 lines for debugging
+            lines = output.split('\n')
+            results["output_tail"] = '\n'.join(lines[-100:])
+        
+        # Restart container after browser tests to clean up zombie Chrome processes
+        # This leaves a clean environment for the next test run
+        if test_type in ["js", "tour", "all"]:
+            print("\nCleaning up test environment...")
+            self.restart_container()
 
         return results
 
@@ -297,7 +347,7 @@ def main() -> None:
     args = parser.parse_args()
 
     runner = TestRunner(verbose=args.verbose, container=args.container, database=args.database, addons_path=args.addons_path)
-
+    
     # Update module if requested
     if args.update:
         if not runner.update_module():
@@ -306,7 +356,7 @@ def main() -> None:
     # Handle special commands
     if args.test_type == "summary":
         # Just run all tests and show summary
-        results = runner.run_tests(specific_test=args.test_tags, timeout=args.timeout)
+        results = runner.run_tests(test_type="all", specific_test=args.test_tags, timeout=args.timeout)
     elif args.test_type == "failing":
         # Show only failing tests
         failing = runner.get_failing_tests()

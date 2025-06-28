@@ -85,6 +85,34 @@ addons/product_connect/
 
 ## Writing Tests
 
+### Mocking Best Practices
+
+When mocking in tests, prefer `patch.object` over string-based patches for better refactoring support:
+
+```python
+from unittest.mock import patch, MagicMock
+
+# PREFERRED: patch.object - type-safe and refactor-friendly
+from ..shopify.sync.importers.customer_importer import CustomerImporter
+
+
+class TestExample(TransactionCase):
+    @patch.object(CustomerImporter, "import_customer")
+    def test_with_mock(self, mock_import_customer: MagicMock) -> None:
+        mock_import_customer.return_value = True
+        # Your test code
+
+# AVOID: String-based patches (unless patching import locations)
+# @patch("odoo.addons.product_connect.services.shopify.sync.importers.customer_importer.CustomerImporter.import_customer")
+```
+
+**Exception**: When patching import locations (where a module imports another), string patches may be necessary:
+
+```python
+# OK for import location patching
+self.shopify_service_patcher = patch("odoo.addons.product_connect.services.shopify.sync.base.ShopifyService")
+```
+
 ### Base Test Classes
 
 Use the provided base classes for consistent test setup:
@@ -250,6 +278,20 @@ Use the inspection API for comprehensive code quality checks:
 
 - Run before test execution to catch code quality issues
 - Useful for detecting issues across the entire codebase
+
+## Handling Test Failures
+
+### Deprecated or Obsolete Tests
+
+When tests fail, consider whether they might be testing deprecated functionality:
+
+- **Features removed**: Test may be checking functionality that no longer exists
+- **API changes**: Test may use old method signatures or field names
+- **Business logic changes**: Test assumptions may no longer be valid
+- **Threading detection**: Tests for threading-based test detection when we now use `env.registry.in_test_mode()`
+
+**Best practice**: When fixing failing tests, first verify if the functionality being tested still exists and is
+relevant. Remove tests for deprecated features rather than trying to fix them.
 
 ## Debugging Tests
 

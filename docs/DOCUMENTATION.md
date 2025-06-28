@@ -6,7 +6,7 @@ This project includes various documentation resources for development.
 
 - **`TESTING.md`** - Testing guide and requirements for the project
 - **`STYLE_GUIDE.md`** - Project-specific code style preferences and conventions
-- **`todo/`** - Work-in-progress documents and notes (gitignored)
+- **`todo/`** - Work-in-progress documents and notes (in gitignore)
 
 ## External Documentation
 

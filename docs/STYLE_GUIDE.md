@@ -26,19 +26,6 @@ This document captures our project-specific style preferences that may differ fr
 - **Exception**: Comments allowed in config files when the file type allows. Only add them when its not clear what a
   thing does or why its set to a value
 
-### Testing
-
-- **Import for mocking**: Don't use string paths in `@patch` decorators
-  ```python
-  # Bad
-  @patch("odoo.addons.product_connect.services.shopify.sync.importers.customer_importer.CustomerImporter.import_customer")
-  
-  # Good
-  from ..shopify.sync.importers.customer_importer import CustomerImporter
-  @patch.object(CustomerImporter, 'import_customer')
-  ```
-- **Test against production data**: Our tests run against a copy of production database, not empty test DB
-- **Check for existing data**: Tests must handle pre-existing records
 
 ### Control Flow
 

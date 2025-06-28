@@ -39,16 +39,16 @@ docker container prune -f
 
 ## Quick Command Reference
 
-**Tests**: `.venv/bin/python tools/test_runner.py` - Enhanced test runner (no docker SDK required)
+**Tests**: `./tools/test_runner.py` - Enhanced test runner (no docker SDK required)
 
-- `.venv/bin/python tools/test_runner.py summary` - Quick test summary (default)
-- `.venv/bin/python tools/test_runner.py all` - Run all tests
-- `.venv/bin/python tools/test_runner.py python` - Python tests only
-- `.venv/bin/python tools/test_runner.py failing` - List currently failing tests
-- `.venv/bin/python tools/test_runner.py -v` - Verbose output with error details
-- `.venv/bin/python tools/test_runner.py --test-tags TestOrderImporter` - Run specific test class
-- `.venv/bin/python tools/test_runner.py --test-tags TestOrderImporter.test_import_order` - Run specific test method
-- `.venv/bin/python tools/test_runner.py -j` - JSON output for parsing
+- `./tools/test_runner.py summary` - Quick test summary (default)
+- `./tools/test_runner.py all` - Run all tests
+- `./tools/test_runner.py python` - Python tests only
+- `./tools/test_runner.py failing` - List currently failing tests
+- `./tools/test_runner.py -v` - Verbose output with error details
+- `./tools/test_runner.py --test-tags TestOrderImporter` - Run specific test class
+- `./tools/test_runner.py --test-tags TestOrderImporter.test_import_order` - Run specific test method
+- `./tools/test_runner.py -j` - JSON output for parsing
 
 **Format**: `ruff format . && ruff check . --fix`
 

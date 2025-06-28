@@ -50,7 +50,16 @@ docker container prune -f
 - `./tools/test_runner.py --test-tags TestOrderImporter.test_import_order` - Run specific test method
 - `./tools/test_runner.py -j` - JSON output for parsing
 
+**Test Templates**:
+
+- Python tests: Use `addons/product_connect/tests/test_template.py` as template
+- JavaScript unit tests: Use `addons/product_connect/static/tests/basic.test.js` as template
+- Tour tests: Use `addons/product_connect/static/tests/tours/basic_tour.js` as template
+- Naming: Python `test_feature_name.py`, JS `feature_name.test.js`, tours `feature_name_tour.js`
+
 **Format**: `ruff format . && ruff check . --fix`
+
+**File Moves**: Always use `git mv` instead of `mv` to preserve Git history.
 
 ## Bug Detection
 

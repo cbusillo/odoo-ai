@@ -8,6 +8,18 @@ This project uses Odoo 18's testing framework with three test layers:
 - **JavaScript Tests** - Frontend testing using Odoo's Hoot framework
 - **Tour Tests** - End-to-end workflow testing
 
+### Test File Naming Conventions
+
+- **JavaScript unit tests**: `feature_name.test.js` in `static/tests/`
+    - Example: `shipping_analytics.test.js`, `motor_form.test.js`
+    - Template: Use `basic.test.js` as reference
+- **Tour tests**: `feature_name_tour.js` in `static/tests/tours/`
+    - Example: `motor_workflow_tour.js`, `basic_tour.js`
+    - Template: Use `basic_tour.js` as reference
+- **Python tests**: `test_feature_name.py` in `tests/`
+    - Example: `test_order_importer.py`
+    - Template: Use `test_template.py` as reference
+
 ## Running Tests
 
 ### Quick Start
@@ -85,6 +97,75 @@ addons/product_connect/
 ```
 
 ## Writing Tests
+
+### JavaScript Unit Tests (Hoot Framework)
+
+JavaScript tests use Odoo 18's Hoot testing framework. Create test files in `static/tests/`:
+
+```javascript
+// Template: basic.test.js
+import { describe, test, expect } from "@odoo/hoot";
+import { animationFrame } from "@odoo/hoot-mock";
+import { mountView } from "@web/../tests/web_test_helpers";
+
+describe("Feature Name Tests", () => {
+    test("should do something", async () => {
+        const serverData = {
+            models: {
+                "model.name": {
+                    fields: {
+                        name: { string: "Name", type: "char" },
+                    },
+                    records: [
+                        { id: 1, name: "Test" },
+                    ],
+                },
+            },
+        };
+
+        const view = await mountView({
+            type: "list",
+            resModel: "model.name",
+            serverData,
+            arch: `<tree><field name="name"/></tree>`,
+        });
+
+        await animationFrame();
+        expect(".o_data_row").toHaveCount(1);
+    });
+});
+```
+
+### Tour Tests
+
+Tour tests simulate user interactions. Create in `static/tests/tours/`:
+
+```javascript
+// Template: basic_tour.js
+import { registry } from "@web/core/registry";
+
+registry.category("web_tour.tours").add("feature_tour", {
+    test: true,  // Important: marks this as a test tour
+    steps: () => [
+        {
+            content: "Wait for page load",
+            trigger: "body.o_web_client",
+        },
+        {
+            content: "Click something",
+            trigger: ".selector",
+            run: "click",
+        },
+        // More steps...
+    ],
+});
+```
+
+**Important Notes**:
+
+- Use `test: true` property for test tours (not for production tours)
+- No `@odoo-module` directive needed for test files
+- Tours must have unique names across the entire Odoo instance
 
 ### Mocking Best Practices
 

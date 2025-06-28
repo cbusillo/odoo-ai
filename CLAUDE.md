@@ -10,11 +10,11 @@ integration.
 
 ## Documentation
 
-Key project documentation is in the `docs/` folder:
+See `docs/DOCUMENTATION.md` for all available documentation resources, including:
 
-- `docs/TESTING.md` - Testing guide and requirements
-- `docs/STYLE_GUIDE.md` - Project-specific code style preferences
-- `docs/todo/` - Transient work-in-progress documents (in gitignore)
+- Project documentation ([testing](docs/TESTING.md), [style guide](docs/STYLE_GUIDE.md))
+- External documentation (Odoo 18, Shopify GraphQL API, etc.)
+- Work-in-progress notes
 
 ## Docker MCP Tools (Use These First!)
 
@@ -116,7 +116,7 @@ docker container prune -f
     - Never use `Any`/`object`
     - Python 3.12+ `type` statements supported (set `target-version = "py312"` in ruff)
 - **Line length**: 133 chars
-- **Tests**: 80% coverage minimum (see `docs/TESTING.md`)
+- **Tests**: 80% coverage minimum (see [docs/TESTING.md](docs/TESTING.md))
 - **F-strings preferred**: Use f-strings for all string formatting, including logging and exceptions
 - **Early returns preferred**: No else after return (ignore TRY300 ruff rule)
 
@@ -160,6 +160,13 @@ docker container prune -f
 
 - `services/shopify/gql/*` - Generated GraphQL client
 - `graphql/schema/*` - Shopify schema
+
+**Shopify GraphQL Reference**:
+
+- Schema: `addons/product_connect/graphql/schema/shopify_schema_2025-04.sdl` (61k+ lines)
+- Search for types: `grep "^type.*{" addons/product_connect/graphql/schema/shopify_schema_2025-04.sdl`
+- Search for mutations:
+  `grep ".*(" addons/product_connect/graphql/schema/shopify_schema_2025-04.sdl | grep -A5 -B5 "mutation"`
 
 **GraphQL regen**: Run `generate_shopify_models.py` when .graphql files or `SHOPIFY_API_VERSION` change
 

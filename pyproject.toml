@@ -1,5 +1,6 @@
 [tool.ruff]
 line-length = 133
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["ANN"]

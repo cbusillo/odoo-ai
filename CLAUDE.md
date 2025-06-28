@@ -39,15 +39,16 @@ docker container prune -f
 
 ## Quick Command Reference
 
-**Tests**: `python tools/test_runner.py` - Enhanced test runner for Claude Code
+**Tests**: `.venv/bin/python tools/test_runner.py` - Enhanced test runner (no docker SDK required)
 
-- `python tools/test_runner.py summary` - Quick test summary (default)
-- `python tools/test_runner.py all` - Run all tests
-- `python tools/test_runner.py python` - Python tests only
-- `python tools/test_runner.py failing` - List currently failing tests
-- `python tools/test_runner.py -v` - Verbose output with error details
-- `python tools/test_runner.py --test-tags TestOrderImporter` - Run specific test class
-- `python tools/test_runner.py -j` - JSON output for parsing
+- `.venv/bin/python tools/test_runner.py summary` - Quick test summary (default)
+- `.venv/bin/python tools/test_runner.py all` - Run all tests
+- `.venv/bin/python tools/test_runner.py python` - Python tests only
+- `.venv/bin/python tools/test_runner.py failing` - List currently failing tests
+- `.venv/bin/python tools/test_runner.py -v` - Verbose output with error details
+- `.venv/bin/python tools/test_runner.py --test-tags TestOrderImporter` - Run specific test class
+- `.venv/bin/python tools/test_runner.py --test-tags TestOrderImporter.test_import_order` - Run specific test method
+- `.venv/bin/python tools/test_runner.py -j` - JSON output for parsing
 
 **Format**: `ruff format . && ruff check . --fix`
 

@@ -13,20 +13,21 @@ This project uses Odoo 18's testing framework with three test layers:
 ### Quick Start
 
 ```bash
-# Enhanced Python test runner - optimized for CI/CD and Claude Code
+# Enhanced test runner - uses docker CLI (no external Python dependencies)
 python tools/test_runner.py           # Summary of test results (default)
-python tools/test_runner.py all       # Run all tests
-python tools/test_runner.py python    # Python tests only
-python tools/test_runner.py js        # JavaScript tests only
-python tools/test_runner.py tour      # Tour tests only
-python tools/test_runner.py failing   # List currently failing tests
+.venv/bin/python tools/test_runner.py all       # Run all tests
+.venv/bin/python tools/test_runner.py python    # Python tests only
+.venv/bin/python tools/test_runner.py js        # JavaScript tests only
+.venv/bin/python tools/test_runner.py tour      # Tour tests only
+.venv/bin/python tools/test_runner.py failing   # List currently failing tests
 
 # Advanced options
-python tools/test_runner.py -v                          # Verbose output with error details
-python tools/test_runner.py --test-tags TestOrderImporter  # Run specific test class
-python tools/test_runner.py -j                          # JSON output
-python tools/test_runner.py -u all                      # Update module before tests
-python tools/test_runner.py -t 300 all                  # Custom timeout (5 minutes)
+.venv/bin/python tools/test_runner.py -v                          # Verbose output with error details
+.venv/bin/python tools/test_runner.py --test-tags TestOrderImporter  # Run specific test class
+.venv/bin/python tools/test_runner.py --test-tags TestOrderImporter.test_import_order  # Run specific test method
+.venv/bin/python tools/test_runner.py -j                          # JSON output
+.venv/bin/python tools/test_runner.py -u all                      # Update module before tests
+.venv/bin/python tools/test_runner.py -t 300 all                  # Custom timeout (5 minutes)
 
 ```
 

@@ -1,13 +1,33 @@
 #!/usr/bin/env python
+"""
+Odoo Test Runner - Enhanced test execution for product_connect module
+
+This tool runs Odoo tests in a Docker container using CLI commands (no Docker SDK required).
+It provides better output formatting, test filtering, and error reporting than raw Odoo commands.
+
+Usage:
+    .venv/bin/python tools/test_runner.py [command] [options]
+
+Commands:
+    summary - Run all tests and show summary (default)
+    all     - Run all tests with details
+    python  - Run Python tests only
+    failing - List currently failing tests
+
+Options:
+    -v, --verbose    - Show detailed output
+    --test-tags TAG  - Run specific test (e.g., TestOrderImporter or TestOrderImporter.test_import)
+    -j, --json       - Output results as JSON
+    -t, --timeout N  - Set timeout in seconds (default: 180)
+"""
+
 import re
 import sys
 import time
-import threading
+import subprocess
 import argparse
 import random
 import json
-import docker
-from docker.errors import DockerException
 
 
 class TestRunner:
@@ -23,23 +43,23 @@ class TestRunner:
         self.database = database
         self.addons_path = addons_path
 
+        # Check if docker is available
         try:
-            self.docker_client = docker.from_env()
-        except DockerException as e:
-            print(f"Error connecting to Docker: {e}")
+            subprocess.run(["docker", "--version"], capture_output=True, check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            print(f"Error: Docker not found or not accessible: {e}")
             sys.exit(1)
 
     def restart_container(self) -> bool:
         """Restart the test container to clean up all zombie processes."""
         try:
-            container = self.docker_client.containers.get(self.container_name)
             print(f"Restarting container {self.container_name} to clean up zombie processes...")
-            container.restart(timeout=30)
+            subprocess.run(["docker", "restart", self.container_name], check=True, capture_output=True)
             # Wait for container to be ready
             time.sleep(5)
             print("Container restarted successfully")
             return True
-        except Exception as e:
+        except subprocess.CalledProcessError as e:
             print(f"Failed to restart container: {e}")
             return False
 
@@ -60,52 +80,23 @@ class TestRunner:
             print(f"Running in {self.container_name}: {' '.join(cmd)}")
 
         try:
-            container = self.docker_client.containers.get(self.container_name)
+            # Build docker exec command
+            docker_cmd = ["docker", "exec", "-e", "PYTHONUNBUFFERED=1", self.container_name] + cmd
 
-            # Execute command with timeout
-            # Note: docker-py doesn't support timeout in exec_run directly,
-            # but we can use a thread with a timer for proper timeout handling
-            class ResultContainer:
-                def __init__(self) -> None:
-                    self.result = None
-                    self.error = None
+            # Run with timeout
+            result = subprocess.run(docker_cmd, capture_output=True, text=True, timeout=timeout)
 
-            container_result = ResultContainer()
+            # Combine stdout and stderr for consistent output
+            output = result.stdout
+            if result.stderr:
+                output += "\n" + result.stderr
 
-            def run_exec() -> None:
-                try:
-                    # Set environment for test execution
-                    env = {
-                        "PYTHONUNBUFFERED": "1",
-                        # CHROME_BIN is already set in Dockerfile
-                    }
-                    # Run with stderr merged to stdout to capture all output
-                    container_result.result = container.exec_run(cmd, environment=env)
-                except Exception as exec_error:
-                    container_result.error = exec_error
+            return result.returncode, output
 
-            thread = threading.Thread(target=run_exec)
-            thread.start()
-            thread.join(timeout=timeout)
-
-            if thread.is_alive():
-                # Timeout occurred
-                return -1, f"Command timed out after {timeout} seconds"
-
-            if container_result.error:
-                raise container_result.error
-
-            result = container_result.result
-
-            # Get output
-            output = result.output.decode("utf-8", errors="replace")
-
-            return result.exit_code, output
-
-        except docker.errors.NotFound:
-            return -1, f"Container '{self.container_name}' not found"
-        except docker.errors.APIError as e:
-            return -1, f"Docker API error: {e}"
+        except subprocess.TimeoutExpired:
+            return -1, f"Command timed out after {timeout} seconds"
+        except FileNotFoundError:
+            return -1, f"Docker command not found"
         except Exception as e:
             return -1, f"Unexpected error: {e}"
 
@@ -190,29 +181,35 @@ class TestRunner:
         test_files = {"python": [], "js": [], "tour": []}
 
         try:
-            container = self.docker_client.containers.get(self.container_name)
-
             # Find Python test files
-            find_cmd = ["find", "/volumes/addons/product_connect", "-name", "test_*.py", "-type", "f"]
-            result = container.exec_run(find_cmd, stderr=False)
+            find_cmd = [
+                "docker",
+                "exec",
+                self.container_name,
+                "find",
+                "/volumes/addons/product_connect",
+                "-name",
+                "test_*.py",
+                "-type",
+                "f",
+            ]
+            result = subprocess.run(find_cmd, capture_output=True, text=True)
 
-            if result.exit_code == 0:
-                output = result.output.decode("utf-8", errors="replace")
-                for file_path in output.strip().split("\n"):
+            if result.returncode == 0:
+                for file_path in result.stdout.strip().split("\n"):
                     if file_path:
                         # Extract test methods from file
-                        grep_cmd = ["grep", "-E", "^\\s*def test_", file_path]
-                        grep_result = container.exec_run(grep_cmd, stderr=False)
+                        grep_cmd = ["docker", "exec", self.container_name, "grep", "-E", "^\\s*def test_", file_path]
+                        grep_result = subprocess.run(grep_cmd, capture_output=True, text=True)
 
-                        if grep_result.exit_code == 0:
-                            grep_output = grep_result.output.decode("utf-8", errors="replace")
-                            for line in grep_output.strip().split("\n"):
+                        if grep_result.returncode == 0:
+                            for line in grep_result.stdout.strip().split("\n"):
                                 if line:
                                     method = re.search(r"def (test_\w+)", line)
                                     if method:
                                         test_files["python"].append(f"{file_path.split('/')[-1]}::{method.group(1)}")
 
-        except (docker.errors.NotFound, docker.errors.APIError):
+        except subprocess.SubprocessError:
             pass
 
         return test_files

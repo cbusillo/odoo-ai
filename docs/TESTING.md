@@ -145,7 +145,6 @@ Tour tests simulate user interactions. Create in `static/tests/tours/`:
 import { registry } from "@web/core/registry";
 
 registry.category("web_tour.tours").add("feature_tour", {
-    test: true,  // Important: marks this as a test tour
     steps: () => [
         {
             content: "Wait for page load",
@@ -161,11 +160,31 @@ registry.category("web_tour.tours").add("feature_tour", {
 });
 ```
 
+**Running Tours**:
+
+1. **Via test_runner.py** (recommended for CI/CD):
+   ```bash
+   ./tools/test_runner.py tour                    # Run all tours
+   ./tools/test_runner.py tour --test-tags TestMotorWorkflow  # Specific test class
+   ```
+
+2. **Via browser console** (for debugging):
+   ```javascript
+   // List all loaded tours
+   Object.keys(odoo.__WOWL_DEBUG__.root.env.services.tour.tours)
+   
+   // Run a specific tour
+   odoo.__WOWL_DEBUG__.root.env.services.tour.run("motor_workflow_tour")
+   ```
+
 **Important Notes**:
 
-- Use `test: true` property for test tours (not for production tours)
+- Tours are automatically available in test mode (no special property needed)
 - No `@odoo-module` directive needed for test files
 - Tours must have unique names across the entire Odoo instance
+- **Database changes**: In tests, changes are rolled back. In browser, changes are permanent!
+- Tours in `static/tests/tours/` are for testing only (won't appear in Tours UI)
+- To make tours visible in Tours UI, move to `static/src/tours/` and update manifest
 
 ### Mocking Best Practices
 

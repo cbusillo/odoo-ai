@@ -44,6 +44,8 @@ docker container prune -f
 - `./tools/test_runner.py summary` - Quick test summary (default)
 - `./tools/test_runner.py all` - Run all tests
 - `./tools/test_runner.py python` - Python tests only
+- `./tools/test_runner.py js` - JavaScript unit tests only
+- `./tools/test_runner.py tour` - Tour tests only (UI automation)
 - `./tools/test_runner.py failing` - List currently failing tests
 - `./tools/test_runner.py -v` - Verbose output with error details
 - `./tools/test_runner.py --test-tags TestOrderImporter` - Run specific test class
@@ -56,6 +58,13 @@ docker container prune -f
 - JavaScript unit tests: Use `addons/product_connect/static/tests/basic.test.js` as template
 - Tour tests: Use `addons/product_connect/static/tests/tours/basic_tour.js` as template
 - Naming: Python `test_feature_name.py`, JS `feature_name.test.js`, tours `feature_name_tour.js`
+
+**Tours** (UI automation tests):
+
+- Drop `.js` files in `static/tests/tours/` - automatically discovered and run
+- Tours simulate real user interactions (clicks, form fills, navigation)
+- Debug in browser: `odoo.__WOWL_DEBUG__.root.env.services.tour.run("tour_name")`
+- Database changes: Rolled back in tests, permanent in browser
 
 **Format**: `ruff format . && ruff check . --fix`
 

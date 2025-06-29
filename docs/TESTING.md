@@ -14,7 +14,7 @@ This project uses Odoo 18's testing framework with three test layers:
     - Example: `shipping_analytics.test.js`, `motor_form.test.js`
     - Template: Use `basic.test.js` as reference
 - **Tour tests**: `feature_name_tour.js` in `static/tests/tours/`
-    - Example: `motor_workflow_tour.js`, `basic_tour.js`
+    - Example: `motor_workflow_to_enabled_product_tour.js`, `basic_tour.js`
     - Template: Use `basic_tour.js` as reference
 - **Python tests**: `test_feature_name.py` in `tests/`
     - Example: `test_order_importer.py`

@@ -160,6 +160,11 @@ docker container prune -f
     - Runtime validation: Add `--stop-after-init` to catch import/syntax errors
     - Note: ruff-odoo plugin exists but PyCharm's Odoo plugin is more mature
 6. **Test and format** - See Quick Command Reference
+    - **IMPORTANT**: Before marking a task complete, run relevant tests:
+        - For new features: `./tools/test_runner.py --test-tags TestFeatureName`
+        - For bug fixes: Run tests for the affected area
+        - For UI changes: Run the corresponding tour test
+    - If you created new functionality without tests, create them first
 7. **Check logs if tests fail** - Use `mcp__docker__get-logs`
 
 ## Architecture

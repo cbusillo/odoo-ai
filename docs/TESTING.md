@@ -12,13 +12,13 @@ This project uses Odoo 18's testing framework with three test layers:
 
 - **JavaScript unit tests**: `feature_name.test.js` in `static/tests/`
     - Example: `shipping_analytics.test.js`, `motor_form.test.js`
-    - Template: Use `basic.test.js` as reference
+    - **Template**: See [`basic.test.js`](../addons/product_connect/static/tests/basic.test.js)
 - **Tour tests**: `feature_name_tour.js` in `static/tests/tours/`
     - Example: `motor_workflow_to_enabled_product_tour.js`, `basic_tour.js`
-    - Template: Use `basic_tour.js` as reference
+    - **Template**: See [`basic_tour.js`](../addons/product_connect/static/tests/tours/basic_tour.js)
 - **Python tests**: `test_feature_name.py` in `tests/`
     - Example: `test_order_importer.py`
-    - Template: Use `test_template.py` as reference
+    - **Template**: See [`test_basic.py`](../addons/product_connect/tests/test_basic.py)
 
 ## Running Tests
 
@@ -82,9 +82,11 @@ docker compose run --rm web /odoo/odoo-bin \
 addons/product_connect/
 ├── tests/                          # Python tests
 │   ├── __init__.py                # Imports all tests
-│   ├── test_motor.py              # Motor model tests
-│   ├── test_product_template.py   # Product template tests
-│   └── test_integration.py        # JS/Tour test runners
+│   ├── test_*.py                  # Feature unit tests
+│   ├── test_tour_coverage.py      # Ensures all tours have runners
+│   └── tours/                     # Tour test runners
+│       ├── __init__.py
+│       └── test_*_tour.py         # Tour runners for UI tests
 ├── services/tests/                 # Service layer tests
 │   ├── test_shopify_helpers.py    # Helper function tests
 │   ├── test_product_exporter.py   # Export functionality tests
@@ -98,67 +100,66 @@ addons/product_connect/
 
 ## Writing Tests
 
-### JavaScript Unit Tests (Hoot Framework)
+### Test Templates
 
-JavaScript tests use Odoo 18's Hoot testing framework. Create test files in `static/tests/`:
+Use these templates as starting points for new tests:
 
-```javascript
-// Template: basic.test.js
-import { describe, test, expect } from "@odoo/hoot";
-import { animationFrame } from "@odoo/hoot-mock";
-import { mountView } from "@web/../tests/web_test_helpers";
+- **Python unit test**: [`test_basic.py`](../addons/product_connect/tests/test_basic.py)
+    - Shows TransactionCase and HttpCase examples
+    - Demonstrates mocking with patch.object
+    - Includes secure password generation for test users
 
-describe("Feature Name Tests", () => {
-    test("should do something", async () => {
-        const serverData = {
-            models: {
-                "model.name": {
-                    fields: {
-                        name: { string: "Name", type: "char" },
-                    },
-                    records: [
-                        { id: 1, name: "Test" },
-                    ],
-                },
-            },
-        };
+- **JavaScript test**: [`basic.test.js`](../addons/product_connect/static/tests/basic.test.js)
+    - Hoot framework example
+    - Shows view mounting and DOM testing
 
-        const view = await mountView({
-            type: "list",
-            resModel: "model.name",
-            serverData,
-            arch: `<tree><field name="name"/></tree>`,
-        });
-
-        await animationFrame();
-        expect(".o_data_row").toHaveCount(1);
-    });
-});
-```
+- **Tour test**: [`basic_tour.js`](../addons/product_connect/static/tests/tours/basic_tour.js)
+    - Minimal tour structure
+    - Shows basic UI verification
 
 ### Tour Tests
 
 Tour tests simulate user interactions. Create in `static/tests/tours/`:
 
-```javascript
-// Template: basic_tour.js
-import { registry } from "@web/core/registry";
+**Recommended Pattern**: Create a dedicated Python test file for each feature that includes both unit tests and tour
+runners:
 
-registry.category("web_tour.tours").add("feature_tour", {
-    steps: () => [
-        {
-            content: "Wait for page load",
-            trigger: "body.o_web_client",
-        },
-        {
-            content: "Click something",
-            trigger: ".selector",
-            run: "click",
-        },
-        // More steps...
-    ],
-});
+```python
+# test_feature_name.py
+@tagged("post_install", "-at_install")
+class TestFeatureName(ProductConnectTransactionCase):
+    """Unit tests for the feature"""
+    def test_business_logic(self):
+        # Test models, computations, etc.
+        pass
+
+@tagged("post_install", "-at_install", "product_connect_tour")
+class TestFeatureNameTour(ProductConnectHttpCase):
+    """Tour runner for UI tests"""
+    def test_feature_name_tour(self):
+        self.start_tour("/odoo", "feature_name_tour", login=self.test_user.login)
 ```
+
+This pattern provides:
+
+- **Feature cohesion**: All tests for a feature in one file
+- **Better debugging**: Tour failures have context about what feature broke
+- **Clear ownership**: Developers know where to add tests
+
+**Tour Organization**:
+
+Tours are organized in a dedicated structure to ensure clear separation and prevent silent failures:
+
+1. **Unit tests**: `tests/test_feature_name.py` - Backend logic tests
+2. **Tour runners**: `tests/tours/test_feature_name_tour.py` - UI test runners
+3. **Tour coverage**: `tests/test_tour_coverage.py` - Ensures all tours have runners
+
+This structure provides:
+
+- Clear separation between unit tests and tour runners
+- Automatic detection of tours without runners
+- Better organization for large test suites
+- Prevents tours from silently passing without being executed
 
 **Running Tours**:
 
@@ -400,3 +401,41 @@ relevant. Remove tests for deprecated features rather than trying to fix them.
 - Add `--screenshots=/tmp/odoo_tests` for failure screenshots
 - Use `ipdb` for Python debugging: `import ipdb; ipdb.set_trace()`
 - Check test output for specific error messages and stack traces
+
+### Common Tour Test Issues
+
+**OwlError: Failed to evaluate domain**
+
+- Use Odoo domain functions: `context_today()`, `relativedelta()`
+- Avoid Python datetime expressions: `datetime.datetime.now()`
+- Example fix: `domain="[('date', '>=', context_today().strftime('%Y-%m-%d'))]"`
+
+**Tour not executing in test runner**
+
+- Check the feature test file has a tour runner class with `product_connect_tour` tag
+- Verify tour registration syntax: `registry.category("web_tour.tours").add("tour_name"`
+- Ensure module update was run after adding tour file
+
+**Tour data conflicts**
+
+- Create unique test data (use timestamps: `Date.now()`)
+- Tours run against production database copy - handle existing data
+- Clean up test data at tour end
+
+**Test Environment vs Browser Console**
+
+Tours behave differently in test mode vs browser console:
+
+**Test Mode** (`./tools/test_runner.py tour`):
+
+- Database changes are rolled back
+- Runs with test user authentication
+- Timeout enforced (120 seconds default)
+- Failures tracked in test results
+
+**Browser Console** (`odoo.__WOWL_DEBUG__.root.env.services.tour.run("tour_name")`):
+
+- Database changes are permanent
+- Runs with current user session
+- No timeout
+- Manual debugging possible with DevTools

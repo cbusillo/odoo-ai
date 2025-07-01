@@ -8,17 +8,41 @@ This project uses Odoo 18's testing framework with three test layers:
 - **JavaScript Tests** - Frontend testing using Odoo's Hoot framework
 - **Tour Tests** - End-to-end workflow testing
 
-### Test File Naming Conventions
+### Test File Structure
+
+**Important**: Odoo's test discovery only works with files directly in the `tests/` directory. Tests in subdirectories
+are not automatically discovered.
+
+#### Directory Structure
+
+```
+tests/
+├── fixtures/              # Test helpers and base classes
+│   ├── test_base.py      # Base test classes (TransactionCase, HttpCase, etc.)
+│   ├── test_service_base.py
+│   └── shopify_responses.py
+├── test_model_*.py       # Model tests (e.g., test_model_motor.py)
+├── test_service_*.py     # Service tests (e.g., test_service_order_importer.py)
+├── test_tour_*.py        # Tour runners (e.g., test_tour_motor_workflow.py)
+└── test_*.py             # Other tests
+```
+
+#### Naming Conventions
+
+- **Python tests**: Use prefixes to indicate test type
+    - `test_model_*.py` - Model and business logic tests
+    - `test_service_*.py` - Service layer tests (API clients, importers, etc.)
+    - `test_tour_*.py` - Tour test runners
+    - Example: `test_model_motor.py`, `test_service_order_importer.py`, `test_tour_shipping_analytics.py`
+    - **Template**: See [`test_basic.py`](../addons/product_connect/tests/test_basic.py)
 
 - **JavaScript unit tests**: `feature_name.test.js` in `static/tests/`
     - Example: `shipping_analytics.test.js`, `motor_form.test.js`
     - **Template**: See [`basic.test.js`](../addons/product_connect/static/tests/basic.test.js)
-- **Tour tests**: `feature_name_tour.js` in `static/tests/tours/`
+
+- **Tour definitions**: `feature_name_tour.js` in `static/tests/tours/`
     - Example: `motor_workflow_to_enabled_product_tour.js`, `basic_tour.js`
     - **Template**: See [`basic_tour.js`](../addons/product_connect/static/tests/tours/basic_tour.js)
-- **Python tests**: `test_feature_name.py` in `tests/`
-    - Example: `test_order_importer.py`
-    - **Template**: See [`test_basic.py`](../addons/product_connect/tests/test_basic.py)
 
 ## Running Tests
 
@@ -121,21 +145,27 @@ Use these templates as starting points for new tests:
 
 Tour tests simulate user interactions. Create in `static/tests/tours/`:
 
-**Recommended Pattern**: Create a dedicated Python test file for each feature that includes both unit tests and tour
-runners:
+**Important**: All test classes MUST have the `@tagged` decorator to be discovered by Odoo's test runner. Tests without
+this decorator will not run!
+
+**Updated Pattern**: Keep unit tests and tour runners in separate files for better organization:
 
 ```python
-# test_feature_name.py
-@tagged("post_install", "-at_install")
+# tests/test_model_feature.py - Model/business logic tests
+@tagged("post_install", "-at_install")  # REQUIRED!
 class TestFeatureName(ProductConnectTransactionCase):
     """Unit tests for the feature"""
+
     def test_business_logic(self):
         # Test models, computations, etc.
         pass
 
-@tagged("post_install", "-at_install", "product_connect_tour")
+
+# tests/test_tour_feature.py - Tour runner
+@tagged("post_install", "-at_install", "product_connect_tour")  # REQUIRED!
 class TestFeatureNameTour(ProductConnectHttpCase):
     """Tour runner for UI tests"""
+
     def test_feature_name_tour(self):
         self.start_tour("/odoo", "feature_name_tour", login=self.test_user.login)
 ```
@@ -148,18 +178,17 @@ This pattern provides:
 
 **Tour Organization**:
 
-Tours are organized in a dedicated structure to ensure clear separation and prevent silent failures:
+Tours follow a clear pattern to ensure proper execution:
 
-1. **Unit tests**: `tests/test_feature_name.py` - Backend logic tests
-2. **Tour runners**: `tests/tours/test_feature_name_tour.py` - UI test runners
-3. **Tour coverage**: `tests/test_tour_coverage.py` - Ensures all tours have runners
+1. **Tour definitions**: `static/tests/tours/feature_name_tour.js` - UI interaction scripts
+2. **Tour runners**: `tests/test_tour_feature_name.py` - Python test classes that execute tours
+3. **Naming**: Tour runners use prefix `test_tour_` for easy identification
 
-This structure provides:
+This structure ensures:
 
-- Clear separation between unit tests and tour runners
-- Automatic detection of tours without runners
-- Better organization for large test suites
-- Prevents tours from silently passing without being executed
+- All tours have corresponding runners (no silent passes)
+- Clear separation between tour logic and test execution
+- Easy identification of test types by prefix
 
 **Running Tours**:
 

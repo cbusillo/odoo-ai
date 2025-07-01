@@ -250,16 +250,17 @@ class TestRunner:
                 # Assume it's a test tag
                 args.append(f"--test-tags={specific_test}")
         elif test_type == "python":
-            # Run all post_install tests (our Python tests)
-            args.append("--test-tags=post_install")
+            # Run all tests in our modules using module path
+            args.append("--test-tags=/product_connect,/disable_odoo_online")
         elif test_type == "js":
-            args.append("--test-tags=product_connect_js")
+            # Run JavaScript tests by file pattern
+            args.append("--test-tags=/product_connect:*.test.js")
         elif test_type == "tour":
-            args.append("--test-tags=product_connect_tour")
+            # Run tour tests by file pattern
+            args.append("--test-tags=/product_connect:*tour*")
         elif test_type == "all":
-            # Run all our tests - Odoo doesn't support comma-separated tags well
-            # Instead, we use the module tag which should run all tests
-            args.append("--test-tags=product_connect,post_install,product_connect_js,product_connect_tour")
+            # Run all tests in our modules - module path runs ALL tests in that module
+            args.append("--test-tags=/product_connect,/disable_odoo_online")
         else:
             args.append(f"--test-tags={test_type}")
 

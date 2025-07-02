@@ -27,8 +27,8 @@ See [Documentation](docs/DOCUMENTATION.md) for all available documentation resou
 **Bash only** (complex Odoo ops):
 
 ```bash
-# Update module (use dedicated script-runner container)
-docker exec odoo-opw-script-runner-1 /odoo/odoo-bin -u product_connect --stop-after-init --addons-path=/volumes/addons,/odoo/addons,/volumes/enterprise
+# Update module and start with dev=all for auto reload and xml reloading (use dedicated script-runner container)
+docker exec odoo-opw-script-runner-1 /odoo/odoo-bin -u product_connect --dev=all --stop-after-init --addons-path=/volumes/addons,/odoo/addons,/volumes/enterprise
 
 # Odoo shell (use dedicated shell container)
 echo "env['motor.product'].search_count([])" | docker exec -i odoo-opw-shell-1 /odoo/odoo-bin shell --database=opw
@@ -69,6 +69,11 @@ docker container prune -f
 **Format**: `ruff format . && ruff check . --fix`
 
 **File Moves**: Always use `git mv` instead of `mv` to preserve Git history.
+
+**Browser Debugging**: Use `mcp__playwright__` tools to check console errors:
+
+- `mcp__playwright__browser_navigate` url: "http://localhost:8069" - Navigate to Odoo
+- `mcp__playwright__browser_console_messages` - Get console logs and errors
 
 ## Bug Detection
 

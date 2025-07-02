@@ -46,6 +46,14 @@ This document captures our project-specific style preferences that may differ fr
     - When: Importing from Shopify, bulk updates, test data, data corrections, internal-only changes
     - Example: `self.env["product.product"].with_context(skip_shopify_sync=True).write({'list_price': 99.99})`
 
+### Python Fields
+
+- **String attributes**: Omit `string` attribute when the display text should match the field name
+    - **Python fields**: `processed_today = fields.Boolean()` displays as "Processed Today"
+    - Odoo automatically converts underscores to spaces and capitalizes appropriately
+    - This ensures consistency and reduces duplication
+    - Use explicit `string` only when display text differs from name: `qty = fields.Integer(string="Quantity")`
+
 ## File Organization
 
 - **Test files in services**: Service-layer tests go in `services/tests/`

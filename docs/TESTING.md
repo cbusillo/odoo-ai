@@ -347,6 +347,14 @@ import { registry } from "@web/core/registry";
 
 registry.category("web_tour.tours").add("tour_name", {
     steps: () => [
+        // Check for console errors during tour execution
+        {
+            trigger: "body",
+            run: () => {
+                const errors = window.odoo.__DEBUG__.services.notification.notifications.filter(n => n.type === "danger");
+                if (errors.length) throw new Error(`Console errors: ${errors.map(e => e.message).join(", ")}`);
+            },
+        },
         {
             content: "Step description",
             trigger: "CSS selector",

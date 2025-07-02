@@ -10,11 +10,11 @@ integration.
 
 ## Documentation
 
-See `docs/DOCUMENTATION.md` for all available documentation resources, including:
+See [Documentation](docs/DOCUMENTATION.md) for all available documentation resources, including:
 
-- Project documentation ([testing](docs/TESTING.md), [style guide](docs/STYLE_GUIDE.md))
-- External documentation (Odoo 18, Shopify GraphQL API, etc.)
-- Work-in-progress notes
+- [Testing Guide](docs/TESTING.md) - Test patterns, coverage requirements, and examples
+- [Style Guide](docs/STYLE_GUIDE.md) - Code standards and naming conventions
+- [Work-in-progress notes](docs/todo) - Development notes and future improvements
 
 ## Docker MCP Tools (Use These First!)
 
@@ -80,7 +80,7 @@ docker container prune -f
 
 1. **Trigger inspection**: `mcp__inspection-pycharm__inspection_trigger()`
 2. **Check status**: `mcp__inspection-pycharm__inspection_get_status()` until complete
-3. **Key**: The status response will clearly tell you:
+3. **Key**: The status response will clearly tell Claude:
     - `clean_inspection: true` → Inspection passed with no problems (stop here!)
     - `has_inspection_results: true` → Problems found, call `inspection_get_problems`
     - Otherwise → No recent inspection, trigger one first
@@ -106,7 +106,7 @@ docker container prune -f
 - `limit`: Max problems per request (default: 100)
 - `offset`: Skip problems for pagination
 
-**Handling Large Results**: When you encounter token limit errors:
+**Handling Large Results**: When Claude encounters token limit errors:
 
 - Start with errors only: `severity="error"`
 - Filter by problem type: `problem_type="PyTypeChecker"`
@@ -164,7 +164,7 @@ docker container prune -f
         - For new features: `./tools/test_runner.py --test-tags TestFeatureName`
         - For bug fixes: Run tests for the affected area
         - For UI changes: Run the corresponding tour test
-    - If you created new functionality without tests, create them first
+    - If Claude created new functionality without tests, create them first
 7. **Check logs if tests fail** - Use `mcp__docker__get-logs`
 
 ## Architecture

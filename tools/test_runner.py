@@ -198,7 +198,7 @@ class TestRunner:
 
                 for pattern in error_patterns:
                     for match in re.finditer(pattern, output, re.MULTILINE):
-                        error_msg = match.group(0).strip()
+                        error_msg = match.group().strip()
                         if error_msg and error_msg not in console_errors:
                             console_errors.append(error_msg)
 

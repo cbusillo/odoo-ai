@@ -152,7 +152,7 @@ class OdooUpstreamRestorer:
                 conn.commit()
         _logger.info("All database connections terminated.")
 
-    def call_odoo_sql(self, sql_call: SqlCall, call_type: SqlCallType) -> list[tuple]:
+    def call_odoo_sql(self, sql_call: SqlCall, call_type: SqlCallType) -> list[tuple] | None:
         self.connect_to_db()
 
         table = sql_call.model.replace(".", "_")

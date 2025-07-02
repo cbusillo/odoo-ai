@@ -160,19 +160,67 @@ class TestRunner:
             else:
                 results["errors_list"].append(test_name)
 
-        # Extract specific error details if requested
-        if self.verbose:
+        # Extract specific error details - always extract for tour tests
+        if self.verbose or "tour" in output.lower():
+            # Look for tour-specific errors
+            tour_error_pattern = r'The test code "odoo\.startTour\([^)]+\)" failed'
+            if re.search(tour_error_pattern, output) or "OwlError" in output or "UncaughtPromiseError" in output:
+                # Extract browser console errors
+                console_error_pattern = (
+                    r"(Console error:|Browser error:|JavaScript error:|UncaughtPromiseError|OwlError)(.*?)(?=\n\d{4}-|$)"
+                )
+                console_errors = []
+                for match in re.finditer(console_error_pattern, output, re.DOTALL):
+                    error_text = match.group(2).strip()
+                    if error_text:
+                        console_errors.append(f"{match.group(1)}: {error_text}")
+                if console_errors:
+                    results["browser_errors"] = console_errors
+
+                # Extract tour step failures
+                tour_step_pattern = r"Tour step failed: (.*?)(?=\n|$)"
+                tour_steps = []
+                for match in re.finditer(tour_step_pattern, output):
+                    tour_steps.append(match.group(1).strip())
+                if tour_steps:
+                    results["failed_tour_steps"] = tour_steps
+
+                # Look for specific error messages in tour output
+                error_patterns = [
+                    r"(UncaughtPromiseError.*?OwlError.*?)(?=\n|$)",
+                    r"(Uncaught Promise.*?)(?=\n|$)",
+                    r"(OwlError:.*?)(?=\n|$)",
+                    r"(TypeError:.*?)(?=\n|$)",
+                    r"(ReferenceError:.*?)(?=\n|$)",
+                    r"Cannot read properties of.*?(?=\n|$)",
+                    r"Invalid props for component.*?(?=\n|$)",
+                ]
+
+                for pattern in error_patterns:
+                    for match in re.finditer(pattern, output, re.MULTILINE):
+                        error_msg = match.group(0).strip()
+                        if error_msg and error_msg not in console_errors:
+                            console_errors.append(error_msg)
+
+                if console_errors:
+                    results["browser_errors"] = console_errors
+
             # Look for tracebacks
             traceback_pattern = r"(FAIL|ERROR): (Test\w+\.test_\w+)(.*?)(?=(?:FAIL|ERROR):|$)"
             for match in re.finditer(traceback_pattern, output, re.DOTALL):
                 status, test_name, details = match.groups()
-                # Extract just the key error line
-                error_match = re.search(r"(AssertionError:|ERROR:|DETAIL:).*", details)
-                if error_match:
-                    error_line = error_match.group().strip()
+                # Extract more detailed error info
+                error_lines = []
+                for line in details.split("\n"):
+                    if any(
+                        keyword in line
+                        for keyword in ["AssertionError:", "ERROR:", "DETAIL:", "TypeError:", "ReferenceError:", "Error:"]
+                    ):
+                        error_lines.append(line.strip())
+                if error_lines:
                     if "error_details" not in results:
                         results["error_details"] = {}
-                    results["error_details"][test_name] = error_line
+                    results["error_details"][test_name] = "\n".join(error_lines)
 
         return results
 
@@ -421,6 +469,21 @@ def main() -> None:
                     for test, error in list(error_details.items())[:5]:
                         print(f"\n{test}:")
                         print(f"  {error}")
+
+            # Always show browser errors for tour tests
+            if results.get("browser_errors"):
+                print(f"\n=== Browser Console Errors ===")
+                for error in results["browser_errors"][:10]:
+                    print(f"  ❌ {error}")
+                if len(results["browser_errors"]) > 10:
+                    print(f"  ... and {len(results['browser_errors']) - 10} more")
+
+            if results.get("failed_tour_steps"):
+                print(f"\n=== Failed Tour Steps ===")
+                for step in results["failed_tour_steps"][:5]:
+                    print(f"  ❌ {step}")
+                if len(results["failed_tour_steps"]) > 5:
+                    print(f"  ... and {len(results['failed_tour_steps']) - 5} more")
 
             if "failing_tests" in results:
                 print(f"\n=== Currently Failing Tests ({results['count']}) ===")

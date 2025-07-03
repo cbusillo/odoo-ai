@@ -79,22 +79,25 @@ Tests in Odoo require proper tagging for discovery:
 
 All tests run through Docker using `odoo-bin`:
 
+**Note**: We use `docker exec` with the existing `script-runner-1` container instead of `docker compose run` to avoid
+creating temporary containers that clutter Docker.
+
 ```bash
 # Run all product_connect tests (use --log-level=info for debugging)
-docker compose run --rm web /odoo/odoo-bin \
+docker exec odoo-opw-script-runner-1 /odoo/odoo-bin \
     --log-level=warn \
     --stop-after-init \
     --test-tags=product_connect \
     --addons-path=/volumes/addons,/odoo/addons,/volumes/enterprise
 
 # Run specific test class
-docker compose run --rm web /odoo/odoo-bin \
+docker exec odoo-opw-script-runner-1 /odoo/odoo-bin \
     --test-tags=product_connect:TestMotor \
     --stop-after-init \
     --addons-path=/volumes/addons,/odoo/addons,/volumes/enterprise
 
 # Run specific test method
-docker compose run --rm web /odoo/odoo-bin \
+docker exec odoo-opw-script-runner-1 /odoo/odoo-bin \
     --test-tags=product_connect:TestMotor.test_generate_qr_code \
     --stop-after-init \
     --addons-path=/volumes/addons,/odoo/addons,/volumes/enterprise

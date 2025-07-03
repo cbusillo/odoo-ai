@@ -50,17 +50,25 @@ class TestRunner:
             print(f"Error: Docker not found or not accessible: {e}")
             sys.exit(1)
 
-    def restart_container(self) -> bool:
-        """Restart the test container to clean up all zombie processes."""
+    def cleanup_docker_environment(self) -> bool:
+        """Clean up Docker environment after tests."""
         try:
-            print(f"Restarting container {self.container_name} to clean up zombie processes...")
-            subprocess.run(["docker", "restart", self.container_name], check=True, capture_output=True)
-            # Wait for container to be ready
-            time.sleep(5)
-            print("Container restarted successfully")
+            print("Cleaning up Docker environment...")
+            # Run docker system prune to clean up:
+            # - all stopped containers
+            # - all networks not used by at least one container
+            # - all dangling images
+            # - all dangling build cache
+            # Note: Named volumes are NOT removed by default
+            prune_cmd = ["docker", "system", "prune", "-f", "--filter", "label!=com.docker.compose.version"]
+            result = subprocess.run(prune_cmd, capture_output=True, text=True)
+            
+            if result.stdout:
+                print(f"Docker cleanup: {result.stdout.strip()}")
+            
             return True
         except subprocess.CalledProcessError as e:
-            print(f"Failed to restart container: {e}")
+            print(f"Failed to clean up Docker: {e}")
             return False
 
     def run_command(self, args: list[str], timeout: int = 180) -> tuple[int, str]:
@@ -80,7 +88,7 @@ class TestRunner:
             print(f"Running in {self.container_name}: {' '.join(cmd)}")
 
         try:
-            # Build docker exec command
+            # Build docker exec command to use existing container
             docker_cmd = ["docker", "exec", "-e", "PYTHONUNBUFFERED=1", self.container_name] + cmd
 
             # Run with timeout
@@ -341,11 +349,10 @@ class TestRunner:
             lines = output.split("\n")
             results["output_tail"] = "\n".join(lines[-100:])
 
-        # Restart container after browser tests to clean up zombie Chrome processes
-        # This leaves a clean environment for the next test run
+        # Clean up Docker environment after tests
+        # This removes any stopped containers and other Docker artifacts
         if test_type in ["js", "tour", "all"]:
-            print("\nCleaning up test environment...")
-            self.restart_container()
+            self.cleanup_docker_environment()
 
         return results
 

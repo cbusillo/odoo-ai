@@ -62,10 +62,10 @@ class TestRunner:
             # Note: Named volumes are NOT removed by default
             prune_cmd = ["docker", "system", "prune", "-f", "--filter", "label!=com.docker.compose.version"]
             result = subprocess.run(prune_cmd, capture_output=True, text=True)
-            
+
             if result.stdout:
                 print(f"Docker cleanup: {result.stdout.strip()}")
-            
+
             return True
         except subprocess.CalledProcessError as e:
             print(f"Failed to clean up Docker: {e}")
@@ -273,8 +273,21 @@ class TestRunner:
     def run_tests(
         self, test_type: str = "all", specific_test: str | None = None, timeout: int = 180, show_details: bool = False
     ) -> dict[str, int | str | list[str] | dict[str, str] | float]:
-        # CRITICAL: Odoo requires module update to run tests
-        args = ["-u", "product_connect", "--test-enable", "--stop-after-init", "--max-cron-threads=0"]
+        # Run tests with proper isolation to avoid locks
+        # Use --workers=0 and --db-filter to isolate database access
+        # Only update module if explicitly requested to avoid timeouts
+        if hasattr(self, "_force_update") and self._force_update:
+            args = [
+                "-u",
+                "product_connect",
+                "--test-enable",
+                "--stop-after-init",
+                "--max-cron-threads=0",
+                "--workers=0",
+                f"--db-filter=^{self.database}$",
+            ]
+        else:
+            args = ["--test-enable", "--stop-after-init", "--max-cron-threads=0", "--workers=0", f"--db-filter=^{self.database}$"]
 
         # Adjust log level based on what we need
         if show_details:

@@ -99,4 +99,19 @@ This document captures our project-specific style preferences that may differ fr
 - **Never commit unless asked**: User controls when to commit
 - **Suggest to commit**: When at a good stopping point. Ideally commits should be a single feature or fix.
 
+## Test Patterns
+
+### SKU Validation Rules
+
+- **Consumable products require 4-8 digit SKUs**: Products with `type='consu'` must have numeric SKUs
+- **Valid examples**: "1234", "12345678", "00001234"
+- **Invalid examples**: "ABC123", "TEST-001", "12", "123456789"
+- **Service products exempt**: Products with `type='service'` can have any SKU format
+- **Bypass validation**: Use `with_context(skip_sku_check=True)` when needed
+
+### Test Class Inheritance
+
+- **Always use base test classes** to avoid SKU validation errors
+- **See [TESTING.md](TESTING.md#base-test-classes)** for details on available base classes and pre-created test data
+
 This is a living document. Add new style decisions as they come up.

@@ -252,7 +252,7 @@ self.shopify_service_patcher = patch("odoo.addons.product_connect.services.shopi
 Use the provided base classes for consistent test setup:
 
 ```python
-from odoo.addons.product_connect.tests.test_base import (
+from odoo.addons.product_connect.tests.fixtures.test_base import (
     ProductConnectTransactionCase,
     ProductConnectHttpCase,
     ProductConnectIntegrationCase
@@ -261,25 +261,46 @@ from odoo.addons.product_connect.tests.test_base import (
 
 # For unit tests
 class TestExample(ProductConnectTransactionCase):
-    @classmethod
-    def _setup_test_data(cls):
-        # Override to add test-specific data
-        pass
+    def test_feature(self):
+        # Pre-created test data available:
+        # - self.test_product: Standard consumable product (SKU: 10000001)
+        # - self.test_service: Service product (SKU: SERVICE-001)
+        # - self.test_product_ready: Ready-to-sell product (SKU: 20000001)
+        # - self.test_products: List of 10 generic products (SKUs: 30000001-30000010)
+        # - self.test_product_not_for_sale: Product with sale_ok=False
+        # - self.test_product_unpublished: Unpublished product
+        # - self.test_product_motor: Motor-sourced product
+        # - self.test_partner: Test customer
+        # - self.test_partners: List of 3 additional test customers
+        
+        # Modify products as needed for your test
+        self.test_products[0].write({'shopify_next_export': True})
 
 
 # For HTTP/browser tests needing authentication
 class TestBrowser(ProductConnectHttpCase):
     def test_feature(self):
-        # test_user and test_user_password are automatically created
+        # Includes all products from TransactionCase plus:
+        # - self.test_user and self.test_user_password are automatically created
         self.browser_js(url, code, login=self.test_user.login)
 
 
 # For integration tests with motor data
 class TestIntegration(ProductConnectIntegrationCase):
     def test_workflow(self):
-        # test_user, test_user_password, and test_motor are available
+        # Includes all products from HttpCase plus:
+        # - self.test_motor is available
         pass
 ```
+
+**Important Notes:**
+
+- All base classes automatically set `skip_shopify_sync=True` and `tracking_disable=True` in context
+- All consumable products have valid 4-8 digit SKUs to pass validation
+- All products include `website_description` for Shopify export tests
+- Service products can have any SKU format (no validation)
+- Use the pre-created products instead of creating new ones when possible
+- Modify existing products rather than creating duplicates
 
 ### Python Tests
 

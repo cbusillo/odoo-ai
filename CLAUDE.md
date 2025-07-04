@@ -51,6 +51,7 @@ docker container prune -f
 - `./tools/test_runner.py --test-tags TestOrderImporter` - Run specific test class
 - `./tools/test_runner.py --test-tags TestOrderImporter.test_import_order` - Run specific test method
 - `./tools/test_runner.py -j` - JSON output for parsing
+- `./tools/test_runner.py -u` - Update module before running tests (use only if needed, can cause timeouts)
 
 **Test Templates**:
 

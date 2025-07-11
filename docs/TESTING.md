@@ -370,6 +370,7 @@ describe("Feature Tests", () => {
 import { registry } from "@web/core/registry";
 
 registry.category("web_tour.tours").add("tour_name", {
+    test: true,  // REQUIRED for test tours
     steps: () => [
         // Check for console errors during tour execution
         {
@@ -387,6 +388,31 @@ registry.category("web_tour.tours").add("tour_name", {
     ],
 });
 ```
+
+### Tour Testing Limitations and Best Practices
+
+**Current State**:
+
+- Tour tests in Odoo 18 are primarily useful as smoke tests
+- Complex UI interactions often fail due to timing issues and selector limitations
+- Console output from tours is not reliably captured in test results
+
+**Best Practices**:
+
+1. **Keep tours simple** - Test basic UI loading and navigation
+2. **Use `test: true` property** - Required for tours to run in test mode
+3. **Avoid complex selectors** - jQuery-style selectors like `:visible` don't work
+4. **Test business logic in Python** - Use tours only for critical UI paths
+5. **Use `/odoo` URLs** - Odoo 18 uses `/odoo` instead of `/web`
+
+**Known Issues**:
+
+- Lazy-loaded assets (`web.assets_backend_lazy`) may not be available during tours
+- Tour helpers and utilities often fail due to timing/promise issues
+- Error messages from failed tours provide minimal debugging information
+
+**Recommendation**: Focus on Python unit/integration tests for business logic. Use tours sparingly for critical user
+workflows that must be tested through the UI
 
 ## Test Tags
 
@@ -482,6 +508,21 @@ relevant. Remove tests for deprecated features rather than trying to fix them.
 - Create unique test data (use timestamps: `Date.now()`)
 - Tours run against production database copy - handle existing data
 - Clean up test data at tour end
+
+**Tour fails with navigation/selector issues**
+
+- In Odoo 18, use `/odoo` as the start URL (changed from `/web` in earlier versions)
+- Use simple, stable selectors (avoid complex CSS selectors with `:visible`, `:not()`, etc.)
+- Add `test: true` property to tour definition for test mode
+- Use `.o_web_client` and `.o_action_manager` as reliable wait triggers
+- Test runner classes should extend `ProductConnectHttpCase` which provides test user
+
+**Lazy-loaded assets in tours**
+
+- Multigraph and other custom views may be in `web.assets_backend_lazy`
+- Add explicit timeouts to steps waiting for lazy components: `timeout: 30000`
+- Use progressive selectors: wait for container before specific elements
+- If tour fails on custom view, check if assets are loaded synchronously in production
 
 **Test Environment vs Browser Console**
 

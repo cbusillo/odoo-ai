@@ -66,6 +66,9 @@ docker container prune -f
 - Tours simulate real user interactions (clicks, form fills, navigation)
 - Debug in browser: `odoo.__WOWL_DEBUG__.root.env.services.tour.run("tour_name")`
 - Database changes: Rolled back in tests, permanent in browser
+- **Important**: In Odoo 18, tours should start at `/odoo` (not the old `/web`)
+- **Important**: Avoid jQuery-style selectors (`:visible`, `:not()`) - use simple selectors
+- **Important**: Tours must have `test: true` property in definition
 
 **Format**: `ruff format . && ruff check . --fix`
 

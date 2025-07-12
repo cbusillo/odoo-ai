@@ -50,8 +50,8 @@ class TestRunner:
             print(f"Error: Docker not found or not accessible: {e}")
             sys.exit(1)
 
-    def cleanup_docker_environment(self) -> bool:
-        """Clean up Docker environment after tests."""
+    @staticmethod
+    def cleanup_docker_environment() -> bool:
         try:
             print("Cleaning up Docker environment...")
             # Run docker system prune to clean up:
@@ -365,7 +365,7 @@ class TestRunner:
         # Clean up Docker environment after tests
         # This removes any stopped containers and other Docker artifacts
         if test_type in ["js", "tour", "all"]:
-            self.cleanup_docker_environment()
+            TestRunner.cleanup_docker_environment()
 
         return results
 

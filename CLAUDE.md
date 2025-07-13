@@ -132,21 +132,8 @@ docker container prune -f
 
 ## Code Standards
 
-- **NO comments/docstrings** - Self-documenting code via:
-    - Descriptive names using full words (no abbreviations)
-    - Clear function/variable names that state their purpose
-    - Method chains that read like sentences
-    - Exception: Comments are allowed in pyproject.toml files for configuration clarity
-- **Type hints required**:
-    - Use the Odoo Plugin for Jetbrains Magic Types when possible
-        - Models: `odoo.model.product_template` (IDE resolves to actual model class)
-        - Dicts/Values: `odoo.values.product_template` (dict with model's field names)
-    - Never use `Any`/`object`
-    - Python 3.12+ `type` statements supported (set `target-version = "py312"` in ruff)
-- **Line length**: 133 chars
-- **Tests**: 80% coverage minimum (see [docs/TESTING.md](docs/TESTING.md))
-- **F-strings preferred**: Use f-strings for all string formatting, including logging and exceptions
-- **Early returns preferred**: No else after return (ignore TRY300 ruff rule)
+See [Style Guide](docs/STYLE_GUIDE.md) for complete coding standards including Python, JavaScript, naming conventions,
+and formatting rules.
 
 ## Development Workflow
 

@@ -325,11 +325,12 @@ class TestRunner:
             # Run JavaScript tests by file pattern
             args.append("--test-tags=/product_connect:*.test.js")
         elif test_type == "tour":
-            # Run tour tests by file pattern
-            args.append("--test-tags=/product_connect:*tour*")
+            # Run tour tests by tag
+            args.append("--test-tags=product_connect_tour")
         elif test_type == "all":
-            # Run all tests in our modules - module path runs ALL tests in that module
-            args.append("--test-tags=/product_connect,/disable_odoo_online")
+            # Run all tests: Python tests (via module path) + Tour tests (via tag)
+            # Note: JS tests are included in module path if properly registered in manifest
+            args.append("--test-tags=/product_connect,/disable_odoo_online,product_connect_tour")
         else:
             args.append(f"--test-tags={test_type}")
 

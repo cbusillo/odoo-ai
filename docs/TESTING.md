@@ -36,9 +36,10 @@ tests/
     - Example: `test_model_motor.py`, `test_service_order_importer.py`, `test_tour_shipping_analytics.py`
     - **Template**: See [`test_basic.py`](../addons/product_connect/tests/test_basic.py)
 
-- **JavaScript unit tests**: `feature_name.test.js` in `static/tests/`
+- **JavaScript tests**: `feature_name.test.js` in `static/tests/`
     - Example: `shipping_analytics.test.js`, `motor_form.test.js`
-    - **Template**: See [`basic.test.js`](../addons/product_connect/static/tests/basic.test.js)
+    - Uses Odoo 18's Hoot framework for both unit and integration tests
+    - **Unit Test Template**: See [`basic.test.js`](../addons/product_connect/static/tests/basic.test.js)
 
 - **Tour definitions**: `feature_name_tour.js` in `static/tests/tours/`
     - Example: `motor_workflow_to_enabled_product_tour.js`, `basic_tour.js`
@@ -272,7 +273,7 @@ class TestExample(ProductConnectTransactionCase):
         # - self.test_product_motor: Motor-sourced product
         # - self.test_partner: Test customer
         # - self.test_partners: List of 3 additional test customers
-        
+
         # Modify products as needed for your test
         self.test_products[0].write({'shopify_next_export': True})
 
@@ -352,14 +353,57 @@ rolled back.
 
 ### JavaScript Tests (Hoot)
 
+Odoo 18 uses the Hoot framework for JavaScript testing, supporting both unit and integration tests.
+
+#### Unit Tests
+
 ```javascript
 import { describe, test, expect } from "@odoo/hoot";
-import { click, fill } from "@odoo/hoot-dom";
 
 describe("Feature Tests", () => {
     test("should do something", async () => {
         // Test implementation
         expect(value).toBe(expected);
+    });
+});
+```
+
+#### Integration Tests
+
+For testing views, widgets, and DOM interactions:
+
+```javascript
+import { describe, test, expect, beforeEach } from "@odoo/hoot";
+import { click, fill } from "@odoo/hoot-dom";
+import { animationFrame } from "@odoo/hoot-mock";
+import { mountView } from "@web/../tests/web_test_helpers";
+
+describe("Widget Integration Tests", () => {
+    let serverData;
+
+    beforeEach(() => {
+        serverData = {
+            models: {
+                "test.model": {
+                    fields: { name: { string: "Name", type: "char" } },
+                    records: [{ id: 1, name: "Test" }],
+                },
+            },
+        };
+    });
+
+    test("should interact with view", async () => {
+        await mountView({
+            type: "form",
+            resModel: "test.model",
+            resId: 1,
+            serverData,
+            arch: `<form><field name="name"/></form>`,
+        });
+
+        expect("input[name='name']").toHaveValue("Test");
+        await fill("input[name='name']", "Updated");
+        expect("input[name='name']").toHaveValue("Updated");
     });
 });
 ```

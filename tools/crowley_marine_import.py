@@ -11,15 +11,12 @@ Usage:
 
 import asyncio
 import argparse
-import json
 import logging
 import os
 import re
 import sys
 import xmlrpc.client
-from datetime import datetime
-from typing import Dict, List, Optional, Tuple
-from urllib.parse import urljoin, urlparse, parse_qs
+from urllib.parse import urljoin
 
 # Playwright imports
 try:
@@ -37,15 +34,14 @@ logger = logging.getLogger(__name__)
 class OdooConnector:
     """Handles connection to Odoo via XML-RPC API"""
 
-    def __init__(self, url: str, db: str, api_key: str):
+    def __init__(self, url: str, db: str, api_key: str) -> None:
         self.url = url
         self.db = db
         self.api_key = api_key
         self.uid = 2  # UID 2 is used for API key authentication
         self.models = None
 
-    def connect(self):
-        """Establish connection to Odoo"""
+    def connect(self) -> bool:
         try:
             # Models endpoint for data operations
             self.models = xmlrpc.client.ServerProxy(f"{self.url}/xmlrpc/2/object")
@@ -62,24 +58,24 @@ class OdooConnector:
             logger.error(f"Failed to connect to Odoo: {e}")
             return False
 
-    def execute(self, model: str, method: str, *args, **kwargs):
+    def execute(self, model: str, method: str, *args: object, **kwargs: object) -> object:
         """Execute method on Odoo model"""
         return self.models.execute_kw(self.db, self.uid, self.api_key, model, method, list(args), kwargs)
 
-    def create(self, model: str, vals: Dict):
+    def create(self, model: str, vals: dict):
         """Create a record"""
         result = self.execute(model, "create", [vals])
         # XML-RPC returns list with single ID
         return result[0] if isinstance(result, list) else result
 
-    def search(self, model: str, domain: List, limit: int = None):
+    def search(self, model: str, domain: list, limit: int = None):
         """Search for records"""
         kwargs = {}
         if limit:
             kwargs["limit"] = limit
         return self.execute(model, "search", domain, **kwargs)
 
-    def search_read(self, model: str, domain: List, fields: List = None, limit: int = None):
+    def search_read(self, model: str, domain: list, fields: list = None, limit: int = None):
         """Search and read records"""
         kwargs = {}
         if fields:
@@ -88,7 +84,7 @@ class OdooConnector:
             kwargs["limit"] = limit
         return self.execute(model, "search_read", domain, **kwargs)
 
-    def write(self, model: str, ids: List[int], vals: Dict):
+    def write(self, model: str, ids: list[int], vals: dict):
         """Update records"""
         return self.execute(model, "write", ids, vals)
 
@@ -115,7 +111,7 @@ class CrowleyMarineScraper:
         "mariner": {"name": "Mariner", "outboard_path": "/mariner/oem-parts/outboard", "types": ["outboard"]},
     }
 
-    def __init__(self, odoo: OdooConnector):
+    def __init__(self, odoo: OdooConnector) -> None:
         self.odoo = odoo
         self.manufacturers_cache = {}
         self.categories_cache = {}
@@ -175,7 +171,7 @@ class CrowleyMarineScraper:
         self.categories_cache[cache_key] = cat_id
         return cat_id
 
-    def create_or_update_model_variant(self, variant_data: Dict) -> Optional[int]:
+    def create_or_update_model_variant(self, variant_data: dict) -> int | None:
         """Create or update model variant in Odoo"""
         try:
             model_code = variant_data.get("model_code")
@@ -225,7 +221,7 @@ class CrowleyMarineScraper:
             self.errors.append(f"Variant {variant_data.get('model_code')}: {str(e)}")
             return None
 
-    def create_or_update_part(self, part_data: Dict) -> Optional[int]:
+    def create_or_update_part(self, part_data: dict) -> int | None:
         """Create or update part in Odoo"""
         try:
             mpn = part_data.get("mpn")
@@ -549,7 +545,7 @@ class CrowleyMarineScraper:
             logger.error(f"Error scraping model parts: {e}")
             self.errors.append(f"Model parts: {str(e)}")
 
-    async def run(self, manufacturer_filter: List[str] = None):
+    async def run(self, manufacturer_filter: list[str] = None):
         """Run the scraper"""
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
@@ -570,8 +566,7 @@ class CrowleyMarineScraper:
             logger.warning(f"Encountered {len(self.errors)} errors")
 
 
-def main():
-    """Main entry point"""
+def main() -> None:
     parser = argparse.ArgumentParser(description="Import Crowley Marine parts catalog into Odoo")
     parser.add_argument(
         "--url", default=os.environ.get("ODOO_URL", "http://localhost:8069"), help="Odoo URL (default: http://localhost:8069)"

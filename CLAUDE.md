@@ -16,25 +16,80 @@ See [Documentation](docs/DOCUMENTATION.md) for all available documentation resou
 - [Style Guide](docs/STYLE_GUIDE.md) - Code standards and naming conventions
 - [Work-in-progress notes](docs/todo) - Development notes and future improvements
 
-## Docker MCP Tools (Use These First!)
+## CRITICAL: Tool Selection Hierarchy
 
-**Container Management** (prefer over bash):
+**ALWAYS follow this order - using the wrong tool wastes time and causes errors:**
 
-- `mcp__docker__list-containers` - Check container status (replaces `docker ps`)
-- `mcp__docker__get-logs` container_name: "odoo-opw-web-1" - View logs (replaces `docker logs`)
-- `mcp__docker__deploy-compose` - Restart entire stack when needed
+1. **MCP Tools FIRST** - Purpose-built for specific tasks
+    - `mcp__odoo-intelligence__*` - For ANY Odoo code analysis (PROJECT-WIDE)
+    - `mcp__docker__*` - For container operations
+    - `mcp__inspection-pycharm__*` - For code quality (single file only)
+    - `mcp__pycharm__*` - For IDE interactions
 
-**Bash only** (complex Odoo ops):
+2. **Built-in Tools SECOND** - For file operations
+    - `Read`, `Write`, `Edit`, `MultiEdit` - File modifications
+    - `Grep`, `Glob` - File searching
+    - `Task` - For complex multi-step operations
 
-```bash
-# Update module and start with dev=all for auto reload and xml reloading (use dedicated script-runner container)
-docker exec odoo-opw-script-runner-1 /odoo/odoo-bin -u product_connect --dev=all --stop-after-init --addons-path=/volumes/addons,/odoo/addons,/volumes/enterprise
+3. **Bash LAST RESORT** - Only when no other option exists
+    - Complex Docker exec commands not covered by MCP
+    - See @docs/agents/dock.md for Docker operations
 
-# Odoo shell (use dedicated shell container)
-echo "env['motor.product'].search_count([])" | docker exec -i odoo-opw-shell-1 /odoo/odoo-bin shell --database=opw
+**NEVER use Bash for**: `find`, `grep`, `cat`, `ls`, `docker ps`, `docker logs`
 
-# Cleanup extra containers if needed
-docker container prune -f
+## 🚀 Proven Success Patterns
+
+### Fast Code Search
+
+```python
+# ✅ RIGHT: Instant project-wide search
+mcp__odoo - intelligence__search_code(pattern="extends.*Controller", file_type="js")
+
+# ❌ WRONG: Slow bash grep
+docker
+exec
+odoo - opw - web - 1
+grep - r
+"extends.*Controller" / odoo /
+```
+
+### Container Operations
+
+```python
+# ✅ RIGHT: Instant, formatted output
+mcp__docker__list - containers()
+mcp__docker__get - logs(container_name="odoo-opw-web-1")
+
+# ❌ WRONG: Creates temporary containers
+docker
+compose
+run - -rm
+web / odoo / odoo - bin...
+```
+
+### Quality Checks
+
+```python
+# ✅ RIGHT: Comprehensive analysis
+mcp__odoo-intelligence__pattern_analysis(pattern_type="all")
+mcp__odoo-intelligence__performance_analysis(model_name="product.template")
+
+# ❌ WRONG: Limited single-file inspection
+# PyCharm inspection only sees one file at a time
+```
+
+### Testing
+
+```python
+# ✅ RIGHT: Use test runner with proper base classes
+./ tools / test_runner.py - -test - tags
+TestFeatureName
+
+# ❌ WRONG: Direct odoo-bin without test infrastructure
+docker
+exec
+odoo - opw - web - 1 / odoo / odoo - bin
+test...
 ```
 
 ## Quick Command Reference
@@ -53,82 +108,27 @@ docker container prune -f
 - `./tools/test_runner.py -j` - JSON output for parsing
 - `./tools/test_runner.py -u` - Update module before running tests (use only if needed, can cause timeouts)
 
-**Test Templates**:
-
-- Python tests: Use `addons/product_connect/tests/test_template.py` as template
-- JavaScript unit tests: Use `addons/product_connect/static/tests/basic.test.js` as template
-- Tour tests: Use `addons/product_connect/static/tests/tours/basic_tour.js` as template
-- Naming: Python `test_feature_name.py`, JS `feature_name.test.js`, tours `feature_name_tour.js`
-
-**Tours** (UI automation tests):
-
-- Drop `.js` files in `static/tests/tours/` - automatically discovered and run
-- Tours simulate real user interactions (clicks, form fills, navigation)
-- Debug in browser: `odoo.__WOWL_DEBUG__.root.env.services.tour.run("tour_name")`
-- Database changes: Rolled back in tests, permanent in browser
-- **Important**: In Odoo 18, tours should start at `/odoo` (not the old `/web`)
-- **Important**: Avoid jQuery-style selectors (`:visible`, `:not()`) - use simple selectors
-- **Important**: Tours must have `test: true` property in definition
+**Testing**: See @docs/agents/scout.md for comprehensive test writing patterns
 
 **Format**: `ruff format . && ruff check . --fix`
 
 **File Moves**: Always use `git mv` instead of `mv` to preserve Git history.
 
-**Browser Debugging**: Use `mcp__playwright__` tools to check console errors:
+**Browser Debugging**: Use `mcp__playwright__` tools - See @docs/agents/owl.md for frontend debugging
 
-- `mcp__playwright__browser_navigate` url: "http://localhost:8069" - Navigate to Odoo
-- `mcp__playwright__browser_console_messages` - Get console logs and errors
-
-## Bug Detection
+## Code Quality
 
 **IMPORTANT**: Never run Python files directly - use proper Odoo environment.
 
-### JetBrains Inspection API (v1.9.0+)
+For comprehensive code quality analysis, see @docs/agents/inspector.md
 
-**Workflow**:
+**Quick check**: `mcp__odoo-intelligence__pattern_analysis(pattern_type="all")`
 
-1. **Trigger inspection**: `mcp__inspection-pycharm__inspection_trigger()`
-2. **Check status**: `mcp__inspection-pycharm__inspection_get_status()` until complete
-3. **Key**: The status response will clearly tell Claude:
-    - `clean_inspection: true` → Inspection passed with no problems (stop here!)
-    - `has_inspection_results: true` → Problems found, call `inspection_get_problems`
-    - Otherwise → No recent inspection, trigger one first
+## Key Paths
 
-**Usage Examples**:
-
-- `mcp__inspection-pycharm__inspection_get_problems()` - Get all problems (paginated)
-- `mcp__inspection-pycharm__inspection_get_problems(severity="error")` - Get only critical errors
-- `mcp__inspection-pycharm__inspection_get_problems(severity="warning")` - Get warnings (default)
-- `mcp__inspection-pycharm__inspection_get_problems(severity="grammar")` - Get grammar issues
-- `mcp__inspection-pycharm__inspection_get_problems(severity="typo")` - Get spelling issues
-- `mcp__inspection-pycharm__inspection_get_problems(problem_type="PyUnresolvedReferences")` - Filter by inspection type
-- `mcp__inspection-pycharm__inspection_get_problems(file_pattern="*.py", limit=50)` - Filter by file pattern with
-  pagination
-- `mcp__inspection-pycharm__inspection_get_problems(scope="addons/product_connect/")` - Scope to specific directory
-
-**Parameters**:
-
-- `scope`: `whole_project` (default) | `current_file` | custom path
-- `severity`: `error` | `warning` (default) | `weak_warning` | `info` | `grammar` | `typo` | `all`
-- `problem_type`: Filter by inspection name (e.g., "PyUnresolvedReferences", "PyTypeChecker")
-- `file_pattern`: Regex or simple pattern (e.g., "*.py", "models/.*\.py$")
-- `limit`: Max problems per request (default: 100)
-- `offset`: Skip problems for pagination
-
-**Handling Large Results**: When Claude encounters token limit errors:
-
-- Start with errors only: `severity="error"`
-- Filter by problem type: `problem_type="PyTypeChecker"`
-- Use pagination: `limit=50, offset=0`
-- Combine filters: `severity="error", file_pattern="models/", limit=100`
-
-## Docker Paths (Container)
-
-- `/odoo` - Odoo community source
-- `/volumes/enterprise` - Enterprise addons
-- `/volumes/addons` - Custom addons (mounted from `./addons`)
-- `/volumes/data` - Filestore
-- Database: `opw`
+- **Custom addons**: `./addons` (accessible from host)
+- **Container paths**: See @docs/agents/archer.md for Odoo source research
+- **Database**: `opw`
 
 ## Code Standards
 
@@ -148,20 +148,9 @@ and formatting rules.
 **Development steps**:
 
 1. **Check containers** - Use `mcp__docker__list-containers`
-2. **Examine existing code** - Follow project patterns, not generic Odoo tutorials
-3. **Code like a senior Odoo core engineer** - Use advanced patterns found in enterprise addons
-4. **Check similar features** - If adding to motors, study existing motor models/views/tests
-5. **Run code quality checks** before committing:
-    - JetBrains Inspection API (see Bug Detection section)
-    - Runtime validation: Add `--stop-after-init` to catch import/syntax errors
-    - Note: ruff-odoo plugin exists but PyCharm's Odoo plugin is more mature
-6. **Test and format** - See Quick Command Reference
-    - **IMPORTANT**: Before marking a task complete, run relevant tests:
-        - For new features: `./tools/test_runner.py --test-tags TestFeatureName`
-        - For bug fixes: Run tests for the affected area
-        - For UI changes: Run the corresponding tour test
-    - If Claude created new functionality without tests, create them first
-7. **Check logs if tests fail** - Use `mcp__docker__get-logs`
+2. **Follow project patterns** - Not generic tutorials
+3. **Run tests before completion** - `./tools/test_runner.py`
+4. **Format code** - `ruff format . && ruff check . --fix`
 
 ## Architecture
 
@@ -181,55 +170,31 @@ and formatting rules.
 - `services/shopify/gql/*` - Generated GraphQL client
 - `graphql/schema/*` - Shopify schema
 
-**Shopify GraphQL Reference**:
+**Shopify Integration**: See @docs/agents/shopkeeper.md for GraphQL and sync patterns
 
-- Schema: `addons/product_connect/graphql/schema/shopify_schema_2025-04.sdl` (61k+ lines)
-- Search for types: `grep "^type.*{" addons/product_connect/graphql/schema/shopify_schema_2025-04.sdl`
-- Search for mutations:
-  `grep ".*(" addons/product_connect/graphql/schema/shopify_schema_2025-04.sdl | grep -A5 -B5 "mutation"`
+## Specialized Development Agents
 
-**GraphQL regen**: Run `generate_shopify_models.py` when .graphql files or `SHOPIFY_API_VERSION` change
+For focused expertise without context pollution, use our specialized agents:
 
-## Enhanced Code Intelligence (MCP Server)
+| Agent              | Specialty                              | Documentation              |
+|--------------------|----------------------------------------|----------------------------|
+| 🏹 **Archer**      | Odoo source research, finding patterns | @docs/agents/archer.md     |
+| 🔍 **Scout**       | Writing comprehensive tests            | @docs/agents/scout.md      |
+| 🔬 **Inspector**   | Code quality analysis                  | @docs/agents/inspector.md  |
+| 🚢 **Dock**        | Docker container operations            | @docs/agents/dock.md       |
+| 🛍️ **Shopkeeper** | Shopify integration                    | @docs/agents/shopkeeper.md |
+| 🦉 **Owl**         | Frontend development (Owl.js)          | @docs/agents/owl.md        |
+| 🔥 **Phoenix**     | Migrating old patterns                 | @docs/agents/phoenix.md    |
+| ⚡ **Flash**        | Performance optimization               | @docs/agents/flash.md      |
 
-**Odoo Intelligence MCP Server** provides deep code analysis through MCP tools:
+**Using Agents**:
 
-**Core Commands:**
+```python
+Task(
+    description="Find graph view patterns",
+    prompt="@docs/agents/archer.md\n\nFind how Odoo 18 implements graph views",
+    subagent_type="general-purpose"
+)
+```
 
-- `mcp__odoo-intelligence-mcp__model_info` model_name: "motor.product" - Fields, methods, inheritance, decorators
-- `mcp__odoo-intelligence-mcp__search_models` pattern: "motor" - Exact → partial → description matches
-- `mcp__odoo-intelligence-mcp__module_structure` module_name: "product_connect" - Models, views, controllers, manifest
-- `mcp__odoo-intelligence-mcp__find_method` method_name: "compute_display_name" - All models implementing method
-- `mcp__odoo-intelligence-mcp__inheritance_chain` model_name: "product.template" - MRO, inherits, inherited fields
-- `mcp__odoo-intelligence-mcp__field_usages` model_name: "motor.product", field_name: "motor_id" - Views, methods,
-  domains
-- `mcp__odoo-intelligence-mcp__search_code` pattern: "shopify", file_type: "py" - Regex search (py|xml|js)
-- `mcp__odoo-intelligence-mcp__addon_dependencies` addon_name: "product_connect" - Manifest, depends, auto_install
-- `mcp__odoo-intelligence-mcp__model_relationships` model_name: "motor.product" - M2O/O2M/M2M + reverse relationships
-- `mcp__odoo-intelligence-mcp__pattern_analysis` type: "computed_fields" - Types: `computed_fields`, `related_fields`,
-  `api_decorators`, `custom_methods`, `state_machines`, `all`
-- `mcp__odoo-intelligence-mcp__performance_analysis` model_name: "sale.order.line" - N+1 queries, missing indexes
-- `mcp__odoo-intelligence-mcp__search_field_type` type: "many2one" - Types: `many2one`, `char`, `selection`, `date`,
-  `boolean`, etc
-- `mcp__odoo-intelligence-mcp__search_field_properties` property: "computed" - Properties: `computed`, `related`,
-  `stored`, `required`, `readonly`
-- `mcp__odoo-intelligence-mcp__search_decorators` decorator: "depends" - Decorators: `depends`, `constrains`,
-  `onchange`, `model_create_multi`
-- `mcp__odoo-intelligence-mcp__resolve_dynamic_fields` model_name: "product.template" - Computed/related fields with
-  cross-model deps
-- `mcp__odoo-intelligence-mcp__field_dependencies` model_name: "product.template", field_name: "list_price" - Dependency
-  graph
-- `mcp__odoo-intelligence-mcp__view_model_usage` model_name: "motor.product" - Views using model, field coverage
-- `mcp__odoo-intelligence-mcp__workflow_states` model_name: "repair.order" - State fields, transitions, button actions
-- `mcp__odoo-intelligence-mcp__execute_code` code: "result = env['product.template'].search_count([])" - Run Python code
-  in Odoo env
-- `mcp__odoo-intelligence-mcp__odoo_shell` code: "print(env['res.partner'].search_count([]))" - Execute code in Odoo
-  shell container
-- `mcp__odoo-intelligence-mcp__test_runner` module: "product_connect" - Run Odoo tests (placeholder)
-- `mcp__odoo-intelligence-mcp__field_value_analyzer` model: "res.partner", field: "name" - Analyze field data
-  patterns/quality
-- `mcp__odoo-intelligence-mcp__permission_checker` user: "admin", model: "res.partner", operation: "read" - Debug access
-  rights
-
-**Usage**: Call MCP tools directly - they connect to running Odoo container automatically. Large response tools
-auto-paginate.
+See @docs/agents/README.md for complete agent overview.

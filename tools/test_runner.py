@@ -50,6 +50,57 @@ class TestRunner:
             print(f"Error: Docker not found or not accessible: {e}")
             sys.exit(1)
 
+        # Ensure required containers are running
+        self._ensure_containers_running()
+
+    def _ensure_containers_running(self) -> None:
+        """Ensure required containers are running, start them if not."""
+        containers_to_check = [
+            {"name": "odoo-opw-script-runner-1", "service": "script-runner", "command": ["tail", "-f", "/dev/null"]},
+            {
+                "name": "odoo-opw-shell-1",
+                "service": "shell",
+                "command": None,  # Uses default command from docker-compose.yml
+            },
+        ]
+
+        for container in containers_to_check:
+            # Check if container is running
+            check_cmd = ["docker", "ps", "--filter", f"name={container['name']}", "--format", "{{.Names}}"]
+            result = subprocess.run(check_cmd, capture_output=True, text=True)
+
+            if container["name"] not in result.stdout:
+                if self.verbose:
+                    print(f"Container {container['name']} not running, starting it...")
+
+                # Start the container
+                start_cmd = ["docker", "compose", "run", "-d", "--name", container["name"], container["service"]]
+                if container["command"]:
+                    start_cmd.extend(container["command"])
+
+                try:
+                    subprocess.run(start_cmd, capture_output=True, check=True, text=True)
+                    if self.verbose:
+                        print(f"Started container {container['name']}")
+                    # Give container a moment to fully start
+                    time.sleep(1)
+                except subprocess.CalledProcessError as e:
+                    # Container might already exist but be stopped
+                    if "already in use" in str(e.stderr):
+                        # Try to start existing container
+                        restart_cmd = ["docker", "start", container["name"]]
+                        try:
+                            subprocess.run(restart_cmd, capture_output=True, check=True)
+                            if self.verbose:
+                                print(f"Restarted existing container {container['name']}")
+                        except subprocess.CalledProcessError:
+                            print(f"Error: Could not start container {container['name']}")
+                            print("Please check your Docker setup and try again.")
+                            sys.exit(1)
+                    else:
+                        print(f"Error starting container {container['name']}: {e.stderr}")
+                        sys.exit(1)
+
     @staticmethod
     def cleanup_docker_environment() -> bool:
         try:

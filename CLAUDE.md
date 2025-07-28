@@ -135,6 +135,18 @@ For comprehensive code quality analysis, see @docs/agents/inspector.md
 See [Style Guide](docs/STYLE_GUIDE.md) for complete coding standards including Python, JavaScript, naming conventions,
 and formatting rules.
 
+## 🎯 AGENT FIRST RULE
+
+**BEFORE doing any work, ask yourself**: "Is there an agent for this?"
+
+- Error? → Use Debugger agent
+- Planning? → Use Planner agent
+- Refactoring? → Use Refactor agent
+- Research? → Use Archer agent
+- Testing? → Use Scout agent
+
+**User doesn't need to ask** - be proactive!
+
 ## Development Workflow
 
 **Tool preferences** (in order of efficiency):
@@ -171,6 +183,50 @@ and formatting rules.
 - `graphql/schema/*` - Shopify schema
 
 **Shopify Integration**: See @docs/agents/shopkeeper.md for GraphQL and sync patterns
+
+## 🚨 AUTOMATIC AGENT USAGE
+
+**IMPORTANT**: Claude should PROACTIVELY use agents for these scenarios:
+
+### Error/Debug Scenarios → Use Debugger Agent
+
+- User shows any Python traceback or error message
+- "Getting error", "doesn't work", "failing", "crashed"
+- Stack traces, AttributeError, ImportError, etc.
+  → **ACTION**:
+  `Task(description="Debug error", prompt="@docs/agents/debugger.md\n\n[error details]", subagent_type="general-purpose")`
+
+### Planning Scenarios → Use Planner Agent
+
+- "How should I implement..."
+- "I want to add feature X"
+- "Design a system for..."
+- Any complex multi-step feature request
+  → **ACTION**:
+  `Task(description="Plan feature", prompt="@docs/agents/planner.md\n\n[feature request]", subagent_type="general-purpose")`
+
+### Refactoring Scenarios → Use Refactor Agent
+
+- "Clean up this code"
+- "Update all instances of..."
+- "Make this consistent across files"
+- "Remove redundant..."
+  → **ACTION**:
+  `Task(description="Refactor code", prompt="@docs/agents/refactor.md\n\n[refactoring request]", subagent_type="general-purpose")`
+
+### Research Scenarios → Use Archer Agent
+
+- "How does Odoo implement..."
+- "Find examples of..."
+- "What's the pattern for..."
+  → **ACTION**: Use Archer agent immediately
+
+### Testing Scenarios → Use Scout Agent
+
+- "Write tests for..."
+- "Test is failing"
+- After implementing any feature
+  → **ACTION**: Use Scout agent proactively
 
 ## Specialized Development Agents
 

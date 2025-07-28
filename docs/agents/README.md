@@ -36,18 +36,21 @@ agent has focused knowledge to avoid context pollution and ensure expertise in t
 
 ## Available Agents
 
-| Agent | Name                   | Specialty              | Primary Tools                                                                           |
-|-------|------------------------|------------------------|-----------------------------------------------------------------------------------------|
-| 🏹    | **Archer**             | Odoo Source Research   | `mcp__odoo-intelligence__search_*`, Docker paths                                        |
-| 🔍    | **Scout**              | Test Writing           | `mcp__odoo-intelligence__test_runner`, test templates                                   |
-| 🔬    | **Inspector**          | Code Quality           | `mcp__odoo-intelligence__*` (project-wide), `mcp__inspection-pycharm__*` (current file) |
-| 🚢    | **Dock**               | Docker Operations      | `mcp__docker__*`, container management                                                  |
-| 🛍️   | **Shopkeeper**         | Shopify Integration    | `mcp__odoo-intelligence__*`, GraphQL patterns                                           |
-| 🦉    | **Owl**                | Frontend Development   | Owl.js patterns, `mcp__pycharm__*` for JS files                                         |
-| 🔥    | **Phoenix**            | Migration Patterns     | `mcp__odoo-intelligence__*`, version differences                                        |
-| ⚡     | **Flash**              | Performance Analysis   | `mcp__odoo-intelligence__performance_*`, optimization                                   |
-| 🧙    | **Odoo Engineer**      | Core Developer Mindset | Framework patterns, idiomatic Odoo                                                      |
-| 🤖    | **Anthropic Engineer** | Claude Best Practices  | AI optimization, context management                                                     |
+| Agent | Name                   | Specialty               | Primary Tools                                                                           |
+|-------|------------------------|-------------------------|-----------------------------------------------------------------------------------------|
+| 🏹    | **Archer**             | Odoo Source Research    | `mcp__odoo-intelligence__search_*`, Docker paths                                        |
+| 🔍    | **Scout**              | Test Writing            | `mcp__odoo-intelligence__test_runner`, test templates                                   |
+| 🔬    | **Inspector**          | Code Quality            | `mcp__odoo-intelligence__*` (project-wide), `mcp__inspection-pycharm__*` (current file) |
+| 🚢    | **Dock**               | Docker Operations       | `mcp__docker__*`, container management                                                  |
+| 🛍️   | **Shopkeeper**         | Shopify Integration     | `mcp__odoo-intelligence__*`, GraphQL patterns                                           |
+| 🦉    | **Owl**                | Frontend Development    | Owl.js patterns, `mcp__pycharm__*` for JS files                                         |
+| 🔥    | **Phoenix**            | Migration Patterns      | `mcp__odoo-intelligence__*`, version differences                                        |
+| ⚡     | **Flash**              | Performance Analysis    | `mcp__odoo-intelligence__performance_*`, optimization                                   |
+| 🐛    | **Debugger**           | Error Analysis          | `mcp__docker__get-logs`, stack trace investigation                                      |
+| 📋    | **Planner**            | Implementation Planning | `TodoWrite`, architecture design, task breakdown                                        |
+| 🔧    | **Refactor**           | Code Improvement        | `MultiEdit`, bulk operations, pattern replacement                                       |
+| 🧙    | **Odoo Engineer**      | Core Developer Mindset  | Framework patterns, idiomatic Odoo                                                      |
+| 🤖    | **Anthropic Engineer** | Claude Best Practices   | AI optimization, context management                                                     |
 
 ## Using Agents
 

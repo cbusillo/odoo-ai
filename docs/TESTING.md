@@ -128,22 +128,17 @@ addons/product_connect/
 
 ## Writing Tests
 
-### Test Templates
+## Writing Tests
 
-Use these templates as starting points for new tests:
+**For comprehensive test writing patterns, templates, and best practices, see @docs/agents/scout.md**
 
-- **Python unit test**: [`test_basic.py`](../addons/product_connect/tests/test_basic.py)
-    - Shows TransactionCase and HttpCase examples
-    - Demonstrates mocking with patch.object
-    - Includes secure password generation for test users
+Scout covers:
 
-- **JavaScript test**: [`basic.test.js`](../addons/product_connect/static/tests/basic.test.js)
-    - Hoot framework example
-    - Shows view mounting and DOM testing
-
-- **Tour test**: [`basic_tour.js`](../addons/product_connect/static/tests/tours/basic_tour.js)
-    - Minimal tour structure
-    - Shows basic UI verification
+- Test templates and base classes
+- SKU validation rules
+- Mocking patterns
+- Tour test creation
+- Common test scenarios
 
 ### Tour Tests
 
@@ -220,88 +215,15 @@ This structure ensures:
 - Tours in `static/tests/tours/` are for testing only (won't appear in Tours UI)
 - To make tours visible in Tours UI, move to `static/src/tours/` and update manifest
 
-### Mocking Best Practices
-
-When mocking in tests, prefer `patch.object` over string-based patches for better refactoring support:
-
-```python
-from unittest.mock import patch, MagicMock
-
-# PREFERRED: patch.object - type-safe and refactor-friendly
-from ..shopify.sync.importers.customer_importer import CustomerImporter
-
-
-class TestExample(TransactionCase):
-    @patch.object(CustomerImporter, "import_customer")
-    def test_with_mock(self, mock_import_customer: MagicMock) -> None:
-        mock_import_customer.return_value = True
-        # Your test code
-
-# AVOID: String-based patches (unless patching import locations)
-# @patch("odoo.addons.product_connect.services.shopify.sync.importers.customer_importer.CustomerImporter.import_customer")
-```
-
-**Exception**: When patching import locations (where a module imports another), string patches may be necessary:
-
-```python
-# OK for import location patching
-self.shopify_service_patcher = patch("odoo.addons.product_connect.services.shopify.sync.base.ShopifyService")
-```
-
 ### Base Test Classes
 
-Use the provided base classes for consistent test setup:
+**See @docs/agents/scout.md for detailed base class usage and pre-created test data**
 
-```python
-from odoo.addons.product_connect.tests.fixtures.test_base import (
-    ProductConnectTransactionCase,
-    ProductConnectHttpCase,
-    ProductConnectIntegrationCase
-)
+Quick reference:
 
-
-# For unit tests
-class TestExample(ProductConnectTransactionCase):
-    def test_feature(self):
-        # Pre-created test data available:
-        # - self.test_product: Standard consumable product (SKU: 10000001)
-        # - self.test_service: Service product (SKU: SERVICE-001)
-        # - self.test_product_ready: Ready-to-sell product (SKU: 20000001)
-        # - self.test_products: List of 10 generic products (SKUs: 30000001-30000010)
-        # - self.test_product_not_for_sale: Product with sale_ok=False
-        # - self.test_product_unpublished: Unpublished product
-        # - self.test_product_motor: Motor-sourced product
-        # - self.test_partner: Test customer
-        # - self.test_partners: List of 3 additional test customers
-
-        # Modify products as needed for your test
-        self.test_products[0].write({'shopify_next_export': True})
-
-
-# For HTTP/browser tests needing authentication
-class TestBrowser(ProductConnectHttpCase):
-    def test_feature(self):
-        # Includes all products from TransactionCase plus:
-        # - self.test_user and self.test_user_password are automatically created
-        self.browser_js(url, code, login=self.test_user.login)
-
-
-# For integration tests with motor data
-class TestIntegration(ProductConnectIntegrationCase):
-    def test_workflow(self):
-        # Includes all products from HttpCase plus:
-        # - self.test_motor is available
-        pass
-```
-
-**Important Notes:**
-
-- All base classes automatically set `skip_shopify_sync=True` and `tracking_disable=True` in context
-- All consumable products have valid 4-8 digit SKUs to pass validation
-- All products include `website_description` for Shopify export tests
-- Service products can have any SKU format (no validation)
-- Use the pre-created products instead of creating new ones when possible
-- Modify existing products rather than creating duplicates
+- `ProductConnectTransactionCase` - Unit tests
+- `ProductConnectHttpCase` - Browser/tour tests
+- `ProductConnectIntegrationCase` - Motor integration tests
 
 ### Python Tests
 
@@ -318,38 +240,6 @@ class TestExample(TransactionCase):
         # Test implementation
         self.assertEqual(actual, expected)
 ```
-
-### HttpCase Tests (Browser/Tour Tests)
-
-For tests requiring authentication (JavaScript tests, tours), create temporary test users:
-
-```python
-import secrets
-from odoo.tests import HttpCase, tagged
-
-
-@tagged("post_install", "-at_install")
-class TestWithAuth(HttpCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        # Create temporary test user with secure password (rolled back after tests)
-        secure_password = secrets.token_urlsafe(32)
-        cls.test_user = cls.env['res.users'].create({
-            'name': 'Test User',
-            'login': 'test_user_unique',
-            'password': secure_password,
-            'groups_id': [(6, 0, [cls.env.ref('base.group_user').id])],
-        })
-        # Store password if needed for authentication
-        cls.test_user_password = secure_password
-
-    def test_browser_feature(self):
-        self.browser_js(url, code, login=cls.test_user.login)
-```
-
-**Important**: Always use cryptographically secure passwords via `secrets.token_urlsafe()`. Test users are automatically
-rolled back.
 
 ### JavaScript Tests (Hoot)
 
@@ -433,30 +323,16 @@ registry.category("web_tour.tours").add("tour_name", {
 });
 ```
 
-### Tour Testing Limitations and Best Practices
+### Tour Testing Limitations
 
-**Current State**:
+**See @docs/agents/scout.md for tour test patterns and limitations**
 
-- Tour tests in Odoo 18 are primarily useful as smoke tests
-- Complex UI interactions often fail due to timing issues and selector limitations
-- Console output from tours is not reliably captured in test results
+Key points:
 
-**Best Practices**:
-
-1. **Keep tours simple** - Test basic UI loading and navigation
-2. **Use `test: true` property** - Required for tours to run in test mode
-3. **Avoid complex selectors** - jQuery-style selectors like `:visible` don't work
-4. **Test business logic in Python** - Use tours only for critical UI paths
-5. **Use `/odoo` URLs** - Odoo 18 uses `/odoo` instead of `/web`
-
-**Known Issues**:
-
-- Lazy-loaded assets (`web.assets_backend_lazy`) may not be available during tours
-- Tour helpers and utilities often fail due to timing/promise issues
-- Error messages from failed tours provide minimal debugging information
-
-**Recommendation**: Focus on Python unit/integration tests for business logic. Use tours sparingly for critical user
-workflows that must be tested through the UI
+- Tours are best for smoke tests
+- Keep selectors simple (no jQuery patterns)
+- Use `/odoo` URLs in Odoo 18
+- Focus on Python tests for business logic
 
 ## Test Tags
 
@@ -497,20 +373,11 @@ Our tests run against a copy of the production database (`opw`) rather than a cl
 - Make tests defensive against existing data state
 - Consider test order dependencies when data is shared
 
-## Code Quality Testing
+## Code Quality
 
-### JetBrains Inspection API
+**See @docs/agents/inspector.md for comprehensive code quality workflows**
 
-Use the inspection API for comprehensive code quality checks:
-
-- `inspection_pycharm__trigger()` - Trigger full project inspection
-- `inspection_pycharm__get_problems()` - Get detailed problems list
-- `inspection_pycharm__get_categories()` - Get summary by category
-
-**Integration with CI/CD**:
-
-- Run before test execution to catch code quality issues
-- Useful for detecting issues across the entire codebase
+Quick check: Run `mcp__odoo-intelligence__pattern_analysis(pattern_type="all")`
 
 ## Handling Test Failures
 

@@ -38,7 +38,6 @@ echo "env['res.partner'].search_count([])" | docker exec -i odoo-opw-shell-1 /od
 - **odoo-opw-shell-1** - Interactive shell operations
 - **odoo-opw-script-runner-1** - Module updates, tests, one-off scripts
 - **odoo-opw-database-1** - PostgreSQL database
-- **odoo-opw-mailpit-1** - Email testing (Mailpit UI)
 
 ### IMPORTANT: Use Dedicated Containers
 
@@ -86,7 +85,7 @@ exec
 odoo - opw - script - runner - 1 / odoo / odoo - bin
 - u
 product_connect - -dev = all - -stop - after - init
-                         - -addons - path = / volumes / addons, / odoo / addons, / volumes / enterprise
+- -addons - path = / volumes / addons, / odoo / addons, / volumes / enterprise
 ```
 
 ### Run Odoo Shell
@@ -269,13 +268,13 @@ product_connect - -dev = all - -stop - after - init
 ```python
 # ✅ SYSTEMATIC: Check → Logs → Restart
 # 1. Check status
-mcp__odoo-intelligence__odoo_status(verbose=True)
+mcp__odoo - intelligence__odoo_status(verbose=True)
 
 # 2. Get detailed logs
-mcp__odoo-intelligence__odoo_logs(lines=500)
+mcp__odoo - intelligence__odoo_logs(lines=500)
 
 # 3. Restart if needed
-mcp__odoo-intelligence__odoo_restart(services="web-1")
+mcp__odoo - intelligence__odoo_restart(services="web-1")
 ```
 
 **Why this works**: Follows a proven debugging flow that catches most issues.

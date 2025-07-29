@@ -1,8 +1,8 @@
 #!/bin/bash
 # Pre-compact hook: Mark that compaction is occurring
 
-CLAUDE_DIR="$CLAUDE_PROJECT_DIR/.claude"
-COMPACT_FLAG="$CLAUDE_DIR/.compacted"
+CLAUDE_DIR=".claude"
+COMPACT_FLAG="$CLAUDE_DIR/.compacted" 
 LOG_FILE="$CLAUDE_DIR/compact.log"
 
 # Ensure .claude directory exists

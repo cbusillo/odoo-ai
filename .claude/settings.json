@@ -1,9 +1,35 @@
 {
+  "$schema": "./claude-settings-schema.json",
   "hooks": {
-    "PreCompact": {
-      "manual": "$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.sh manual",
-      "auto": "$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.sh auto"
-    },
-    "UserPromptSubmit": "$CLAUDE_PROJECT_DIR/.claude/hooks/prompt-submit.sh"
+    "PreCompact": [
+      {
+        "matcher": "manual",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/pre-compact.sh manual"
+          }
+        ]
+      },
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/pre-compact.sh auto"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/prompt-submit.sh"
+          }
+        ]
+      }
+    ]
   }
 }

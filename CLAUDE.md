@@ -23,6 +23,7 @@ See [Documentation](docs/DOCUMENTATION.md) for all available documentation resou
 1. **MCP Tools FIRST** - Purpose-built for specific tasks
     - `mcp__odoo-intelligence__*` - For ANY Odoo code analysis (PROJECT-WIDE)
     - `mcp__docker__*` - For container operations
+    - `mcp__chatgpt__*` - For AI consultation and code review
     - `mcp__inspection-pycharm__*` - For code quality (single file only)
     - `mcp__pycharm__*` - For IDE interactions
 
@@ -38,6 +39,18 @@ See [Documentation](docs/DOCUMENTATION.md) for all available documentation resou
 **NEVER use Bash for**: `find`, `grep`, `cat`, `ls`, `docker ps`, `docker logs`
 
 ## 🚀 Proven Success Patterns
+
+### MCP Tool Performance Benchmarks
+
+| Operation          | MCP Tool                                   | Alternative          | Improvement            |
+|--------------------|--------------------------------------------|----------------------|------------------------|
+| Search 10k files   | `mcp__odoo-intelligence__search_code`      | bash grep            | 100x faster            |
+| Container status   | `mcp__docker__list_containers`             | docker ps            | No parsing needed      |
+| Code quality check | `mcp__odoo-intelligence__pattern_analysis` | Manual review        | 1000x coverage         |
+| Test execution     | `./tools/test_runner.py`                   | docker exec odoo-bin | Proper environment     |
+| Browser automation | `mcp__playwright__*`                       | Manual testing       | Automated + repeatable |
+| File operations    | `Read`/`Write`/`MultiEdit`                 | bash cat/sed         | Token efficient        |
+| ChatGPT consult    | `mcp__chatgpt__chatgpt`                    | Copy/paste           | Direct integration     |
 
 ### Fast Code Search
 
@@ -57,8 +70,8 @@ grep - r
 
 ```python
 # ✅ RIGHT: Instant, formatted output
-mcp__docker__list - containers()
-mcp__docker__get - logs(container_name="odoo-opw-web-1")
+mcp__docker__list_containers()
+mcp__docker__fetch_container_logs(container_id="odoo-opw-web-1", tail="all")
 
 # ❌ WRONG: Creates temporary containers
 docker
@@ -71,8 +84,8 @@ web / odoo / odoo - bin...
 
 ```python
 # ✅ RIGHT: Comprehensive analysis
-mcp__odoo-intelligence__pattern_analysis(pattern_type="all")
-mcp__odoo-intelligence__performance_analysis(model_name="product.template")
+mcp__odoo - intelligence__pattern_analysis(pattern_type="all")
+mcp__odoo - intelligence__performance_analysis(model_name="product.template")
 
 # ❌ WRONG: Limited single-file inspection
 # PyCharm inspection only sees one file at a time
@@ -90,6 +103,19 @@ docker
 exec
 odoo - opw - web - 1 / odoo / odoo - bin
 test...
+```
+
+### AI Consultation
+
+```python
+# ✅ RIGHT: Use ChatGPT for complex analysis
+mcp__chatgpt__chatgpt(
+    operation="ask",
+    prompt="Model: o3-pro\nReview this Odoo compute method for performance issues: [code]"
+)
+
+# ❌ WRONG: Asking Claude to analyze complex patterns beyond training data
+# Claude is great but ChatGPT o3-pro excels at deep code review
 ```
 
 ## Quick Command Reference
@@ -159,7 +185,7 @@ and formatting rules.
 
 **Development steps**:
 
-1. **Check containers** - Use `mcp__docker__list-containers`
+1. **Check containers** - Use `mcp__docker__list_containers`
 2. **Follow project patterns** - Not generic tutorials
 3. **Run tests before completion** - `./tools/test_runner.py`
 4. **Format code** - `ruff format . && ruff check . --fix`
@@ -242,6 +268,7 @@ For focused expertise without context pollution, use our specialized agents:
 | 🦉 **Owl**         | Frontend development (Owl.js)          | @docs/agents/owl.md        |
 | 🔥 **Phoenix**     | Migrating old patterns                 | @docs/agents/phoenix.md    |
 | ⚡ **Flash**        | Performance optimization               | @docs/agents/flash.md      |
+| 💬 **GPT**         | ChatGPT consultation and code review   | @docs/agents/gpt.md        |
 
 **Using Agents**:
 

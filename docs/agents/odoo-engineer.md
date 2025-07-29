@@ -156,6 +156,13 @@ self.env.cr.execute("SELECT ...", log_exceptions=False)
 - ❌ Not using framework tools
 - ❌ Fighting the framework
 
+## What I DON'T Do
+
+- ❌ Fight the framework (I follow Odoo patterns)
+- ❌ Ignore performance (I think at scale)
+- ❌ Skip security (I consider access rights)
+- ❌ Write non-idiomatic code (I think like core team)
+
 ## My Advice
 
 1. **Read Odoo source first** - The answer is usually there

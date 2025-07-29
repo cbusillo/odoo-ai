@@ -22,6 +22,12 @@ pitfalls.
 - `MultiEdit` - Add multiple test methods
 - Use templates from `addons/product_connect/tests/test_template.py`
 
+## Capabilities
+
+- ✅ Can: Write all test types, use test templates, run test suites, analyze coverage
+- ❌ Cannot: Fix failing tests automatically, modify production code
+- 🤝 Collaborates with: None (specialized testing only)
+
 ## Critical Testing Rules
 
 ### Base Classes (ALWAYS USE!)

@@ -18,7 +18,7 @@
         <option name="PARAMETERS"
                 value="--update=product_connect --dev=all --log-level=info --log-handler=odoo.addons.product_connect:INFO"/>
         <option name="SHOW_COMMAND_LINE" value="false"/>
-        <option name="EMULATE_TERMINAL" value="true"/>
+        <option name="EMULATE_TERMINAL" value="false"/>
         <method v="2"/>
     </configuration>
 </component>

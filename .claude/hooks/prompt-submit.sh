@@ -1,7 +1,7 @@
 #!/bin/bash
 # Post-compact hook: Check if compaction occurred and inject CLAUDE.md reminder
 
-CLAUDE_DIR="$CLAUDE_PROJECT_DIR/.claude"
+CLAUDE_DIR=".claude"
 COMPACT_FLAG="$CLAUDE_DIR/.compacted"
 
 # Check if compaction flag exists
@@ -17,7 +17,7 @@ if [[ -f "$COMPACT_FLAG" ]]; then
 }
 EOF
     else
-        # Log error but don't break the prompt flow
+        # Log error but don't break the prompt flow  
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Warning: Could not remove compact flag" >> "$CLAUDE_DIR/compact.log"
     fi
 fi

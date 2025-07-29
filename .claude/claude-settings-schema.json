@@ -1,0 +1,126 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Claude Code Settings",
+  "description": "Configuration file for Claude Code hooks and settings",
+  "type": "object",
+  "properties": {
+    "hooks": {
+      "type": "object",
+      "description": "Hook configurations for various Claude Code events",
+      "properties": {
+        "PreToolUse": {
+          "$ref": "#/definitions/hookArray"
+        },
+        "PostToolUse": {
+          "$ref": "#/definitions/hookArray"
+        },
+        "Notification": {
+          "$ref": "#/definitions/hookArrayNoMatcher"
+        },
+        "UserPromptSubmit": {
+          "$ref": "#/definitions/hookArrayNoMatcher"
+        },
+        "Stop": {
+          "$ref": "#/definitions/hookArrayNoMatcher"
+        },
+        "SubagentStop": {
+          "$ref": "#/definitions/hookArrayNoMatcher"
+        },
+        "PreCompact": {
+          "type": "array",
+          "description": "Hooks that run before compaction occurs",
+          "items": {
+            "type": "object",
+            "properties": {
+              "matcher": {
+                "type": "string",
+                "enum": [
+                  "manual",
+                  "auto"
+                ],
+                "description": "Type of compaction trigger"
+              },
+              "hooks": {
+                "$ref": "#/definitions/hookDefinitions"
+              }
+            },
+            "required": [
+              "hooks"
+            ]
+          }
+        },
+        "SessionStart": {
+          "$ref": "#/definitions/hookArrayNoMatcher"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "definitions": {
+    "hookArray": {
+      "type": "array",
+      "description": "Array of hook configurations with matchers",
+      "items": {
+        "type": "object",
+        "properties": {
+          "matcher": {
+            "type": "string",
+            "description": "Pattern to match against (tool names, regex, or * for wildcard)"
+          },
+          "hooks": {
+            "$ref": "#/definitions/hookDefinitions"
+          }
+        },
+        "required": [
+          "hooks"
+        ]
+      }
+    },
+    "hookArrayNoMatcher": {
+      "type": "array",
+      "description": "Array of hook configurations without matchers",
+      "items": {
+        "type": "object",
+        "properties": {
+          "hooks": {
+            "$ref": "#/definitions/hookDefinitions"
+          }
+        },
+        "required": [
+          "hooks"
+        ]
+      }
+    },
+    "hookDefinitions": {
+      "type": "array",
+      "description": "Array of individual hook definitions",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "command"
+            ],
+            "description": "Type of hook - currently only 'command' is supported"
+          },
+          "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "Timeout in seconds (default: 60)",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "type",
+          "command"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": true
+}

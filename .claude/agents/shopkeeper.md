@@ -1,7 +1,6 @@
 ---
 name: shopkeeper
 description: Shopify integration expert. Handles GraphQL, sync patterns, and API integration. Use when working with Shopify sync, imports, exports, or GraphQL operations.
-tools: [mcp__odoo-intelligence__model_info, mcp__odoo-intelligence__field_usages, mcp__odoo-intelligence__search_code, mcp__odoo-intelligence__find_method, Grep, Read, Write]
 ---
 
 @docs/agents/shopkeeper.md

@@ -1,4 +1,6 @@
 # syntax=docker/dockerfile:1.2
+FROM postgres:17-bullseye AS pg17
+
 FROM alpine/git as enterprise
 
 ARG ODOO_ENTERPRISE_REPOSITORY
@@ -15,6 +17,11 @@ RUN echo "Cloning Enterprise Addons from ${ODOO_ENTERPRISE_REPOSITORY} branch ${
 
 FROM ghcr.io/adomi-io/odoo:18.0 as base
 USER root
+# bring in PostgreSQL 17 client tools
+COPY --from=pg17 /usr/lib/postgresql/17/bin/pg_restore /usr/local/bin/pg_restore
+COPY --from=pg17 /usr/lib/postgresql/17/bin/psql       /usr/local/bin/psql
+COPY --from=pg17 /usr/lib/postgresql/17/bin/pg_dump      /usr/local/bin/pg_dump
+
 ARG PYTHON_VERSION
 
 RUN apt-get update && \

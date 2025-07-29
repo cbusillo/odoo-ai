@@ -11,9 +11,10 @@ if [[ -f "$COMPACT_FLAG" ]]; then
         # Return additional prompt to remind Claude about CLAUDE.md
         cat <<EOF
 {
-  "additionalUserPrompts": [
-    "CRITICAL: Conversation was just compacted. You MUST immediately read CLAUDE.md in the project root to restore all project instructions, conventions, and safety rules. Do not proceed with any tasks until you've confirmed you've read and understood CLAUDE.md."
-  ]
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "CRITICAL: Conversation was just compacted. You MUST immediately read CLAUDE.md in the project root to restore all project instructions, conventions, and safety rules. Do not proceed with any tasks until you've confirmed you've read and understood CLAUDE.md."
+  }
 }
 EOF
     else

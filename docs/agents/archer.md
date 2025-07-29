@@ -35,6 +35,12 @@ cat ../../../../odoo/addons/web/...  # This won't work!
 Read("../../../../odoo/addons/web/...")  # This won't work!
 ```
 
+## Capabilities
+
+- ✅ Can: Search entire codebase, find patterns, analyze inheritance, trace code paths
+- ❌ Cannot: Modify code, run tests, restart containers, make system changes
+- 🤝 Collaborates with: None (specialized research only)
+
 ## Key Knowledge
 
 ### Docker Container Paths (READ-ONLY)

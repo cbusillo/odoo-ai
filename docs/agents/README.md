@@ -18,6 +18,7 @@ agent has focused knowledge to avoid context pollution and ensure expertise in t
 - **`mcp__inspection-pycharm__*`** - For code quality (limited to open files)
 - **`mcp__playwright__*`** - For browser automation
 - **`mcp__applescript__*`** - For macOS automation
+- **`mcp__chatgpt__*`** - For AI consultation and code review
 
 ### 2. Built-in Tools SECOND (For file operations)
 
@@ -52,6 +53,24 @@ agent has focused knowledge to avoid context pollution and ensure expertise in t
 | 🎭    | **Playwright**         | Browser Testing         | `mcp__playwright__*`, tour test execution, UI debugging                                 |
 | 🧙    | **Odoo Engineer**      | Core Developer Mindset  | Framework patterns, idiomatic Odoo                                                      |
 | 🤖    | **Anthropic Engineer** | Claude Best Practices   | AI optimization, context management                                                     |
+| 💬    | **GPT**                | ChatGPT Consultation    | `mcp__chatgpt__*`, code review, architecture advice                                     |
+
+## Quick Agent Selection Guide
+
+| Scenario                  | Primary Agent    | Supporting Agents                 |
+|---------------------------|------------------|-----------------------------------|
+| "Error in traceback"      | 🐛 Debugger      | 🚢 Dock (logs), 💬 GPT (analysis) |
+| "Write tests for X"       | 🔍 Scout         | 🏹 Archer (examples)              |
+| "Optimize performance"    | ⚡ Flash          | 🔬 Inspector (quality)            |
+| "Fix code quality issues" | 🔬 Inspector     | 🔧 Refactor (bulk fixes)          |
+| "Implement new feature"   | 📋 Planner       | 🏹 Archer (research)              |
+| "Debug UI/browser issue"  | 🎭 Playwright    | 🦉 Owl (frontend)                 |
+| "Shopify integration"     | 🛍️ Shopkeeper   | 🏹 Archer (patterns)              |
+| "Frontend development"    | 🦉 Owl           | 🎭 Playwright (testing)           |
+| "Container problems"      | 🚢 Dock          | 🐛 Debugger (logs)                |
+| "Complex code review"     | 💬 GPT           | 🔬 Inspector (quality)            |
+| "Migration issues"        | 🔥 Phoenix       | 🏹 Archer (patterns)              |
+| "Architecture design"     | 🧙 Odoo Engineer | 📋 Planner (implementation)       |
 
 ## Using Agents
 
@@ -170,6 +189,16 @@ Some agents can call other agents using the Task tool:
 - **🤖 Anthropic Engineer** - Can demonstrate agent workflows
 - **📋 Planner** - Can call Archer for research before planning
 - **🦉 Owl** - Can call Dock to restart containers after frontend changes
+
+### Collaboration Matrix
+
+| Agent                 | Can Call   | Purpose                                   |
+|-----------------------|------------|-------------------------------------------|
+| 🤖 Anthropic Engineer | All agents | Demonstrate any workflow                  |
+| 📋 Planner            | 🏹 Archer  | Research before planning                  |
+| 🦉 Owl                | 🚢 Dock    | Restart containers after frontend changes |
+| 🐛 Debugger           | 🚢 Dock    | Get container logs                        |
+| Other agents          | None       | Focused on their specialty                |
 
 ### Collaboration Examples:
 

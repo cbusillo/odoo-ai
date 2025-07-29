@@ -1,0 +1,9 @@
+{
+  "hooks": {
+    "PreCompact": {
+      "manual": "$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.sh manual",
+      "auto": "$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.sh auto"
+    },
+    "UserPromptSubmit": "$CLAUDE_PROJECT_DIR/.claude/hooks/prompt-submit.sh"
+  }
+}

@@ -239,6 +239,24 @@ TodoWrite([
 - Performance test criteria
 - User acceptance criteria
 
+## Agent Collaboration
+
+Since I have access to the Task tool, I can call other agents when needed:
+
+```python
+# Research existing patterns before planning
+research = Task(
+    description="Research similar features",
+    prompt="@docs/agents/archer.md\n\nFind how Odoo implements similar features to [feature]",
+    subagent_type="general-purpose"
+)
+
+# Use research results in planning
+# Based on research findings, create comprehensive plan...
+```
+
+This allows me to gather information before creating implementation plans.
+
 ## What I DON'T Do
 
 - ❌ Start implementation without understanding requirements

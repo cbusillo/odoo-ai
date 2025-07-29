@@ -74,6 +74,15 @@
 - "Add UI element..."
 - **Command**: `/owl`
 
+### 🎭 **BROWSER TESTING** → Playwright
+
+- "Run tour test..."
+- "UI test failing..."
+- "Take screenshot..."
+- "Check console errors..."
+- "Test user workflow..."
+- **Command**: `/browser-test`
+
 ## 🚀 One Command to Rule Them All
 
 **Can't remember which agent?** Just use:

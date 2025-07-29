@@ -256,6 +256,28 @@ window.odoo.__WOWL_DEBUG__.apps  // All Owl apps
 - Mark optional props with `optional: true`
 - Owl validates props in dev mode
 
+## Agent Collaboration
+
+Since I have access to the Task tool, I can call other agents:
+
+```python
+# After making frontend changes, restart containers
+restart = Task(
+    description="Restart containers",
+    prompt="@docs/agents/dock.md\n\nRestart web container to apply frontend changes",
+    subagent_type="general-purpose"
+)
+
+# Check for JavaScript errors after changes
+debug = Task(
+    description="Debug frontend errors",
+    prompt="@docs/agents/debugger.md\n\nInvestigate this JavaScript error: [error]",
+    subagent_type="general-purpose"
+)
+```
+
+This helps ensure frontend changes are properly deployed and debugged.
+
 ## What I DON'T Do
 
 - ❌ Use jQuery or $

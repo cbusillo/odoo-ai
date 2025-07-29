@@ -49,6 +49,7 @@ agent has focused knowledge to avoid context pollution and ensure expertise in t
 | 🐛    | **Debugger**           | Error Analysis          | `mcp__docker__get-logs`, stack trace investigation                                      |
 | 📋    | **Planner**            | Implementation Planning | `TodoWrite`, architecture design, task breakdown                                        |
 | 🔧    | **Refactor**           | Code Improvement        | `MultiEdit`, bulk operations, pattern replacement                                       |
+| 🎭    | **Playwright**         | Browser Testing         | `mcp__playwright__*`, tour test execution, UI debugging                                 |
 | 🧙    | **Odoo Engineer**      | Core Developer Mindset  | Framework patterns, idiomatic Odoo                                                      |
 | 🤖    | **Anthropic Engineer** | Claude Best Practices   | AI optimization, context management                                                     |
 
@@ -159,6 +160,40 @@ Task(
 ✅ Need to maintain state between operations
 ✅ Simple file edits or reads
 ✅ Discussing architecture or planning
+
+## Agent Collaboration
+
+Some agents can call other agents using the Task tool:
+
+### Agents That Can Call Others:
+
+- **🤖 Anthropic Engineer** - Can demonstrate agent workflows
+- **📋 Planner** - Can call Archer for research before planning
+- **🦉 Owl** - Can call Dock to restart containers after frontend changes
+
+### Collaboration Examples:
+
+```python
+# Planner calling Archer for research
+research = Task(
+    description="Research patterns",
+    prompt="@docs/agents/archer.md\n\nFind similar implementations",
+    subagent_type="general-purpose"
+)
+
+# Owl calling Dock after frontend changes
+restart = Task(
+    description="Apply changes",
+    prompt="@docs/agents/dock.md\n\nRestart web container",
+    subagent_type="general-purpose"
+)
+```
+
+### Benefits:
+
+- Agents stay focused on their specialty
+- Complex workflows can be automated
+- Context remains clean in each agent
 
 ## Important Notes
 

@@ -26,17 +26,30 @@ to use.
 
 ```bash
 # ONLY for reading Odoo core/enterprise source:
+# ✅ CORRECT - Use docker exec with ABSOLUTE paths
 docker exec odoo-opw-web-1 cat /odoo/addons/web/static/src/views/graph/graph_controller.js
 docker exec odoo-opw-web-1 cat /volumes/enterprise/sale_subscription/models/sale_order.py
+
+# ❌ WRONG - Never use relative paths
+cat ../../../../odoo/addons/web/...  # This won't work!
+Read("../../../../odoo/addons/web/...")  # This won't work!
 ```
 
 ## Key Knowledge
 
 ### Docker Container Paths (READ-ONLY)
 
-- `/odoo/addons/*` - Odoo Community core modules
-- `/volumes/enterprise/*` - Odoo Enterprise modules
-- `/volumes/addons/*` - Custom addons (but use Read tool for these)
+**CRITICAL**: These paths are INSIDE Docker containers, not on your host filesystem!
+
+- `/odoo/addons/*` - Odoo Community core modules (use `docker exec`)
+- `/volumes/enterprise/*` - Odoo Enterprise modules (use `docker exec`)
+- `/volumes/addons/*` - Custom addons (mapped to `./addons`, use `Read` tool)
+
+**Path Rules**:
+
+- ✅ Custom addons: `Read("addons/product_connect/models/motor.py")`
+- ✅ Odoo core: `docker exec odoo-opw-web-1 cat /odoo/addons/base/models/res_partner.py`
+- ❌ NEVER: `Read("../../../../odoo/...")` - This path doesn't exist on host!
 
 ### NEVER Trust Training Data
 
@@ -86,7 +99,12 @@ mcp__odoo-intelligence__search_code(
 )
 
 # If you need to read core JS files:
+# ✅ CORRECT - Docker exec with absolute container path
 docker exec odoo-opw-web-1 cat /odoo/addons/web/static/src/views/graph/graph_view.js
+
+# ❌ WRONG - These won't work!
+Read("/odoo/addons/web/...")  # Host doesn't have this path
+Read("../../../../odoo/...")  # Relative paths won't reach container
 ```
 
 ### Finding Method Implementations
@@ -142,6 +160,29 @@ mcp__odoo - intelligence__search_code(
     pattern="_inherit.*=.*product\\.template",
     file_type="py"
 )
+```
+
+## Common Mistakes to Avoid
+
+### ❌ Path Confusion
+
+```python
+# WRONG - Trying to read container paths from host
+Read("../../../../odoo/addons/web/views/graph_view.js")  # NO!
+Read("/odoo/addons/web/...")  # NO!
+
+# CORRECT - Use docker exec for container files
+docker exec odoo-opw-web-1 cat /odoo/addons/web/static/src/views/graph/graph_view.js
+```
+
+### ❌ Forgetting Docker Context
+
+```python
+# WRONG - Assuming Odoo source is on host
+Grep(pattern="GraphController", path="/odoo/addons")  # NO!
+
+# CORRECT - Search with MCP tools first
+mcp__odoo-intelligence__search_code(pattern="GraphController", file_type="js")
 ```
 
 ## Success Patterns

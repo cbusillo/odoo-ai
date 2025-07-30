@@ -16,15 +16,16 @@ import os
 import re
 import sys
 import xmlrpc.client
+from typing import cast
 from urllib.parse import urljoin
 
 # Playwright imports
 try:
     from playwright.async_api import async_playwright, Page, TimeoutError as PlaywrightTimeout
-except ImportError:
+except ImportError as e:
     print("ERROR: Playwright not installed. Please run: pip install playwright")
     print("Then run: playwright install chromium")
-    sys.exit(1)
+    raise SystemExit(1) from e
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -54,37 +55,39 @@ class OdooConnector:
             logger.info(f"Connected to Odoo at {self.url} using API key")
             return True
 
-        except Exception as e:
-            logger.error(f"Failed to connect to Odoo: {e}")
+        except Exception as error:
+            logger.error(f"Failed to connect to Odoo: {error}")
             return False
 
     def execute(self, model: str, method: str, *args: object, **kwargs: object) -> object:
         """Execute method on Odoo model"""
         return self.models.execute_kw(self.db, self.uid, self.api_key, model, method, list(args), kwargs)
 
-    def create(self, model: str, vals: dict):
+    def create(self, model: str, vals: dict) -> int:
         """Create a record"""
         result = self.execute(model, "create", [vals])
         # XML-RPC returns list with single ID
         return result[0] if isinstance(result, list) else result
 
-    def search(self, model: str, domain: list, limit: int = None):
+    def search(self, model: str, domain: list, limit: int | None = None) -> list[int]:
         """Search for records"""
         kwargs = {}
         if limit:
             kwargs["limit"] = limit
-        return self.execute(model, "search", domain, **kwargs)
+        return cast(list[int], self.execute(model, "search", domain, **kwargs))
 
-    def search_read(self, model: str, domain: list, fields: list = None, limit: int = None):
+    def search_read(
+        self, model: str, domain: list, fields: list[str] | None = None, limit: int | None = None
+    ) -> list[dict[str, object]]:
         """Search and read records"""
         kwargs = {}
         if fields:
             kwargs["fields"] = fields
         if limit:
             kwargs["limit"] = limit
-        return self.execute(model, "search_read", domain, **kwargs)
+        return cast(list[dict[str, object]], self.execute(model, "search_read", domain, **kwargs))
 
-    def write(self, model: str, ids: list[int], vals: dict):
+    def write(self, model: str, ids: list[int], vals: dict) -> bool:
         """Update records"""
         return self.execute(model, "write", ids, vals)
 
@@ -113,12 +116,12 @@ class CrowleyMarineScraper:
 
     def __init__(self, odoo: OdooConnector) -> None:
         self.odoo = odoo
-        self.manufacturers_cache = {}
-        self.categories_cache = {}
-        self.model_variants_cache = {}
+        self.manufacturers_cache: dict[str, int] = {}
+        self.categories_cache: dict[str, int] = {}
+        self.model_variants_cache: dict[str, int] = {}
         self.processed_parts = 0
         self.processed_variants = 0
-        self.errors = []
+        self.errors: list[str] = []
 
     def get_or_create_manufacturer(self, name: str) -> int:
         """Get or create manufacturer in Odoo"""
@@ -143,7 +146,7 @@ class CrowleyMarineScraper:
         self.manufacturers_cache[name] = mfr_id
         return mfr_id
 
-    def get_or_create_category(self, name: str, parent_id: int = None) -> int:
+    def get_or_create_category(self, name: str, parent_id: int | None = None) -> int:
         """Get or create category in Odoo"""
         cache_key = f"{name}:{parent_id}"
         if cache_key in self.categories_cache:
@@ -164,6 +167,8 @@ class CrowleyMarineScraper:
             # Create new
             vals = {"name": name}
             if parent_id:
+                # Many2one fields accept integer IDs
+                # noinspection PyTypeChecker
                 vals["parent_id"] = parent_id
             cat_id = self.odoo.create("catalog.category", vals)
             logger.info(f"Created category: {name}")
@@ -216,9 +221,9 @@ class CrowleyMarineScraper:
             self.model_variants_cache[model_code] = variant_id
             return variant_id
 
-        except Exception as e:
-            logger.error(f"Error creating/updating variant {variant_data.get('model_code')}: {e}")
-            self.errors.append(f"Variant {variant_data.get('model_code')}: {str(e)}")
+        except Exception as error:
+            logger.error(f"Error creating/updating variant {variant_data.get('model_code')}: {error}")
+            self.errors.append(f"Variant {variant_data.get('model_code')}: {str(error)}")
             return None
 
     def create_or_update_part(self, part_data: dict) -> int | None:
@@ -266,12 +271,12 @@ class CrowleyMarineScraper:
                 self.processed_parts += 1
                 return part_id
 
-        except Exception as e:
-            logger.error(f"Error creating/updating part {part_data.get('mpn')}: {e}")
-            self.errors.append(f"Part {part_data.get('mpn')}: {str(e)}")
+        except Exception as error:
+            logger.error(f"Error creating/updating part {part_data.get('mpn')}: {error}")
+            self.errors.append(f"Part {part_data.get('mpn')}: {str(error)}")
             return None
 
-    async def scrape_manufacturer(self, page: Page, manufacturer_key: str):
+    async def scrape_manufacturer(self, page: "Page", manufacturer_key: str):
         """Scrape all parts for a manufacturer"""
         mfr_info = self.MANUFACTURERS[manufacturer_key]
         manufacturer_id = self.get_or_create_manufacturer(mfr_info["name"])
@@ -322,12 +327,12 @@ class CrowleyMarineScraper:
             for year, year_url in years_to_process:
                 await self.scrape_year_models(page, manufacturer_key, manufacturer_id, mfr_category_id, year, year_url)
 
-        except Exception as e:
-            logger.error(f"Error scraping {manufacturer_key}: {e}")
-            self.errors.append(f"Manufacturer {manufacturer_key}: {str(e)}")
+        except Exception as error:
+            logger.error(f"Error scraping {manufacturer_key}: {error}")
+            self.errors.append(f"Manufacturer {manufacturer_key}: {str(error)}")
 
     async def scrape_year_models(
-        self, page: Page, manufacturer_key: str, manufacturer_id: int, mfr_category_id: int, year: str, year_url: str
+        self, page: "Page", manufacturer_key: str, manufacturer_id: int, mfr_category_id: int, year: str, year_url: str
     ):
         """Scrape all models for a specific year"""
         try:
@@ -395,7 +400,7 @@ class CrowleyMarineScraper:
                 horsepower = float(hp_match.group(1)) if hp_match else 0.0
 
                 # Extract shaft code if present (e.g., [M], [ML], etc.)
-                shaft_match = re.search(r"\[([A-Z]+)\]", model_text)
+                shaft_match = re.search(r"\[([A-Z]+)]", model_text)
                 shaft_code = shaft_match.group(1) if shaft_match else ""
 
                 # Create model variant
@@ -415,9 +420,9 @@ class CrowleyMarineScraper:
                     logger.info(f"Scraping parts for model variant {model_code}")
                     await self.scrape_model_parts(page, manufacturer_id, mfr_category_id, variant_id, model_url)
 
-        except Exception as e:
-            logger.error(f"Error processing year {year}: {e}")
-            self.errors.append(f"Year {year}: {str(e)}")
+        except Exception as error:
+            logger.error(f"Error processing year {year}: {error}")
+            self.errors.append(f"Year {year}: {str(error)}")
 
     async def scrape_model_parts(self, page: Page, manufacturer_id: int, mfr_category_id: int, variant_id: int, model_url: str):
         """Scrape parts for a specific model"""
@@ -536,14 +541,14 @@ class CrowleyMarineScraper:
                             if part_created:
                                 parts_found += 1
 
-                    except Exception as e:
-                        logger.warning(f"Error parsing part row: {e}")
+                    except Exception as error:
+                        logger.warning(f"Error parsing part row: {error}")
 
                 logger.info(f"Found and processed {parts_found} parts in {component_name}")
 
-        except Exception as e:
-            logger.error(f"Error scraping model parts: {e}")
-            self.errors.append(f"Model parts: {str(e)}")
+        except Exception as error:
+            logger.error(f"Error scraping model parts: {error}")
+            self.errors.append(f"Model parts: {str(error)}")
 
     async def run(self, manufacturer_filter: list[str] = None):
         """Run the scraper"""
@@ -613,8 +618,8 @@ def main() -> None:
 
     except KeyboardInterrupt:
         logger.info("Import cancelled by user")
-    except Exception as e:
-        logger.error(f"Import failed: {e}")
+    except Exception as error:
+        logger.error(f"Import failed: {error}")
         sys.exit(1)
 
 

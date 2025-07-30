@@ -54,11 +54,9 @@ result2 = Read(file2)
 ```python
 # Use specialized agents for focused tasks
 Task(
-    description="Focused task",
-    prompt="""@specialized_knowledge.md
-    
-    Specific request here""",
-    subagent_type="general-purpose"
+    description="Research Odoo patterns",
+    prompt="@docs/agents/archer.md\n\nFind how Odoo implements wizard patterns",
+    subagent_type="archer"
 )
 
 # Don't pollute main context with specialized knowledge

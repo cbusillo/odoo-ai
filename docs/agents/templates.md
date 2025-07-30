@@ -16,7 +16,7 @@ MODULES: Focus on [enterprise/community] modules
 SPECIFIC: Look for [inheritance/views/methods/decorators]
 OUTPUT: File paths and code examples
 """,
-    subagent_type="general-purpose"
+    subagent_type="archer"
 )
 ```
 
@@ -35,7 +35,7 @@ FIND:
 4. Inheritance chain
 5. Views using this model
 """,
-    subagent_type="general-purpose"
+    subagent_type="archer"
 )
 ```
 
@@ -54,7 +54,7 @@ FOCUS:
 - Asset bundle placement
 AVOID: jQuery patterns from older versions
 """,
-    subagent_type="general-purpose"
+    subagent_type="archer"
 )
 ```
 
@@ -76,7 +76,7 @@ CREATE:
 USE: ProductConnect base classes
 MOCK: External services (Shopify, APIs)
 """,
-    subagent_type="general-purpose"  
+    subagent_type="scout"  
 )
 ```
 
@@ -95,7 +95,7 @@ TEST CASES:
 4. Permission checks (if applicable)
 MOCK: [any external dependencies]
 """,
-    subagent_type="general-purpose"
+    subagent_type="scout"
 )
 ```
 
@@ -112,7 +112,7 @@ ANALYZE: Why test fails
 FIX: Update test or code as needed
 ENSURE: Uses proper base classes and SKU validation
 """,
-    subagent_type="general-purpose"
+    subagent_type="scout"
 )
 ```
 
@@ -134,7 +134,7 @@ RUN:
 FOCUS ON: New code added recently
 REPORT: Critical issues first
 """,
-    subagent_type="general-purpose"
+    subagent_type="inspector"
 )
 ```
 
@@ -154,7 +154,7 @@ CHECK FOR:
 5. Unnecessary searches
 SUGGEST: Optimizations with examples
 """,
-    subagent_type="general-purpose"
+    subagent_type="inspector"
 )
 ```
 
@@ -174,7 +174,7 @@ CHECK:
 4. Memory/CPU usage if high
 FOCUS: [web-1/script-runner-1/shell-1]
 """,
-    subagent_type="general-purpose"
+    subagent_type="dock"
 )
 ```
 
@@ -193,7 +193,7 @@ STEPS:
 4. Restart if needed
 USE: script-runner-1 for updates
 """,
-    subagent_type="general-purpose"
+    subagent_type="dock"
 )
 ```
 
@@ -215,7 +215,7 @@ IMPLEMENT:
 4. Skip sync context usage
 REFERENCE: Schema in graphql/schema/
 """,
-    subagent_type="general-purpose"
+    subagent_type="shopkeeper"
 )
 ```
 
@@ -235,7 +235,7 @@ CHECK:
 4. Field mapping accurate?
 5. Error logs in sync_error field?
 """,
-    subagent_type="general-purpose"
+    subagent_type="shopkeeper"
 )
 ```
 
@@ -257,7 +257,7 @@ USE: Owl.js 2.0 patterns
 NO: jQuery, semicolons, old patterns
 INCLUDE: Template and registration
 """,
-    subagent_type="general-purpose"
+    subagent_type="owl"
 )
 ```
 
@@ -278,7 +278,7 @@ CHECK:
 5. Service usage
 FIX: Following Odoo 18 patterns
 """,
-    subagent_type="general-purpose"
+    subagent_type="owl"
 )
 ```
 
@@ -300,7 +300,7 @@ SPECIFICALLY:
 - No odoo.define in JS
 - Remove jQuery usage
 """,
-    subagent_type="general-purpose"
+    subagent_type="phoenix"
 )
 ```
 
@@ -323,7 +323,7 @@ ANALYZE:
 4. Batch operation opportunities
 IMPLEMENT: Most impactful optimizations
 """,
-    subagent_type="general-purpose"
+    subagent_type="flash"
 )
 ```
 
@@ -337,7 +337,7 @@ research = Task(
     description="Research",
     prompt="""@docs/agents/archer.md
     Find how Odoo implements [SIMILAR_FEATURE]""",
-    subagent_type="general-purpose"
+    subagent_type="archer"
 )
 
 # Then implement
@@ -347,7 +347,7 @@ Task(
     
     Implement [FEATURE] following same patterns.
     Include: models, views, security, tests""",
-    subagent_type="general-purpose"
+    subagent_type="planner"
 )
 ```
 
@@ -361,7 +361,7 @@ investigation = Task(
     
     BUG: [description]
     Find where this occurs and why""",
-    subagent_type="general-purpose"
+    subagent_type="archer"
 )
 
 # Fix and test
@@ -374,7 +374,7 @@ Task(
     1. Write test that reproduces bug
     2. Implement fix
     3. Verify test passes""",
-    subagent_type="general-purpose"
+    subagent_type="scout"
 )
 ```
 

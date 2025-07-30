@@ -107,11 +107,11 @@ def init(self):
 
 ### Widget to Component
 
-```javascript
+```text
 // Find old widgets
-mcp__odoo - intelligence__search_code(
-    pattern = "Widget\\.extend|widget\\.extend",
-    file_type = "js"
+mcp__odoo_intelligence__search_code(
+    pattern="Widget\\.extend|widget\\.extend",
+    file_type="js"
 )
 
 // Convert to Owl Component
@@ -120,9 +120,9 @@ mcp__odoo - intelligence__search_code(
 
 ### Old Test Patterns
 
-```python
+```text
 # Find old test methods
-mcp__odoo - intelligence__search_code(
+mcp__odoo_intelligence__search_code(
     pattern="def test.*threading|test.*thread",
     file_type="py"
 )
@@ -132,11 +132,11 @@ mcp__odoo - intelligence__search_code(
 
 ### jQuery to Native
 
-```javascript
+```text
 // Find jQuery usage
-mcp__odoo - intelligence__search_code(
-    pattern = "\\$\\(|jQuery\\(",
-    file_type = "js"
+mcp__odoo_intelligence__search_code(
+    pattern="\\$\\(|jQuery\\(",
+    file_type="js"
 )
 
 // Convert to native DOM methods
@@ -198,22 +198,22 @@ export class ModernComponent extends Component {
 
 ### 🎯 Finding Outdated Patterns
 
-```python
+```text
 # ✅ SEARCH: Find old patterns systematically
 # Find old type hints
-mcp__odoo - intelligence__search_code(
+mcp__odoo_intelligence__search_code(
     pattern="from typing import.*Optional|List|Dict",
     file_type="py"
 )
 
 # Find jQuery usage
-mcp__odoo - intelligence__search_code(
+mcp__odoo_intelligence__search_code(
     pattern="\\$\\(|jQuery\\(",
     file_type="js"
 )
 
 # Find old field patterns
-mcp__odoo - intelligence__search_code(
+mcp__odoo_intelligence__search_code(
     pattern="fields\\..*_id.*=.*fields\\.Many2one",
     file_type="py"
 )

@@ -7,7 +7,7 @@ creating extra containers.
 
 - ✅ Can: Manage containers, view logs, restart services, check status
 - ❌ Cannot: Modify code, run tests directly, create new services
-- 🤝 Collaborates with: None (container operations only)
+- 🤝 Collaborates with: 🐛 Debugger (container logs), 🦉 Owl (restart after frontend changes)
 
 ## Tool Priority (ALWAYS MCP FIRST!)
 
@@ -66,7 +66,7 @@ docker ps
 
 ### View Logs
 
-```python
+```text
 # GOOD - MCP tool
 mcp__docker__fetch_container_logs(container_id="odoo-opw-web-1", tail="all")
 
@@ -79,7 +79,7 @@ docker logs odoo-opw-web-1
 
 ### Update Modules
 
-```python
+```text
 # GOOD - MCP tool
 mcp__odoo_intelligence__odoo_update_module(modules="product_connect")
 
@@ -91,7 +91,7 @@ docker exec odoo-opw-script-runner-1 /odoo/odoo-bin \
 
 ### Run Odoo Shell
 
-```python
+```text
 # GOOD - MCP tool for simple commands
 mcp__odoo_intelligence__odoo_shell(
     code="print(env['product.template'].search_count([]))"
@@ -285,7 +285,7 @@ mcp__odoo_intelligence__odoo_restart(services="web-1")
 
 ### 🎯 Real Example (container recovery)
 
-```bash
+```text
 # When web-1 is unresponsive
 mcp__docker__fetch_container_logs(container_id="odoo-opw-web-1", tail="all")
 # Found: "FATAL: remaining connection slots reserved"

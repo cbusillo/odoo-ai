@@ -255,6 +255,27 @@ usage = mcp__odoo-intelligence__search_code(
 # 3. Fix: Add missing field or update code
 ```
 
+## Common Workflows
+
+### Error Analysis Pipeline
+
+1. **Analyze stack trace** (Debugger agent - me!)
+2. **Get container logs** → Route to Dock agent: [@docs/agents/dock.md](dock.md)
+3. **Complex analysis** → Route to GPT agent: [@docs/agents/gpt.md](gpt.md)
+4. **Find patterns** → Route to Archer agent: [@docs/agents/archer.md](archer.md)
+
+### Container Issue Investigation
+
+1. **Debug error symptoms** (Debugger agent)
+2. **Check container status** → Route to Dock agent for logs and status
+3. **Restart if needed** → Dock agent handles container operations
+
+### Code Error Resolution
+
+1. **Identify error pattern** (Debugger agent)
+2. **Find similar implementations** → Route to Archer agent for pattern research
+3. **Quality check fix** → Route to Inspector agent: [@docs/agents/inspector.md](inspector.md)
+
 ## Tips for Using Me
 
 1. **Paste the full error**: Include stack trace, not just the error message

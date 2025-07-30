@@ -254,7 +254,7 @@ Since I have access to the Task tool, I can call other agents when needed:
 research = Task(
     description="Research similar features",
     prompt="@docs/agents/archer.md\n\nFind how Odoo implements similar features to [feature]",
-    subagent_type="general-purpose"
+    subagent_type="archer"
 )
 
 # Use research results in planning

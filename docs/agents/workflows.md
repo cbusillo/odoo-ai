@@ -20,7 +20,7 @@ research = Task(
     Find how Odoo 18 implements [FEATURE_TYPE] in enterprise modules.
     Focus on: inheritance patterns, view extensions, and best practices.
     """,
-    subagent_type="general-purpose"
+    subagent_type="archer"
 )
 
 # Step 2: Implement based on findings
@@ -31,7 +31,7 @@ implementation = Task(
     
     Implement [FEATURE_DESCRIPTION] following the same patterns.
     """,
-    subagent_type="general-purpose"
+    subagent_type="planner"
 )
 
 # Step 3: Write comprehensive tests
@@ -44,7 +44,7 @@ tests = Task(
     - Integration tests for workflows
     - Tour test for UI interaction
     """,
-    subagent_type="general-purpose"
+    subagent_type="scout"
 )
 
 # Step 4: Validate quality
@@ -55,7 +55,7 @@ validation = Task(
     Run comprehensive quality checks on product_connect module.
     Focus on new code added for [FEATURE_NAME].
     """,
-    subagent_type="general-purpose"
+    subagent_type="inspector"
 )
 ```
 
@@ -73,7 +73,7 @@ analysis = Task(
     
     Find where this error originates and similar error handling patterns.
     """,
-    subagent_type="general-purpose"
+    subagent_type="archer"
 )
 
 # Step 2: Container/log investigation (if needed)
@@ -84,7 +84,7 @@ logs = Task(
     Get recent logs related to [ERROR_CONTEXT].
     Check all relevant containers.
     """,
-    subagent_type="general-purpose"
+    subagent_type="dock"
 )
 
 # Step 3: Fix and test
@@ -95,7 +95,7 @@ fix = Task(
     Based on error analysis, create a test that reproduces the bug,
     then implement the fix.
     """,
-    subagent_type="general-purpose"
+    subagent_type="scout"
 )
 ```
 
@@ -112,7 +112,7 @@ analysis = Task(
     Analyze performance issues in [MODEL/FEATURE].
     Focus on: N+1 queries, missing indexes, inefficient computes.
     """,
-    subagent_type="general-purpose"
+    subagent_type="flash"
 )
 
 # Step 2: Find optimization patterns
@@ -123,7 +123,7 @@ patterns = Task(
     Find how Odoo core optimizes similar operations.
     Look for: batch operations, query optimization, caching.
     """,
-    subagent_type="general-purpose"
+    subagent_type="archer"
 )
 
 # Step 3: Implement and measure
@@ -134,7 +134,7 @@ optimize = Task(
     
     Implement optimizations and measure improvements.
     """,
-    subagent_type="general-purpose"
+    subagent_type="flash"
 )
 ```
 
@@ -151,7 +151,7 @@ shopify_analysis = Task(
     Analyze Shopify [OBJECT_TYPE] structure.
     Map fields to Odoo equivalents.
     """,
-    subagent_type="general-purpose"
+    subagent_type="shopkeeper"
 )
 
 # Step 2: Implement importer
@@ -162,7 +162,7 @@ importer = Task(
     Implement importer for [OBJECT_TYPE].
     Remember: Always use skip_shopify_sync=True context.
     """,
-    subagent_type="general-purpose"
+    subagent_type="shopkeeper"
 )
 
 # Step 3: Test with mocks
@@ -173,7 +173,7 @@ test_sync = Task(
     Write tests for Shopify [OBJECT_TYPE] sync.
     Mock all external API calls.
     """,
-    subagent_type="general-purpose"
+    subagent_type="scout"
 )
 ```
 
@@ -190,7 +190,7 @@ ui_patterns = Task(
     Find how Odoo 18 implements [UI_COMPONENT_TYPE].
     Focus on: Owl.js patterns, service usage, asset loading.
     """,
-    subagent_type="general-purpose"
+    subagent_type="owl"
 )
 
 # Step 2: Implement component
@@ -201,7 +201,7 @@ component = Task(
     Create [COMPONENT_NAME] following Odoo 18 patterns.
     No jQuery, no semicolons, use ES6 modules.
     """,
-    subagent_type="general-purpose"
+    subagent_type="owl"
 )
 
 # Step 3: Test component
@@ -212,7 +212,7 @@ test_ui = Task(
     Write Hoot tests for [COMPONENT_NAME].
     Test: rendering, user interaction, state changes.
     """,
-    subagent_type="general-purpose"
+    subagent_type="scout"
 )
 ```
 
@@ -228,7 +228,7 @@ Task(
     Run pattern analysis on product_connect module.
     Report any critical issues.
     """,
-    subagent_type="general-purpose"
+    subagent_type="inspector"
 )
 ```
 
@@ -242,7 +242,7 @@ Task(
     Find 3 examples of [PATTERN] in Odoo 18 enterprise modules.
     Show the file paths and key code sections.
     """,
-    subagent_type="general-purpose"
+    subagent_type="archer"
 )
 ```
 
@@ -256,7 +256,7 @@ Task(
     Check all container status and recent logs.
     Report any issues or errors.
     """,
-    subagent_type="general-purpose"
+    subagent_type="dock"
 )
 ```
 
@@ -295,3 +295,192 @@ results = await Promise.all([
 - Include agent docs with @mentions
 - Use success patterns from each agent
 - Trust agent tool selection
+
+## Specialized Agent Workflows
+
+### Testing Workflows (Scout Agent)
+
+#### Test Development Pipeline
+
+1. **Write comprehensive tests** → Scout agent
+2. **Debug browser test issues** → Route to Playwright agent
+3. **Frontend test patterns** → Route to Owl agent
+4. **Quality check tests** → Route to Inspector agent
+
+#### Test Maintenance
+
+1. **Update failing tests** → Scout agent
+2. **Find test patterns** → Route to Archer agent
+3. **Container issues** → Route to Dock agent
+
+#### Test Debugging
+
+1. **Analyze test failures** → Scout agent
+2. **Debug complex errors** → Route to Debugger agent
+3. **Performance test issues** → Route to Flash agent
+
+### Frontend Workflows (Owl Agent)
+
+#### Frontend Development Pipeline
+
+1. **Create/modify components** → Owl agent
+2. **Write tests** → Route to Scout agent
+3. **Debug browser issues** → Route to Playwright agent
+4. **Apply changes** → Route to Dock agent to restart containers
+
+#### Frontend Quality Check
+
+1. **Implement components** → Owl agent
+2. **Check code quality** → Route to Inspector agent
+3. **Fix bulk issues** → Route to Refactor agent
+
+#### Frontend Troubleshooting
+
+1. **JavaScript errors** → Debug with browser console (Owl)
+2. **Asset loading issues** → Check manifests and restart containers (Owl → Dock)
+3. **Complex debugging** → Route to Playwright for automated testing
+4. **Performance issues** → Route to Flash agent
+
+### Quality & Refactoring Workflows
+
+#### Quality Check Pipeline (Inspector Agent)
+
+1. **Run project-wide analysis** → Inspector agent
+2. **Bulk fix issues** → Route to Refactor agent
+3. **Validate fixes** → Return to Inspector for verification
+4. **Frontend quality** → Route to Owl agent
+
+#### Code Review Process
+
+1. **Comprehensive analysis** → Inspector agent
+2. **Performance check** → Route to Flash agent
+3. **Architecture review** → Route to GPT agent
+
+#### Coordinated Refactoring (Refactor Agent)
+
+```python
+# DELEGATE ANALYSIS: Let specialists find patterns
+analysis = Task(
+    description="Find refactoring patterns",
+    prompt="@docs/agents/archer.md\n\nFind all instances of pattern X that need refactoring",
+    subagent_type="archer"
+)
+
+# COORDINATE: Plan based on specialist knowledge
+# 1. Group by complexity (simple changes first)
+# 2. Plan dependency order (base classes before inherited)
+# 3. Schedule domain-specific vs bulk operations
+# 4. Define validation checkpoints
+```
+
+### Container & DevOps Workflows (Dock Agent)
+
+#### After Code Changes
+
+```python
+# 1. Check containers running
+mcp__docker__list_containers()
+
+# 2. Update module
+mcp__odoo_intelligence__odoo_update_module(modules="product_connect")
+
+# 3. Check logs if issues
+mcp__docker__fetch_container_logs(container_id="odoo-opw-web-1", tail="all")
+```
+
+#### Running Tests
+
+```bash
+# Always use script-runner!
+./tools/test_runner.py all  # This uses script-runner internally
+```
+
+#### Debugging Container Issues
+
+```python
+# 1. Check Odoo status
+mcp__odoo_intelligence__odoo_status(verbose=True)
+
+# 2. Get recent logs
+mcp__odoo_intelligence__odoo_logs(lines=500)
+
+# 3. Restart if needed
+mcp__odoo_intelligence__odoo_restart()
+```
+
+### Error Investigation Workflows (Debugger Agent)
+
+#### Error Analysis Pipeline
+
+1. **Analyze stack trace** → Debugger agent
+2. **Get container logs** → Route to Dock agent
+3. **Complex analysis** → Route to GPT agent
+4. **Find patterns** → Route to Archer agent
+
+#### Container Issue Investigation
+
+1. **Debug error symptoms** → Debugger agent
+2. **Check container status** → Route to Dock agent for logs and status
+3. **Restart if needed** → Dock agent handles container operations
+
+#### Code Error Resolution
+
+1. **Parse error message** → Debugger agent
+2. **Find similar errors** → Route to Archer for pattern search
+3. **Write test case** → Route to Scout agent
+4. **Fix and verify** → Implementation agent based on domain
+
+### External Consultation Workflows (GPT Agent)
+
+#### Standard ChatGPT Workflow
+
+1. **Prepare ChatGPT**:
+    - Ensure desktop app is open
+    - Start new conversation for focused help
+    - Select appropriate model from dropdown
+
+2. **Choose Mode**:
+    - Standard: Most common tasks
+    - Agent mode: Multi-step + research needed
+    - Deep Research: Comprehensive investigation
+
+3. **Frame Request**:
+    - Be specific about Odoo context
+    - Include relevant code snippets
+    - Mention performance/security concerns
+
+### Browser Testing Workflows (Playwright Agent)
+
+#### Testing User Workflows
+
+```python
+# Login flow
+mcp__playwright__browser_navigate(url="http://localhost:8069/web/login")
+mcp__playwright__browser_type(
+    element="Username field",
+    ref="input[name='login']",
+    text="admin"
+)
+mcp__playwright__browser_type(
+    element="Password field",
+    ref="input[name='password']",
+    text="admin"
+)
+mcp__playwright__browser_click(
+    element="Login button",
+    ref="button[type='submit']"
+)
+```
+
+## Workflow Selection Guide
+
+| Task Type        | Primary Workflow         | Alternative Workflow               |
+|------------------|--------------------------|------------------------------------|
+| New Feature      | Feature Development      | Frontend Development (if UI-heavy) |
+| Bug Fix          | Bug Investigation        | Error Analysis Pipeline            |
+| Performance      | Performance Optimization | Quality Check Pipeline             |
+| Tests Failing    | Test Maintenance         | Test Debugging                     |
+| Code Quality     | Quality Check Pipeline   | Coordinated Refactoring            |
+| Integration      | Shopify Integration      | External Consultation (complex)    |
+| Container Issues | Container & DevOps       | Error Investigation                |
+| UI Problems      | Frontend Troubleshooting | Browser Testing                    |

@@ -7,7 +7,7 @@ entire project versus just single files.
 
 - ✅ Can: Analyze entire codebase quality, find anti-patterns, check style compliance
 - ❌ Cannot: Automatically fix all issues, modify code without review
-- 🤝 Collaborates with: None (analysis only)
+- 🤝 Collaborates with: 🔧 Refactor (bulk fixes), ⚡ Flash (performance issues)
 
 ## Tool Priority (PROJECT-WIDE vs SINGLE FILE)
 
@@ -40,17 +40,17 @@ entire project versus just single files.
 
 ```python
 # 1. Trigger inspection
-mcp__inspection-pycharm__inspection_trigger()
+mcp__inspection - pycharm__inspection_trigger()
 
 # 2. Check status until complete
-status = mcp__inspection-pycharm__inspection_get_status()
+status = mcp__inspection - pycharm__inspection_get_status()
 # Look for: clean_inspection=true (no issues) or has_inspection_results=true
 
 # 3. Get problems if any found
 if status["has_inspection_results"]:
-    problems = mcp__inspection-pycharm__inspection_get_problems(
+    problems = mcp__inspection - pycharm__inspection_get_problems(
         severity="error",  # Start with errors
-        limit=50          # Paginate if needed
+        limit=50  # Paginate if needed
     )
 ```
 
@@ -58,17 +58,17 @@ if status["has_inspection_results"]:
 
 ```python
 # Find all performance issues
-mcp__odoo-intelligence__performance_analysis(
+mcp__odoo - intelligence__performance_analysis(
     model_name="sale.order.line"
 )
 
 # Find code patterns
-mcp__odoo-intelligence__pattern_analysis(
+mcp__odoo - intelligence__pattern_analysis(
     pattern_type="computed_fields"  # or "api_decorators", "state_machines"
 )
 
 # Find field issues
-mcp__odoo-intelligence__search_field_properties(
+mcp__odoo - intelligence__search_field_properties(
     property="required"  # Find all required fields
 )
 ```
@@ -79,7 +79,7 @@ mcp__odoo-intelligence__search_field_properties(
 
 ```python
 # Find unresolved references
-mcp__inspection-pycharm__inspection_get_problems(
+mcp__inspection - pycharm__inspection_get_problems(
     problem_type="PyUnresolvedReferences"
 )
 ```
@@ -88,7 +88,7 @@ mcp__inspection-pycharm__inspection_get_problems(
 
 ```python
 # Check type consistency
-mcp__inspection-pycharm__inspection_get_problems(
+mcp__inspection - pycharm__inspection_get_problems(
     problem_type="PyTypeChecker"
 )
 ```
@@ -97,7 +97,7 @@ mcp__inspection-pycharm__inspection_get_problems(
 
 ```python
 # Find N+1 queries project-wide
-mcp__odoo-intelligence__performance_analysis(
+mcp__odoo - intelligence__performance_analysis(
     model_name="product.template"
 )
 ```
@@ -106,7 +106,7 @@ mcp__odoo-intelligence__performance_analysis(
 
 ```python
 # Analyze compute dependencies
-mcp__odoo-intelligence__field_dependencies(
+mcp__odoo - intelligence__field_dependencies(
     model_name="product.template",
     field_name="display_name"
 )
@@ -118,19 +118,19 @@ When you get token limit errors:
 
 ```python
 # Start with critical issues
-problems = mcp__inspection-pycharm__inspection_get_problems(
+problems = mcp__inspection - pycharm__inspection_get_problems(
     severity="error",
     limit=50
 )
 
 # Filter by type
-problems = mcp__inspection-pycharm__inspection_get_problems(
+problems = mcp__inspection - pycharm__inspection_get_problems(
     problem_type="PyUnresolvedReferences",
     file_pattern="models/*.py"
 )
 
 # Paginate
-problems = mcp__inspection-pycharm__inspection_get_problems(
+problems = mcp__inspection - pycharm__inspection_get_problems(
     limit=100,
     offset=100  # Skip first 100
 )
@@ -138,25 +138,24 @@ problems = mcp__inspection-pycharm__inspection_get_problems(
 
 ## Style Guide Compliance
 
-### Our Rules (from STYLE_GUIDE.md):
+**Reference files**:
 
-- **No semicolons** in JavaScript
-- **No comments** (self-documenting code)
-- **F-strings only** (no % or .format())
-- **Type hints**: Use `str | None` not `Optional[str]`
-- **Line length**: 133 chars max
+- [@docs/style/CORE.md](../style/CORE.md) - Universal rules (naming, git, line length)
+- [@docs/style/PYTHON.md](../style/PYTHON.md) - Python patterns (type hints, f-strings)
+- [@docs/style/JAVASCRIPT.md](../style/JAVASCRIPT.md) - JS patterns (no semicolons, Owl.js)
+- [@docs/style/ODOO.md](../style/ODOO.md) - Odoo patterns (field naming, context usage)
 
 ### Checking Style
 
 ```python
 # Find long lines
-mcp__odoo-intelligence__search_code(
+mcp__odoo - intelligence__search_code(
     pattern=".{134,}",  # Lines over 133 chars
     file_type="py"
 )
 
 # Find old string formatting
-mcp__odoo-intelligence__search_code(
+mcp__odoo - intelligence__search_code(
     pattern="%.*(s|d|f)|\.format\\(",
     file_type="py"
 )
@@ -179,7 +178,10 @@ from odoo.addons.product_connect.models.product_template import ProductTemplate
 ```python
 # Before
 from typing import Optional, List, Dict
+
+
 def method(self, vals: Optional[Dict]) -> List[str]:
+
 
 # After
 def method(self, vals: dict | None) -> list[str]:
@@ -221,6 +223,21 @@ Before marking code as complete:
    ruff format . && ruff check . --fix
    ```
 
+## Quick Quality Commands
+
+For fast quality checks:
+
+```python
+# ✅ COMPREHENSIVE: Check all code patterns at once
+mcp__odoo-intelligence__pattern_analysis(pattern_type="all")
+
+# ✅ PERFORMANCE: Find performance bottlenecks
+mcp__odoo-intelligence__performance_analysis(model_name="product.template")
+
+# ✅ STYLE: Find style violations
+mcp__odoo-intelligence__search_code(pattern=".{134,}", file_type="py")  # Long lines
+```
+
 ## What I DON'T Do
 
 - ❌ Run PyCharm inspection on entire project (it can't!)
@@ -234,12 +251,12 @@ Before marking code as complete:
 
 ```python
 # ✅ COMPREHENSIVE: Analyze entire module at once
-mcp__odoo-intelligence__pattern_analysis(
+mcp__odoo - intelligence__pattern_analysis(
     pattern_type="all"  # Gets everything!
 )
 
 # ✅ PERFORMANCE: Find all slow patterns
-mcp__odoo-intelligence__performance_analysis(
+mcp__odoo - intelligence__performance_analysis(
     model_name="product.template"
 )
 ```
@@ -250,14 +267,14 @@ mcp__odoo-intelligence__performance_analysis(
 
 ```python
 # ✅ SMART: Start with critical issues
-problems = mcp__inspection-pycharm__inspection_get_problems(
-    severity="error",     # Errors first
-    limit=50,            # Manageable chunks
+problems = mcp__inspection - pycharm__inspection_get_problems(
+    severity="error",  # Errors first
+    limit=50,  # Manageable chunks
     file_pattern="models/*.py"  # Focus area
 )
 
 # ✅ THEN: Work through warnings
-problems = mcp__inspection-pycharm__inspection_get_problems(
+problems = mcp__inspection - pycharm__inspection_get_problems(
     severity="warning",
     problem_type="PyUnresolvedReferences"  # Specific issue type
 )
@@ -269,13 +286,13 @@ problems = mcp__inspection-pycharm__inspection_get_problems(
 
 ```python
 # ✅ N+1 QUERIES: Find them all
-mcp__odoo-intelligence__search_code(
+mcp__odoo - intelligence__search_code(
     pattern="for.*in.*:\\s*.*\\.search\\(",
     file_type="py"
 )
 
 # ✅ MISSING INDEXES: Check frequently searched fields
-mcp__odoo-intelligence__performance_analysis(
+mcp__odoo - intelligence__performance_analysis(
     model_name="sale.order"
 )
 # Shows: Fields used in domains without indexes
@@ -287,12 +304,33 @@ mcp__odoo-intelligence__performance_analysis(
 
 ```python
 # How Odoo finds inefficient inventory calculations
-mcp__odoo-intelligence__pattern_analysis(
+mcp__odoo - intelligence__pattern_analysis(
     pattern_type="computed_fields"
 )
 # Found: stock.quant._compute_available_quantity searches in loop
 # Fix: Batch computation with read_group
 ```
+
+## Common Workflows
+
+### Quality Check Pipeline
+
+1. **Run project-wide analysis** (Inspector agent - me!)
+2. **Bulk fix issues** → Route to Refactor agent: [@docs/agents/refactor.md](refactor.md)
+3. **Validate fixes** → Return to Inspector for verification
+4. **Frontend quality** → Route to Owl agent: [@docs/agents/owl.md](owl.md)
+
+### Code Review Process
+
+1. **Comprehensive analysis** (Inspector agent)
+2. **Performance check** → Route to Flash agent: [@docs/agents/flash.md](flash.md)
+3. **Architecture review** → Route to GPT agent: [@docs/agents/gpt.md](gpt.md)
+
+### Error Investigation
+
+1. **Quality scan** (Inspector agent)
+2. **Debug specific errors** → Route to Debugger agent: [@docs/agents/debugger.md](debugger.md)
+3. **Container issues** → Route to Dock agent: [@docs/agents/dock.md](dock.md)
 
 ## Tips for Using Me
 

@@ -5,7 +5,7 @@ This project includes various documentation resources for development.
 ## Project Documentation
 
 - **`TESTING.md`** - Testing guide and requirements for the project
-- **`STYLE_GUIDE.md`** - Project-specific code style preferences and conventions
+- **`style/`** - Domain-specific code style guides (CORE, PYTHON, JAVASCRIPT, TESTING, ODOO)
 - **`todo/`** - Work-in-progress documents and notes (in gitignore)
 - **`../addons/product_connect/docs/AUTOMATED_TOUR_TESTING.md`** - Guide for creating and running automated tour tests
 

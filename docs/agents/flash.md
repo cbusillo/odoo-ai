@@ -231,7 +231,8 @@ class SaleOrder(models.Model):
     partner_id = fields.Many2one(index=True)  # Foreign key searches
 ```
 
-**Why this works**: Indexes make searches 100x faster but slow writes - use strategically.
+**Why this works**: Indexes dramatically improve search performance but slow writes - use strategically. See
+the [Performance Reference Guide](../PERFORMANCE_REFERENCE.md#index-optimization-note) for details.
 
 ### 🎯 Efficient Search Patterns
 

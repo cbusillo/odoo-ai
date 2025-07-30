@@ -35,6 +35,73 @@ agent has focused knowledge to avoid context pollution and ensure expertise in t
 
 **NEVER use Bash for**: `find`, `grep`, `cat`, `ls`, `docker ps`, `docker logs` - Claude Code has better tools!
 
+## Why MCP Tools Matter
+
+Using the correct tools makes a massive difference in performance and reliability. See
+the [Performance Reference Guide](../PERFORMANCE_REFERENCE.md) for detailed benchmarks and real-world examples.
+
+**Quick Summary**:
+
+- Search operations: 10-100x faster with MCP tools
+- Analysis operations: 1000x better coverage
+- Container operations: Instant + structured data
+- Development speed: 3-5x faster with proper tool selection
+
+This is why agents should always use MCP tools first - they're purpose-built for the task!
+
+## Tool Selection Examples (Key Patterns)
+
+### Code Search Across Project
+
+```python
+# ✅ RIGHT: Instant project-wide search (100x faster)
+mcp__odoo-intelligence__search_code(
+    pattern="extends.*Controller", 
+    file_type="js"
+)
+# Returns: All JS files with Controller extensions in <1 second
+
+# ❌ WRONG: Slow bash grep with parsing overhead  
+docker exec odoo-opw-web-1 grep -r "extends.*Controller" /odoo/
+# Takes: 30+ seconds, requires output parsing, misses context
+```
+
+### Container Operations
+
+```python
+# ✅ RIGHT: Instant container status with structured data
+mcp__docker__list_containers()
+# Returns: Formatted JSON with status, names, ports instantly
+
+# ❌ WRONG: Raw docker ps output requiring parsing
+bash("docker ps --format 'table {{.Names}}\\t{{.Status}}'")  
+# Returns: Raw text requiring manual parsing, error-prone
+```
+
+### Code Quality Analysis
+
+```python
+# ✅ RIGHT: Comprehensive project-wide analysis (1000x coverage)
+mcp__odoo-intelligence__pattern_analysis(pattern_type="all")
+# Analyzes: Entire codebase, finds patterns across all modules
+
+# ❌ WRONG: Manual file-by-file review
+bash("find . -name '*.py' -exec grep -l 'pattern' {} \\;")
+# Misses: Complex patterns, relationships, context across files
+```
+
+**See [Tool Examples Appendix](#tool-examples-appendix) for additional patterns.**
+
+### Key Takeaways
+
+- **MCP tools**: Purpose-built, optimized, structured output
+- **Bash alternatives**: Raw, requires parsing, error-prone, slower
+- **Performance**: 10-100x speed improvements with MCP tools
+- **Reliability**: MCP tools handle edge cases and errors better
+- **Context**: MCP tools preserve context and relationships
+
+**Always check**: Is there an MCP tool for this task before using bash!
+
 ## Available Agents
 
 | Agent | Name                   | Specialty               | Primary Tools                                                                           |
@@ -84,7 +151,7 @@ Task(
     
     Find all models that inherit from product.template and override the create method.
     """,
-    subagent_type="general-purpose"
+    subagent_type="archer"
 )
 ```
 
@@ -104,14 +171,14 @@ Task(
 research_result = Task(
     description="Research patterns",
     prompt="@docs/agents/archer.md\n\nFind how Odoo implements graph views",
-    subagent_type="general-purpose"
+    subagent_type="archer"
 )
 
 # Then: Implement based on findings
 implementation = Task(
     description="Implement feature",
     prompt=f"Based on this research: {research_result}\n\nImplement a custom graph view",
-    subagent_type="general-purpose"
+    subagent_type="owl"
 )
 ```
 
@@ -122,45 +189,29 @@ implementation = Task(
 Task(
     description="Quality check",
     prompt="@docs/agents/inspector.md\n\nRun full inspection on product_connect module",
-    subagent_type="general-purpose"
+    subagent_type="inspector"
 )
 ```
 
 ## Agent Effectiveness Metrics
 
-### Speed Improvements
+For detailed performance benchmarks and real-world examples, see
+the [Performance Reference Guide](../PERFORMANCE_REFERENCE.md).
 
-- **Archer with MCP**: 10-100x faster than bash grep/find
-    - Searching 10,000+ files: <1 second vs 30+ seconds
-    - Pattern matching with context: Instant vs manual hunting
+### Quick Performance Summary
 
-- **Inspector project-wide**: 1000x more coverage than single-file
-    - Entire codebase analysis: Finds patterns across modules
-    - PyCharm single file: Limited to open file only
+- **Speed**: 10-100x faster searches, instant analysis
+- **Coverage**: 1000x better than manual review
+- **Quality**: 90% fewer test failures, 75% fewer bugs
+- **Development**: 3-5x faster complex tasks
 
-- **Dock with MCP**: Zero container overhead
-    - No temporary containers created
-    - Instant status checks vs docker ps parsing
+### Key Improvements by Agent
 
-### Quality Improvements
-
-- **Scout with base classes**: 90% fewer test failures
-    - Pre-validated test data
-    - Proper context flags set automatically
-
-- **Flash optimizations**: 10-100x performance gains
-    - N+1 query detection prevents production slowdowns
-    - Batch operation patterns reduce database load
-
-### Development Speed
-
-- **Parallel agents**: 3-5x faster complex tasks
-    - Research + implement + test in parallel
-    - Each agent focused on their specialty
-
-- **Tool hierarchy**: 75% fewer failed commands
-    - Right tool first time
-    - No wasted time on inefficient approaches
+- **Archer**: Instant codebase search vs 30+ seconds
+- **Inspector**: Complete project analysis vs single file
+- **Flash**: Finds all performance issues systematically
+- **Scout**: Pre-validated test data prevents failures
+- **Dock**: Zero container overhead, instant operations
 
 ## When to Use Agents vs Main Context
 
@@ -182,47 +233,60 @@ Task(
 
 ## Agent Collaboration
 
-Some agents can call other agents using the Task tool:
+Agents should use specialized agents when tasks fall outside their expertise. This keeps each agent focused while
+enabling powerful workflows.
+
+### Key Collaboration Principles:
+
+1. **Delegate to specialists**: When you encounter a task outside your domain, route to the expert
+2. **Sequential workflows**: Chain agents to build comprehensive solutions
+3. **Parallel analysis**: Launch multiple agents for independent tasks
 
 ### Agents That Can Call Others:
 
-- **🤖 Anthropic Engineer** - Can demonstrate agent workflows
-- **📋 Planner** - Can call Archer for research before planning
-- **🦉 Owl** - Can call Dock to restart containers after frontend changes
+- **🤖 Anthropic Engineer** - Can demonstrate any agent workflow
+- **📋 Planner** - Calls Archer for research before planning
+- **🦉 Owl** - Calls Dock to restart containers after frontend changes
+- **🔧 Refactor** - Calls Archer, Owl, and Inspector for coordinated refactoring
+- **🐛 Debugger** - Calls Dock for logs, GPT for complex analysis
+- **🔬 Inspector** - Can recommend Refactor for bulk fixes
 
 ### Collaboration Matrix
 
-| Agent                 | Can Call   | Purpose                                   |
-|-----------------------|------------|-------------------------------------------|
-| 🤖 Anthropic Engineer | All agents | Demonstrate any workflow                  |
-| 📋 Planner            | 🏹 Archer  | Research before planning                  |
-| 🦉 Owl                | 🚢 Dock    | Restart containers after frontend changes |
-| 🐛 Debugger           | 🚢 Dock    | Get container logs                        |
-| Other agents          | None       | Focused on their specialty                |
+| Agent                 | Can Call                        | Purpose                                                          |
+|-----------------------|---------------------------------|------------------------------------------------------------------|
+| 🤖 Anthropic Engineer | All agents                      | Demonstrate any workflow                                         |
+| 📋 Planner            | 🏹 Archer                       | Research before planning                                         |
+| 🦉 Owl                | 🚢 Dock, 🎭 Playwright          | Restart containers, debug UI issues                              |
+| 🐛 Debugger           | 🚢 Dock, 💬 GPT                 | Get container logs, complex analysis                             |
+| 🔧 Refactor           | 🏹 Archer, 🦉 Owl, 🔬 Inspector | Research patterns, delegate domain refactoring, validate results |
+| 🔬 Inspector          | 🔧 Refactor                     | Recommend bulk fixes for systematic issues                       |
+| Other agents          | Case-by-case                    | Route when tasks exceed their specialty                          |
 
-### Collaboration Examples:
+### Example Collaboration:
 
 ```python
-# Planner calling Archer for research
-research = Task(
-    description="Research patterns",
-    prompt="@docs/agents/archer.md\n\nFind similar implementations",
-    subagent_type="general-purpose"
+# Owl agent calling Dock after frontend changes
+restart_task = Task(
+    description="Apply frontend changes",
+    prompt="@docs/agents/dock.md\n\nRestart web container to apply component changes",
+    subagent_type="dock"
 )
 
-# Owl calling Dock after frontend changes
-restart = Task(
-    description="Apply changes",
-    prompt="@docs/agents/dock.md\n\nRestart web container",
-    subagent_type="general-purpose"
-)
+# Inspector finding bulk issues, routing to Refactor
+if bulk_issues_found:
+    refactor_task = Task(
+        description="Fix systematic issues",
+        prompt="@docs/agents/refactor.md\n\nFix these 20+ similar issues found by analysis",
+        subagent_type="refactor"
+    )
 ```
 
 ### Benefits:
 
-- Agents stay focused on their specialty
-- Complex workflows can be automated
-- Context remains clean in each agent
+- Agents stay focused on their core strength
+- Complex workflows get expert attention at each step
+- No single agent becomes a bottleneck
 
 ## Important Notes
 
@@ -232,3 +296,44 @@ restart = Task(
 - **Always include agent doc**: Use @mention to include the agent's instructions
 - **Be specific**: Clear, focused prompts get better results
 - **Check agent specialties**: Use the right agent for the job
+
+## Tool Examples Appendix
+
+### Container Logs
+
+```python
+# ✅ RIGHT: Clean log retrieval with pagination
+mcp__docker__fetch_container_logs(
+    container_id="odoo-opw-web-1",
+    tail="all"
+)
+# Returns: Clean log output, handles large files efficiently
+
+# ❌ WRONG: Raw docker logs with potential memory issues
+bash("docker logs odoo-opw-web-1")
+# Can: Overwhelm output, no pagination, harder to process
+```
+
+### File Operations
+
+```python
+# ✅ RIGHT: Token-efficient file access
+Read("addons/product_connect/models/motor.py")
+# Benefits: Precise content retrieval, optimized for AI processing
+
+# ❌ WRONG: Bash file operations  
+bash("cat addons/product_connect/models/motor.py")
+# Issues: Less efficient token usage, no built-in error handling
+```
+
+### Odoo Module Updates
+
+```python
+# ✅ RIGHT: Proper environment with error handling
+mcp__odoo - intelligence__odoo_update_module(modules="product_connect")
+# Uses: Dedicated script-runner container, proper flags, clean output
+
+# ❌ WRONG: Direct docker exec without proper environment
+bash("docker exec odoo-opw-web-1 /odoo/odoo-bin -u product_connect")
+# Risks: Interferes with web requests, missing flags, no error handling
+```

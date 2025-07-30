@@ -1,5 +1,4 @@
 {
-  "$schema": "./claude-settings-schema.json",
   "hooks": {
     "PreCompact": [
       {

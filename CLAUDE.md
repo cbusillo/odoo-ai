@@ -5,279 +5,163 @@ Claude Code guidance for this repository.
 ## Project Overview
 
 Odoo 18 Enterprise project for Outboard Parts Warehouse (OPW). Custom addons for motor parts management with Shopify
-integration.
-**Stack**: Python 3.12+, PostgreSQL 17, Owl.js 2.0, Docker, GraphQL
-
-## Documentation
-
-See [Documentation](docs/DOCUMENTATION.md) for all available documentation resources, including:
-
-- [Testing Guide](docs/TESTING.md) - Test patterns, coverage requirements, and examples
-- [Style Guide](docs/STYLE_GUIDE.md) - Code standards and naming conventions
-- [Work-in-progress notes](docs/todo) - Development notes and future improvements
-
-## CRITICAL: Tool Selection Hierarchy
-
-**ALWAYS follow this order - using the wrong tool wastes time and causes errors:**
-
-1. **MCP Tools FIRST** - Purpose-built for specific tasks
-    - `mcp__odoo-intelligence__*` - For ANY Odoo code analysis (PROJECT-WIDE)
-    - `mcp__docker__*` - For container operations
-    - `mcp__chatgpt__*` - For AI consultation and code review
-    - `mcp__inspection-pycharm__*` - For code quality (single file only)
-    - `mcp__pycharm__*` - For IDE interactions
-
-2. **Built-in Tools SECOND** - For file operations
-    - `Read`, `Write`, `Edit`, `MultiEdit` - File modifications
-    - `Grep`, `Glob` - File searching
-    - `Task` - For complex multi-step operations
-
-3. **Bash LAST RESORT** - Only when no other option exists
-    - Complex Docker exec commands not covered by MCP
-    - See @docs/agents/dock.md for Docker operations
-
-**NEVER use Bash for**: `find`, `grep`, `cat`, `ls`, `docker ps`, `docker logs`
-
-## 🚀 Proven Success Patterns
-
-### MCP Tool Performance Benchmarks
-
-| Operation          | MCP Tool                                   | Alternative          | Improvement            |
-|--------------------|--------------------------------------------|----------------------|------------------------|
-| Search 10k files   | `mcp__odoo-intelligence__search_code`      | bash grep            | 100x faster            |
-| Container status   | `mcp__docker__list_containers`             | docker ps            | No parsing needed      |
-| Code quality check | `mcp__odoo-intelligence__pattern_analysis` | Manual review        | 1000x coverage         |
-| Test execution     | `./tools/test_runner.py`                   | docker exec odoo-bin | Proper environment     |
-| Browser automation | `mcp__playwright__*`                       | Manual testing       | Automated + repeatable |
-| File operations    | `Read`/`Write`/`MultiEdit`                 | bash cat/sed         | Token efficient        |
-| ChatGPT consult    | `mcp__chatgpt__chatgpt`                    | Copy/paste           | Direct integration     |
-
-### Fast Code Search
-
-```python
-# ✅ RIGHT: Instant project-wide search
-mcp__odoo - intelligence__search_code(pattern="extends.*Controller", file_type="js")
-
-# ❌ WRONG: Slow bash grep
-docker
-exec
-odoo - opw - web - 1
-grep - r
-"extends.*Controller" / odoo /
-```
-
-### Container Operations
-
-```python
-# ✅ RIGHT: Instant, formatted output
-mcp__docker__list_containers()
-mcp__docker__fetch_container_logs(container_id="odoo-opw-web-1", tail="all")
-
-# ❌ WRONG: Creates temporary containers
-docker
-compose
-run - -rm
-web / odoo / odoo - bin...
-```
-
-### Quality Checks
-
-```python
-# ✅ RIGHT: Comprehensive analysis
-mcp__odoo - intelligence__pattern_analysis(pattern_type="all")
-mcp__odoo - intelligence__performance_analysis(model_name="product.template")
-
-# ❌ WRONG: Limited single-file inspection
-# PyCharm inspection only sees one file at a time
-```
-
-### Testing
-
-```python
-# ✅ RIGHT: Use test runner with proper base classes
-./ tools / test_runner.py - -test - tags
-TestFeatureName
-
-# ❌ WRONG: Direct odoo-bin without test infrastructure
-docker
-exec
-odoo - opw - web - 1 / odoo / odoo - bin
-test...
-```
-
-### AI Consultation
-
-```python
-# ✅ RIGHT: Use ChatGPT for complex analysis
-mcp__chatgpt__chatgpt(
-    operation="ask",
-    prompt="Model: o3-pro\nReview this Odoo compute method for performance issues: [code]"
-)
-
-# ❌ WRONG: Asking Claude to analyze complex patterns beyond training data
-# Claude is great but ChatGPT o3-pro excels at deep code review
-```
-
-## Quick Command Reference
-
-**Tests**: `./tools/test_runner.py` - Enhanced test runner (no docker SDK required)
-
-- `./tools/test_runner.py summary` - Quick test summary (default)
-- `./tools/test_runner.py all` - Run all tests
-- `./tools/test_runner.py python` - Python tests only
-- `./tools/test_runner.py js` - JavaScript unit tests only
-- `./tools/test_runner.py tour` - Tour tests only (UI automation)
-- `./tools/test_runner.py failing` - List currently failing tests
-- `./tools/test_runner.py -v` - Verbose output with error details
-- `./tools/test_runner.py --test-tags TestOrderImporter` - Run specific test class
-- `./tools/test_runner.py --test-tags TestOrderImporter.test_import_order` - Run specific test method
-- `./tools/test_runner.py -j` - JSON output for parsing
-- `./tools/test_runner.py -u` - Update module before running tests (use only if needed, can cause timeouts)
-
-**Testing**: See @docs/agents/scout.md for comprehensive test writing patterns
-
-**Format**: `ruff format . && ruff check . --fix`
-
-**File Moves**: Always use `git mv` instead of `mv` to preserve Git history.
-
-**Browser Debugging**: Use `mcp__playwright__` tools - See @docs/agents/owl.md for frontend debugging
-
-## Code Quality
-
-**IMPORTANT**: Never run Python files directly - use proper Odoo environment.
-
-For comprehensive code quality analysis, see @docs/agents/inspector.md
-
-**Quick check**: `mcp__odoo-intelligence__pattern_analysis(pattern_type="all")`
-
-## Key Paths
-
-- **Custom addons**: `./addons` (accessible from host)
-- **Container paths**: See @docs/agents/archer.md for Odoo source research
-- **Database**: `opw`
-
-## Code Standards
-
-See [Style Guide](docs/STYLE_GUIDE.md) for complete coding standards including Python, JavaScript, naming conventions,
-and formatting rules.
-
-## 🎯 AGENT FIRST RULE
-
-**BEFORE doing any work, ask yourself**: "Is there an agent for this?"
-
-- Error? → Use Debugger agent
-- Planning? → Use Planner agent
-- Refactoring? → Use Refactor agent
-- Research? → Use Archer agent
-- Testing? → Use Scout agent
-
-**User doesn't need to ask** - be proactive!
-
-## Development Workflow
-
-**Tool preferences** (in order of efficiency):
-
-1. **MCP tools** - Docker ops, Odoo intelligence, PyCharm inspection
-2. **Built-in tools** - `Read`, `Edit`, `MultiEdit`, `Write`, `Grep`, `Glob`
-3. **Bash** - Only for complex Docker commands that MCP can't handle
-
-**NEVER use bash for**: `find`, `grep`, `cat`, `ls` - use Claude Code tools instead
-
-**Development steps**:
-
-1. **Check containers** - Use `mcp__docker__list_containers`
-2. **Follow project patterns** - Not generic tutorials
-3. **Run tests before completion** - `./tools/test_runner.py`
-4. **Format code** - `ruff format . && ruff check . --fix`
-
-## Architecture
-
-**Addons**:
-
-- `product_connect` - Core business (motors, Shopify sync, widgets)
-- `disable_odoo_online` - Disables online features
-
-**Structure**:
-
-- Models: `models/` - Odoo inheritance with mixins
-- Frontend: `static/src/js/` - Owl.js 2.0 components
-- Services: `services/` - External integrations
-
-**DO NOT MODIFY**:
-
-- `services/shopify/gql/*` - Generated GraphQL client
-- `graphql/schema/*` - Shopify schema
-
-**Shopify Integration**: See @docs/agents/shopkeeper.md for GraphQL and sync patterns
-
-## 🚨 AUTOMATIC AGENT USAGE
-
-**IMPORTANT**: Claude should PROACTIVELY use agents for these scenarios:
-
-### Error/Debug Scenarios → Use Debugger Agent
-
-- User shows any Python traceback or error message
-- "Getting error", "doesn't work", "failing", "crashed"
-- Stack traces, AttributeError, ImportError, etc.
-  → **ACTION**:
-  `Task(description="Debug error", prompt="@docs/agents/debugger.md\n\n[error details]", subagent_type="general-purpose")`
-
-### Planning Scenarios → Use Planner Agent
-
-- "How should I implement..."
-- "I want to add feature X"
-- "Design a system for..."
-- Any complex multi-step feature request
-  → **ACTION**:
-  `Task(description="Plan feature", prompt="@docs/agents/planner.md\n\n[feature request]", subagent_type="general-purpose")`
-
-### Refactoring Scenarios → Use Refactor Agent
-
-- "Clean up this code"
-- "Update all instances of..."
-- "Make this consistent across files"
-- "Remove redundant..."
-  → **ACTION**:
-  `Task(description="Refactor code", prompt="@docs/agents/refactor.md\n\n[refactoring request]", subagent_type="general-purpose")`
-
-### Research Scenarios → Use Archer Agent
-
-- "How does Odoo implement..."
-- "Find examples of..."
-- "What's the pattern for..."
-  → **ACTION**: Use Archer agent immediately
-
-### Testing Scenarios → Use Scout Agent
-
-- "Write tests for..."
-- "Test is failing"
-- After implementing any feature
-  → **ACTION**: Use Scout agent proactively
-
-## Specialized Development Agents
-
-For focused expertise without context pollution, use our specialized agents:
-
-| Agent              | Specialty                              | Documentation              |
-|--------------------|----------------------------------------|----------------------------|
-| 🏹 **Archer**      | Odoo source research, finding patterns | @docs/agents/archer.md     |
-| 🔍 **Scout**       | Writing comprehensive tests            | @docs/agents/scout.md      |
-| 🔬 **Inspector**   | Code quality analysis                  | @docs/agents/inspector.md  |
-| 🚢 **Dock**        | Docker container operations            | @docs/agents/dock.md       |
-| 🛍️ **Shopkeeper** | Shopify integration                    | @docs/agents/shopkeeper.md |
-| 🦉 **Owl**         | Frontend development (Owl.js)          | @docs/agents/owl.md        |
-| 🔥 **Phoenix**     | Migrating old patterns                 | @docs/agents/phoenix.md    |
-| ⚡ **Flash**        | Performance optimization               | @docs/agents/flash.md      |
-| 💬 **GPT**         | ChatGPT consultation and code review   | @docs/agents/gpt.md        |
-
-**Using Agents**:
+integration.  
+**Stack**: Python 3.12+, PostgreSQL 17, Owl.js 2.0, Docker, GraphQL  
+**Documentation**:
+See [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md) | [Testing](docs/TESTING.md) | [Style Guide](docs/STYLE_GUIDE.md)
+
+## 🎯 PROACTIVE AGENT USAGE
+
+**CRITICAL**: Claude should automatically use specialized agents. DO NOT use `subagent_type="general-purpose"`!
+
+### When to Use Agents (Automatic Triggers)
+
+| User Says                     | Agent Type | Syntax                       |
+|-------------------------------|------------|------------------------------|
+| Error/traceback/crash         | debugger   | `subagent_type="debugger"`   |
+| "Write tests" / failing tests | scout      | `subagent_type="scout"`      |
+| "Find how Odoo..." / research | archer     | `subagent_type="archer"`     |
+| "Clean up" / refactor         | refactor   | `subagent_type="refactor"`   |
+| Complex feature planning      | planner    | `subagent_type="planner"`    |
+| Frontend/Owl.js issues        | owl        | `subagent_type="owl"`        |
+| Docker/container issues       | dock       | `subagent_type="dock"`       |
+| Code quality issues           | inspector  | `subagent_type="inspector"`  |
+| Shopify integration           | shopkeeper | `subagent_type="shopkeeper"` |
+| Performance issues            | flash      | `subagent_type="flash"`      |
+
+### Agent Usage Pattern
 
 ```python
 Task(
-    description="Find graph view patterns",
-    prompt="@docs/agents/archer.md\n\nFind how Odoo 18 implements graph views",
-    subagent_type="general-purpose"
+    description="Debug error",
+    prompt="@docs/agents/debugger.md\n\n[error details]",
+    subagent_type="debugger"  # Use specific agent name!
 )
 ```
 
-See @docs/agents/README.md for complete agent overview.
+**See**: [@docs/agents/README.md](docs/agents/README.md) for complete agent guide
+
+## ⚡ Agent-First Architecture (CRITICAL)
+
+**Claude's Role**: Route tasks to specialist agents, coordinate work, maintain conversation context  
+**Agents' Role**: Write code, implement features, research, analyze - the actual work
+
+### Who Writes Code?
+
+**✅ AGENTS write all code:**
+
+- **Owl Agent** → Frontend code, CSS, JavaScript, Owl components
+- **Scout Agent** → Test code, test files, test patterns
+- **Refactor Agent** → Bulk code changes (coordinates with specialists)
+- **Other Agents** → Domain-specific code within their expertise
+
+**✅ CLAUDE orchestrates:**
+
+- Route tasks to appropriate agents
+- Coordinate multi-agent workflows
+- Answer questions and provide guidance
+- Review agent work for completeness
+
+### Agent Routing Hierarchy
+
+1. **AGENT DELEGATION FIRST** - Route to specialist
+    - Odoo research → **Archer Agent**
+    - Container ops → **Dock Agent**
+    - Code quality → **Inspector Agent**
+    - Frontend work → **Owl Agent**
+
+2. **DIRECT TOOLS ONLY** - When no agent exists
+    - Simple file reads: `Read`, `Grep`, `Glob`
+    - Quick checks: `Bash` for basic commands
+
+### Why Agent-First Matters
+
+| Task Type     | Agent Route     | vs Direct Tools     | Benefit                    |
+|---------------|-----------------|---------------------|----------------------------|
+| Odoo research | Archer Agent    | Direct MCP tools    | Domain expertise + context |
+| Code quality  | Inspector Agent | Manual tool usage   | Project-wide analysis      |
+| Frontend work | Owl Agent       | Direct file editing | Framework knowledge        |
+
+## 🚀 Quick Commands
+
+- **Tests**: Route to Scout Agent - See [@docs/agents/scout.md](docs/agents/scout.md)
+- **Format**: `ruff format . && ruff check . --fix` (Claude can run directly)
+- **Quality**: Route to Inspector Agent - See [@docs/agents/inspector.md](docs/agents/inspector.md)
+- **Containers**: Route to Dock Agent - See [@docs/agents/dock.md](docs/agents/dock.md)
+- **Odoo Research**: Route to Archer Agent - See [@docs/agents/archer.md](docs/agents/archer.md)
+- **Frontend Work**: Route to Owl Agent - See [@docs/agents/owl.md](docs/agents/owl.md)
+
+## 🏗️ Architecture
+
+**Addons**: `product_connect` (core), `disable_odoo_online`  
+**Key Paths**: `./addons` (custom), Database: `opw`  
+**DO NOT MODIFY**: `services/shopify/gql/*` (generated), `graphql/schema/*`
+
+**Detailed Architecture**: See [@docs/agents/archer.md](docs/agents/archer.md) for research patterns
+
+## 🔧 Development Workflow
+
+1. **Route tasks to agents** - Don't do the work yourself, delegate to specialists
+2. **Check containers** - Use [@docs/agents/dock.md](docs/agents/dock.md)
+3. **Run tests** - Use [@docs/agents/scout.md](docs/agents/scout.md)
+4. **Code quality** - Use [@docs/agents/inspector.md](docs/agents/inspector.md)
+
+**AGENT FIRST RULE**: Before doing ANY work, ask "Which agent should handle this?" Route to specialists!
+
+## ✅ Success Patterns
+
+### Agent Routing Examples
+
+```python
+# ✅ RIGHT: Route code writing to specialist agent
+Task(
+    description="Fix frontend component",
+    prompt="@docs/agents/owl.md\n\nFix this Owl component rendering issue: [code]",
+    subagent_type="owl"
+)
+
+# ❌ WRONG: Claude writing frontend code directly
+Edit("path/to/component.js", old_string="...", new_string="...")
+```
+
+### Complex Task Coordination
+
+```python
+# ✅ RIGHT: Use multiple agents for complex tasks
+# 1. Research with Archer
+archer_result = Task(description="Research pattern", prompt="@docs/agents/archer.md\n\nFind Odoo graph view patterns",
+                     subagent_type="archer")
+
+# 2. Implement with Owl  
+Task(description="Implement component",
+     prompt=f"@docs/agents/owl.md\n\nBased on research: {archer_result}\n\nImplement custom graph view",
+     subagent_type="owl")
+
+# 3. Test with Scout
+Task(description="Write tests", prompt="@docs/agents/scout.md\n\nWrite tests for new graph component",
+     subagent_type="scout")
+```
+
+### When Claude Acts Directly
+
+**✅ ACCEPTABLE: Simple questions, coordination, file reads**
+
+- Answer user questions about architecture
+- Read files to understand context before routing
+- Coordinate between multiple agents
+- Run basic commands like `ruff format .`
+
+**❌ NEVER: Write code when specialist agent exists**
+
+- Don't write Owl components (use Owl agent)
+- Don't write Python models (route to appropriate agent)
+- Don't write tests (use Scout agent)
+
+## 📋 Essential Links
+
+- **All Agents**: [@docs/agents/README.md](docs/agents/README.md)
+- **Testing Patterns**: [@docs/agents/scout.md](docs/agents/scout.md)
+- **Odoo Research**: [@docs/agents/archer.md](docs/agents/archer.md)
+- **Code Quality**: [@docs/agents/inspector.md](docs/agents/inspector.md)
+- **Docker Operations**: [@docs/agents/dock.md](docs/agents/dock.md)
+- **Style Standards**: [docs/STYLE_GUIDE.md](docs/STYLE_GUIDE.md) - Domain-specific style guides

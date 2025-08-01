@@ -269,11 +269,3 @@ def _compute_quantities_dict(self, lot_id, owner_id, package_id):
     return {q['product_id'][0]: q for q in quants}
 ```
 
-## Tips for Using Me
-
-1. **Describe the slowness**: "Product list takes 30 seconds"
-2. **Mention data volume**: "10,000 products"
-3. **Show current code**: I'll spot the bottlenecks
-4. **Ask for analysis**: I'll use performance tools
-
-Remember: Measure first, optimize second. Make it fast where it matters!

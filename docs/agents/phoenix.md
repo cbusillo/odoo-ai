@@ -246,11 +246,3 @@ class NewModel(models.Model):
     # process - no @api.multi needed
 ```
 
-## Tips for Using Me
-
-1. **Show me the old code**: I'll identify what needs updating
-2. **Be specific about patterns**: "Old widget inheritance" vs "jQuery usage"
-3. **Ask for modern examples**: I'll find them in Odoo 18 core
-4. **Mention the file type**: Python vs JavaScript patterns differ
-
-Remember: Phoenix rises from the ashes - making code modern and clean!

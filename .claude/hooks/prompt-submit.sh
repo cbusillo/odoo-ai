@@ -3,10 +3,12 @@
 
 CLAUDE_DIR=".claude"
 COMPACT_FLAG="$CLAUDE_DIR/.compacted"
+DEBUG_LOG="$CLAUDE_DIR/hook-debug.log"
 
 # Output to stderr for claude --debug visibility
 debug_log() {
     echo "[prompt-submit.sh] $1" >&2
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] PROMPT-SUBMIT: $1" >> "$DEBUG_LOG"
 }
 
 # Check if compaction flag exists

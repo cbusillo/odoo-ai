@@ -70,6 +70,7 @@ class SmartContextManager:
             "scout": {"default_model": ModelTier.SONNET, "specialty": "testing"},
             "owl": {"default_model": ModelTier.SONNET, "specialty": "frontend"},
             "inspector": {"default_model": ModelTier.SONNET, "specialty": "code_quality"},
+            "qc": {"default_model": ModelTier.SONNET, "specialty": "quality_control"},
             "dock": {"default_model": ModelTier.HAIKU, "specialty": "containers"},
             "shopkeeper": {"default_model": ModelTier.SONNET, "specialty": "shopify"},
             "refactor": {"default_model": ModelTier.OPUS, "specialty": "bulk_changes"},
@@ -77,15 +78,15 @@ class SmartContextManager:
             "debugger": {"default_model": ModelTier.OPUS, "specialty": "debugging"},
             "planner": {"default_model": ModelTier.OPUS, "specialty": "architecture"},
             "gpt": {"default_model": ModelTier.OPUS, "specialty": "consultation"},
-            "phoenix": {"default_model": ModelTier.OPUS, "specialty": "migration"},
-            "qc": {"default_model": ModelTier.SONNET, "specialty": "quality_control"},
+            "phoenix": {"default_model": ModelTier.OPUS, "specialty": "migration"}
         }
         
         # Task patterns for agent routing (pattern_key -> [agent_name, keywords...])
         self.task_patterns = {
             "scout": ["scout", "write test", "test case", "unit test", "tour test"],
             "owl": ["owl", "javascript", "js", "component", "owl.js", "css", "html"],
-            "inspector": ["inspector", "qc", "code quality", "lint", "review", "style"],
+            "inspector": ["inspector", "code quality", "lint", "review", "style", "analyze quality"],
+            "qc": ["qc", "quality audit", "quality control", "comprehensive review", "quality gate", "pre-commit check"],
             "dock": ["dock", "docker", "container", "restart", "deploy"],
             "shopkeeper": ["shopkeeper", "graphql", "sync", "import", "export"],
             "debugger": ["debugger", "error", "exception", "traceback", "crash", "bug"],

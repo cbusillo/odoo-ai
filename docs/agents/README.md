@@ -296,6 +296,8 @@ if bulk_issues_found:
 - **Always include agent doc**: Use @mention to include the agent's instructions
 - **Be specific**: Clear, focused prompts get better results
 - **Check agent specialties**: Use the right agent for the job
+- **Shared tools**: See `docs/agents/SHARED_TOOLS.md` for tools ALL agents should know about
+- **Model selection**: See `docs/agents/MODEL_SELECTION.md` for cost optimization strategies
 
 ## Tool Examples Appendix
 

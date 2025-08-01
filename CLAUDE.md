@@ -33,6 +33,7 @@ See [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md) | [Testing](docs/TESTING.md) 
 | Frontend/Owl.js issues        | owl        | `subagent_type="owl"`        |
 | Docker/container issues       | dock       | `subagent_type="dock"`       |
 | Code quality issues           | inspector  | `subagent_type="inspector"`  |
+| Quality audit/comprehensive   | qc         | `subagent_type="qc"`         |
 | Shopify integration           | shopkeeper | `subagent_type="shopkeeper"` |
 | Performance issues            | flash      | `subagent_type="flash"`      |
 | "User can't see/access X"     | debugger   | `subagent_type="debugger"` + SHARED_TOOLS |
@@ -315,6 +316,7 @@ prompt="@docs/agents/debugger.md\n\nModel: auto\n\nComplex stack trace analysis"
 - **Odoo Research**: Route to Archer Agent - See [@docs/agents/archer.md](docs/agents/archer.md)
 - **Frontend Work**: Route to Owl Agent - See [@docs/agents/owl.md](docs/agents/owl.md)
 - **ChatGPT Analysis**: Route to GPT Agent - See [@docs/agents/gpt.md](docs/agents/gpt.md) (automated!)
+- **Performance Guide**: See [docs/TOOL_SELECTION_PERFORMANCE_GUIDE.md](docs/TOOL_SELECTION_PERFORMANCE_GUIDE.md)
 
 ## 🏗️ Architecture
 
@@ -389,4 +391,5 @@ Task(description="Write tests", prompt="@docs/agents/scout.md\n\nWrite tests for
 - **Odoo Research**: [@docs/agents/archer.md](docs/agents/archer.md)
 - **Code Quality**: [@docs/agents/inspector.md](docs/agents/inspector.md)
 - **Docker Operations**: [@docs/agents/dock.md](docs/agents/dock.md)
+- **Performance Guide**: [docs/TOOL_SELECTION_PERFORMANCE_GUIDE.md](docs/TOOL_SELECTION_PERFORMANCE_GUIDE.md)
 - **Style Standards**: [docs/STYLE_GUIDE.md](docs/STYLE_GUIDE.md) - Domain-specific style guides

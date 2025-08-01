@@ -364,3 +364,95 @@ class ShopifyService:
 
 This architecture supports the motor parts business requirements while maintaining Odoo best practices and scalability
 for future growth.
+
+## 📦 Order Management Strategy
+
+### Import-Only Architecture
+
+**Current Design**: Orders imported from external platforms (Shopify, eBay) for visibility only.
+
+```
+External Platform Orders
+    ↓
+Import via API
+    ↓
+Create Draft Orders (no confirmation)
+    ↓
+Reporting & Analytics
+    ↓
+External Fulfillment (source of truth)
+```
+
+### Key Decisions
+
+- **Orders stay in draft**: Prevents inventory movements and stock impacts
+- **External systems authoritative**: Inventory managed outside Odoo
+- **Visibility focus**: Orders imported for reporting across platforms
+- **Easy re-import**: Draft orders can be deleted/reimported during testing
+
+### Implementation Notes
+
+```python
+# Orders marked with source platform
+order.source_platform = 'shopify'  # or 'ebay', 'manual'
+
+# Shipping captured separately
+order.shipping_charge = 29.99
+
+# Delivery mapping via service map
+carrier_map = env['delivery.carrier.service.map']
+```
+
+### Future Migration Path
+
+When Odoo becomes source of truth:
+1. Enable order confirmation workflow
+2. Implement bi-directional fulfillment sync
+3. Activate inventory movements
+4. Sync tracking information
+
+## 🔒 Field Constraints and Inheritance
+
+### Challenge: Required Fields in Inherited Models
+
+When adding required fields to widely-inherited models, external modules can fail:
+
+```
+null value in column "source" violates not-null constraint
+```
+
+### Root Cause
+
+- XML data imports bypass Python defaults
+- External modules (delivery_ups_rest) create records via XML
+- Our required fields unknown to external modules
+
+### Solution Pattern
+
+```python
+# Make field optional at DB level, enforce in logic
+source = fields.Selection(
+    selection=[
+        ("import", "Import Product"),
+        ("motor", "Motor Product"),
+        ("standard", "Standard Product")
+    ],
+    default="standard",
+    required=False,  # Not required at DB level
+    index=True,
+)
+
+# Add targeted SQL constraint
+_sql_constraints = [
+    ('source_required_for_consumables',
+     "CHECK((type != 'consu') OR (source IS NOT NULL))",
+     "Source is required for consumable products"),
+]
+```
+
+### Best Practices
+
+1. **Avoid strict constraints** on widely-inherited models
+2. **Use SQL CHECK** constraints for conditional requirements
+3. **Test with external modules** that create records
+4. **Document special handling** for inherited fields

@@ -128,9 +128,9 @@ Task(
 | Code quality  | Inspector Agent | Manual tool usage   | Project-wide analysis      |
 | Frontend work | Owl Agent       | Direct file editing | Framework knowledge        |
 
-## 🧠 Smart Context Management (NEW!)
+## 🧠 Smart Context Management (Token Optimization!)
 
-**AUTOMATIC AGENT + MODEL SELECTION**: The system now automatically chooses optimal agents and models based on task complexity, reducing costs by 60% while maintaining quality.
+**AUTOMATIC AGENT + MODEL SELECTION**: The system now optimizes for **preserving Claude rate limits** by intelligently offloading to GPT and using efficient models.
 
 ### Smart Context Manager
 
@@ -140,16 +140,20 @@ Use `tools/smart_context_manager.py` for intelligent routing:
 from tools.smart_context_manager import SmartContextManager
 
 manager = SmartContextManager()
-analysis = manager.analyze_task("Debug complex race condition in order processing")
+analysis = manager.analyze_task("Implement complete product variant system", file_count=20)
 
 # Result: 
-# Agent: debugger + Model: opus-4 + Cost: $2.50-7.50 + Confidence: 100%
+# Agent: gpt + Model: gpt-4.1
+# Tokens: 150K-600K tokens  
+# Rate Limit Impact: NONE (offloaded to GPT)
+# GPT Offload: ✅ YES - Saves Claude tokens!
 ```
 
 **Automatic Optimizations**:
-- **Simple tasks** → Haiku 3.5 ($0.01-0.05) - 10x cheaper
-- **Standard development** → Sonnet 4 ($0.15-0.50) - Balanced  
-- **Complex analysis** → Opus 4 ($2.50-7.50) - Premium quality
+- **Simple tasks** → Haiku 3.5 (1K-5K tokens) - Minimal rate limit impact
+- **Standard development** → Sonnet 4 (15K-50K tokens) - Balanced usage
+- **Complex analysis** → Opus 4 (100K-300K tokens) - Consider GPT offload!
+- **Large implementations** → GPT-4.1 (ZERO Claude tokens!) - Preserve rate limit
 
 ### Usage Examples
 
@@ -170,10 +174,10 @@ Task(
 ```
 
 **Smart Features**:
-- **Keyword Detection**: "debug", "complex" → Opus 4 for quality
-- **Context Size**: 50+ files → Upgrade model for large context
+- **Keyword Detection**: "implement complete" → GPT offload (saves 100% Claude tokens)
+- **Context Size**: 15+ files → Route to GPT-4.1 (preserves rate limit)
 - **Agent Expertise**: Frontend tasks → Owl agent automatically
-- **Cost Optimization**: Simple tasks → Haiku 3.5 for speed/cost
+- **Token Optimization**: Simple tasks → Haiku 3.5 (1K-5K tokens vs 100K+)
 
 ### 💡 Claude + GPT Hybrid Development (NEW!)
 

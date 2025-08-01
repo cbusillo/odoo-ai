@@ -138,6 +138,7 @@ bash("find . -name '*.py' -exec grep -l 'pattern' {} \\;")
 | "Complex code review"     | 💬 GPT           | 🔬 Inspector (quality)            |
 | "Migration issues"        | 🔥 Phoenix       | 🏹 Archer (patterns)              |
 | "Architecture design"     | 🧙 Odoo Engineer | 📋 Planner (implementation)       |
+| **"Large implementation"** | 💬 **GPT (4.1)** | **Claude analyzes, GPT codes**   |
 
 ## Using Agents
 

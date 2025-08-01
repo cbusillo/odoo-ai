@@ -87,7 +87,7 @@ class SmartContextManager:
         }
 
     def analyze_task(self, task_description: str, context_files: List[str] = None, 
-                    user_preference: Optional[str] = None) -> TaskAnalysis:
+                    user_preference: Optional[str] = None, file_count: Optional[int] = None) -> TaskAnalysis:
         """Analyze a task and recommend agent/model"""
         
         reasoning = []
@@ -96,13 +96,18 @@ class SmartContextManager:
         # 1. Determine task complexity
         complexity = self._assess_complexity(task_description, context_files, reasoning)
         
-        # 2. Find best agent match
-        agent = self._find_best_agent(task_description, reasoning)
+        # 2. Check if large implementation based on file count
+        if file_count and file_count > 15:
+            agent = "gpt"
+            reasoning.append(f"Large implementation scope ({file_count} files) - routing to GPT agent")
+        else:
+            # 3. Find best agent match
+            agent = self._find_best_agent(task_description, reasoning)
         
-        # 3. Select optimal model
+        # 4. Select optimal model
         model = self._select_model(complexity, agent, len(context_files), reasoning)
         
-        # 4. Apply user preferences
+        # 5. Apply user preferences
         if user_preference:
             if user_preference in ["fast", "cheap"]:
                 model = ModelTier.HAIKU
@@ -111,10 +116,10 @@ class SmartContextManager:
                 model = ModelTier.OPUS
                 reasoning.append(f"User requested {user_preference} results")
         
-        # 5. Calculate estimated cost
+        # 6. Calculate estimated cost
         cost = self._estimate_cost(model, complexity)
         
-        # 6. Calculate confidence
+        # 7. Calculate confidence
         confidence = self._calculate_confidence(task_description, agent, reasoning)
         
         return TaskAnalysis(
@@ -160,6 +165,15 @@ class SmartContextManager:
         task_lower = task.lower()
         best_agent = "scout"  # Default
         best_score = 0
+        
+        # Check for large implementation patterns that should go to GPT
+        large_impl_keywords = [
+            "implement complete", "generate entire", "create full", 
+            "build comprehensive", "develop whole", "mass generation"
+        ]
+        if any(keyword in task_lower for keyword in large_impl_keywords):
+            reasoning.append("Large implementation detected - routing to GPT agent")
+            return "gpt"
         
         for agent_name, patterns in self.task_patterns.items():
             # Skip the agent name itself, check the keywords

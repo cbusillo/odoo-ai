@@ -175,6 +175,16 @@ Task(
 - **Agent Expertise**: Frontend tasks → Owl agent automatically
 - **Cost Optimization**: Simple tasks → Haiku 3.5 for speed/cost
 
+### 💡 Claude + GPT Hybrid Development (NEW!)
+
+**Use GPT-4.1 for Large Implementations** - 70% cost savings vs all-Claude approach:
+
+- **Claude analyzes** using MCP tools → Gathers patterns, context, requirements
+- **GPT-4.1 implements** with 1M token context → Generates complete features following your exact patterns
+- **Claude validates** with Inspector agent → Ensures quality and compliance
+
+See [@docs/agents/gpt.md](docs/agents/gpt.md) for the complete hybrid development pattern with code examples.
+
 ## 🧠 Model Selection Strategy (July 2025)
 
 **CRITICAL**: Optimize costs while maintaining quality by using the right Claude model for each agent.

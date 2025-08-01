@@ -639,9 +639,9 @@ message = "This code is slow, help fix it"
 
 **KEY INSIGHT**: GPT-4.1's 1M token context + detailed instruction following makes it excellent for actual code implementation, not just reviews.
 
-**Cost Savings**: 70% reduction vs all-Claude approach
-- Current (All Claude Opus): ~$400/month
-- Hybrid (Claude orchestrates, GPT implements): ~$120/month
+**Rate Limit Preservation**: Preserves 100% of Claude rate limits
+- Current (All Claude Opus): High rate limit consumption
+- Hybrid (Claude orchestrates, GPT implements): Zero Claude rate limit impact for implementations
 
 ### Optimal Task Division
 
@@ -823,7 +823,7 @@ Keep with Claude/specialized agents when:
 **Observed Results**:
 - **Generation Speed**: 5-10x faster for large modules
 - **Consistency**: 95% pattern compliance (vs 70% with context-split Claude)
-- **Cost**: $2-5 per major feature (vs $15-30 with Opus)
+- **Rate Limit Impact**: Zero Claude tokens per major feature (vs high usage with Opus)
 - **Context Handling**: No truncation or chunking needed
 
 ### Best Practices

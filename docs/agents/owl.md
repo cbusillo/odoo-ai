@@ -142,7 +142,7 @@ Task(
 
 ## Need More?
 
-- **Model selection details**: Load @docs/agents/MODEL_SELECTION.md
+- **Model selection details**: Load @docs/agents/MODEL_SELECTION_GUIDE.md
 - **Component examples**: Load @docs/agents/owl/component-patterns.md
 - **Hoot test patterns**: Load @docs/agents/owl/hoot-testing.md
 - **Service usage**: Load @docs/agents/owl/service-patterns.md

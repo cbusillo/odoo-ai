@@ -110,7 +110,7 @@ Task(
 
 ## Need More?
 
-- **Model selection details**: Load @docs/agents/MODEL_SELECTION.md
+- **Model selection details**: Load @docs/agents/MODEL_SELECTION_GUIDE.md
 - **Test templates**: Load @docs/agents/scout/test-templates.md
 - **Tour patterns**: Load @docs/agents/scout/tour-patterns.md  
 - **Common scenarios**: Load @docs/agents/scout/common-scenarios.md

@@ -4,7 +4,9 @@ Claude Code guidance for this repository.
 
 ## 🎯 Critical Thinking Directive
 
-**ACCURACY OVER AGREEMENT**: The user values being correct more than being agreed with. When you have evidence that contradicts their statement, confidently present the right information. Pattern: "Actually, I think [X] because [evidence]. Here's why [Y] would be better." Be assertive about facts, not opinions.
+**ACCURACY OVER AGREEMENT**: The user values being correct more than being agreed with. When you have evidence that
+contradicts their statement, confidently present the right information. Pattern: "Actually, I think [X]
+because [evidence]. Here's why [Y] would be better." Be assertive about facts, not opinions.
 
 ## Project Overview
 
@@ -18,35 +20,36 @@ See [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md) | [Testing](docs/TESTING.md) 
 
 **CRITICAL**: Claude should automatically use specialized agents. DO NOT use `subagent_type="general-purpose"`!
 
-**Terminology**: When the user refers to "the team" or "our team," they mean the specialized agents (Scout, Owl, Archer, etc.), not human developers.
+**Terminology**: When the user refers to "the team" or "our team," they mean the specialized agents (Scout, Owl, Archer,
+etc.), not human developers.
 
 ### When to Use Agents (Automatic Triggers)
 
-| User Says                     | Agent Type | Syntax                       |
-|-------------------------------|------------|------------------------------|
-| Error/traceback/crash         | debugger   | `subagent_type="debugger"`   |
-| "Write tests" (Python/Tour)   | scout      | `subagent_type="scout"`      |
-| "Write Hoot tests" (JS/Owl)   | owl        | `subagent_type="owl"`        |
-| "Find how Odoo..." / research | archer     | `subagent_type="archer"`     |
-| "Clean up" / refactor         | refactor   | `subagent_type="refactor"`   |
-| Complex feature planning      | planner    | `subagent_type="planner"`    |
-| Frontend/Owl.js issues        | owl        | `subagent_type="owl"`        |
-| Docker/container issues       | dock       | `subagent_type="dock"`       |
-| Code quality issues           | inspector  | `subagent_type="inspector"`  |
-| Quality audit/comprehensive   | qc         | `subagent_type="qc"`         |
-| Shopify integration           | shopkeeper | `subagent_type="shopkeeper"` |
-| Performance issues            | flash      | `subagent_type="flash"`      |
+| User Says                     | Agent Type | Syntax                                    |
+|-------------------------------|------------|-------------------------------------------|
+| Error/traceback/crash         | debugger   | `subagent_type="debugger"`                |
+| "Write tests" (Python/Tour)   | scout      | `subagent_type="scout"`                   |
+| "Write Hoot tests" (JS/Owl)   | owl        | `subagent_type="owl"`                     |
+| "Find how Odoo..." / research | archer     | `subagent_type="archer"`                  |
+| "Clean up" / refactor         | refactor   | `subagent_type="refactor"`                |
+| Complex feature planning      | planner    | `subagent_type="planner"`                 |
+| Frontend/Owl.js issues        | owl        | `subagent_type="owl"`                     |
+| Docker/container issues       | dock       | `subagent_type="dock"`                    |
+| Code quality issues           | inspector  | `subagent_type="inspector"`               |
+| Quality audit/comprehensive   | qc         | `subagent_type="qc"`                      |
+| Shopify integration           | shopkeeper | `subagent_type="shopkeeper"`              |
+| Performance issues            | flash      | `subagent_type="flash"`                   |
 | "User can't see/access X"     | debugger   | `subagent_type="debugger"` + SHARED_TOOLS |
-| "Quick test" / "Check data"   | Any agent  | Include SHARED_TOOLS for `execute_code` |
+| "Quick test" / "Check data"   | Any agent  | Include SHARED_TOOLS for `execute_code`   |
 
 ### Test Writing Routing
 
-| Test Type              | Primary Agent | Supporting Agent | Notes                           |
-|------------------------|---------------|------------------|---------------------------------|
-| Python Unit Tests      | scout         | -                | Model tests, service tests      |
-| Tour Tests (browser)   | scout         | playwright       | UI automation, selectors        |
-| Hoot Tests (JS/Owl)    | owl           | scout            | Component tests, service mocks  |
-| Integration Tests      | scout         | -                | API tests, workflow tests       |
+| Test Type            | Primary Agent | Supporting Agent | Notes                          |
+|----------------------|---------------|------------------|--------------------------------|
+| Python Unit Tests    | scout         | -                | Model tests, service tests     |
+| Tour Tests (browser) | scout         | playwright       | UI automation, selectors       |
+| Hoot Tests (JS/Owl)  | owl           | scout            | Component tests, service mocks |
+| Integration Tests    | scout         | -                | API tests, workflow tests      |
 
 ### Agent Usage Pattern
 
@@ -76,15 +79,15 @@ Task(
 **Loading Additional Context**:
 
 1. **Agent subdocs** (when needed):
-   - `scout/test-templates.md` - Detailed test examples
-   - `owl/component-patterns.md` - Component examples
-   - `refactor/bulk-operations.md` - Bulk refactoring patterns
+    - `scout/test-templates.md` - Detailed test examples
+    - `owl/component-patterns.md` - Component examples
+    - `refactor/bulk-operations.md` - Bulk refactoring patterns
 
 2. **SHARED_TOOLS.md** (specific tools):
-   - Debugging permissions → `permission_checker`
-   - Analyzing data → `field_value_analyzer`
-   - Quick Python tests → `execute_code`
-   - Workflow analysis → `workflow_states`
+    - Debugging permissions → `permission_checker`
+    - Analyzing data → `field_value_analyzer`
+    - Quick Python tests → `execute_code`
+    - Workflow analysis → `workflow_states`
 
 **See**: [@docs/agents/README.md](docs/agents/README.md) for complete agent guide
 
@@ -131,7 +134,8 @@ Task(
 
 ## 🧠 Smart Context Management (Token Optimization!)
 
-**AUTOMATIC AGENT + MODEL SELECTION**: The system now optimizes for **preserving Claude rate limits** by intelligently offloading to GPT and using efficient models.
+**AUTOMATIC AGENT + MODEL SELECTION**: The system now optimizes for **preserving Claude rate limits** by intelligently
+offloading to GPT and using efficient models.
 
 ### Smart Context Manager
 
@@ -151,6 +155,7 @@ analysis = manager.analyze_task("Implement complete product variant system", fil
 ```
 
 **Automatic Optimizations**:
+
 - **Simple tasks** → Haiku 3.5 (1K-5K tokens) - Minimal rate limit impact
 - **Standard development** → Sonnet 4 (15K-50K tokens) - Balanced usage
 - **Complex analysis** → Opus 4 (100K-300K tokens) - Consider GPT offload!
@@ -175,6 +180,7 @@ Task(
 ```
 
 **Smart Features**:
+
 - **Keyword Detection**: "implement complete" → GPT offload (saves 100% Claude tokens)
 - **Context Size**: 15+ files → Route to GPT-4.1 (preserves rate limit)
 - **Agent Expertise**: Frontend tasks → Owl agent automatically
@@ -192,35 +198,36 @@ See [@docs/agents/gpt.md](docs/agents/gpt.md) for the complete hybrid developmen
 
 ## 🧠 Model Selection Strategy (July 2025)
 
-**CRITICAL**: Optimize for rate limit preservation while maintaining quality by using the right Claude model for each agent.
+**CRITICAL**: Optimize for rate limit preservation while maintaining quality by using the right Claude model for each
+agent.
 
 ### Available Models
 
-| Model | Input | Output | Best For |
-|-------|-------|--------|----------|
-| **Claude Opus 4** | $15/M | $75/M | Complex reasoning, architecture, debugging |
-| **Claude Sonnet 4** | $3/M | $15/M | Coding expertise, 72.7% SWE-bench |
-| **Claude 3.5 Haiku** | $0.80/M | $4/M | Fast operations, simple tasks |
-| **Claude 3.5 Sonnet** | $3/M | $15/M | Previous generation (fallback) |
-| **Claude 3.7 Sonnet** | $3/M | $15/M | Hybrid reasoning (specialized cases) |
+| Model                 | Input   | Output | Best For                                   |
+|-----------------------|---------|--------|--------------------------------------------|
+| **Claude Opus 4**     | $15/M   | $75/M  | Complex reasoning, architecture, debugging |
+| **Claude Sonnet 4**   | $3/M    | $15/M  | Coding expertise, 72.7% SWE-bench          |
+| **Claude 3.5 Haiku**  | $0.80/M | $4/M   | Fast operations, simple tasks              |
+| **Claude 3.5 Sonnet** | $3/M    | $15/M  | Previous generation (fallback)             |
+| **Claude 3.7 Sonnet** | $3/M    | $15/M  | Hybrid reasoning (specialized cases)       |
 
 ### Agent Model Assignments
 
-| Agent | Model | Reasoning |
-|-------|-------|-----------|
-| 🚢 **Dock** | Haiku 3.5 | Simple container ops, speed critical |
-| 🏹 **Archer** | Haiku 3.5 | Fast pattern search, volume queries |
-| 🔍 **Scout** | Sonnet 4 | Test writing needs coding expertise |
-| 🦉 **Owl** | Sonnet 4 | Frontend complexity, framework knowledge |
-| 🔬 **Inspector** | Sonnet 4 | Code analysis, pattern detection |
-| 🛍️ **Shopkeeper** | Sonnet 4 | GraphQL integration, business logic |
-| 🎭 **Playwright** | Sonnet 4 | Browser automation, UI testing |
-| 🔧 **Refactor** | Opus 4 | Systematic changes, consistency |
-| ⚡ **Flash** | Opus 4 | Performance analysis, bottlenecks |
-| 🐛 **Debugger** | Opus 4 | Complex reasoning, root cause analysis |
-| 📋 **Planner** | Opus 4 | Architecture design, multi-step reasoning |
-| 💬 **GPT** | Opus 4 | Expert consultation, match GPT-4 |
-| 🔥 **Phoenix** | Opus 4 | Migration complexity, compatibility |
+| Agent              | Model     | Reasoning                                 |
+|--------------------|-----------|-------------------------------------------|
+| 🚢 **Dock**        | Haiku 3.5 | Simple container ops, speed critical      |
+| 🏹 **Archer**      | Haiku 3.5 | Fast pattern search, volume queries       |
+| 🔍 **Scout**       | Sonnet 4  | Test writing needs coding expertise       |
+| 🦉 **Owl**         | Sonnet 4  | Frontend complexity, framework knowledge  |
+| 🔬 **Inspector**   | Sonnet 4  | Code analysis, pattern detection          |
+| 🛍️ **Shopkeeper** | Sonnet 4  | GraphQL integration, business logic       |
+| 🎭 **Playwright**  | Sonnet 4  | Browser automation, UI testing            |
+| 🔧 **Refactor**    | Opus 4    | Systematic changes, consistency           |
+| ⚡ **Flash**        | Opus 4    | Performance analysis, bottlenecks         |
+| 🐛 **Debugger**    | Opus 4    | Complex reasoning, root cause analysis    |
+| 📋 **Planner**     | Opus 4    | Architecture design, multi-step reasoning |
+| 💬 **GPT**         | Opus 4    | Expert consultation, match GPT-4          |
+| 🔥 **Phoenix**     | Opus 4    | Migration complexity, compatibility       |
 
 ### Dynamic Model Selection
 
@@ -252,18 +259,21 @@ Task(
 ### Rate Limit Optimization Guidelines
 
 **High-Volume Operations (Use Haiku 3.5)**:
+
 - Bulk file searches
 - Simple container operations
 - Basic pattern matching
 - Quick status checks
 
 **Standard Development (Use Sonnet 4)**:
+
 - Code writing and editing
 - Test implementation
 - Code analysis
 - Frontend development
 
 **Complex Analysis (Use Opus 4)**:
+
 - Architecture design
 - Complex debugging
 - Performance optimization
@@ -289,20 +299,24 @@ prompt="@docs/agents/debugger.md\n\nModel: auto\n\nComplex stack trace analysis"
 ### Rate Limit Impact Estimates
 
 **Conservative Usage (Rate Limit Optimized)**:
+
 - Haiku 3.5: Minimal rate limit impact (high-volume simple tasks)
 - Sonnet 4: Balanced rate limit usage (standard development)
 - Opus 4: Higher rate limit usage (complex reasoning)
 - **Combined**: Well within rate limits
 
 **Heavy Development (All Opus)**:
+
 - Opus 4: Maximum rate limit consumption
 - **Rate Limit Preservation**: 66% reduction in Claude token usage
 
-*Note: With Pro/Max subscriptions, pricing shown for reference. We optimize for preserving Claude rate limits, not cost savings.*
+*Note: With Pro/Max subscriptions, pricing shown for reference. We optimize for preserving Claude rate limits, not cost
+savings.*
 
 ### Quality Benchmarks
 
 **Agent Performance by Model**:
+
 - **Dock + Haiku**: 2x faster operations, same reliability
 - **Scout + Sonnet 4**: 85% test success rate vs 72% with Haiku
 - **Flash + Opus**: Finds 95% of performance issues vs 60% with Sonnet
@@ -313,7 +327,8 @@ prompt="@docs/agents/debugger.md\n\nModel: auto\n\nComplex stack trace analysis"
 - **Python/Tour Tests**: Route to Scout Agent - See [@docs/agents/scout.md](docs/agents/scout.md)
 - **Hoot Tests (JS/Owl)**: Route to Owl Agent - See [@docs/agents/owl.md](docs/agents/owl.md)
 - **Format**: `ruff format . && ruff check . --fix` (Claude can run directly)
-- **Quality**: Route to Inspector Agent - See [@docs/agents/inspector.md](docs/agents/inspector.md)
+- **Quality Check**: `/quality` - Comprehensive checks via QC Agent - See [@docs/agents/qc.md](docs/agents/qc.md)
+- **Code Analysis**: Route to Inspector Agent - See [@docs/agents/inspector.md](docs/agents/inspector.md)
 - **Containers**: Route to Dock Agent - See [@docs/agents/dock.md](docs/agents/dock.md)
 - **Odoo Research**: Route to Archer Agent - See [@docs/agents/archer.md](docs/agents/archer.md)
 - **Frontend Work**: Route to Owl Agent - See [@docs/agents/owl.md](docs/agents/owl.md)
@@ -328,6 +343,46 @@ prompt="@docs/agents/debugger.md\n\nModel: auto\n\nComplex stack trace analysis"
 
 **Detailed Architecture**: See [@docs/agents/archer.md](docs/agents/archer.md) for research patterns
 
+## ✅ Quality Control (PROACTIVE!)
+
+**CRITICAL**: Claude should proactively suggest quality checks BEFORE commits!
+
+### When to Suggest QC Checks
+
+1. **Before Commits** (Always suggest!)
+   ```
+   "I've completed the changes. Before committing, would you like me to run /quality to check for issues?"
+   ```
+
+2. **After Major Changes**
+    - Multiple files modified
+    - New features implemented
+    - Refactoring completed
+    - Bug fixes applied
+
+3. **Periodic Health Checks**
+    - When context is getting large
+    - Before pushing to remote
+    - After merging branches
+
+### QC Integration Pattern
+
+```
+# Use the slash command for comprehensive checks
+/quality changed    # Check changed files (default)
+/quality product_connect    # Check specific module  
+/quality all    # Full project audit
+
+# Claude proactively suggests:
+"Before committing, shall I run /quality to check for issues?"
+
+# QC agent coordinates fixes:
+"QC found 3 formatting issues and 2 performance concerns. 
+I can route these to the appropriate agents for fixes."
+```
+
+**See**: [@docs/QC_INTEGRATION.md](docs/QC_INTEGRATION.md) for complete guide
+
 ## 🔧 Development Workflow
 
 1. **Route tasks to agents** - Don't do the work yourself, delegate to specialists
@@ -336,6 +391,18 @@ prompt="@docs/agents/debugger.md\n\nModel: auto\n\nComplex stack trace analysis"
 4. **Code quality** - Use [@docs/agents/inspector.md](docs/agents/inspector.md)
 
 **AGENT FIRST RULE**: Before doing ANY work, ask "Which agent should handle this?" Route to specialists!
+
+## 🛡️ Error Recovery (NEW!)
+
+**Automatic error handling and agent fallbacks are now available!**
+
+When agents fail, I'll automatically:
+
+1. **Classify the error** (rate limit, timeout, permission, etc.)
+2. **Suggest recovery** (retry with backoff, use fallback agent, or fail)
+3. **Route to alternatives** (Inspector → Archer → General-purpose)
+
+**See**: [@docs/agents/ERROR_RECOVERY.md](docs/agents/ERROR_RECOVERY.md) for patterns
 
 ## ✅ Success Patterns
 

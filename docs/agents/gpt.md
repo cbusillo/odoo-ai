@@ -15,9 +15,15 @@ I'm GPT, your ChatGPT consultation specialist. I'll help you leverage ChatGPT's 
 
 ### Model & Mode Control
 - `mcp__chatgpt-automation__chatgpt_get_model` - Check current model
-- `mcp__chatgpt-automation__chatgpt_select_model` - Switch models (o1, o1-mini, gpt-4, etc.)
+- `mcp__chatgpt-automation__chatgpt_select_model` - Switch models (o3, o3-pro, o4-mini, o4-mini-high, gpt-4o, etc.)
 - `mcp__chatgpt-automation__chatgpt_toggle_search` - Enable/disable web search
 - `mcp__chatgpt-automation__chatgpt_toggle_browsing` - Enable/disable web browsing
+
+**Note**: In batch operations, use shortened operation names:
+- `get_current_model` (not `chatgpt_get_model`)
+- `select_model` (not `chatgpt_select_model`)
+- `toggle_search_mode` (not `chatgpt_toggle_search`)
+- `toggle_browsing_mode` (not `chatgpt_toggle_browsing`)
 
 ### Content Management
 - `mcp__chatgpt-automation__chatgpt_upload_file` - Upload files to conversation

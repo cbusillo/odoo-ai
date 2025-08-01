@@ -38,6 +38,7 @@ agent has focused knowledge to avoid context pollution and ensure expertise in t
 ## Why MCP Tools Matter
 
 Using the correct tools makes a massive difference in performance and reliability. See:
+
 - [Tool Selection Performance Guide](../TOOL_SELECTION_PERFORMANCE_GUIDE.md) - Comprehensive patterns and benchmarks
 - [Performance Reference Guide](../PERFORMANCE_REFERENCE.md) - Quick performance summary
 
@@ -110,7 +111,7 @@ bash("find . -name '*.py' -exec grep -l 'pattern' {} \\;")
 | 🏹    | **Archer**             | Odoo Source Research    | `mcp__odoo-intelligence__search_*`, Docker paths                                        |
 | 🔍    | **Scout**              | Test Writing            | `mcp__odoo-intelligence__test_runner`, test templates                                   |
 | 🔬    | **Inspector**          | Code Quality            | `mcp__odoo-intelligence__*` (project-wide), `mcp__inspection-pycharm__*` (current file) |
-| 🔍    | **QC**                 | Quality Control         | Multi-agent coordination, enforcement, `mcp__odoo-intelligence__*`                       |
+| 🔍    | **QC**                 | Quality Control         | Multi-agent coordination, enforcement, `mcp__odoo-intelligence__*`                      |
 | 🚢    | **Dock**               | Docker Operations       | `mcp__docker__*`, container management                                                  |
 | 🛍️   | **Shopkeeper**         | Shopify Integration     | `mcp__odoo-intelligence__*`, GraphQL patterns                                           |
 | 🦉    | **Owl**                | Frontend Development    | Owl.js patterns, `mcp__pycharm__*` for JS files                                         |
@@ -123,25 +124,27 @@ bash("find . -name '*.py' -exec grep -l 'pattern' {} \\;")
 | 🧙    | **Odoo Engineer**      | Core Developer Mindset  | Framework patterns, idiomatic Odoo                                                      |
 | 🤖    | **Anthropic Engineer** | Claude Best Practices   | AI optimization, context management                                                     |
 | 💬    | **GPT**                | ChatGPT Consultation    | `mcp__chatgpt__*`, code review, architecture advice                                     |
+| 📝    | **Doc**                | Documentation Updates   | Maintain accurate docs, track changes, update guides                                    |
 
 ## Quick Agent Selection Guide
 
-| Scenario                  | Primary Agent    | Supporting Agents                 |
-|---------------------------|------------------|-----------------------------------|
-| "Error in traceback"      | 🐛 Debugger      | 🚢 Dock (logs), 💬 GPT (analysis) |
-| "Write tests for X"       | 🔍 Scout         | 🏹 Archer (examples)              |
-| "Optimize performance"    | ⚡ Flash          | 🔬 Inspector (quality)            |
-| "Fix code quality issues" | 🔬 Inspector     | 🔧 Refactor (bulk fixes)          |
-| "Quality audit/review"    | 🔍 QC            | 🔬 Inspector, ⚡ Flash, 🔍 Scout |
-| "Implement new feature"   | 📋 Planner       | 🏹 Archer (research)              |
-| "Debug UI/browser issue"  | 🎭 Playwright    | 🦉 Owl (frontend)                 |
-| "Shopify integration"     | 🛍️ Shopkeeper   | 🏹 Archer (patterns)              |
-| "Frontend development"    | 🦉 Owl           | 🎭 Playwright (testing)           |
-| "Container problems"      | 🚢 Dock          | 🐛 Debugger (logs)                |
-| "Complex code review"     | 💬 GPT           | 🔬 Inspector (quality)            |
-| "Migration issues"        | 🔥 Phoenix       | 🏹 Archer (patterns)              |
-| "Architecture design"     | 🧙 Odoo Engineer | 📋 Planner (implementation)       |
-| **"Large implementation"** | 💬 **GPT (4.1)** | **Claude analyzes, GPT codes**   |
+| Scenario                   | Primary Agent    | Supporting Agents                 |
+|----------------------------|------------------|-----------------------------------|
+| "Error in traceback"       | 🐛 Debugger      | 🚢 Dock (logs), 💬 GPT (analysis) |
+| "Write tests for X"        | 🔍 Scout         | 🏹 Archer (examples)              |
+| "Optimize performance"     | ⚡ Flash          | 🔬 Inspector (quality)            |
+| "Fix code quality issues"  | 🔬 Inspector     | 🔧 Refactor (bulk fixes)          |
+| "Quality audit/review"     | 🔍 QC            | 🔬 Inspector, ⚡ Flash, 🔍 Scout   |
+| "Implement new feature"    | 📋 Planner       | 🏹 Archer (research)              |
+| "Debug UI/browser issue"   | 🎭 Playwright    | 🦉 Owl (frontend)                 |
+| "Shopify integration"      | 🛍️ Shopkeeper   | 🏹 Archer (patterns)              |
+| "Frontend development"     | 🦉 Owl           | 🎭 Playwright (testing)           |
+| "Container problems"       | 🚢 Dock          | 🐛 Debugger (logs)                |
+| "Complex code review"      | 💬 GPT           | 🔬 Inspector (quality)            |
+| "Migration issues"         | 🔥 Phoenix       | 🏹 Archer (patterns)              |
+| "Architecture design"      | 🧙 Odoo Engineer | 📋 Planner (implementation)       |
+| **"Large implementation"** | 💬 **GPT (4.1)** | **Claude analyzes, GPT codes**    |
+| "Update documentation"     | 📝 Doc           | 🏹 Archer (technical details)     |
 
 ## Using Agents
 
@@ -200,6 +203,7 @@ Task(
 ## Agent Effectiveness Metrics
 
 For detailed performance benchmarks and real-world examples, see:
+
 - [Tool Selection Performance Guide](../TOOL_SELECTION_PERFORMANCE_GUIDE.md) - Complete patterns and anti-patterns
 - [Performance Reference Guide](../PERFORMANCE_REFERENCE.md) - Agent-specific improvements
 

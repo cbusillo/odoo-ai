@@ -323,16 +323,106 @@ registry.category("web_tour.tours").add("tour_name", {
 });
 ```
 
-### Tour Testing Limitations
+### Tour Testing Best Practices
 
 **See @docs/agents/scout.md for tour test patterns and limitations**
 
-Key points:
+#### Current Limitations
 
-- Tours are best for smoke tests
-- Keep selectors simple (no jQuery patterns)
-- Use `/odoo` URLs in Odoo 18
-- Focus on Python tests for business logic
+- Tours execute quickly, can miss lazy-loaded components
+- Asset bundles (`web.assets_backend_lazy`) load asynchronously
+- Minimal error feedback - tours pass even with console errors
+- Complex selectors break easily between Odoo versions
+
+#### Comprehensive Tour Pattern
+
+```javascript
+registry.category("web_tour.tours").add("comprehensive_tour", {
+    test: true,
+    steps: () => [
+        // 1. Initial error check
+        {
+            trigger: "body",
+            run: () => {
+                const errors = window.odoo.__DEBUG__.services.notification.notifications.filter(n => n.type === "danger");
+                if (errors.length) throw new Error(`Initial errors: ${errors.map(e => e.message).join(", ")}`);
+            },
+        },
+        // 2. Navigation with proper wait
+        {
+            content: "Navigate to app",
+            trigger: ".o_app[data-menu-xmlid='product_connect.main_menu']",
+            run: "click",
+        },
+        {
+            content: "Wait for lazy assets to load",
+            trigger: ".expected_lazy_element",
+            timeout: 30000,  // Increase timeout for lazy loading
+        },
+        // 3. Functional interaction
+        {
+            content: "Test actual functionality",
+            trigger: ".interactive_element",
+            run: function() {
+                // Verify initial state
+                const initialState = this.el.dataset.state;
+                if (initialState !== "expected") {
+                    throw new Error(`Unexpected initial state: ${initialState}`);
+                }
+                
+                // Perform action
+                this.el.click();
+            },
+        },
+        // 4. Verify results
+        {
+            content: "Verify action completed",
+            trigger: ".result_element:contains('Success')",
+            timeout: 10000,
+        },
+        // 5. Final error check
+        {
+            trigger: "body",
+            run: () => {
+                // Check for JS errors
+                const errors = window.odoo.__DEBUG__.services.notification.notifications.filter(n => n.type === "danger");
+                if (errors.length) throw new Error(`Errors during tour: ${errors.map(e => e.message).join(", ")}`);
+                
+                // Check console
+                if (window.consoleErrors?.length) {
+                    throw new Error(`Console errors: ${window.consoleErrors.join(", ")}`);
+                }
+            },
+        },
+    ],
+});
+```
+
+#### Tour Testing Strategy
+
+1. **Smoke Tests** (Current)
+   - Verify UI loads without errors
+   - Basic navigation works
+   - Minimal functional testing
+
+2. **Functional Tests** (Recommended)
+   - Test actual user workflows
+   - Verify data changes
+   - Check view transitions
+   - Monitor for errors throughout
+
+3. **Comprehensive Tests** (Ideal)
+   - Full workflow from start to finish
+   - Multiple user personas
+   - Edge cases and error handling
+   - Performance monitoring
+
+#### Common Tour Pitfalls
+
+- **NO jQuery selectors**: Use native selectors only
+- **NO :visible/:contains**: Use attribute selectors
+- **Avoid timing races**: Use proper wait conditions
+- **Check for errors**: Add error monitoring steps
 
 ## Test Tags
 

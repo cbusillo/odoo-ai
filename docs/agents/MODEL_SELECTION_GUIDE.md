@@ -2,7 +2,7 @@
 
 ## Overview
 
-Claude Code agents can request specific AI models based on task complexity. This feature enables cost and performance optimization by matching the right model to each task.
+Claude Code agents can request specific AI models based on task complexity. This feature enables rate limit preservation and performance optimization by matching the right model to each task.
 
 ## Quick Reference
 

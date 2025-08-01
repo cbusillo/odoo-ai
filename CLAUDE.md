@@ -182,7 +182,7 @@ Task(
 
 ### 💡 Claude + GPT Hybrid Development (NEW!)
 
-**Use GPT-4.1 for Large Implementations** - 70% cost savings vs all-Claude approach:
+**Use GPT-4.1 for Large Implementations** - preserves 100% of Claude rate limits:
 
 - **Claude analyzes** using MCP tools → Gathers patterns, context, requirements
 - **GPT-4.1 implements** with 1M token context → Generates complete features following your exact patterns
@@ -192,7 +192,7 @@ See [@docs/agents/gpt.md](docs/agents/gpt.md) for the complete hybrid developmen
 
 ## 🧠 Model Selection Strategy (July 2025)
 
-**CRITICAL**: Optimize costs while maintaining quality by using the right Claude model for each agent.
+**CRITICAL**: Optimize for rate limit preservation while maintaining quality by using the right Claude model for each agent.
 
 ### Available Models
 
@@ -249,7 +249,7 @@ Task(
 )
 ```
 
-### Cost Optimization Guidelines
+### Rate Limit Optimization Guidelines
 
 **High-Volume Operations (Use Haiku 3.5)**:
 - Bulk file searches
@@ -286,17 +286,19 @@ prompt="@docs/agents/debugger.md\n\nModel: auto\n\nSimple log review" # Uses Hai
 prompt="@docs/agents/debugger.md\n\nModel: auto\n\nComplex stack trace analysis" # Uses Opus 4
 ```
 
-### Monthly Cost Estimates
+### Rate Limit Impact Estimates
 
-**Conservative Usage (Optimized)**:
-- Haiku 3.5: ~$10/month (high-volume simple tasks)
-- Sonnet 4: ~$50/month (standard development)
-- Opus 4: ~$75/month (complex reasoning)
-- **Total**: ~$135/month
+**Conservative Usage (Rate Limit Optimized)**:
+- Haiku 3.5: Minimal rate limit impact (high-volume simple tasks)
+- Sonnet 4: Balanced rate limit usage (standard development)
+- Opus 4: Higher rate limit usage (complex reasoning)
+- **Combined**: Well within rate limits
 
 **Heavy Development (All Opus)**:
-- Opus 4: ~$400/month
-- **Savings**: ~$265/month (66% reduction)
+- Opus 4: Maximum rate limit consumption
+- **Rate Limit Preservation**: 66% reduction in Claude token usage
+
+*Note: With Pro/Max subscriptions, pricing shown for reference. We optimize for preserving Claude rate limits, not cost savings.*
 
 ### Quality Benchmarks
 

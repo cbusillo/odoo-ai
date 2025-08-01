@@ -2,8 +2,10 @@
 """
 Smart Context Management for Odoo Agent System
 
-Automatically selects optimal agents and models based on task complexity,
-context size, and performance requirements.
+Automatically selects optimal agents and models to preserve Claude rate limits
+by intelligently offloading to GPT and using efficient models.
+
+OPTIMIZATION GOAL: Minimize Claude token usage, not cost!
 """
 
 import re
@@ -34,7 +36,9 @@ class TaskAnalysis:
     recommended_agent: str
     confidence: float
     reasoning: List[str]
-    estimated_cost: str
+    estimated_tokens: str
+    rate_limit_impact: str
+    gpt_offload_recommended: bool
 
 
 class SmartContextManager:
@@ -51,6 +55,13 @@ class SmartContextManager:
             "architecture", "design", "performance", "optimization", "debug",
             "race condition", "deadlock", "bottleneck", "refactor", "migration",
             "bulk", "systematic", "analyze", "investigate", "troubleshoot"
+        ]
+        
+        # Keywords that strongly suggest GPT offload
+        self.gpt_offload_keywords = [
+            "implement complete", "generate entire", "create full",
+            "build comprehensive", "mass generation", "bulk creation",
+            "following patterns", "based on examples", "using templates"
         ]
         
         # Agent specialties with default models
@@ -116,10 +127,16 @@ class SmartContextManager:
                 model = ModelTier.OPUS
                 reasoning.append(f"User requested {user_preference} results")
         
-        # 6. Calculate estimated cost
-        cost = self._estimate_cost(model, complexity)
+        # 6. Check GPT offload recommendation
+        gpt_offload = self._should_offload_to_gpt(task_description, agent, complexity, file_count, reasoning)
         
-        # 7. Calculate confidence
+        # 7. Calculate estimated tokens
+        tokens = self._estimate_tokens(model, complexity, len(context_files))
+        
+        # 8. Calculate rate limit impact
+        impact = self._calculate_rate_limit_impact(tokens, gpt_offload)
+        
+        # 9. Calculate confidence
         confidence = self._calculate_confidence(task_description, agent, reasoning)
         
         return TaskAnalysis(
@@ -128,7 +145,9 @@ class SmartContextManager:
             recommended_agent=agent,
             confidence=confidence,
             reasoning=reasoning,
-            estimated_cost=cost
+            estimated_tokens=tokens,
+            rate_limit_impact=impact,
+            gpt_offload_recommended=gpt_offload
         )
 
     def _assess_complexity(self, task: str, context_files: List[str], reasoning: List[str]) -> TaskComplexity:
@@ -228,23 +247,94 @@ class SmartContextManager:
             
         return model
 
-    def _estimate_cost(self, model: ModelTier, complexity: TaskComplexity) -> str:
-        """Estimate task cost"""
+    def _should_offload_to_gpt(self, task: str, agent: str, complexity: TaskComplexity, 
+                               file_count: Optional[int], reasoning: List[str]) -> bool:
+        """Determine if task should be offloaded to GPT to save Claude tokens"""
         
-        # Rough cost estimates per task
-        costs = {
-            (ModelTier.HAIKU, TaskComplexity.SIMPLE): "$0.01-0.05",
-            (ModelTier.HAIKU, TaskComplexity.MEDIUM): "$0.05-0.15", 
-            (ModelTier.HAIKU, TaskComplexity.COMPLEX): "$0.15-0.30",
-            (ModelTier.SONNET, TaskComplexity.SIMPLE): "$0.05-0.15",
-            (ModelTier.SONNET, TaskComplexity.MEDIUM): "$0.15-0.50",
-            (ModelTier.SONNET, TaskComplexity.COMPLEX): "$0.50-1.50",
-            (ModelTier.OPUS, TaskComplexity.SIMPLE): "$0.25-0.75",
-            (ModelTier.OPUS, TaskComplexity.MEDIUM): "$0.75-2.50",
-            (ModelTier.OPUS, TaskComplexity.COMPLEX): "$2.50-7.50",
+        task_lower = task.lower()
+        
+        # Already routing to GPT agent
+        if agent == "gpt":
+            reasoning.append("Already routing to GPT agent")
+            return True
+            
+        # Check for GPT offload keywords
+        if any(keyword in task_lower for keyword in self.gpt_offload_keywords):
+            reasoning.append("GPT offload keywords detected - pattern following task")
+            return True
+            
+        # Large file count
+        if file_count and file_count > 15:
+            reasoning.append(f"Large file count ({file_count}) - offload to GPT recommended")
+            return True
+            
+        # Complex implementation tasks
+        if complexity == TaskComplexity.COMPLEX and "implement" in task_lower:
+            reasoning.append("Complex implementation - consider GPT offload")
+            return True
+            
+        return False
+
+    def _estimate_tokens(self, model: ModelTier, complexity: TaskComplexity, context_files: int) -> str:
+        """Estimate token usage for the task"""
+        
+        # Base token estimates
+        base_tokens = {
+            (ModelTier.HAIKU, TaskComplexity.SIMPLE): (1000, 5000),
+            (ModelTier.HAIKU, TaskComplexity.MEDIUM): (5000, 15000),
+            (ModelTier.HAIKU, TaskComplexity.COMPLEX): (15000, 30000),
+            (ModelTier.SONNET, TaskComplexity.SIMPLE): (5000, 15000),
+            (ModelTier.SONNET, TaskComplexity.MEDIUM): (15000, 50000),
+            (ModelTier.SONNET, TaskComplexity.COMPLEX): (50000, 150000),
+            (ModelTier.OPUS, TaskComplexity.SIMPLE): (10000, 30000),
+            (ModelTier.OPUS, TaskComplexity.MEDIUM): (30000, 100000),
+            (ModelTier.OPUS, TaskComplexity.COMPLEX): (100000, 300000),
         }
         
-        return costs.get((model, complexity), "$0.50-2.00")
+        min_tokens, max_tokens = base_tokens.get((model, complexity), (10000, 50000))
+        
+        # Adjust for context files
+        if context_files > 10:
+            min_tokens *= 1.5
+            max_tokens *= 2
+            
+        # Format with K/M suffix
+        def format_tokens(n):
+            if n >= 1_000_000:
+                return f"{n/1_000_000:.1f}M"
+            elif n >= 1000:
+                return f"{n/1000:.0f}K"
+            else:
+                return str(n)
+                
+        return f"{format_tokens(min_tokens)}-{format_tokens(max_tokens)} tokens"
+
+    def _calculate_rate_limit_impact(self, tokens: str, gpt_offload: bool) -> str:
+        """Calculate impact on Claude rate limit"""
+        
+        if gpt_offload:
+            return "NONE (offloaded to GPT)"
+            
+        # Parse token range
+        token_range = tokens.split("-")[1].strip().split()[0]
+        
+        # Convert to number
+        if "M" in token_range:
+            max_tokens = float(token_range.replace("M", "")) * 1_000_000
+        elif "K" in token_range:
+            max_tokens = float(token_range.replace("K", "")) * 1000
+        else:
+            max_tokens = float(token_range)
+            
+        # Rate limit impact categories
+        if max_tokens < 10_000:
+            return "LOW (minimal impact)"
+        elif max_tokens < 50_000:
+            return "MEDIUM (noticeable usage)"
+        elif max_tokens < 150_000:
+            return "HIGH (significant usage)"
+        else:
+            return "CRITICAL (consider GPT offload!)"
 
     def _calculate_confidence(self, task: str, agent: str, reasoning: List[str]) -> float:
         """Calculate confidence in the recommendation"""
@@ -291,13 +381,17 @@ class SmartContextManager:
     def explain_recommendation(self, analysis: TaskAnalysis) -> str:
         """Generate human-readable explanation"""
         
+        offload_msg = "✅ YES - Offload to GPT!" if analysis.gpt_offload_recommended else "❌ No - Keep with Claude"
+        
         return f"""
 🎯 Task Analysis Results:
 
 **Recommended Agent**: {analysis.recommended_agent}
 **Recommended Model**: {analysis.recommended_model.value}
 **Complexity**: {analysis.complexity.value}
-**Estimated Cost**: {analysis.estimated_cost}
+**Estimated Tokens**: {analysis.estimated_tokens}
+**Rate Limit Impact**: {analysis.rate_limit_impact}
+**GPT Offload**: {offload_msg}
 **Confidence**: {analysis.confidence:.1%}
 
 **Reasoning**:
@@ -305,13 +399,14 @@ class SmartContextManager:
 
 **Why this matters**:
 • Right agent = domain expertise
-• Right model = cost/quality balance  
-• Smart routing = 3-5x faster development
+• Right model = token efficiency
+• GPT offload = preserve Claude rate limit
+• Smart routing = avoid hitting 5-hour limit!
 """
 
 
 def demo_smart_routing():
-    """Demonstrate smart context management"""
+    """Demonstrate smart context management with token optimization"""
     
     manager = SmartContextManager()
     
@@ -320,20 +415,34 @@ def demo_smart_routing():
         ("Find how Odoo implements graph views", []),
         ("Debug this complex race condition in order processing", ["order.py", "queue.py", "worker.py"]),
         ("Check container status", []),
-        ("Refactor 50 files to use new API pattern", ["file{}.py".format(i) for i in range(50)]),
+        ("Implement complete product variant system with 50+ fields", ["file{}.py".format(i) for i in range(20)]),
         ("Create a product selector component", []),
         ("Quick code quality check on current file", ["current.py"]),
+        ("Generate entire Shopify sync module following our patterns", []),
     ]
     
-    print("🧠 Smart Context Management Demo")
-    print("=" * 50)
+    print("🧠 Smart Context Management Demo (Token Optimization)")
+    print("=" * 60)
+    print("GOAL: Preserve Claude rate limit by intelligent routing!\n")
+    
+    total_claude_tokens = 0
+    total_gpt_tokens = 0
     
     for task, files in test_cases:
-        analysis = manager.analyze_task(task, files)
+        analysis = manager.analyze_task(task, files, file_count=len(files))
         print(f"\n📋 Task: '{task[:50]}{'...' if len(task) > 50 else ''}'")
         print(f"🎯 Route: {analysis.recommended_agent} + {analysis.recommended_model.value}")
-        print(f"💰 Cost: {analysis.estimated_cost}")
+        print(f"🔢 Tokens: {analysis.estimated_tokens}")
+        print(f"⚠️  Impact: {analysis.rate_limit_impact}")
+        
+        if analysis.gpt_offload_recommended:
+            print("✅ OFFLOAD TO GPT - Saves Claude tokens!")
+        
         print(f"📊 Confidence: {analysis.confidence:.1%}")
+    
+    print("\n" + "=" * 60)
+    print("💡 With smart routing, complex implementations go to GPT,")
+    print("   preserving your Claude rate limit for what it does best!")
 
 
 if __name__ == "__main__":

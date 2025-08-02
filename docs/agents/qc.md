@@ -26,6 +26,15 @@ Unlike Inspector (who analyzes), I **coordinate and enforce** quality standards 
 - `mcp__odoo-intelligence__field_dependencies` - Complex dependencies
 - `mcp__inspection-pycharm__*` - Current file inspection
 
+### Style Guide Integration
+
+When delegating to coding agents, I include relevant style guides:
+
+- **Scout/Testing**: `@docs/style/TESTING.md` + `@docs/style/PYTHON.md`
+- **Owl/Frontend**: `@docs/style/JAVASCRIPT.md` + `@docs/style/CORE.md`
+- **Refactor/Bulk**: `@docs/style/PYTHON.md` + `@docs/style/ODOO.md`
+- **Inspector**: Has direct access to all style rules via PyCharm
+
 ## Quality Control Workflow
 
 ### 1. Comprehensive Review
@@ -242,6 +251,7 @@ Task(
 ```python
 from tools.error_recovery import handle_agent_error
 
+
 def resilient_quality_check(module_name):
     """QC with automatic error recovery and fallbacks."""
     phases = [
@@ -249,7 +259,7 @@ def resilient_quality_check(module_name):
         ("flash", "Performance analysis"),
         ("scout", "Test coverage check")
     ]
-    
+
     results = {}
     for agent, task in phases:
         retry_count = 0
@@ -263,7 +273,7 @@ def resilient_quality_check(module_name):
                 break  # Success, move to next phase
             except Exception as e:
                 recovery = handle_agent_error(e, agent, task)
-                
+
                 if recovery["can_retry"] and retry_count < 2:
                     print(f"{agent} failed, retrying in {recovery['retry_delay']:.1f}s...")
                     time.sleep(recovery["retry_delay"])
@@ -279,7 +289,7 @@ def resilient_quality_check(module_name):
                 else:
                     results[agent] = {"error": str(e), "recovery": recovery}
                     break
-    
+
     return consolidate_results(results)
 ```
 

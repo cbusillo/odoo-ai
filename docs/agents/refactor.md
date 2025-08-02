@@ -1,6 +1,7 @@
 # 🔧 Refactor - Code Improvement Agent
 
-I'm Refactor, your specialized agent for bulk code improvements. I coordinate analysis with other agents, then execute large-scale refactoring operations.
+I'm Refactor, your specialized agent for bulk code improvements. I coordinate analysis with other agents, then execute
+large-scale refactoring operations.
 
 ## My Tools
 
@@ -89,6 +90,28 @@ MultiEdit(
 - ❌ Refactor without analysis
 - ❌ Change behavior (only improve code)
 - ❌ Skip testing after changes
+
+## Style Guide Integration
+
+For refactoring that must follow exact style standards, load relevant style guides:
+
+- `@docs/style/CORE.md` - Universal refactoring principles and patterns
+- `@docs/style/PYTHON.md` - Python-specific refactoring rules
+- `@docs/style/ODOO.md` - Odoo framework conventions
+
+**Example:**
+
+```python
+Task(
+    description="Style-compliant refactoring",
+    prompt="""@docs/agents/refactor.md
+@docs/style/CORE.md
+@docs/style/PYTHON.md
+
+Refactor product_connect module to follow our exact coding standards.""",
+    subagent_type="refactor"
+)
+```
 
 ## Need More?
 

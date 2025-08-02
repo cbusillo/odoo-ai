@@ -373,8 +373,8 @@ class TestRunner:
             # Run all tests in our modules using module path
             args.append("--test-tags=/product_connect,/disable_odoo_online")
         elif test_type == "js":
-            # Run JavaScript tests by file pattern
-            args.append("--test-tags=/product_connect:*.test.js")
+            # Run JavaScript tests via Python test runner
+            args.append("--test-tags=/product_connect:ProductConnectJSTests")
         elif test_type == "tour":
             # Run tour tests by tag
             args.append("--test-tags=product_connect_tour")

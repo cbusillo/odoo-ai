@@ -3,6 +3,7 @@
 ## Critical Issue: Recursive Agent Calls
 
 ### The Problem
+
 Agents can inadvertently call themselves, creating infinite loops that crash Claude Code:
 
 ```python
@@ -15,6 +16,7 @@ Task(
 ```
 
 ### Why This Happens
+
 1. Agents might delegate "similar" tasks without checking agent type
 2. Generic task descriptions can match multiple agents
 3. No built-in loop detection in Claude Code
@@ -22,16 +24,23 @@ Task(
 ## Safeguard Patterns
 
 ### 1. Agent Self-Awareness
+
 Each agent should know its own identity and avoid self-delegation:
 
 ```python
 # In agent documentation
 ## What I DON'T Do
-- ❌ Call myself (Inspector) for sub-tasks
-- ❌ Create recursive delegation loops
+- ❌ Call
+myself(Inspector)
+for sub - tasks
+    - ❌ Create
+recursive
+delegation
+loops
 ```
 
 ### 2. Explicit Delegation Rules
+
 Define clear handoff patterns:
 
 ```python
@@ -53,6 +62,7 @@ if more_analysis_needed:
 ```
 
 ### 3. Task Context Passing
+
 When agents need to maintain context, pass it explicitly rather than re-delegating:
 
 ```python
@@ -71,42 +81,46 @@ Task(subagent_type="inspector", prompt="Analyze deeper...")
 
 Safe delegation patterns between agents:
 
-| From Agent | Safe to Call | Never Call |
-|------------|--------------|------------|
-| Inspector | Refactor, QC, GPT | Inspector (self) |
-| QC | Inspector, Scout, Flash, Refactor | QC (self) |
-| Refactor | Archer, Owl, Inspector | Refactor (self) |
-| Scout | Playwright, Owl | Scout (self) |
-| Debugger | Dock, GPT | Debugger (self) |
-| Planner | Archer, GPT | Planner (self) |
+| From Agent | Safe to Call                      | Never Call       |
+|------------|-----------------------------------|------------------|
+| Inspector  | Refactor, QC, GPT                 | Inspector (self) |
+| QC         | Inspector, Scout, Flash, Refactor | QC (self)        |
+| Refactor   | Archer, Owl, Inspector            | Refactor (self)  |
+| Scout      | Playwright, Owl                   | Scout (self)     |
+| Debugger   | Dock, GPT                         | Debugger (self)  |
+| Planner    | Archer, GPT                       | Planner (self)   |
 
 ## Implementation Recommendations
 
 ### 1. Add Call Stack Tracking
+
 ```python
 # Hypothetical Claude Code enhancement
 def Task(..., subagent_type, _call_stack=None):
     if _call_stack and subagent_type in _call_stack:
         raise RecursionError(f"Agent {subagent_type} already in call stack")
-    
+
     new_stack = (_call_stack or []) + [subagent_type]
     # Pass new_stack to sub-tasks
 ```
 
 ### 2. Agent Metadata Validation
+
 ```python
 # In smart context manager
 def validate_delegation(from_agent: str, to_agent: str) -> bool:
     """Prevent dangerous delegations"""
     if from_agent == to_agent:
         raise ValueError(f"Agent {from_agent} cannot delegate to itself")
-    
+
     # Additional rules...
     return True
 ```
 
 ### 3. Documentation Standards
+
 Every agent should explicitly list:
+
 - ✅ Agents it CAN safely call
 - ❌ Agents it should NEVER call
 - 📋 Preferred delegation patterns

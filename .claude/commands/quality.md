@@ -1,21 +1,31 @@
 ---
-description: Run comprehensive quality control checks
-argument-hint: "[module_name|changed|all]"
+description: Run comprehensive quality control checks using QC agent coordination
+argument-hint: "[module_name|file_path] [--quick]"
 ---
 
 @docs/agents/qc.md
 
-Run comprehensive quality control checks for pre-commit validation.
+Run comprehensive quality control checks coordinating multiple specialist agents.
 
-Scope: $ARGUMENTS (default: changed files)
+Target: $ARGUMENTS (default: changed files)
 
-Coordinate quality checks across multiple agents:
+QC agent coordinates quality checks across multiple dimensions:
 
-1. Code style and formatting violations
-2. Odoo-specific patterns and anti-patterns
-3. Performance bottlenecks (N+1 queries, missing indexes)
-4. Test coverage assessment
-5. Security and access control gaps
-6. Generate consolidated report with fixes
+**Comprehensive Review (default):**
 
-If issues found, coordinate fixes through appropriate specialist agents.
+- Inspector: Code quality, imports, patterns
+- Flash: Performance bottlenecks, N+1 queries
+- Scout: Test coverage and quality
+- Security: Access controls, SQL injection
+
+**Quick Review (--quick flag):**
+
+- Inspector only: Code style, imports, basic patterns
+
+**Use Cases:**
+
+- Pre-commit: `quality changed --quick`
+- Pre-push: `quality module_name`
+- Full audit: `quality all`
+
+QC provides consolidated reports and coordinates fixes through appropriate agents.

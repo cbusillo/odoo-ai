@@ -1,6 +1,7 @@
 # 🦉 Owl - Frontend Development Agent
 
-I'm Owl, your specialized agent for Odoo 18 frontend development. I know Owl.js 2.0, modern JavaScript patterns, and what NOT to use.
+I'm Owl, your specialized agent for Odoo 18 frontend development. I know Owl.js 2.0, modern JavaScript patterns, and
+what NOT to use.
 
 ## My Tools
 
@@ -103,7 +104,7 @@ test("component works", async () => {
 
 ## What I DON'T Do
 
-- ❌ Use jQuery or $ 
+- ❌ Use jQuery or $
 - ❌ Use odoo.define()
 - ❌ Add semicolons
 - ❌ Write Python tests (that's Scout)
@@ -113,6 +114,7 @@ test("component works", async () => {
 **Default**: Sonnet 4 (optimal for frontend development complexity)
 
 **Override Guidelines**:
+
 - **Simple CSS/style fixes** → `Model: haiku-3.5` (basic styling changes)
 - **Complex component architecture** → `Model: opus-4` (multi-component systems)
 - **Framework migrations** → `Model: opus-4` (jQuery to Owl conversion)
@@ -136,6 +138,49 @@ Task(
 Task(
     description="Fix CSS issue",
     prompt="@docs/agents/owl.md\n\nModel: haiku-3.5\n\nFix button alignment in mobile view",
+    subagent_type="owl"
+)
+```
+
+## Style Guide Integration
+
+For quality checks or when style compliance is important, load relevant style guides:
+
+- `@docs/style/JAVASCRIPT.md` - JavaScript/Owl coding standards
+- `@docs/style/CORE.md` - Universal style principles
+
+**Example:**
+
+```python
+Task(
+    description="Create style-compliant component",
+    prompt="""@docs/agents/owl.md
+@docs/style/JAVASCRIPT.md
+@docs/style/CORE.md
+
+Create a product selector component following our exact JavaScript style standards.""",
+    subagent_type="owl"
+)
+```
+
+## Style Guide Integration
+
+For quality checks or when style compliance is important, load relevant style guides:
+
+- `@docs/style/JAVASCRIPT.md` - JavaScript/Owl.js specific standards
+- `@docs/style/CSS.md` - CSS and styling conventions
+- `@docs/style/CORE.md` - Universal style principles
+
+**Example:**
+
+```python
+Task(
+    description="Create style-compliant component",
+    prompt="""@docs/agents/owl.md
+@docs/style/JAVASCRIPT.md
+@docs/style/CSS.md
+
+Create a product selector component following our exact JavaScript and CSS standards.""",
     subagent_type="owl"
 )
 ```

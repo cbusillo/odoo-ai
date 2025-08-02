@@ -327,7 +327,7 @@ savings.*
 - **Python/Tour Tests**: Route to Scout Agent - See [@docs/agents/scout.md](docs/agents/scout.md)
 - **Hoot Tests (JS/Owl)**: Route to Owl Agent - See [@docs/agents/owl.md](docs/agents/owl.md)
 - **Format**: `ruff format . && ruff check . --fix` (Claude can run directly)
-- **Quality Check**: `/quality` - Comprehensive checks via QC Agent - See [@docs/agents/qc.md](docs/agents/qc.md)
+- **Quality Check**: Route to Inspector Agent - See [@docs/agents/inspector.md](docs/agents/inspector.md)
 - **Code Analysis**: Route to Inspector Agent - See [@docs/agents/inspector.md](docs/agents/inspector.md)
 - **Containers**: Route to Dock Agent - See [@docs/agents/dock.md](docs/agents/dock.md)
 - **Odoo Research**: Route to Archer Agent - See [@docs/agents/archer.md](docs/agents/archer.md)
@@ -351,7 +351,7 @@ savings.*
 
 1. **Before Commits** (Always suggest!)
    ```
-   "I've completed the changes. Before committing, would you like me to run /quality to check for issues?"
+   "I've completed the changes. Before committing, would you like me to route to Inspector agent to check for issues?"
    ```
 
 2. **After Major Changes**
@@ -365,23 +365,23 @@ savings.*
     - Before pushing to remote
     - After merging branches
 
-### QC Integration Pattern
+### Quality Check Integration Pattern
 
-```
-# Use the slash command for comprehensive checks
-/quality changed    # Check changed files (default)
-/quality product_connect    # Check specific module  
-/quality all    # Full project audit
+```python
+# Route to Inspector agent for quality checks
+Task(
+    description="Quality check",
+    prompt="@docs/agents/inspector.md\n\nRun comprehensive quality checks using PyCharm inspections",
+    subagent_type="inspector"
+)
 
 # Claude proactively suggests:
-"Before committing, shall I run /quality to check for issues?"
+"Before committing, shall I route to Inspector agent to check for issues?"
 
-# QC agent coordinates fixes:
-"QC found 3 formatting issues and 2 performance concerns. 
-I can route these to the appropriate agents for fixes."
+# Inspector agent uses PyCharm inspections and reports:
+"Inspector found 3 formatting issues and 2 performance concerns. 
+I can fix these or route to appropriate specialists."
 ```
-
-**See**: [@docs/QC_INTEGRATION.md](docs/QC_INTEGRATION.md) for complete guide
 
 ## 🔧 Development Workflow
 

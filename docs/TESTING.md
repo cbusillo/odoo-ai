@@ -50,23 +50,24 @@ tests/
 ### Quick Start
 
 ```bash
-# Enhanced test runner - uses docker CLI (no external Python dependencies)
+# Using uv (automatically manages venv and dependencies)
 # Output goes to tmp/tests/odoo-tests-{timestamp}/ for human and agent analysis
-.venv/bin/python tools/test_runner.py           # Summary of test results (default)
-.venv/bin/python tools/test_runner.py all       # Run all tests
-.venv/bin/python tools/test_runner.py python    # Python tests only
-.venv/bin/python tools/test_runner.py js        # JavaScript tests only
-.venv/bin/python tools/test_runner.py tour      # Tour tests only
-.venv/bin/python tools/test_runner.py failing   # List currently failing tests
+uv run python tools/test_runner.py           # Summary of test results (default)
+uv run python tools/test_runner.py all       # Run all tests
+uv run python tools/test_runner.py python    # Python tests only
+uv run python tools/test_runner.py js        # JavaScript tests only
+uv run python tools/test_runner.py tour      # Tour tests only
+uv run python tools/test_runner.py failing   # List currently failing tests
 
 # Advanced options
-.venv/bin/python tools/test_runner.py -v                          # Verbose output with error details
-.venv/bin/python tools/test_runner.py --test-tags TestOrderImporter  # Run specific test class
-.venv/bin/python tools/test_runner.py --test-tags TestOrderImporter.test_import_order  # Run specific test method
-.venv/bin/python tools/test_runner.py -j                          # JSON output
-.venv/bin/python tools/test_runner.py -u all                      # Update module before tests
-.venv/bin/python tools/test_runner.py -t 300 all                  # Custom timeout (5 minutes)
+uv run python tools/test_runner.py -v                          # Verbose output with error details
+uv run python tools/test_runner.py --test-tags TestOrderImporter  # Run specific test class
+uv run python tools/test_runner.py --test-tags TestOrderImporter.test_import_order  # Run specific test method
+uv run python tools/test_runner.py -j                          # JSON output
+uv run python tools/test_runner.py -u all                      # Update module before tests
+uv run python tools/test_runner.py -t 300 all                  # Custom timeout (5 minutes)
 
+# Note: uv automatically installs dependencies from pyproject.toml (psutil, rich)
 ```
 
 ### Test Tags

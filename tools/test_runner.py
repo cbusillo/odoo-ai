@@ -7,6 +7,7 @@ import subprocess
 import argparse
 import json
 import socket
+import random
 from pathlib import Path
 from datetime import datetime
 from dataclasses import dataclass, asdict
@@ -121,6 +122,11 @@ class OutputManager:
                 r"(Failed to load registry|Failed to initialize database|TypeError: Model|AttributeError:.*models)"
             ),
             "critical_exception": re.compile(r"(CRITICAL|FATAL|OperationalError:)"),
+            "port_conflict": re.compile(r"(Address already in use|Port.*is in use|bind.*failed|Cannot bind)"),
+            "access_error": re.compile(r"(odoo\.exceptions\.AccessError|AccessError:|You are not allowed to)"),
+            "validation_error": re.compile(r"(odoo\.exceptions\.ValidationError|ValidationError:|UserError:)"),
+            "missing_dependency": re.compile(r"(ModuleNotFoundError:|ImportError:.*No module named|unmet dependencies)"),
+            "test_discovery": re.compile(r"(No tests? found|0 tests? collected|ImportError.*test_)"),
         }
 
         # Track critical errors
@@ -267,6 +273,7 @@ class UnifiedTestRunner:
         self.container_name = container
         self.database = database
         self.addons_path = addons_path
+        self.test_tags: str | None = None  # Track specific test requested
 
         # Detect caller type
         self.caller_type = CallerDetector.detect_caller()
@@ -340,7 +347,11 @@ class UnifiedTestRunner:
     def get_available_port(start: int = 20100, end: int = 21000) -> int:
         reserved_ports = {8069, 8070, 8071, 8072}
 
-        for port in range(start, end):
+        # Use random starting point to avoid conflicts
+        port_range = list(range(start, end))
+        random.shuffle(port_range)
+
+        for port in port_range:
             if port in reserved_ports:
                 continue
             try:
@@ -351,12 +362,77 @@ class UnifiedTestRunner:
                 continue
         raise RuntimeError(f"No available ports found in range {start}-{end}")
 
+    def _run_preflight_checks(self) -> dict[str, bool]:
+        """Run pre-execution checks to validate environment."""
+        checks = {}
+
+        # Check if database is accessible
+        try:
+            check_db = [
+                "docker",
+                "exec",
+                self.container_name,
+                "python3",
+                "-c",
+                f"import psycopg2; conn = psycopg2.connect('dbname={self.database} host=database user=odoo'); conn.close(); print('OK')",
+            ]
+            result = subprocess.run(check_db, capture_output=True, text=True, timeout=5)
+            checks["database_accessible"] = result.returncode == 0 and "OK" in result.stdout
+        except (subprocess.SubprocessError, subprocess.TimeoutExpired, OSError):
+            checks["database_accessible"] = False
+
+        # Check if addons paths exist
+        try:
+            check_paths = [
+                "docker",
+                "exec",
+                self.container_name,
+                "python3",
+                "-c",
+                f"import os; paths = '{self.addons_path}'.split(','); missing = [p for p in paths if not os.path.exists(p)]; print('Missing:' + str(missing) if missing else 'OK')",
+            ]
+            result = subprocess.run(check_paths, capture_output=True, text=True, timeout=5)
+            checks["addons_paths_exist"] = result.returncode == 0 and "OK" in result.stdout
+        except (subprocess.SubprocessError, subprocess.TimeoutExpired, OSError):
+            checks["addons_paths_exist"] = False
+
+        # Check if product_connect module exists
+        try:
+            check_module = [
+                "docker",
+                "exec",
+                self.container_name,
+                "python3",
+                "-c",
+                "import os; print('OK' if os.path.exists('/volumes/addons/product_connect') else 'Missing')",
+            ]
+            result = subprocess.run(check_module, capture_output=True, text=True, timeout=5)
+            checks["product_connect_exists"] = result.returncode == 0 and "OK" in result.stdout
+        except (subprocess.SubprocessError, subprocess.TimeoutExpired, OSError):
+            checks["product_connect_exists"] = False
+
+        return checks
+
     def run_tests_with_streaming(self, test_type: str = "all", specific_test: str | None = None, timeout: int = 180) -> TestResults:
         # Initialize output manager
         self.output_manager = OutputManager(self.output_dir, self.caller_type)
 
+        # Run preflight checks
+        if self.verbose or self.debug:
+            self.output_manager.write_line("Running preflight checks...")
+            checks = self._run_preflight_checks()
+            for check, passed in checks.items():
+                status = "✓" if passed else "✗"
+                self.output_manager.write_line(f"  {status} {check}")
+
+            if not all(checks.values()):
+                self.output_manager.write_line("⚠️  Warning: Some preflight checks failed")
+
+        # Store specific test for diagnostics
+        self.test_tags = specific_test
+
         # Build command
-        port = self.get_available_port()
+        port = UnifiedTestRunner.get_available_port()
         cmd = [
             "/odoo/odoo-bin",
             "-d",
@@ -511,6 +587,25 @@ class UnifiedTestRunner:
         if self.output_manager.critical_error_detected:
             results.critical_error = self.output_manager.critical_error_details
             results.summary = f"CRITICAL ERROR: {self.output_manager.critical_error_details.get('type', 'unknown')}"
+        # Check for early exit with error
+        elif return_code == 1 and elapsed < 5 and results.total == 0:
+            # Likely a startup failure
+            results.critical_error = {
+                "type": "startup_failure",
+                "phase": "starting",
+                "error": "Process exited immediately - check logs for port conflicts or configuration issues",
+            }
+            results.summary = "CRITICAL ERROR: startup_failure"
+        # Check for test discovery failure
+        elif return_code == 0 and results.total == 0 and not self.output_manager.critical_error_detected:
+            # Tests completed "successfully" but no tests found
+            error_msg = self._analyze_test_discovery_failure(full_output)
+            results.critical_error = {
+                "type": "test_discovery_failure",
+                "phase": "discovery",
+                "error": error_msg,
+            }
+            results.summary = "CRITICAL ERROR: test_discovery_failure"
 
         # Add output file paths
         results.output_files = {
@@ -613,6 +708,53 @@ class UnifiedTestRunner:
 
         return results
 
+    def _analyze_test_discovery_failure(self, output: str) -> str:
+        """Analyze why test discovery failed and provide actionable diagnostics."""
+        reasons = []
+
+        # Check for common test discovery issues
+        if "ImportError" in output:
+            import_match = re.search(r"ImportError: (.+)", output)
+            if import_match:
+                reasons.append(f"Import error: {import_match.group(1)}")
+
+        if "ModuleNotFoundError" in output:
+            module_match = re.search(r"ModuleNotFoundError: (.+)", output)
+            if module_match:
+                reasons.append(f"Missing module: {module_match.group(1)}")
+
+        if "@tagged" not in output:
+            reasons.append("No @tagged decorator found - tests must have @tagged('post_install', '-at_install')")
+
+        if "test_" not in output.lower():
+            reasons.append("No test methods found - ensure methods start with 'test_'")
+
+        if "odoo.tests" not in output:
+            reasons.append("No test imports found - ensure tests import from odoo.tests")
+
+        # Check for test file naming
+        test_pattern = getattr(self, "test_tags", "")
+        if test_pattern:
+            if "." in test_pattern:
+                class_name, method_name = test_pattern.split(".", 1)
+                reasons.append(f"Specific test method requested: {test_pattern}")
+                reasons.append(f"Verify class '{class_name}' exists and has method '{method_name}'")
+            elif test_pattern.startswith("Test"):
+                reasons.append(f"Specific test class requested: {test_pattern}")
+                reasons.append(f"Verify class '{test_pattern}' exists in tests/ directory")
+
+        # Check for common test configuration issues
+        if "product_connect" in output and "tests" in output:
+            reasons.append("Module found but no tests discovered - check test file imports")
+            reasons.append("Ensure tests/__init__.py imports all test files")
+        
+        # Default message if no specific reason found
+        if not reasons:
+            reasons.append("Test discovery failed - check test file naming (test_*.py) and class inheritance")
+            reasons.append("Verify tests are in the tests/ directory and properly imported in __init__.py")
+
+        return "; ".join(reasons)
+
     def _write_summary(self, results: TestResults) -> None:
         summary_data = {
             "timestamp": datetime.now().isoformat(),
@@ -684,6 +826,8 @@ class UnifiedTestRunner:
         if results.total == 0 and not results.loading_failed:
             recommendations.append("Check test discovery - ensure tests are properly tagged")
             recommendations.append("Verify test files exist and inherit from proper base classes")
+            recommendations.append("Ensure test methods start with 'test_' and classes have @tagged decorator")
+            recommendations.append("Check that test files are imported in tests/__init__.py")
 
         return recommendations
 
@@ -743,7 +887,7 @@ def main() -> None:
     # Run tests
     if args.test_type == "failing":
         # Quick implementation for failing tests
-        results = runner.run_tests_with_streaming(args.test_tags, timeout)
+        results = runner.run_tests_with_streaming(timeout=timeout)
         failing = results.failures + results.errors_list
         results_dict = {"failing_tests": failing, "count": len(failing)}
     else:
@@ -763,8 +907,10 @@ def main() -> None:
                 print("🚨" * 30)
                 print(f"\nError Type: {results.critical_error.get('type', 'unknown')}")
                 print(f"Phase: {results.critical_error.get('phase', 'unknown')}")
-                print(f"Current Test: {results.critical_error.get('current_test', 'unknown')}")
-                print(f"Error: {results.critical_error.get('line', 'unknown')}")
+                if results.critical_error.get("current_test"):
+                    print(f"Current Test: {results.critical_error.get('current_test')}")
+                error_msg = results.critical_error.get("error", results.critical_error.get("line", "unknown"))
+                print(f"\nError Details:\n{error_msg}")
                 print(f"\nReturn Code: {results.returncode}")
                 print("\nAction Required: Fix the critical error before running tests again")
             elif results.loading_failed:

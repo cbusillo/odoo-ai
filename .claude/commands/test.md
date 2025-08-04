@@ -6,5 +6,5 @@ argument-hint: "[all|python|js|tour|failing|<TestClass>]"
 Run tests using the enhanced test runner:
 
 ```bash
-!./tools/test_runner.py $ARGUMENTS
+!.venv/bin/python tools/test_runner.py $ARGUMENTS
 ```

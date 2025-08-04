@@ -51,20 +51,21 @@ tests/
 
 ```bash
 # Enhanced test runner - uses docker CLI (no external Python dependencies)
-python tools/test_runner.py           # Summary of test results (default)
-./tools/test_runner.py all       # Run all tests
-./tools/test_runner.py python    # Python tests only
-./tools/test_runner.py js        # JavaScript tests only
-./tools/test_runner.py tour      # Tour tests only
-./tools/test_runner.py failing   # List currently failing tests
+# Output goes to tmp/tests/odoo-tests-{timestamp}/ for human and agent analysis
+.venv/bin/python tools/test_runner.py           # Summary of test results (default)
+.venv/bin/python tools/test_runner.py all       # Run all tests
+.venv/bin/python tools/test_runner.py python    # Python tests only
+.venv/bin/python tools/test_runner.py js        # JavaScript tests only
+.venv/bin/python tools/test_runner.py tour      # Tour tests only
+.venv/bin/python tools/test_runner.py failing   # List currently failing tests
 
 # Advanced options
-./tools/test_runner.py -v                          # Verbose output with error details
-./tools/test_runner.py --test-tags TestOrderImporter  # Run specific test class
-./tools/test_runner.py --test-tags TestOrderImporter.test_import_order  # Run specific test method
-./tools/test_runner.py -j                          # JSON output
-./tools/test_runner.py -u all                      # Update module before tests
-./tools/test_runner.py -t 300 all                  # Custom timeout (5 minutes)
+.venv/bin/python tools/test_runner.py -v                          # Verbose output with error details
+.venv/bin/python tools/test_runner.py --test-tags TestOrderImporter  # Run specific test class
+.venv/bin/python tools/test_runner.py --test-tags TestOrderImporter.test_import_order  # Run specific test method
+.venv/bin/python tools/test_runner.py -j                          # JSON output
+.venv/bin/python tools/test_runner.py -u all                      # Update module before tests
+.venv/bin/python tools/test_runner.py -t 300 all                  # Custom timeout (5 minutes)
 
 ```
 
@@ -193,8 +194,8 @@ This structure ensures:
 
 1. **Via test_runner.py** (recommended for CI/CD):
    ```bash
-   ./tools/test_runner.py tour                    # Run all tours
-   ./tools/test_runner.py tour --test-tags TestMotorWorkflow  # Specific test class
+   .venv/bin/python tools/test_runner.py tour                    # Run all tours
+   .venv/bin/python tools/test_runner.py tour --test-tags TestMotorWorkflow  # Specific test class
    ```
 
 2. **Via browser console** (for debugging):
@@ -529,7 +530,7 @@ relevant. Remove tests for deprecated features rather than trying to fix them.
 
 Tours behave differently in test mode vs browser console:
 
-**Test Mode** (`./tools/test_runner.py tour`):
+**Test Mode** (`.venv/bin/python tools/test_runner.py tour`):
 
 - Database changes are rolled back
 - Runs with test user authentication

@@ -7,7 +7,7 @@ coordinate with Owl for Hoot tests.
 
 - `mcp__odoo-intelligence__model_info` - Understand what to test
 - `mcp__odoo-intelligence__field_usages` - See how fields are used
-- `./tools/test_runner.py` via Bash - Run tests
+- `.venv/bin/python tools/test_runner.py` via Bash - Run tests
 - `Write` - Create test files
 - `MultiEdit` - Add test methods
 
@@ -59,10 +59,10 @@ class TestFeature(ProductConnectTransactionCase):
 ## Running Tests
 
 ```bash
-./tools/test_runner.py          # Quick summary
-./tools/test_runner.py python   # Python tests only
-./tools/test_runner.py tour     # Tour tests only
-./tools/test_runner.py failing  # Show failures
+.venv/bin/python tools/test_runner.py          # Quick summary
+.venv/bin/python tools/test_runner.py python   # Python tests only
+.venv/bin/python tools/test_runner.py tour     # Tour tests only
+.venv/bin/python tools/test_runner.py failing  # Show failures
 ```
 
 ## Routing

@@ -195,8 +195,9 @@ odoo.*.conf
 /docker/config/_generated.conf
 
 inspection-results/
-/test_*
-/temp_*
+
+# Temporary files directory
+/tmp/
 
 /docs/todo
 /.claude/.compacted

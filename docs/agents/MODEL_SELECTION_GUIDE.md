@@ -2,18 +2,19 @@
 
 ## Overview
 
-Claude Code agents can request specific AI models based on task complexity. This feature enables rate limit preservation and performance optimization by matching the right model to each task.
+Claude Code agents can request specific AI models based on task complexity. This feature enables rate limit preservation
+and performance optimization by matching the right model to each task.
 
 ## Quick Reference
 
 ### Model Tiers
 
-| Model | Speed | Tokens | Rate Limit Impact | Best For |
-|-------|-------|--------|-------------------|----------|
-| **Haiku 3.5** | <1s | 1K-5K | LOW | Simple queries, status checks |
-| **Sonnet 4** | ~5s | 15K-50K | MEDIUM | Standard development |
-| **Opus 4** | ~15s | 100K-300K | HIGH | Complex analysis |
-| **GPT-4.1** | ~30s | 0 Claude | NONE | Large implementations |
+| Model         | Speed | Tokens    | Rate Limit Impact | Best For                      |
+|---------------|-------|-----------|-------------------|-------------------------------|
+| **Haiku 3.5** | <1s   | 1K-5K     | LOW               | Simple queries, status checks |
+| **Sonnet 4**  | ~5s   | 15K-50K   | MEDIUM            | Standard development          |
+| **Opus 4**    | ~15s  | 100K-300K | HIGH              | Complex analysis              |
+| **GPT-4.1**   | ~30s  | 0 Claude  | NONE              | Large implementations         |
 
 ### Syntax
 
@@ -35,21 +36,21 @@ Task details...""",
 
 Each agent has an optimal default model based on typical task complexity:
 
-| Agent | Default Model | Reasoning |
-|-------|---------------|-----------|
-| 🚢 **Dock** | Haiku 3.5 | Simple container operations |
-| 🏹 **Archer** | Haiku 3.5 | Fast pattern searches |
-| 🔍 **Scout** | Sonnet 4 | Test writing complexity |
-| 🦉 **Owl** | Sonnet 4 | Frontend development |
-| 🔬 **Inspector** | Sonnet 4 | Code analysis |
-| 🛍️ **Shopkeeper** | Sonnet 4 | Business logic |
-| 🎭 **Playwright** | Sonnet 4 | Browser automation |
-| 🔧 **Refactor** | Opus 4 | Systematic changes |
-| ⚡ **Flash** | Opus 4 | Performance analysis |
-| 🐛 **Debugger** | Opus 4 | Complex reasoning |
-| 📋 **Planner** | Opus 4 | Architecture design |
-| 💬 **GPT** | Opus 4 | Match ChatGPT capability |
-| 🔥 **Phoenix** | Opus 4 | Migration complexity |
+| Agent              | Default Model | Reasoning                   |
+|--------------------|---------------|-----------------------------|
+| 🚢 **Dock**        | Haiku 3.5     | Simple container operations |
+| 🏹 **Archer**      | Haiku 3.5     | Fast pattern searches       |
+| 🔍 **Scout**       | Sonnet 4      | Test writing complexity     |
+| 🦉 **Owl**         | Sonnet 4      | Frontend development        |
+| 🔬 **Inspector**   | Sonnet 4      | Code analysis               |
+| 🛍️ **Shopkeeper** | Sonnet 4      | Business logic              |
+| 🎭 **Playwright**  | Sonnet 4      | Browser automation          |
+| 🔧 **Refactor**    | Opus 4        | Systematic changes          |
+| ⚡ **Flash**        | Opus 4        | Performance analysis        |
+| 🐛 **Debugger**    | Opus 4        | Complex reasoning           |
+| 📋 **Planner**     | Opus 4        | Architecture design         |
+| 💬 **GPT**         | Opus 4        | Match ChatGPT capability    |
+| 🔥 **Phoenix**     | Opus 4        | Migration complexity        |
 
 ### Override Examples
 
@@ -112,7 +113,8 @@ analysis = manager.analyze_task("Check container status")
 
 ## Rate Limit Optimization
 
-With Pro/Max subscriptions, the real constraint is Claude rate limits, not cost. GPT usage is essentially free (just time cost).
+With Pro/Max subscriptions, the real constraint is Claude rate limits, not cost. GPT usage is essentially free (just
+time cost).
 
 ### Token Usage by Model
 
@@ -155,27 +157,29 @@ Model: auto  # Let Claude Code decide
 ## Performance Benchmarks
 
 ### Response Times
+
 Based on real testing:
 
-| Task Type | Model | Response Time | Quality |
-|-----------|-------|---------------|---------|
-| Container status | Haiku 3.5 | <1s | Perfect |
-| Write unit test | Sonnet 4 | ~5s | Excellent |
-| Architecture analysis | Opus 4 | ~15s | Comprehensive |
-| 50-file refactor | GPT-4.1 | ~30s | Consistent |
+| Task Type             | Model     | Response Time | Quality       |
+|-----------------------|-----------|---------------|---------------|
+| Container status      | Haiku 3.5 | <1s           | Perfect       |
+| Write unit test       | Sonnet 4  | ~5s           | Excellent     |
+| Architecture analysis | Opus 4    | ~15s          | Comprehensive |
+| 50-file refactor      | GPT-4.1   | ~30s          | Consistent    |
 
 ### Success Rates by Task Type
 
-| Task Type | Haiku 3.5 | Sonnet 4 | Opus 4 |
-|-----------|-----------|----------|--------|
-| Simple file ops | 98% | 99% | 99% |
-| Code writing | 65% | 87% | 92% |
-| Test writing | 72% | 85% | 89% |
-| Bug fixing | 45% | 78% | 91% |
-| Architecture | 25% | 68% | 94% |
-| Performance optimization | 15% | 52% | 89% |
+| Task Type                | Haiku 3.5 | Sonnet 4 | Opus 4 |
+|--------------------------|-----------|----------|--------|
+| Simple file ops          | 98%       | 99%      | 99%    |
+| Code writing             | 65%       | 87%      | 92%    |
+| Test writing             | 72%       | 85%      | 89%    |
+| Bug fixing               | 45%       | 78%      | 91%    |
+| Architecture             | 25%       | 68%      | 94%    |
+| Performance optimization | 15%       | 52%      | 89%    |
 
-**Key Insight**: Haiku 3.5 is 3-15x faster but with lower success rates on complex tasks. Opus 4 has 2x higher success rate for complex work.
+**Key Insight**: Haiku 3.5 is 3-15x faster but with lower success rates on complex tasks. Opus 4 has 2x higher success
+rate for complex work.
 
 ## Troubleshooting
 

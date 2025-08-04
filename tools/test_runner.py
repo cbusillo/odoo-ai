@@ -14,8 +14,13 @@ Commands:
     python  - Run Python tests only
     failing - List currently failing tests
 
+Debug Mode:
+    Use --debug flag to enable detailed test discovery information and debug-level logging.
+    This helps troubleshoot issues with test detection and execution.
+
 Options:
     -v, --verbose    - Show detailed output
+    --debug          - Enable debug mode with verbose test discovery and debug logging
     --test-tags TAG  - Run specific test (e.g., TestOrderImporter or TestOrderImporter.test_import)
     -j, --json       - Output results as JSON
     -t, --timeout N  - Set timeout in seconds (default: 180)
@@ -26,19 +31,61 @@ import sys
 import time
 import subprocess
 import argparse
-import random
 import json
+import socket
+from pathlib import Path
+
+
+def check_execution_context() -> None:
+    """Check if the script is being run correctly and provide helpful guidance."""
+    # Check if we're in a virtual environment
+    in_venv = hasattr(sys, "real_prefix") or (hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix)
+
+    # Get the project root (parent of tools directory)
+    script_path = Path(__file__).resolve()
+    project_root = script_path.parent.parent
+    expected_venv = project_root / ".venv"
+
+    # Check if running from the correct directory
+    cwd = Path.cwd()
+    if cwd != project_root:
+        print(f"⚠️  Warning: You should run this script from the project root directory.")
+        print(f"   Current directory: {cwd}")
+        print(f"   Expected directory: {project_root}")
+        print()
+
+    # Check if using the project's virtual environment
+    if not in_venv:
+        print("❌ Error: Not running in a virtual environment!")
+        print()
+        print("Please run this script using the project's virtual environment:")
+        print(f"    {expected_venv}/bin/python {script_path.relative_to(project_root)}")
+        print()
+        print("Or activate the virtual environment first:")
+        print(f"    source {expected_venv}/bin/activate")
+        print(f"    python {script_path.relative_to(project_root)}")
+        sys.exit(1)
+
+    # Check if using the correct virtual environment
+    venv_path = Path(sys.prefix)
+    if venv_path != expected_venv and not venv_path.parts[-1].startswith("venv"):
+        print(f"⚠️  Warning: You might be using a different virtual environment.")
+        print(f"   Current venv: {venv_path}")
+        print(f"   Expected venv: {expected_venv}")
+        print()
 
 
 class TestRunner:
     def __init__(
         self,
         verbose: bool = False,
+        debug: bool = False,
         container: str = "odoo-opw-script-runner-1",
         database: str = "opw",
         addons_path: str = "/volumes/addons,/odoo/addons,/volumes/enterprise",
     ) -> None:
         self.verbose = verbose
+        self.debug = debug
         self.container_name = container
         self.database = database
         self.addons_path = addons_path
@@ -101,6 +148,44 @@ class TestRunner:
                         print(f"Error starting container {container['name']}: {e.stderr}")
                         sys.exit(1)
 
+    def get_available_port(self, start: int = 18080, end: int = 19000) -> int:
+        """Find an available port, avoiding known conflicts."""
+        # Common ports to avoid
+        reserved_ports = {8069, 8070, 8071, 8072}  # Odoo web containers
+
+        for port in range(start, end):
+            if port in reserved_ports:
+                continue
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.bind(("", port))
+                    if self.verbose:
+                        print(f"Selected available port: {port}")
+                    return port
+            except OSError:
+                continue
+        raise RuntimeError(f"No available ports found in range {start}-{end}")
+
+    def cleanup_test_processes(self) -> bool:
+        """Kill any lingering test processes in the container"""
+        try:
+            if self.verbose:
+                print("Cleaning up any lingering test processes...")
+
+            # Kill any odoo-bin test processes
+            kill_cmd = ["docker", "exec", self.container_name, "sh", "-c", "pkill -f 'odoo-bin.*--test-enable' || true"]
+            subprocess.run(kill_cmd, timeout=5)
+
+            # Kill any lingering Chrome processes
+            chrome_kill_cmd = ["docker", "exec", self.container_name, "sh", "-c", "pkill -f 'chromium|chrome' || true"]
+            subprocess.run(chrome_kill_cmd, timeout=5)
+
+            return True
+        except Exception as e:
+            if self.verbose:
+                print(f"Error cleaning up test processes: {e}")
+            return False
+
     @staticmethod
     def cleanup_docker_environment() -> bool:
         try:
@@ -123,7 +208,7 @@ class TestRunner:
             return False
 
     def run_command(self, args: list[str], timeout: int = 180) -> tuple[int, str]:
-        port = random.randint(8080, 18079)
+        port = self.get_available_port()
 
         cmd = [
             "/odoo/odoo-bin",
@@ -135,14 +220,19 @@ class TestRunner:
             str(port),
         ] + args
 
-        if self.verbose:
+        if self.verbose or self.debug:
             print(f"Running in {self.container_name}: {' '.join(cmd)}")
 
+        if self.debug:
+            print(f"Debug: Full docker command: docker exec -e PYTHONUNBUFFERED=1 {self.container_name} {' '.join(cmd)}")
+            print(f"Debug: Using port {port} for test execution")
+            print(f"Debug: Timeout set to {timeout} seconds")
+
         try:
-            # Build docker exec command to use existing container
+            # Simple approach: direct docker exec with timeout
             docker_cmd = ["docker", "exec", "-e", "PYTHONUNBUFFERED=1", self.container_name] + cmd
 
-            # Run with timeout
+            # Run with subprocess timeout
             result = subprocess.run(docker_cmd, capture_output=True, text=True, timeout=timeout)
 
             # Combine stdout and stderr for consistent output
@@ -152,8 +242,20 @@ class TestRunner:
 
             return result.returncode, output
 
-        except subprocess.TimeoutExpired:
-            return -1, f"Command timed out after {timeout} seconds"
+        except subprocess.TimeoutExpired as e:
+            # Kill any remaining processes in container matching our command
+            kill_cmd = ["docker", "exec", self.container_name, "pkill", "-f", f"http-port.{port}"]
+            try:
+                subprocess.run(kill_cmd, timeout=5)
+            except (subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError):
+                pass  # Ignore errors in cleanup
+
+            # Try to get partial output if available
+            output = ""
+            if hasattr(e, "stdout") and e.stdout:
+                output = e.stdout.decode(errors="ignore")
+
+            return -1, f"Command timed out after {timeout} seconds (killed by Python)\n{output}"
         except FileNotFoundError:
             return -1, f"Docker command not found"
         except Exception as e:
@@ -287,6 +389,10 @@ class TestRunner:
         """List all available tests by scanning test files in the container"""
         test_files = {"python": [], "js": [], "tour": []}
 
+        if self.debug:
+            print(f"Debug: Discovering tests in container {self.container_name}")
+            print(f"Debug: Searching for test files in /volumes/addons/product_connect")
+
         try:
             # Find Python test files
             find_cmd = [
@@ -300,33 +406,70 @@ class TestRunner:
                 "-type",
                 "f",
             ]
+
+            if self.debug:
+                print(f"Debug: Running test file discovery: {' '.join(find_cmd)}")
+
             result = subprocess.run(find_cmd, capture_output=True, text=True)
 
             if result.returncode == 0:
-                for file_path in result.stdout.strip().split("\n"):
+                found_files = [f for f in result.stdout.strip().split("\n") if f]
+                if self.debug:
+                    print(f"Debug: Found {len(found_files)} test files:")
+                    for file_path in found_files:
+                        print(f"  - {file_path}")
+
+                for file_path in found_files:
                     if file_path:
                         # Extract test methods from file
                         grep_cmd = ["docker", "exec", self.container_name, "grep", "-E", "^\\s*def test_", file_path]
+
+                        if self.debug:
+                            print(f"Debug: Scanning {file_path} for test methods...")
+
                         grep_result = subprocess.run(grep_cmd, capture_output=True, text=True)
 
                         if grep_result.returncode == 0:
+                            methods_found = []
                             for line in grep_result.stdout.strip().split("\n"):
                                 if line:
                                     method = re.search(r"def (test_\w+)", line)
                                     if method:
-                                        test_files["python"].append(f"{file_path.split('/')[-1]}::{method.group(1)}")
+                                        method_name = method.group(1)
+                                        test_files["python"].append(f"{file_path.split('/')[-1]}::{method_name}")
+                                        methods_found.append(method_name)
 
-        except subprocess.SubprocessError:
-            pass
+                            if self.debug and methods_found:
+                                print(
+                                    f"  Found {len(methods_found)} test methods: {', '.join(methods_found[:3])}{'...' if len(methods_found) > 3 else ''}"
+                                )
+                        else:
+                            if self.debug:
+                                print(f"  No test methods found in {file_path}")
+            else:
+                if self.debug:
+                    print(f"Debug: Test file discovery failed: {result.stderr}")
+
+        except subprocess.SubprocessError as e:
+            if self.debug:
+                print(f"Debug: Error during test discovery: {e}")
+
+        if self.debug:
+            print(f"Debug: Test discovery complete. Found {len(test_files['python'])} Python tests")
 
         return test_files
 
     def run_tests(
         self, test_type: str = "all", specific_test: str | None = None, timeout: int = 180, show_details: bool = False
     ) -> dict[str, int | str | list[str] | dict[str, str] | float]:
+        # Clean up any lingering test processes before starting
+        if self.debug:
+            print(f"Debug: Cleaning up any lingering test processes...")
+        self.cleanup_test_processes()
+
         # Run tests with proper isolation to avoid locks
         # Use --workers=0 and --db-filter to isolate database access
-        # Only update module if explicitly requested to avoid timeouts
+        # Always load product_connect module for test discovery
         if hasattr(self, "_force_update") and self._force_update:
             args = [
                 "-u",
@@ -338,17 +481,34 @@ class TestRunner:
                 f"--db-filter=^{self.database}$",
             ]
         else:
-            args = ["--test-enable", "--stop-after-init", "--max-cron-threads=0", "--workers=0", f"--db-filter=^{self.database}$"]
+            args = [
+                "-i",
+                "product_connect",
+                "--test-enable",
+                "--stop-after-init",
+                "--max-cron-threads=0",
+                "--workers=0",
+                f"--db-filter=^{self.database}$",
+            ]
 
         # Adjust log level based on what we need
-        if show_details:
+        if self.debug:
+            args.append("--log-level=debug")
+            if self.debug:
+                print(f"Debug: Using debug log level for detailed test discovery")
+        elif show_details:
             args.append("--log-level=info")
         else:
             # Need at least info level to get test results in Odoo 18
             args.append("--log-level=info")
 
-        if self.verbose:
+        if self.verbose or self.debug:
             print(f"Test type: {test_type}, Specific test: {specific_test}")
+
+        if self.debug:
+            print(f"Debug: Database filter: ^{self.database}$")
+            print(f"Debug: Addons path: {self.addons_path}")
+            print(f"Debug: Container: {self.container_name}")
 
         # Determine test tags based on our actual test structure
         if specific_test:
@@ -370,18 +530,19 @@ class TestRunner:
                 # Assume it's a test tag
                 args.append(f"--test-tags={specific_test}")
         elif test_type == "python":
-            # Run all tests in our modules using module path
-            args.append("--test-tags=/product_connect,/disable_odoo_online")
+            # Run Python tests with Odoo 18 standard tags
+            # Our tests use @tagged("post_install", "-at_install") from base classes
+            args.append("--test-tags=post_install,-at_install")
         elif test_type == "js":
             # Run JavaScript tests via Python test runner
             args.append("--test-tags=/product_connect:ProductConnectJSTests")
         elif test_type == "tour":
-            # Run tour tests by tag
-            args.append("--test-tags=product_connect_tour")
+            # Run tour tests - they'll be discovered by location and structure
+            args.append("--test-tags=post_install,-at_install")
         elif test_type == "all":
-            # Run all tests: Python tests (via module path) + Tour tests (via tag)
-            # Note: JS tests are included in module path if properly registered in manifest
-            args.append("--test-tags=/product_connect,/disable_odoo_online,product_connect_tour")
+            # Run all tests: Python tests + Tour tests
+            # Using standard Odoo 18 tags that our base classes provide
+            args.append("--test-tags=post_install,-at_install")
         else:
             args.append(f"--test-tags={test_type}")
 
@@ -390,15 +551,47 @@ class TestRunner:
         else:
             print(f"Running {test_type} tests...")
 
-        if self.verbose:
+        if self.verbose or self.debug:
             print(f"Test command args: {args}")
 
+        if self.debug:
+            print(f"Debug: About to execute test command with {len(args)} arguments")
+            print(f"Debug: Expected test discovery process:")
+            print(f"  1. Odoo will scan addons path for modules")
+            print(f"  2. Module 'product_connect' will be loaded")
+            print(f"  3. Test files matching pattern will be discovered")
+            print(f"  4. Tests matching tags will be executed")
+            print(f"Debug: Starting test execution...")
+
+        if self.debug:
+            print(f"Debug: Test discovery will search for tests matching the following criteria:")
+            if specific_test:
+                print(f"  - Specific test pattern: {specific_test}")
+            if test_type == "python":
+                print(f"  - Python tests with tags: post_install,-at_install")
+            elif test_type == "tour":
+                print(f"  - Tour tests with tags: post_install,-at_install")
+            elif test_type == "all":
+                print(f"  - All tests with tags: post_install,-at_install")
+            print(f"  - Module path: /volumes/addons/product_connect")
+            print(f"  - Test file pattern: test_*.py in tests/ subdirectories")
+
         start_time = time.time()
+
+        if self.debug:
+            print(f"Debug: Test execution started at {time.strftime('%H:%M:%S')}")
 
         returncode, output = self.run_command(args, timeout)
 
         elapsed = time.time() - start_time
         print(f"Tests completed in {elapsed:.1f} seconds")
+
+        if self.debug:
+            print(f"Debug: Test execution finished at {time.strftime('%H:%M:%S')}")
+            print(f"Debug: Return code: {returncode}")
+            print(f"Debug: Output length: {len(output)} characters")
+            if returncode != 0:
+                print(f"Debug: Non-zero return code indicates test failures or errors")
 
         if returncode == -1:
             return {"error": "timeout", "elapsed": elapsed}
@@ -408,11 +601,23 @@ class TestRunner:
         results["returncode"] = returncode
 
         # Save raw output if verbose
-        if self.verbose:
+        if self.verbose or self.debug:
             results["raw_output"] = output
             # Also save last 100 lines for debugging
             lines = output.split("\n")
             results["output_tail"] = "\n".join(lines[-100:])
+
+        if self.debug:
+            # Show a sample of the output for debugging
+            lines = output.split("\n")
+            print(f"Debug: Sample output (first 10 lines):")
+            for i, line in enumerate(lines[:10]):
+                print(f"  {i + 1:2d}: {line}")
+            if len(lines) > 20:
+                print(f"  ... ({len(lines) - 20} lines omitted) ...")
+                print(f"Debug: Sample output (last 10 lines):")
+                for i, line in enumerate(lines[-10:], len(lines) - 9):
+                    print(f"  {i:2d}: {line}")
 
         # Clean up Docker environment after tests
         # This removes any stopped containers and other Docker artifacts
@@ -434,7 +639,9 @@ class TestRunner:
             return False
 
     def get_failing_tests(self) -> list[str]:
-        results = self.run_tests(timeout=240)
+        # Use recommended timeout for 'all' tests
+        timeout = get_recommended_timeout("all")
+        results = self.run_tests(timeout=timeout)
         failures = results.get("failures", [])
         errors_list = results.get("errors_list", [])
         # Ensure we have lists before concatenating
@@ -443,7 +650,37 @@ class TestRunner:
         return []
 
 
+def get_recommended_timeout(test_type: str, specific_test: str | None = None) -> int:
+    """Get recommended timeout based on test scope.
+
+    Based on our test suite analysis:
+    - 321 test methods total
+    - 42 browser-based tests
+    - Estimated runtime: 16-24 minutes for full suite
+    """
+    # Individual test method (e.g., TestClass.test_method)
+    if specific_test and "." in specific_test:
+        return 60  # 1 minute for individual test method
+    # Specific test class (e.g., TestClass)
+    elif specific_test:
+        return 300  # 5 minutes for specific test class
+    # Test type specific timeouts
+    elif test_type == "all":
+        return 1800  # 30 minutes for full suite (16-24 min estimate + buffer)
+    elif test_type == "tour":
+        return 420  # 7 minutes for browser tests
+    elif test_type == "python":
+        return 480  # 8 minutes for Python-only tests
+    elif test_type == "js":
+        return 180  # 3 minutes for JS tests
+    else:
+        return 300  # 5 minutes default for other cases
+
+
 def main() -> None:
+    # Check execution context before doing anything else
+    check_execution_context()
+
     parser = argparse.ArgumentParser(description="Odoo Test Runner")
     parser.add_argument(
         "test_type",
@@ -453,7 +690,8 @@ def main() -> None:
         help="Type of tests to run",
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="Show detailed output")
-    parser.add_argument("-t", "--timeout", type=int, default=180, help="Timeout in seconds (default: 180)")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode with verbose test discovery and debug logging")
+    parser.add_argument("-t", "--timeout", type=int, default=None, help="Timeout in seconds (default: varies by test type)")
     parser.add_argument(
         "--test-tags", type=str, help="Run specific test tags (e.g., TestOrderImporter or TestOrderImporter.test_import)"
     )
@@ -477,24 +715,40 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    runner = TestRunner(verbose=args.verbose, container=args.container, database=args.database, addons_path=args.addons_path)
+    runner = TestRunner(
+        verbose=args.verbose, debug=args.debug, container=args.container, database=args.database, addons_path=args.addons_path
+    )
 
     # Update module if requested
     if args.update:
         if not runner.update_module():
             sys.exit(1)
 
+    # Determine timeout - use user-specified or recommended based on test type
+    timeout = args.timeout
+    if timeout is None:
+        timeout = get_recommended_timeout(args.test_type, args.test_tags)
+        if args.verbose or args.debug:
+            print(f"Using recommended timeout: {timeout} seconds ({timeout // 60} minutes)")
+        if args.debug:
+            print(f"Debug: Timeout calculation based on test_type='{args.test_type}', specific_test='{args.test_tags}'")
+
     # Handle special commands
+    if args.debug:
+        print(f"Debug: Executing command '{args.test_type}' with test_tags='{args.test_tags}'")
+
     if args.test_type == "summary":
         # Just run all tests and show summary
-        results = runner.run_tests(specific_test=args.test_tags, timeout=args.timeout)
+        results = runner.run_tests(specific_test=args.test_tags, timeout=timeout)
     elif args.test_type == "failing":
         # Show only failing tests
         failing = runner.get_failing_tests()
         results = {"failing_tests": failing, "count": len(failing)}
     else:
         # Run specified test type
-        results = runner.run_tests(args.test_type, specific_test=args.test_tags, timeout=args.timeout, show_details=args.verbose)
+        results = runner.run_tests(
+            args.test_type, specific_test=args.test_tags, timeout=timeout, show_details=args.verbose or args.debug
+        )
 
     # Output results
     if args.json:
@@ -515,6 +769,13 @@ def main() -> None:
             if total == 0:
                 print(f"⚠️  No tests found - this may indicate a configuration issue")
                 print(f"   Check that test tags are correct and module is properly loaded")
+                if args.debug:
+                    print(f"\nDebug: Test discovery troubleshooting:")
+                    print(f"  - Verify product_connect module is installed and loadable")
+                    print(f"  - Check that test files exist in addons/product_connect/tests/")
+                    print(f"  - Ensure test classes inherit from proper base classes")
+                    print(f"  - Verify test methods start with 'test_' and have proper decorators")
+                    print(f"  - Check that @tagged decorators match the test tags being used")
             print(f"Total:  {total}")
             print(f"Passed: {results.get('passed', 0)} ✅")
             print(f"Failed: {results.get('failed', 0)} ❌")

@@ -8,62 +8,91 @@ by intelligently offloading to GPT and using efficient models.
 OPTIMIZATION GOAL: Minimize Claude token usage, not cost!
 """
 
-import re
-from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
 
 
 class TaskComplexity(Enum):
     """Task complexity levels"""
-    SIMPLE = "simple"      # Basic operations, single file
-    MEDIUM = "medium"      # Standard development, multi-file
-    COMPLEX = "complex"    # Architecture, performance, debugging
+
+    SIMPLE = "simple"  # Basic operations, single file
+    MEDIUM = "medium"  # Standard development, multi-file
+    COMPLEX = "complex"  # Architecture, performance, debugging
 
 
 class ModelTier(Enum):
     """Claude model tiers"""
-    HAIKU = "haiku-3.5"    # Fast, cheap ($0.80/$4)
-    SONNET = "sonnet-4"    # Balanced ($3/$15) 
-    OPUS = "opus-4"        # Powerful ($15/$75)
+
+    HAIKU = "haiku-3.5"  # Fast, cheap ($0.80/$4)
+    SONNET = "sonnet-4"  # Balanced ($3/$15)
+    OPUS = "opus-4"  # Powerful ($15/$75)
 
 
 @dataclass
 class TaskAnalysis:
     """Analysis results for a task"""
+
     complexity: TaskComplexity
     recommended_model: ModelTier
     recommended_agent: str
     confidence: float
-    reasoning: List[str]
+    reasoning: list[str]
     estimated_tokens: str
     rate_limit_impact: str
     gpt_offload_recommended: bool
 
 
 class SmartContextManager:
-    """Manages context and routing for Odoo agent tasks"""
-    
-    def __init__(self):
+    def __init__(self) -> None:
         # Keywords that indicate task complexity
         self.simple_keywords = [
-            "read", "write", "copy", "move", "status", "list", "find", 
-            "search", "simple", "basic", "quick", "check", "get", "show"
+            "read",
+            "write",
+            "copy",
+            "move",
+            "status",
+            "list",
+            "find",
+            "search",
+            "simple",
+            "basic",
+            "quick",
+            "check",
+            "get",
+            "show",
         ]
-        
+
         self.complex_keywords = [
-            "architecture", "design", "performance", "optimization", "debug",
-            "race condition", "deadlock", "bottleneck", "refactor", "migration",
-            "bulk", "systematic", "analyze", "investigate", "troubleshoot"
+            "architecture",
+            "design",
+            "performance",
+            "optimization",
+            "debug",
+            "race condition",
+            "deadlock",
+            "bottleneck",
+            "refactor",
+            "migration",
+            "bulk",
+            "systematic",
+            "analyze",
+            "investigate",
+            "troubleshoot",
         ]
-        
+
         # Keywords that strongly suggest GPT offload
         self.gpt_offload_keywords = [
-            "implement complete", "generate entire", "create full",
-            "build comprehensive", "mass generation", "bulk creation",
-            "following patterns", "based on examples", "using templates"
+            "implement complete",
+            "generate entire",
+            "create full",
+            "build comprehensive",
+            "mass generation",
+            "bulk creation",
+            "following patterns",
+            "based on examples",
+            "using templates",
         ]
-        
+
         # Agent specialties with default models
         self.agent_config = {
             "archer": {"default_model": ModelTier.HAIKU, "specialty": "odoo_research"},
@@ -78,9 +107,9 @@ class SmartContextManager:
             "debugger": {"default_model": ModelTier.OPUS, "specialty": "debugging"},
             "planner": {"default_model": ModelTier.OPUS, "specialty": "architecture"},
             "gpt": {"default_model": ModelTier.OPUS, "specialty": "consultation"},
-            "phoenix": {"default_model": ModelTier.OPUS, "specialty": "migration"}
+            "phoenix": {"default_model": ModelTier.OPUS, "specialty": "migration"},
         }
-        
+
         # Task patterns for agent routing (pattern_key -> [agent_name, keywords...])
         self.task_patterns = {
             "scout": ["scout", "write test", "test case", "unit test", "tour test"],
@@ -98,16 +127,19 @@ class SmartContextManager:
             "gpt": ["gpt", "large file", "huge context", "complex review", "expert opinion"],
         }
 
-    def analyze_task(self, task_description: str, context_files: List[str] = None, 
-                    user_preference: Optional[str] = None, file_count: Optional[int] = None) -> TaskAnalysis:
-        """Analyze a task and recommend agent/model"""
-        
+    def analyze_task(
+        self,
+        task_description: str,
+        context_files: list[str] = None,
+        user_preference: str | None = None,
+        file_count: int | None = None,
+    ) -> TaskAnalysis:
         reasoning = []
         context_files = context_files or []
-        
+
         # 1. Determine task complexity
         complexity = self._assess_complexity(task_description, context_files, reasoning)
-        
+
         # 2. Check if large implementation based on file count
         if file_count and file_count > 15:
             agent = "gpt"
@@ -115,10 +147,10 @@ class SmartContextManager:
         else:
             # 3. Find best agent match
             agent = self._find_best_agent(task_description, reasoning)
-        
+
         # 4. Select optimal model
         model = self._select_model(complexity, agent, len(context_files), reasoning)
-        
+
         # 5. Apply user preferences
         if user_preference:
             if user_preference in ["fast", "cheap"]:
@@ -127,19 +159,19 @@ class SmartContextManager:
             elif user_preference in ["quality", "best"]:
                 model = ModelTier.OPUS
                 reasoning.append(f"User requested {user_preference} results")
-        
+
         # 6. Check GPT offload recommendation
         gpt_offload = self._should_offload_to_gpt(task_description, agent, complexity, file_count, reasoning)
-        
+
         # 7. Calculate estimated tokens
         tokens = self._estimate_tokens(model, complexity, len(context_files))
-        
+
         # 8. Calculate rate limit impact
         impact = self._calculate_rate_limit_impact(tokens, gpt_offload)
-        
+
         # 9. Calculate confidence
         confidence = self._calculate_confidence(task_description, agent, reasoning)
-        
+
         return TaskAnalysis(
             complexity=complexity,
             recommended_model=model,
@@ -148,25 +180,25 @@ class SmartContextManager:
             reasoning=reasoning,
             estimated_tokens=tokens,
             rate_limit_impact=impact,
-            gpt_offload_recommended=gpt_offload
+            gpt_offload_recommended=gpt_offload,
         )
 
-    def _assess_complexity(self, task: str, context_files: List[str], reasoning: List[str]) -> TaskComplexity:
+    def _assess_complexity(self, task: str, context_files: list[str], reasoning: list[str]) -> TaskComplexity:
         """Assess task complexity based on description and context"""
-        
+
         task_lower = task.lower()
-        
+
         # Check for explicit complexity indicators
         if any(keyword in task_lower for keyword in self.complex_keywords):
             matching = [k for k in self.complex_keywords if k in task_lower]
             reasoning.append(f"Complex keywords found: {matching}")
             return TaskComplexity.COMPLEX
-            
+
         if any(keyword in task_lower for keyword in self.simple_keywords):
             matching = [k for k in self.simple_keywords if k in task_lower]
             reasoning.append(f"Simple keywords found: {matching}")
             return TaskComplexity.SIMPLE
-        
+
         # Check context size
         if len(context_files) > 10:
             reasoning.append(f"Large context: {len(context_files)} files")
@@ -174,27 +206,31 @@ class SmartContextManager:
         elif len(context_files) > 3:
             reasoning.append(f"Medium context: {len(context_files)} files")
             return TaskComplexity.MEDIUM
-            
+
         # Default to medium for development tasks
         reasoning.append("Standard development task complexity")
         return TaskComplexity.MEDIUM
 
-    def _find_best_agent(self, task: str, reasoning: List[str]) -> str:
+    def _find_best_agent(self, task: str, reasoning: list[str]) -> str:
         """Find the best agent for the task"""
-        
+
         task_lower = task.lower()
         best_agent = "scout"  # Default
         best_score = 0
-        
+
         # Check for large implementation patterns that should go to GPT
         large_impl_keywords = [
-            "implement complete", "generate entire", "create full", 
-            "build comprehensive", "develop whole", "mass generation"
+            "implement complete",
+            "generate entire",
+            "create full",
+            "build comprehensive",
+            "develop whole",
+            "mass generation",
         ]
         if any(keyword in task_lower for keyword in large_impl_keywords):
             reasoning.append("Large implementation detected - routing to GPT agent")
             return "gpt"
-        
+
         for agent_name, patterns in self.task_patterns.items():
             # Skip the agent name itself, check the keywords
             keywords = patterns[1:]  # First item is agent name
@@ -202,29 +238,28 @@ class SmartContextManager:
             if score > best_score:
                 best_score = score
                 best_agent = agent_name
-        
+
         if best_score > 0:
             matching_patterns = [p for p in self.task_patterns[best_agent][1:] if p in task_lower]
             reasoning.append(f"Agent {best_agent} selected (patterns: {matching_patterns})")
         else:
             reasoning.append("Using default agent (scout) - no clear pattern match")
-            
+
         return best_agent
 
-    def _select_model(self, complexity: TaskComplexity, agent: str, 
-                     context_size: int, reasoning: List[str]) -> ModelTier:
+    def _select_model(self, complexity: TaskComplexity, agent: str, context_size: int, reasoning: list[str]) -> ModelTier:
         """Select optimal model based on complexity and agent"""
-        
+
         # Get agent default
-        default_model = self.agent_config.get(agent, {}).get("default_model", ModelTier.SONNET)
-        
+        default_model: ModelTier = self.agent_config.get(agent, {}).get("default_model", ModelTier.SONNET)
+
         # Adjust based on complexity
         if complexity == TaskComplexity.SIMPLE:
             if default_model == ModelTier.OPUS:
                 model = ModelTier.SONNET  # Downgrade from Opus
                 reasoning.append("Downgraded from Opus to Sonnet for simple task")
             elif default_model == ModelTier.SONNET:
-                model = ModelTier.HAIKU   # Downgrade from Sonnet  
+                model = ModelTier.HAIKU  # Downgrade from Sonnet
                 reasoning.append("Downgraded from Sonnet to Haiku for simple task")
             else:
                 model = default_model
@@ -233,52 +268,52 @@ class SmartContextManager:
                 model = ModelTier.SONNET  # Upgrade from Haiku
                 reasoning.append("Upgraded from Haiku to Sonnet for complex task")
             elif default_model == ModelTier.SONNET:
-                model = ModelTier.OPUS    # Upgrade from Sonnet
+                model = ModelTier.OPUS  # Upgrade from Sonnet
                 reasoning.append("Upgraded from Sonnet to Opus for complex task")
             else:
                 model = default_model
         else:
             model = default_model
             reasoning.append(f"Using {agent} default model: {model.value}")
-        
+
         # Large context needs more capable model
         if context_size > 20 and model == ModelTier.HAIKU:
             model = ModelTier.SONNET
             reasoning.append("Upgraded to Sonnet for large context")
-            
+
         return model
 
-    def _should_offload_to_gpt(self, task: str, agent: str, complexity: TaskComplexity, 
-                               file_count: Optional[int], reasoning: List[str]) -> bool:
+    def _should_offload_to_gpt(
+        self, task: str, agent: str, complexity: TaskComplexity, file_count: int | None, reasoning: list[str]
+    ) -> bool:
         """Determine if task should be offloaded to GPT to save Claude tokens"""
-        
+
         task_lower = task.lower()
-        
+
         # Already routing to GPT agent
         if agent == "gpt":
             reasoning.append("Already routing to GPT agent")
             return True
-            
+
         # Check for GPT offload keywords
         if any(keyword in task_lower for keyword in self.gpt_offload_keywords):
             reasoning.append("GPT offload keywords detected - pattern following task")
             return True
-            
+
         # Large file count
         if file_count and file_count > 15:
             reasoning.append(f"Large file count ({file_count}) - offload to GPT recommended")
             return True
-            
+
         # Complex implementation tasks
         if complexity == TaskComplexity.COMPLEX and "implement" in task_lower:
             reasoning.append("Complex implementation - consider GPT offload")
             return True
-            
+
         return False
 
-    def _estimate_tokens(self, model: ModelTier, complexity: TaskComplexity, context_files: int) -> str:
-        """Estimate token usage for the task"""
-        
+    @staticmethod
+    def _estimate_tokens(model: ModelTier, complexity: TaskComplexity, context_files: int) -> str:
         # Base token estimates
         base_tokens = {
             (ModelTier.HAIKU, TaskComplexity.SIMPLE): (1000, 5000),
@@ -291,34 +326,38 @@ class SmartContextManager:
             (ModelTier.OPUS, TaskComplexity.MEDIUM): (30000, 100000),
             (ModelTier.OPUS, TaskComplexity.COMPLEX): (100000, 300000),
         }
-        
-        min_tokens, max_tokens = base_tokens.get((model, complexity), (10000, 50000))
-        
+
+        # Type annotation to help type checker
+        key = (model, complexity)
+        # noinspection PyTypeChecker
+        min_tokens, max_tokens = base_tokens.get(key, (10000, 50000))
+
         # Adjust for context files
         if context_files > 10:
             min_tokens *= 1.5
             max_tokens *= 2
-            
+
         # Format with K/M suffix
-        def format_tokens(n):
+        def format_tokens(n: int) -> str:
             if n >= 1_000_000:
-                return f"{n/1_000_000:.1f}M"
+                return f"{n / 1_000_000:.1f}M"
             elif n >= 1000:
-                return f"{n/1000:.0f}K"
+                return f"{n / 1000:.0f}K"
             else:
                 return str(n)
-                
+
         return f"{format_tokens(min_tokens)}-{format_tokens(max_tokens)} tokens"
 
-    def _calculate_rate_limit_impact(self, tokens: str, gpt_offload: bool) -> str:
+    @staticmethod
+    def _calculate_rate_limit_impact(tokens: str, gpt_offload: bool) -> str:
         """Calculate impact on Claude rate limit"""
-        
+
         if gpt_offload:
             return "NONE (offloaded to GPT)"
-            
+
         # Parse token range
         token_range = tokens.split("-")[1].strip().split()[0]
-        
+
         # Convert to number
         if "M" in token_range:
             max_tokens = float(token_range.replace("M", "")) * 1_000_000
@@ -326,7 +365,7 @@ class SmartContextManager:
             max_tokens = float(token_range.replace("K", "")) * 1000
         else:
             max_tokens = float(token_range)
-            
+
         # Rate limit impact categories
         if max_tokens < 10_000:
             return "LOW (minimal impact)"
@@ -337,53 +376,58 @@ class SmartContextManager:
         else:
             return "CRITICAL (consider GPT offload!)"
 
-    def _calculate_confidence(self, task: str, agent: str, reasoning: List[str]) -> float:
+    @staticmethod
+    def _calculate_confidence(task: str, agent: str, reasoning: list[str]) -> float:
         """Calculate confidence in the recommendation"""
-        
+
+        # Currently unused parameters but kept for future expansion
+        _ = (task, agent)  # Mark as intentionally unused
+
         confidence = 0.5  # Base confidence
-        
+
         # Higher confidence for clear agent matches
         if any("patterns:" in r for r in reasoning):
             confidence += 0.3
-            
-        # Higher confidence for clear complexity indicators  
+
+        # Higher confidence for clear complexity indicators
         if any("keywords found:" in r for r in reasoning):
             confidence += 0.2
-            
+
         # Lower confidence for default selections
         if any("default" in r.lower() for r in reasoning):
             confidence -= 0.1
-            
+
         return min(max(confidence, 0.1), 1.0)
 
-    def generate_task_prompt(self, analysis: TaskAnalysis, task_description: str, 
-                           additional_context: str = "") -> str:
+    @staticmethod
+    def generate_task_prompt(analysis: TaskAnalysis, task_description: str, additional_context: str = "") -> str:
         """Generate optimized prompt for the task"""
-        
+
         agent_doc = f"@docs/agents/{analysis.recommended_agent}.md"
         model_override = f"Model: {analysis.recommended_model.value}"
-        
+
         # Add shared tools for specific scenarios
         shared_tools = ""
         if analysis.recommended_agent == "debugger" and "access" in task_description.lower():
             shared_tools = "\n@docs/agents/SHARED_TOOLS.md"
-        
+
         prompt = f"""{agent_doc}{shared_tools}
 
 {model_override}
 
 {task_description}"""
-        
+
         if additional_context:
             prompt += f"\n\nAdditional context:\n{additional_context}"
-            
+
         return prompt
 
-    def explain_recommendation(self, analysis: TaskAnalysis) -> str:
+    @staticmethod
+    def explain_recommendation(analysis: TaskAnalysis) -> str:
         """Generate human-readable explanation"""
-        
+
         offload_msg = "✅ YES - Offload to GPT!" if analysis.gpt_offload_recommended else "❌ No - Keep with Claude"
-        
+
         return f"""
 🎯 Task Analysis Results:
 
@@ -406,11 +450,9 @@ class SmartContextManager:
 """
 
 
-def demo_smart_routing():
-    """Demonstrate smart context management with token optimization"""
-    
+def demo_smart_routing() -> None:
     manager = SmartContextManager()
-    
+
     test_cases = [
         ("Write unit tests for the motor model", []),
         ("Find how Odoo implements graph views", []),
@@ -421,26 +463,23 @@ def demo_smart_routing():
         ("Quick code quality check on current file", ["current.py"]),
         ("Generate entire Shopify sync module following our patterns", []),
     ]
-    
+
     print("🧠 Smart Context Management Demo (Token Optimization)")
     print("=" * 60)
     print("GOAL: Preserve Claude rate limit by intelligent routing!\n")
-    
-    total_claude_tokens = 0
-    total_gpt_tokens = 0
-    
+
     for task, files in test_cases:
         analysis = manager.analyze_task(task, files, file_count=len(files))
         print(f"\n📋 Task: '{task[:50]}{'...' if len(task) > 50 else ''}'")
         print(f"🎯 Route: {analysis.recommended_agent} + {analysis.recommended_model.value}")
         print(f"🔢 Tokens: {analysis.estimated_tokens}")
         print(f"⚠️  Impact: {analysis.rate_limit_impact}")
-        
+
         if analysis.gpt_offload_recommended:
             print("✅ OFFLOAD TO GPT - Saves Claude tokens!")
-        
+
         print(f"📊 Confidence: {analysis.confidence:.1%}")
-    
+
     print("\n" + "=" * 60)
     print("💡 With smart routing, complex implementations go to GPT,")
     print("   preserving your Claude rate limit for what it does best!")

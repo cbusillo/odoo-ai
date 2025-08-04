@@ -8,6 +8,7 @@ dependencies = [
     "rich>=13.0.0",
 ]
 
+
 [tool.setuptools]
 packages = []
 

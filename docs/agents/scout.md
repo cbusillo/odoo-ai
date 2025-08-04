@@ -59,10 +59,10 @@ class TestFeature(ProductConnectTransactionCase):
 ## Running Tests
 
 ```bash
-.venv/bin/python tools/test_runner.py          # Quick summary
-.venv/bin/python tools/test_runner.py python   # Python tests only
-.venv/bin/python tools/test_runner.py tour     # Tour tests only
-.venv/bin/python tools/test_runner.py failing  # Show failures
+uv run python tools/test_runner.py          # Quick summary
+uv run python tools/test_runner.py python   # Python tests only
+uv run python tools/test_runner.py tour     # Tour tests only
+uv run python tools/test_runner.py failing  # Show failures
 ```
 
 ## Routing

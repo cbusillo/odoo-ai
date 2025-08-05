@@ -34,8 +34,8 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "psutil", specifier = ">=5.9.0" },
-    { name = "rich", specifier = ">=13.0.0" },
+    { name = "psutil" },
+    { name = "rich" },
 ]
 
 [[package]]

@@ -462,7 +462,9 @@ class UnifiedTestRunner:
             else:
                 cmd.extend(["--test-tags", specific_test])
         elif test_type in ["python", "tour", "all"]:
-            cmd.extend(["--test-tags", "post_install,-at_install"])
+            # Only run product_connect tests by default to avoid permission issues
+            # with other modules' test setup
+            cmd.extend(["--test-tags", "product_connect"])
         else:
             cmd.extend(["--test-tags", test_type])
 
@@ -747,7 +749,7 @@ class UnifiedTestRunner:
         if "product_connect" in output and "tests" in output:
             reasons.append("Module found but no tests discovered - check test file imports")
             reasons.append("Ensure tests/__init__.py imports all test files")
-        
+
         # Default message if no specific reason found
         if not reasons:
             reasons.append("Test discovery failed - check test file naming (test_*.py) and class inheritance")

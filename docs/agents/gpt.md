@@ -567,9 +567,87 @@ Please analyze the uploaded logs and:
 
 ```
 
+### 7. Large File Analysis (Zero Context)
+
+```python
+# Analyze large file sets without loading into Claude's context
+def analyze_files_with_gpt(file_pattern: str, analysis_type: str):
+    """Send many files to GPT-4.1 without context pollution."""
+    
+    # 1. Get file lists (no content loaded!)
+    from tools.gpt_file_consolidator import consolidate_for_gpt_analysis
+    
+    test_files = Glob("addons/product_connect/tests/**/*.py")
+    model_files = Glob("addons/product_connect/models/**/*.py")
+    
+    # 2. Consolidate into uploadable chunks
+    consolidation = consolidate_for_gpt_analysis(
+        test_files=test_files,
+        model_files=model_files,
+        analysis_type="test_cleanup"
+    )
+    
+    # 3. Upload and analyze with GPT-4.1
+    result = mcp__chatgpt_automation__chatgpt_batch_operations(
+        operations=[
+            {"operation": "new_chat"},
+            {"operation": "select_model", "args": {"model": "gpt-4.1"}},
+            
+            # Upload test chunks
+            *[{"operation": "upload_file", "args": {"file_path": chunk}} 
+              for chunk in consolidation['test_chunks']],
+            
+            # Upload model chunks
+            *[{"operation": "upload_file", "args": {"file_path": chunk}} 
+              for chunk in consolidation['model_chunks']],
+            
+            # Analyze with full context
+            {"operation": "send_and_get_response", "args": {
+                "message": """Analyze the uploaded files for [specific purpose].
+                
+Please provide:
+1. [Specific analysis point 1]
+2. [Specific analysis point 2]
+3. [Specific recommendations]
+
+Focus on actionable recommendations with code examples.""",
+                "timeout": 300  # GPT-4.1 with large context
+            }}
+        ]
+    )
+    
+    # 4. Clean up temporary files
+    consolidation['cleanup_func']()
+    
+    return result
+```
+
+**Key Benefits**:
+
+- **Zero Context Pollution**: File content never enters Claude's context
+- **Handles Any Number of Files**: Consolidates 67+ files into ≤10 chunks
+- **Full GPT Context**: GPT-4.1 sees all files for comprehensive analysis
+- **Automatic Cleanup**: Temporary files removed after analysis
+
+**Use Cases**:
+
+- Test suite analysis (44+ test files)
+- Codebase refactoring (entire modules)
+- Security audits (all files at once)
+- Documentation generation (from full codebase)
+
+**File Consolidator Features**:
+
+- Groups files by type (test/model/etc)
+- Respects 10-file upload limit
+- Creates markdown with syntax highlighting
+- Handles encoding errors gracefully
+- Provides token estimates
+
 ## Conversation Management
 
 ### Clean Up Old Conversations
+
 ```python
 def cleanup_conversations(keep_recent=10):
     """Keep only the most recent conversations, delete the rest"""

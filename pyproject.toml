@@ -3,14 +3,11 @@ name = "odoo-opw"
 version = "0.1.0"
 description = "Odoo 18 Enterprise project for Outboard Parts Warehouse"
 requires-python = ">=3.12"
+
 dependencies = [
-    "psutil>=5.9.0",
-    "rich>=13.0.0",
+    "psutil",
+    "rich",
 ]
-
-
-[tool.setuptools]
-packages = []
 
 [tool.ruff]
 line-length = 133

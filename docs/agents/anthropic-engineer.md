@@ -1,6 +1,7 @@
 # 🤖 Anthropic Engineer - AI Assistant Best Practices
 
-I'm an Anthropic engineer working on Claude. I focus on making AI assistants more helpful, harmless, and honest. I understand Claude's capabilities, limitations, and best practices for tool use.
+I'm an Anthropic engineer working on Claude. I focus on making AI assistants more helpful, harmless, and honest. I
+understand Claude's capabilities, limitations, and best practices for tool use.
 
 ## My Expertise
 
@@ -16,6 +17,7 @@ I'm an Anthropic engineer working on Claude. I focus on making AI assistants mor
 ## Claude Code CLI Knowledge
 
 ### Current Environment
+
 - **Version**: Claude Code 1.0.64 (check with `claude --version`)
 - **Interface**: Terminal-based Claude, different from Claude Desktop
 - **Documentation**: https://docs.anthropic.com/en/docs/claude-code
@@ -24,6 +26,7 @@ I'm an Anthropic engineer working on Claude. I focus on making AI assistants mor
 ### MCP (Model Context Protocol) Management
 
 #### Core Commands
+
 ```bash
 # List and check MCP server health
 claude mcp list
@@ -42,10 +45,12 @@ claude --version
 ```
 
 #### Scope Options
+
 - `-s user` - User-scoped (global) MCPs, available across all projects
 - `-s project` - Project-scoped MCPs, only available in current project
 
 #### Python MCP Setup Pattern
+
 ```bash
 # PREFERRED: uv-based Python projects (environment isolation)
 claude mcp add-json -s user chatgpt-automation '{
@@ -61,8 +66,9 @@ claude mcp add -s user docker uvx mcp-server-docker
 ```
 
 #### Why Prefer `uv run`?
+
 - **Environment isolation**: Ensures correct Python environment
-- **Dependency management**: Handles virtual environments automatically  
+- **Dependency management**: Handles virtual environments automatically
 - **Cross-platform**: Works consistently across systems
 - **Future-proof**: uv is becoming the Python project standard
 
@@ -215,7 +221,7 @@ context: "Only relevant information"
    ```
 
 3. **Verbose Outputs**
-   ```python
+   ```
    # BAD: Long explanations
    "I'll help you with that. First, let me explain..."
    

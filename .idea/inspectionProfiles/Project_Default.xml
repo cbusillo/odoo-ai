@@ -3,6 +3,7 @@
     <option name="myName" value="Project Default" />
     <option name="scopesOrder">
       <list>
+        <option value="Temp" />
         <option value="Docs" />
         <option value="Conf" />
         <option value="All Changed Files" />
@@ -22,7 +23,23 @@
     </inspection_tool>
     <inspection_tool class="PyArgumentEqualDefaultInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true" />
     <inspection_tool class="PyAugmentAssignmentInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true" />
+    <inspection_tool class="PyBroadExceptionInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true">
+      <scope name="Docs" level="WEAK WARNING" enabled="false" />
+    </inspection_tool>
+    <inspection_tool class="PyCallingNonCallableInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <scope name="Docs" level="WARNING" enabled="false" />
+    </inspection_tool>
     <inspection_tool class="PyCompatibilityInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <scope name="Docs" level="WARNING" enabled="false">
+        <option name="ourVersions">
+          <value>
+            <list size="2">
+              <item index="0" class="java.lang.String" itemvalue="2.7" />
+              <item index="1" class="java.lang.String" itemvalue="3.14" />
+            </list>
+          </value>
+        </option>
+      </scope>
       <option name="ourVersions">
         <value>
           <list size="3">
@@ -33,6 +50,9 @@
         </value>
       </option>
     </inspection_tool>
+    <inspection_tool class="PyInconsistentReturnsInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true">
+      <scope name="Docs" level="WEAK WARNING" enabled="false" />
+    </inspection_tool>
     <inspection_tool class="PyMissingTypeHintsInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true">
       <scope name="Docs" level="WEAK WARNING" enabled="false">
         <option name="m_onlyWhenTypesAreKnown" value="false" />
@@ -42,19 +62,27 @@
     <inspection_tool class="PyRedeclarationInspection" enabled="true" level="WARNING" enabled_by_default="true">
       <scope name="Docs" level="WARNING" enabled="false" />
     </inspection_tool>
+    <inspection_tool class="PyStatementEffectInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <scope name="Docs" level="WARNING" enabled="false" />
+    </inspection_tool>
+    <inspection_tool class="PyTypeCheckerInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <scope name="Docs" level="WARNING" enabled="false" />
+    </inspection_tool>
+    <inspection_tool class="PyUnreachableCodeInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <scope name="Docs" level="WARNING" enabled="false" />
+    </inspection_tool>
     <inspection_tool class="PyUnresolvedReferencesInspection" enabled="true" level="WARNING" enabled_by_default="true">
       <scope name="Docs" level="WARNING" enabled="false" />
     </inspection_tool>
     <inspection_tool class="PyUnusedLocalInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true">
       <scope name="Docs" level="WEAK WARNING" enabled="false" />
     </inspection_tool>
-    <inspection_tool class="PyTypeCheckerInspection" enabled="true" level="WARNING" enabled_by_default="true">
-      <scope name="Docs" level="WARNING" enabled="false" />
-    </inspection_tool>
-    <inspection_tool class="PyCallingNonCallableInspection" enabled="true" level="WARNING" enabled_by_default="true">
-      <scope name="Docs" level="WARNING" enabled="false" />
-    </inspection_tool>
     <inspection_tool class="SpellCheckingInspection" enabled="true" level="TYPO" enabled_by_default="true">
+      <scope name="Temp" level="TYPO" enabled="false">
+        <option name="processCode" value="true" />
+        <option name="processLiterals" value="true" />
+        <option name="processComments" value="true" />
+      </scope>
       <scope name="Conf" level="TYPO" enabled="false">
         <option name="processCode" value="true" />
         <option name="processLiterals" value="true" />

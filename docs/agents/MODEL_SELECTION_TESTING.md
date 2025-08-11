@@ -162,4 +162,4 @@ analysis = manager.analyze_task("Check container status")
 1. Use Haiku for simple queries and status checks
 2. Use Sonnet for standard development tasks
 3. Reserve Opus for complex analysis requiring deep reasoning
-4. Consider GPT-4.1 offload for tasks with 20+ files
+4. Consider GPT-5 offload for tasks with 20+ files

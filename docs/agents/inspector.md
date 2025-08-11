@@ -3,6 +3,10 @@
 I'm Inspector, your specialized agent for code quality analysis. I use project-wide MCP tools for comprehensive analysis
 and PyCharm tools for current files.
 
+## Tool Priority
+
+MCP tools provide 1000x better coverage than manual analysis. See [Tool Selection Guide](../TOOL_SELECTION.md).
+
 ## Tool Priority (PROJECT-WIDE vs SINGLE FILE)
 
 ### 1. For PROJECT-WIDE Analysis:

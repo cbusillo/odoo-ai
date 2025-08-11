@@ -18,7 +18,7 @@ I'm Playwright, your specialized agent for browser automation and UI testing. I 
 - `mcp__playwright__browser_wait_for` - Wait conditions
 
 ### Tour Tests
-- `mcp__odoo-intelligence__test_runner` - Run Odoo tours
+- `.venv/bin/python tools/test_runner.py tour` via Bash - Run Odoo tours
 - Use with Scout agent for tour test writing
 
 ## Common Patterns
@@ -26,10 +26,7 @@ I'm Playwright, your specialized agent for browser automation and UI testing. I 
 ### Debug Failed Tour
 ```python
 # 1. Run tour test
-test_result = mcp__odoo-intelligence__test_runner(
-    module="product_connect",
-    test_class="TestProductTour"
-)
+test_result = Bash(".venv/bin/python tools/test_runner.py tour --test-tags TestProductTour")
 
 # 2. Debug if failed
 mcp__playwright__browser_navigate(url="http://localhost:8069/odoo")

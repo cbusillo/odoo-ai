@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "odoo-opw"
 version = "0.1.0"
@@ -7,7 +11,33 @@ requires-python = ">=3.12"
 dependencies = [
     "psutil",
     "rich",
+    "click>=8.1.0",
+    "tomli>=2.0.0",
 ]
+
+[tool.setuptools.packages.find]
+include = ["tools*"]
+exclude = ["addons*", "tmp*", "docker*", "patches*"]
+
+[project.scripts]
+# Core test commands
+test-unit = "tools.test_commands:run_unit_tests"
+test-integration = "tools.test_commands:run_integration_tests"
+test-tour = "tools.test_commands:run_tour_tests"
+test-all = "tools.test_commands:run_all_tests"
+test-quick = "tools.test_commands:run_quick_tests"
+test-stats = "tools.test_commands:show_test_stats"
+
+[tool.odoo-test.timeouts]
+unit = 180          # 3 minutes
+integration = 600   # 10 minutes  
+tour = 1800        # 30 minutes
+default = 300      # 5 minutes
+
+[tool.odoo-test.parallel]
+enabled = true
+workers = 4
+scope = "class"    # Run test classes in parallel
 
 [tool.ruff]
 line-length = 133

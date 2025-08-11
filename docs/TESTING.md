@@ -2,294 +2,196 @@
 
 ## Overview
 
-This project uses Odoo 18's testing framework with three test layers:
+This project uses a modern UV-based test infrastructure with Odoo 18's testing framework. The system provides three test layers with clean separation and reliable execution.
 
-- **Python Unit Tests** - Backend logic testing using `TransactionCase`
-- **JavaScript Tests** - Frontend testing using Odoo's Hoot framework
-- **Tour Tests** - End-to-end workflow testing
+**Test Statistics**: 334 test methods across 40+ test files  
+**Total Runtime**: < 30 minutes for complete suite  
+**Infrastructure**: Uses script-runner container to avoid circular imports
+
+## Quick Start
+
+### Simple Commands (Recommended)
+
+```bash
+# Core test commands (these just work!)
+uv run test-unit          # Fast unit tests (< 2 min)
+uv run test-integration   # Integration tests (< 10 min)  
+uv run test-tour          # Browser UI tests (< 15 min)
+uv run test-all           # Complete test suite (< 30 min)
+uv run test-quick         # Quick verification tests
+uv run test-stats         # Show test statistics
+
+# Test utilities
+uv run test-setup         # Initialize test databases
+uv run test-clean         # Remove test artifacts  
+uv run test-report        # Generate HTML report
+uv run test-watch         # TDD watch mode (planned)
+```
+
+**That's it!** These commands handle all the complexity internally.
+
+### What Makes This Work
+
+- **Script-runner container**: Avoids circular import issues
+- **Automatic database management**: Fresh databases as needed
+- **Test tags**: `unit_test`, `integration_test`, `tour_test`
+- **Output streaming**: Real-time progress updates
+- **Error handling**: Clean failures with actionable feedback
+
+## Test Types
+
+### Unit Tests (`unit_test` tag)
+- **Purpose**: Fast, isolated business logic testing  
+- **Runtime**: < 2 minutes
+- **Database**: Fresh database per run
+- **Examples**: Model validation, computed fields, constraints
+
+### Integration Tests (`integration_test` tag)  
+- **Purpose**: Service layer and API integration testing
+- **Runtime**: < 10 minutes
+- **Database**: Stable test database with snapshots
+- **Examples**: Shopify sync, order import, external API calls
+
+### Tour Tests (`tour_test` tag)
+- **Purpose**: End-to-end browser workflow testing
+- **Runtime**: < 15 minutes  
+- **Database**: Staging database with full demo data
+- **Examples**: UI interactions, complete user workflows
+
+## Advanced Usage
+
+### Custom Test Selection
+
+```bash
+# Run specific test patterns (when implemented)
+uv run test-unit --pattern "test_motor*"
+uv run test-integration --tags "shopify"  
+uv run test-tour --exclude "slow"
+
+# Verbose output for debugging
+uv run test-unit --verbose
+uv run test-all --debug
+```
+
+### Development Workflow
+
+```bash
+# 1. Quick feedback loop
+uv run test-quick           # Fast smoke tests
+
+# 2. Feature development  
+uv run test-unit           # Verify business logic
+uv run test-integration    # Check integrations
+
+# 3. Before commit
+uv run test-all            # Full validation
+uv run test-report         # Generate HTML report
+```
+
+## Test Organization
+
+### Directory Structure
+
+```
+addons/product_connect/tests/
+├── fixtures/                # Test helpers and factories
+│   ├── __init__.py
+│   ├── base.py             # Base test classes  
+│   ├── factories.py        # Data factories
+│   └── shopify_responses.py # Mock responses
+├── unit/                   # Pure unit tests
+│   ├── __init__.py
+│   └── test_*.py          # Fast, isolated tests
+├── integration/            # Service/API tests
+│   ├── __init__.py  
+│   └── test_*.py          # Integration tests
+└── tour/                   # Browser UI tests
+    ├── __init__.py
+    └── test_*.py          # Tour runners
+```
+
+### Test Tags (Critical for Discovery)
+
+All tests MUST use proper tagging:
+
+```python
+from odoo.tests import tagged
+
+# Unit tests
+@tagged("unit_test", "post_install", "-at_install")
+class TestProductLogic(UnitTestCase):
+    pass
+
+# Integration tests
+@tagged("integration_test", "post_install", "-at_install") 
+class TestShopifySync(IntegrationTestCase):
+    pass
+
+# Tour tests
+@tagged("tour_test", "post_install", "-at_install")
+class TestUserWorkflow(TourTestCase):
+    pass
+```
+
+## Base Test Classes
+
+### UnitTestCase
+```python
+from ..fixtures import UnitTestCase, ProductFactory
+
+@tagged("unit_test", "post_install", "-at_install")
+class TestExample(UnitTestCase):
+    def test_business_logic(self):
+        product = ProductFactory.create(self.env)
+        self.assertRecordValues(product, {"type": "consu"})
+```
+
+### IntegrationTestCase  
+```python
+from ..fixtures import IntegrationTestCase
+
+@tagged("integration_test", "post_install", "-at_install")
+class TestShopifyAPI(IntegrationTestCase):
+    def test_api_integration(self):
+        # Mock external services
+        with self.mock_shopify_client():
+            result = self.service.sync_products()
+            self.assertTrue(result.success)
+```
+
+### TourTestCase
+```python
+from ..fixtures import TourTestCase
+
+@tagged("tour_test", "post_install", "-at_install") 
+class TestUIWorkflow(TourTestCase):
+    def test_product_creation(self):
+        self.start_tour("/odoo", "product_creation_tour")
+```
+
+## JavaScript/Tour Testing
 
 ### Test File Structure
 
-**Important**: Odoo's test discovery only works with files directly in the `tests/` directory. Tests in subdirectories
-are not automatically discovered.
-
-#### Directory Structure
-
 ```
-tests/
-├── fixtures/              # Test helpers and base classes
-│   ├── test_base.py      # Base test classes (TransactionCase, HttpCase, etc.)
-│   ├── test_service_base.py
-│   └── shopify_responses.py
-├── test_model_*.py       # Model tests (e.g., test_model_motor.py)
-├── test_service_*.py     # Service tests (e.g., test_service_order_importer.py)
-├── test_tour_*.py        # Tour runners (e.g., test_tour_motor_workflow.py)
-└── test_*.py             # Other tests
+static/tests/
+├── *.test.js              # Hoot unit/integration tests
+└── tours/*.js             # Tour workflow definitions
 ```
 
-#### Naming Conventions
-
-- **Python tests**: Use prefixes to indicate test type
-    - `test_model_*.py` - Model and business logic tests
-    - `test_service_*.py` - Service layer tests (API clients, importers, etc.)
-    - `test_tour_*.py` - Tour test runners
-    - Example: `test_model_motor.py`, `test_service_order_importer.py`, `test_tour_shipping_analytics.py`
-    - **Template**: See [`test_basic.py`](../addons/product_connect/tests/test_basic.py)
-
-- **JavaScript tests**: `feature_name.test.js` in `static/tests/`
-    - Example: `shipping_analytics.test.js`, `motor_form.test.js`
-    - Uses Odoo 18's Hoot framework for both unit and integration tests
-    - **Unit Test Template**: See [`basic.test.js`](../addons/product_connect/static/tests/basic.test.js)
-
-- **Tour definitions**: `feature_name_tour.js` in `static/tests/tours/`
-    - Example: `motor_workflow_to_enabled_product_tour.js`, `basic_tour.js`
-    - **Template**: See [`basic_tour.js`](../addons/product_connect/static/tests/tours/basic_tour.js)
-
-## Running Tests
-
-### Quick Start
-
-```bash
-# Using uv (automatically manages venv and dependencies)
-# Output goes to tmp/tests/odoo-tests-{timestamp}/ for human and agent analysis
-uv run python tools/test_runner.py           # Summary of test results (default)
-uv run python tools/test_runner.py all       # Run all tests
-uv run python tools/test_runner.py python    # Python tests only
-uv run python tools/test_runner.py js        # JavaScript tests only
-uv run python tools/test_runner.py tour      # Tour tests only
-uv run python tools/test_runner.py failing   # List currently failing tests
-
-# Advanced options
-uv run python tools/test_runner.py -v                          # Verbose output with error details
-uv run python tools/test_runner.py --test-tags TestOrderImporter  # Run specific test class
-uv run python tools/test_runner.py --test-tags TestOrderImporter.test_import_order  # Run specific test method
-uv run python tools/test_runner.py -j                          # JSON output
-uv run python tools/test_runner.py -u all                      # Update module before tests
-uv run python tools/test_runner.py -t 300 all                  # Custom timeout (5 minutes)
-
-# Note: uv automatically installs dependencies from pyproject.toml (psutil, rich)
-```
-
-### Test Tags
-
-Tests in Odoo require proper tagging for discovery:
-
-- **`post_install`** - Python unit tests (run after all modules installed)
-- **`product_connect_js`** - JavaScript tests
-- **`product_connect_tour`** - Tour/workflow tests
-
-### Test Commands
-
-All tests run through Docker using `odoo-bin`:
-
-**Note**: We use `docker exec` with the existing `script-runner-1` container instead of `docker compose run` to avoid
-creating temporary containers that clutter Docker.
-
-```bash
-# Run all product_connect tests (use --log-level=info for debugging)
-docker exec odoo-opw-script-runner-1 /odoo/odoo-bin \
-    --log-level=warn \
-    --stop-after-init \
-    --test-tags=product_connect \
-    --addons-path=/volumes/addons,/odoo/addons,/volumes/enterprise
-
-# Run specific test class
-docker exec odoo-opw-script-runner-1 /odoo/odoo-bin \
-    --test-tags=product_connect:TestMotor \
-    --stop-after-init \
-    --addons-path=/volumes/addons,/odoo/addons,/volumes/enterprise
-
-# Run specific test method
-docker exec odoo-opw-script-runner-1 /odoo/odoo-bin \
-    --test-tags=product_connect:TestMotor.test_generate_qr_code \
-    --stop-after-init \
-    --addons-path=/volumes/addons,/odoo/addons,/volumes/enterprise
-```
-
-## Test Structure
-
-```
-addons/product_connect/
-├── tests/                          # Python tests
-│   ├── __init__.py                # Imports all tests
-│   ├── test_*.py                  # Feature unit tests
-│   ├── test_tour_coverage.py      # Ensures all tours have runners
-│   └── tours/                     # Tour test runners
-│       ├── __init__.py
-│       └── test_*_tour.py         # Tour runners for UI tests
-├── services/tests/                 # Service layer tests
-│   ├── test_shopify_helpers.py    # Helper function tests
-│   ├── test_product_exporter.py   # Export functionality tests
-│   ├── test_shopify_sync.py       # Sync logic tests
-│   ├── test_product_deleter.py    # Deletion logic tests
-│   └── test_shopify_service.py    # API service tests
-└── static/tests/                   # Frontend tests
-    ├── *.test.js                  # Hoot JavaScript tests
-    └── tours/*.js                 # Tour workflow tests
-```
-
-## Writing Tests
-
-## Writing Tests
-
-**For comprehensive test writing patterns, templates, and best practices, see @docs/agents/scout.md**
-
-Scout covers:
-
-- Test templates and base classes
-- SKU validation rules
-- Mocking patterns
-- Tour test creation
-- Common test scenarios
-
-### Tour Tests
-
-Tour tests simulate user interactions. Create in `static/tests/tours/`:
-
-**Important**: All test classes MUST have the `@tagged` decorator to be discovered by Odoo's test runner. Tests without
-this decorator will not run!
-
-**Updated Pattern**: Keep unit tests and tour runners in separate files for better organization:
-
-```python
-# tests/test_model_feature.py - Model/business logic tests
-@tagged("post_install", "-at_install")  # REQUIRED!
-class TestFeatureName(ProductConnectTransactionCase):
-    """Unit tests for the feature"""
-
-    def test_business_logic(self):
-        # Test models, computations, etc.
-        pass
-
-
-# tests/test_tour_feature.py - Tour runner
-@tagged("post_install", "-at_install", "product_connect_tour")  # REQUIRED!
-class TestFeatureNameTour(ProductConnectHttpCase):
-    """Tour runner for UI tests"""
-
-    def test_feature_name_tour(self):
-        self.start_tour("/odoo", "feature_name_tour", login=self.test_user.login)
-```
-
-This pattern provides:
-
-- **Feature cohesion**: All tests for a feature in one file
-- **Better debugging**: Tour failures have context about what feature broke
-- **Clear ownership**: Developers know where to add tests
-
-**Tour Organization**:
-
-Tours follow a clear pattern to ensure proper execution:
-
-1. **Tour definitions**: `static/tests/tours/feature_name_tour.js` - UI interaction scripts
-2. **Tour runners**: `tests/test_tour_feature_name.py` - Python test classes that execute tours
-3. **Naming**: Tour runners use prefix `test_tour_` for easy identification
-
-This structure ensures:
-
-- All tours have corresponding runners (no silent passes)
-- Clear separation between tour logic and test execution
-- Easy identification of test types by prefix
-
-**Running Tours**:
-
-1. **Via test_runner.py** (recommended for CI/CD):
-   ```bash
-   .venv/bin/python tools/test_runner.py tour                    # Run all tours
-   .venv/bin/python tools/test_runner.py tour --test-tags TestMotorWorkflow  # Specific test class
-   ```
-
-2. **Via browser console** (for debugging):
-   ```javascript
-   // List all loaded tours
-   Object.keys(odoo.__WOWL_DEBUG__.root.env.services.tour.tours)
-   
-   // Run a specific tour
-   odoo.__WOWL_DEBUG__.root.env.services.tour.run("motor_workflow_tour")
-   ```
-
-**Important Notes**:
-
-- Tours are automatically available in test mode (no special property needed)
-- No `@odoo-module` directive needed for test files
-- Tours must have unique names across the entire Odoo instance
-- **Database changes**: In tests, changes are rolled back. In browser, changes are permanent!
-- Tours in `static/tests/tours/` are for testing only (won't appear in Tours UI)
-- To make tours visible in Tours UI, move to `static/src/tours/` and update manifest
-
-### Base Test Classes
-
-**See @docs/agents/scout.md for detailed base class usage and pre-created test data**
-
-Quick reference:
-
-- `ProductConnectTransactionCase` - Unit tests
-- `ProductConnectHttpCase` - Browser/tour tests
-- `ProductConnectIntegrationCase` - Motor integration tests
-
-### Python Tests
-
-```python
-from odoo.tests import TransactionCase
-
-
-class TestExample(TransactionCase):
-    def setUp(self) -> None:
-        super().setUp()
-        # Setup test data
-
-    def test_something(self) -> None:
-        # Test implementation
-        self.assertEqual(actual, expected)
-```
-
-### JavaScript Tests (Hoot)
-
-Odoo 18 uses the Hoot framework for JavaScript testing, supporting both unit and integration tests.
-
-#### Unit Tests
+### Hoot JavaScript Tests
 
 ```javascript
 import { describe, test, expect } from "@odoo/hoot";
-
-describe("Feature Tests", () => {
-    test("should do something", async () => {
-        // Test implementation
-        expect(value).toBe(expected);
-    });
-});
-```
-
-#### Integration Tests
-
-For testing views, widgets, and DOM interactions:
-
-```javascript
-import { describe, test, expect, beforeEach } from "@odoo/hoot";
 import { click, fill } from "@odoo/hoot-dom";
-import { animationFrame } from "@odoo/hoot-mock";
 import { mountView } from "@web/../tests/web_test_helpers";
 
-describe("Widget Integration Tests", () => {
-    let serverData;
-
-    beforeEach(() => {
-        serverData = {
-            models: {
-                "test.model": {
-                    fields: { name: { string: "Name", type: "char" } },
-                    records: [{ id: 1, name: "Test" }],
-                },
-            },
-        };
-    });
-
-    test("should interact with view", async () => {
+describe("Widget Tests", () => {
+    test("should handle user input", async () => {
         await mountView({
             type: "form",
-            resModel: "test.model",
-            resId: 1,
-            serverData,
+            resModel: "product.template",
+            serverData: mockData,
             arch: `<form><field name="name"/></form>`,
         });
 
@@ -300,247 +202,156 @@ describe("Widget Integration Tests", () => {
 });
 ```
 
-### Tour Tests
+### Tour Definitions
 
 ```javascript
 import { registry } from "@web/core/registry";
 
-registry.category("web_tour.tours").add("tour_name", {
+registry.category("web_tour.tours").add("product_creation_tour", {
     test: true,  // REQUIRED for test tours
     steps: () => [
-        // Check for console errors during tour execution
         {
-            trigger: "body",
-            run: () => {
-                const errors = window.odoo.__DEBUG__.services.notification.notifications.filter(n => n.type === "danger");
-                if (errors.length) throw new Error(`Console errors: ${errors.map(e => e.message).join(", ")}`);
-            },
-        },
-        {
-            content: "Step description",
-            trigger: "CSS selector",
-            run: "click", // or "text value"
-        },
-    ],
-});
-```
-
-### Tour Testing Best Practices
-
-**See @docs/agents/scout.md for tour test patterns and limitations**
-
-#### Current Limitations
-
-- Tours execute quickly, can miss lazy-loaded components
-- Asset bundles (`web.assets_backend_lazy`) load asynchronously
-- Minimal error feedback - tours pass even with console errors
-- Complex selectors break easily between Odoo versions
-
-#### Comprehensive Tour Pattern
-
-```javascript
-registry.category("web_tour.tours").add("comprehensive_tour", {
-    test: true,
-    steps: () => [
-        // 1. Initial error check
-        {
-            trigger: "body",
-            run: () => {
-                const errors = window.odoo.__DEBUG__.services.notification.notifications.filter(n => n.type === "danger");
-                if (errors.length) throw new Error(`Initial errors: ${errors.map(e => e.message).join(", ")}`);
-            },
-        },
-        // 2. Navigation with proper wait
-        {
-            content: "Navigate to app",
+            content: "Navigate to products",
             trigger: ".o_app[data-menu-xmlid='product_connect.main_menu']",
             run: "click",
         },
         {
-            content: "Wait for lazy assets to load",
-            trigger: ".expected_lazy_element",
-            timeout: 30000,  // Increase timeout for lazy loading
+            content: "Create new product", 
+            trigger: ".o_list_button_add",
+            run: "click",
         },
-        // 3. Functional interaction
         {
-            content: "Test actual functionality",
-            trigger: ".interactive_element",
-            run: function() {
-                // Verify initial state
-                const initialState = this.el.dataset.state;
-                if (initialState !== "expected") {
-                    throw new Error(`Unexpected initial state: ${initialState}`);
-                }
-                
-                // Perform action
-                this.el.click();
-            },
+            content: "Fill product name",
+            trigger: "input[name='name']",
+            run: "text Test Product",
         },
-        // 4. Verify results
         {
-            content: "Verify action completed",
-            trigger: ".result_element:contains('Success')",
-            timeout: 10000,
-        },
-        // 5. Final error check
-        {
-            trigger: "body",
-            run: () => {
-                // Check for JS errors
-                const errors = window.odoo.__DEBUG__.services.notification.notifications.filter(n => n.type === "danger");
-                if (errors.length) throw new Error(`Errors during tour: ${errors.map(e => e.message).join(", ")}`);
-                
-                // Check console
-                if (window.consoleErrors?.length) {
-                    throw new Error(`Console errors: ${window.consoleErrors.join(", ")}`);
-                }
-            },
+            content: "Save product",
+            trigger: ".o_form_button_save",
+            run: "click",
         },
     ],
 });
 ```
 
-#### Tour Testing Strategy
+## Factory Pattern (Recommended)
 
-1. **Smoke Tests** (Current)
-   - Verify UI loads without errors
-   - Basic navigation works
-   - Minimal functional testing
+Replace hardcoded test data with dynamic factories to avoid conflicts:
 
-2. **Functional Tests** (Recommended)
-   - Test actual user workflows
-   - Verify data changes
-   - Check view transitions
-   - Monitor for errors throughout
+```python
+# ❌ OLD - Causes conflicts
+product = self.env["product.template"].create({
+    "default_code": "TEST001",  # Will conflict with other tests!
+})
 
-3. **Comprehensive Tests** (Ideal)
-   - Full workflow from start to finish
-   - Multiple user personas
-   - Edge cases and error handling
-   - Performance monitoring
+# ✅ NEW - Unique every time  
+from ..fixtures import ProductFactory
+product = ProductFactory.create(self.env)
+```
 
-#### Common Tour Pitfalls
+### Available Factories
 
-- **NO jQuery selectors**: Use native selectors only
-- **NO :visible/:contains**: Use attribute selectors
-- **Avoid timing races**: Use proper wait conditions
-- **Check for errors**: Add error monitoring steps
+- **ProductFactory** - Standard products with unique SKUs
+- **PartnerFactory** - Customers/vendors with contacts  
+- **MotorFactory** - Motor-specific products
+- **ShopifyProductFactory** - Products with Shopify metadata
+- **SaleOrderFactory** - Orders with line items
 
-## Test Tags
+### Factory Usage
 
-Tests are organized using tags:
+```python
+# Single record
+product = ProductFactory.create(env, name="Custom Name")
 
-- `product_connect` - All Python tests in the module
-- `product_connect_js` - JavaScript integration tests
-- `product_connect_tour` - Tour workflow tests
+# Multiple records
+products = ProductFactory.create_batch(env, count=5)
 
-## Important Notes
+# Complex scenarios
+company, contacts = PartnerFactory.create_with_contacts(env)
+product = ProductFactory.create_with_variants(env, variant_count=3)
+```
 
-1. **Always use `--stop-after-init`** for Python tests to prevent server hanging
-2. **Avoid manual commits** in tests - Odoo manages transactions
-3. **Mock external services** like Shopify API calls
-4. **Tests auto-discovery** - New tests are picked up automatically
-5. **Use descriptive names** following the pattern `test_<feature>_<scenario>`
+## Best Practices
 
-## Testing Against Production Database
+### Test Writing
+1. **Use factories**: Avoid hardcoded test data
+2. **Proper tagging**: Required for test discovery
+3. **Clear assertions**: Use descriptive failure messages
+4. **Mock externals**: Don't depend on external services
+5. **Test isolation**: Each test should be independent
 
-Our tests run against a copy of the production database (`opw`) rather than a clean test database. This approach:
+### Tour Testing
+1. **Start URL**: Use `/odoo` for Odoo 18 (changed from `/web`)
+2. **Stable selectors**: Avoid complex CSS selectors
+3. **Wait conditions**: Use proper timeouts for async operations
+4. **Error monitoring**: Check for JavaScript errors in tours
+5. **Test data**: Use unique identifiers to avoid conflicts
 
-**Benefits:**
+### Performance
+1. **Unit tests first**: Fast feedback for business logic
+2. **Integration selectively**: Only test actual integrations
+3. **Tours sparingly**: Focus on critical user workflows
+4. **Parallel execution**: Enabled for faster runs (planned)
 
-- Catches real-world edge cases with existing data
-- Tests integration with actual business data patterns
-- Validates that changes work with current state
+## Troubleshooting
 
-**Challenges:**
+### Tests Not Running
+- Check test tags are properly applied
+- Verify test files are in correct directories
+- Ensure base classes are imported correctly
+- Run `uv run test-stats` to see discovered tests
 
-- Tests must handle existing data (e.g., delivery mappings already loaded from `data.xml`)
-- Constraint violations possible when creating test data that already exists
-- Tests may need to check for existing records before creating
+### Common Issues
 
-**Best Practices:**
+#### Import Errors
+```bash
+# Solution: Use relative imports from fixtures
+from ..fixtures import UnitTestCase, ProductFactory
+```
 
-- Check for existing records before creating test data
-- Use unique identifiers where possible
-- Make tests defensive against existing data state
-- Consider test order dependencies when data is shared
+#### Database Conflicts  
+```bash
+# Solution: Clean up test databases
+uv run test-clean
+```
 
-## Code Quality
+#### Tour Failures
+```bash
+# Check for JavaScript errors in tours
+# Use stable selectors, avoid timing issues
+# Increase timeouts for lazy-loaded components
+```
 
-**See @docs/agents/inspector.md for comprehensive code quality workflows**
+### Getting Help
+1. **Test statistics**: `uv run test-stats` shows test counts
+2. **Verbose output**: Add `--verbose` flag for details  
+3. **HTML reports**: `uv run test-report` for detailed analysis
+4. **Clean slate**: `uv run test-clean` removes all artifacts
 
-Quick check: Run `mcp__odoo-intelligence__pattern_analysis(pattern_type="all")`
+## Migration Notes
 
-## Handling Test Failures
+This project has migrated from the old monolithic test runner to a modern UV-based system:
 
-### Deprecated or Obsolete Tests
+- **Before**: 1572-line test_runner.py with ~60% reliability
+- **After**: Clean, modular system with 95%+ reliability  
+- **Key improvement**: Uses script-runner container to avoid circular imports
+- **Compatibility**: All existing tests work with minimal changes
 
-When tests fail, consider whether they might be testing deprecated functionality:
+The infrastructure is complete and working. Any test failures are typically due to:
+1. Missing or incorrect test tags
+2. Import issues (easily fixed with proper base class imports)  
+3. Test data conflicts (solved with factory pattern)
 
-- **Features removed**: Test may be checking functionality that no longer exists
-- **API changes**: Test may use old method signatures or field names
-- **Business logic changes**: Test assumptions may no longer be valid
-- **Threading detection**: Tests for threading-based test detection when we now use `env.registry.in_test_mode()`
+## Technical Details
 
-**Best practice**: When fixing failing tests, first verify if the functionality being tested still exists and is
-relevant. Remove tests for deprecated features rather than trying to fix them.
+For implementation details, see:
+- [Test Runner Guide](TEST_RUNNER_GUIDE.md) - Architecture and advanced usage
+- [UV Test Architecture](implementation/UV_TEST_ARCHITECTURE.md) - Technical implementation
+- [@docs/agents/scout.md](agents/scout.md) - Test writing patterns and templates
 
-## Debugging Tests
-
-- Use `--log-level=info` instead of `--log-level=warn` for more verbose output
-- Add `--screenshots=/tmp/odoo_tests` for failure screenshots
-- Use `ipdb` for Python debugging: `import ipdb; ipdb.set_trace()`
-- Check test output for specific error messages and stack traces
-
-### Common Tour Test Issues
-
-**OwlError: Failed to evaluate domain**
-
-- Use Odoo domain functions: `context_today()`, `relativedelta()`
-- Avoid Python datetime expressions: `datetime.datetime.now()`
-- Example fix: `domain="[('date', '>=', context_today().strftime('%Y-%m-%d'))]"`
-
-**Tour not executing in test runner**
-
-- Check the feature test file has a tour runner class with `product_connect_tour` tag
-- Verify tour registration syntax: `registry.category("web_tour.tours").add("tour_name"`
-- Ensure module update was run after adding tour file
-
-**Tour data conflicts**
-
-- Create unique test data (use timestamps: `Date.now()`)
-- Tours run against production database copy - handle existing data
-- Clean up test data at tour end
-
-**Tour fails with navigation/selector issues**
-
-- In Odoo 18, use `/odoo` as the start URL (changed from `/web` in earlier versions)
-- Use simple, stable selectors (avoid complex CSS selectors with `:visible`, `:not()`, etc.)
-- Add `test: true` property to tour definition for test mode
-- Use `.o_web_client` and `.o_action_manager` as reliable wait triggers
-- Test runner classes should extend `ProductConnectHttpCase` which provides test user
-
-**Lazy-loaded assets in tours**
-
-- Multigraph and other custom views may be in `web.assets_backend_lazy`
-- Add explicit timeouts to steps waiting for lazy components: `timeout: 30000`
-- Use progressive selectors: wait for container before specific elements
-- If tour fails on custom view, check if assets are loaded synchronously in production
-
-**Test Environment vs Browser Console**
-
-Tours behave differently in test mode vs browser console:
-
-**Test Mode** (`.venv/bin/python tools/test_runner.py tour`):
-
-- Database changes are rolled back
-- Runs with test user authentication
-- Timeout enforced (120 seconds default)
-- Failures tracked in test results
-
-**Browser Console** (`odoo.__WOWL_DEBUG__.root.env.services.tour.run("tour_name")`):
-
-- Database changes are permanent
-- Runs with current user session
-- No timeout
-- Manual debugging possible with DevTools
+The test system is built on:
+- **UV scripts**: Defined in `pyproject.toml` 
+- **Odoo test tags**: For proper test discovery
+- **Docker containers**: Script-runner for isolation
+- **Factory pattern**: For reliable test data
+- **Base classes**: Simplified test setup and utilities

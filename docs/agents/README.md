@@ -3,113 +3,19 @@
 This directory contains specialized instructions for sub-agents that handle specific aspects of Odoo development. Each
 agent has focused knowledge to avoid context pollution and ensure expertise in their domain.
 
-## CRITICAL: Tool Selection Hierarchy
+## Tool Selection
 
-**ALWAYS follow this priority order - using the wrong tool wastes time and causes errors:**
+**See [Tool Selection Guide](../TOOL_SELECTION.md)** for complete decision tree and performance benchmarks.
 
-### 1. MCP Tools FIRST (Purpose-built for specific tasks)
+**Quick reminder**: MCP tools (`mcp__*`) are 10-100x faster than Bash alternatives.
 
-- **`mcp__odoo-intelligence__*`** - For ANY Odoo code analysis (PROJECT-WIDE capability)
-    - Can analyze entire codebase, find patterns across modules
-    - Has deep Odoo understanding (models, fields, inheritance)
-    - Runs in actual Odoo environment
-- **`mcp__docker__*`** - For container operations
-- **`mcp__pycharm__*`** - For IDE interactions (SINGLE FILE only)
-- **`mcp__inspection-pycharm__*`** - For code quality (limited to open files)
-- **`mcp__playwright__*`** - For browser automation
-- **`mcp__applescript__*`** - For macOS automation
-- **`mcp__chatgpt__*`** - For AI consultation and code review
-
-### 2. Built-in Tools SECOND (For file operations)
-
-- `Read`, `Write`, `Edit`, `MultiEdit` - File modifications
-- `Grep`, `Glob` - File searching (when MCP search isn't available)
-- `Task` - For launching other specialized agents
-- `WebFetch`, `WebSearch` - For documentation/web resources
-
-### 3. Bash LAST RESORT (Only when no other option)
-
-- Complex Docker exec commands for Odoo operations
-- Operations not covered by MCP tools
-- System administration tasks
-
-**NEVER use Bash for**: `find`, `grep`, `cat`, `ls`, `docker ps`, `docker logs` - Claude Code has better tools!
-
-## Why MCP Tools Matter
-
-Using the correct tools makes a massive difference in performance and reliability. See:
-
-- [Tool Selection Performance Guide](../TOOL_SELECTION_PERFORMANCE_GUIDE.md) - Comprehensive patterns and benchmarks
-- [Performance Reference Guide](../PERFORMANCE_REFERENCE.md) - Quick performance summary
-
-**Quick Summary**:
-
-- Search operations: 10-100x faster with MCP tools
-- Analysis operations: 1000x better coverage
-- Container operations: Instant + structured data
-- Development speed: 3-5x faster with proper tool selection
-
-This is why agents should always use MCP tools first - they're purpose-built for the task!
-
-## Tool Selection Examples (Key Patterns)
-
-### Code Search Across Project
-
-```python
-# ✅ RIGHT: Instant project-wide search (100x faster)
-mcp__odoo-intelligence__search_code(
-    pattern="extends.*Controller", 
-    file_type="js"
-)
-# Returns: All JS files with Controller extensions in <1 second
-
-# ❌ WRONG: Slow bash grep with parsing overhead  
-docker exec odoo-opw-web-1 grep -r "extends.*Controller" /odoo/
-# Takes: 30+ seconds, requires output parsing, misses context
-```
-
-### Container Operations
-
-```python
-# ✅ RIGHT: Instant container status with structured data
-mcp__docker__list_containers()
-# Returns: Formatted JSON with status, names, ports instantly
-
-# ❌ WRONG: Raw docker ps output requiring parsing
-bash("docker ps --format 'table {{.Names}}\\t{{.Status}}'")  
-# Returns: Raw text requiring manual parsing, error-prone
-```
-
-### Code Quality Analysis
-
-```python
-# ✅ RIGHT: Comprehensive project-wide analysis (1000x coverage)
-mcp__odoo-intelligence__pattern_analysis(pattern_type="all")
-# Analyzes: Entire codebase, finds patterns across all modules
-
-# ❌ WRONG: Manual file-by-file review
-bash("find . -name '*.py' -exec grep -l 'pattern' {} \\;")
-# Misses: Complex patterns, relationships, context across files
-```
-
-**See [Tool Examples Appendix](#tool-examples-appendix) for additional patterns.**
-
-### Key Takeaways
-
-- **MCP tools**: Purpose-built, optimized, structured output
-- **Bash alternatives**: Raw, requires parsing, error-prone, slower
-- **Performance**: 10-100x speed improvements with MCP tools
-- **Reliability**: MCP tools handle edge cases and errors better
-- **Context**: MCP tools preserve context and relationships
-
-**Always check**: Is there an MCP tool for this task before using bash!
 
 ## Available Agents
 
 | Agent | Name                   | Specialty               | Primary Tools                                                                           |
 |-------|------------------------|-------------------------|-----------------------------------------------------------------------------------------|
 | 🏹    | **Archer**             | Odoo Source Research    | `mcp__odoo-intelligence__search_*`, Docker paths                                        |
-| 🔍    | **Scout**              | Test Writing            | `mcp__odoo-intelligence__test_runner`, test templates                                   |
+| 🔍    | **Scout**              | Test Writing            | `.venv/bin/python tools/test_runner.py` via Bash, test templates                        |
 | 🔬    | **Inspector**          | Code Quality            | `mcp__odoo-intelligence__*` (project-wide), `mcp__inspection-pycharm__*` (current file) |
 | 🔍    | **QC**                 | Quality Control         | Multi-agent coordination, enforcement, `mcp__odoo-intelligence__*`                      |
 | 🚢    | **Dock**               | Docker Operations       | `mcp__docker__*`, container management                                                  |
@@ -123,7 +29,7 @@ bash("find . -name '*.py' -exec grep -l 'pattern' {} \\;")
 | 🎭    | **Playwright**         | Browser Testing         | `mcp__playwright__*`, tour test execution, UI debugging                                 |
 | 🧙    | **Odoo Engineer**      | Core Developer Mindset  | Framework patterns, idiomatic Odoo                                                      |
 | 🤖    | **Anthropic Engineer** | Claude Best Practices   | AI optimization, context management                                                     |
-| 💬    | **GPT**                | ChatGPT Consultation    | `mcp__chatgpt__*`, code review, architecture advice                                     |
+| 💬    | **GPT**                | ChatGPT Consultation    | `mcp__chatgpt_automation__*`, GPT-5 models, thinking mode, web search                   |
 | 📝    | **Doc**                | Documentation Updates   | Maintain accurate docs, track changes, update guides                                    |
 
 ## Quick Agent Selection Guide
@@ -240,25 +146,34 @@ For detailed performance benchmarks and real-world examples, see:
 ✅ Simple file edits or reads
 ✅ Discussing architecture or planning
 
-## Agent Collaboration
+## Agent Collaboration (Your Team Works Together!)
 
-Agents should use specialized agents when tasks fall outside their expertise. This keeps each agent focused while
-enabling powerful workflows.
+**Important**: Agents can and should call other agents (except themselves) when it helps complete the task. This is how your team collaborates effectively.
 
 ### Key Collaboration Principles:
 
-1. **Delegate to specialists**: When you encounter a task outside your domain, route to the expert
-2. **Sequential workflows**: Chain agents to build comprehensive solutions
-3. **Parallel analysis**: Launch multiple agents for independent tasks
+1. **Cross-functional teamwork**: Agents call specialists in other domains
+2. **No recursive calls**: Agents cannot call themselves
+3. **Context preservation**: Each agent works in its own context window
+4. **Parallel execution**: Multiple agents can work simultaneously
 
-### Agents That Can Call Others:
+### Common Collaboration Patterns:
 
-- **🤖 Anthropic Engineer** - Can demonstrate any agent workflow
-- **📋 Planner** - Calls Archer for research before planning
-- **🦉 Owl** - Calls Dock to restart containers after frontend changes
-- **🔧 Refactor** - Calls Archer, Owl, and Inspector for coordinated refactoring
-- **🐛 Debugger** - Calls Dock for logs, GPT for complex analysis
-- **🔬 Inspector** - Can recommend Refactor for bulk fixes
+| Primary Agent | Calls | Purpose |
+|---------------|-------|---------|
+| 🦉 Owl | 🚢 Dock | Restart containers after frontend changes |
+| 🔬 Inspector | 🔧 Refactor | Fix systematic issues found in analysis |
+| 📋 Planner | 🏹 Archer | Research patterns before planning |
+| 🐛 Debugger | 🚢 Dock, 💬 GPT | Get logs, analyze complex errors |
+| 🔧 Refactor | 🏹 Archer, 🦉 Owl | Get patterns, delegate domain-specific changes |
+| 🔍 Scout | 🎭 Playwright | Browser test debugging |
+
+### Why This Matters:
+
+- **Efficiency**: Tasks get routed to the right expert
+- **Quality**: Each agent applies its specialized knowledge
+- **Context**: Main conversation stays clean while agents work
+- **Speed**: Parallel execution when tasks are independent
 
 ### Collaboration Matrix
 

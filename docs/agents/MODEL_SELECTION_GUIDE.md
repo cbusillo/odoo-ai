@@ -14,7 +14,7 @@ and performance optimization by matching the right model to each task.
 | **Haiku 3.5** | <1s   | 1K-5K     | LOW               | Simple queries, status checks |
 | **Sonnet 4**  | ~5s   | 15K-50K   | MEDIUM            | Standard development          |
 | **Opus 4**    | ~15s  | 100K-300K | HIGH              | Complex analysis              |
-| **GPT-4.1**   | ~30s  | 0 Claude  | NONE              | Large implementations         |
+| **GPT-5**     | ~30s  | 0 Claude  | NONE              | Large implementations         |
 
 ### Syntax
 
@@ -92,7 +92,7 @@ Task(
     description="Large refactoring via GPT",
     prompt="""@docs/agents/gpt.md
 
-Use GPT-4.1 for this 50+ file refactoring to preserve Claude rate limits""",
+Use GPT-5 for this 50+ file refactoring to preserve Claude rate limits""",
     subagent_type="gpt"
 )
 ```
@@ -121,14 +121,14 @@ time cost).
 - **Haiku 3.5**: 1K-5K tokens → Minimal rate limit impact
 - **Sonnet 4**: 15K-50K tokens → Moderate rate limit usage
 - **Opus 4**: 100K-300K tokens → Heavy rate limit usage
-- **GPT-4.1**: 0 Claude tokens → Zero rate limit impact! (Free via ChatGPT Pro)
+- **GPT-5**: 0 Claude tokens → Zero rate limit impact! (Free via ChatGPT Pro)
 
 ### Optimization Strategy
 
 1. **High-volume operations** → Use Haiku 3.5
 2. **Standard development** → Use Sonnet 4 (default)
 3. **Complex analysis** → Use Opus 4 sparingly
-4. **Large implementations** → Offload to GPT-4.1 (preserves 100% Claude tokens)
+4. **Large implementations** → Offload to GPT-5 (preserves 100% Claude tokens)
 
 ## Best Practices
 
@@ -165,7 +165,7 @@ Based on real testing:
 | Container status      | Haiku 3.5 | <1s           | Perfect       |
 | Write unit test       | Sonnet 4  | ~5s           | Excellent     |
 | Architecture analysis | Opus 4    | ~15s          | Comprehensive |
-| 50-file refactor      | GPT-4.1   | ~30s          | Consistent    |
+| 50-file refactor      | GPT-5     | ~30s          | Consistent    |
 
 ### Success Rates by Task Type
 
@@ -197,7 +197,7 @@ See [AGENT_SAFEGUARDS.md](./AGENT_SAFEGUARDS.md) for prevention strategies.
 
 1. Monitor token usage in Claude Code output
 2. Switch to Haiku for high-volume tasks
-3. Use GPT-4.1 for large implementations
+3. Use GPT-5 for large implementations
 4. Break complex tasks into smaller chunks
 
 ## Related Documentation

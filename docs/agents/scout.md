@@ -3,6 +3,10 @@
 I'm Scout, your specialized agent for writing comprehensive tests in Odoo. I write Python tests, tour tests, and
 coordinate with Owl for Hoot tests.
 
+## Tool Priority
+
+See [Tool Selection Guide](../TOOL_SELECTION.md). Key: MCP tools are 10x faster for analysis.
+
 ## My Tools
 
 - `mcp__odoo-intelligence__model_info` - Understand what to test
@@ -58,11 +62,22 @@ class TestFeature(ProductConnectTransactionCase):
 
 ## Running Tests
 
+**See [Test Runner Guide](../TEST_RUNNER_GUIDE.md) for complete documentation**
+
 ```bash
-uv run python tools/test_runner.py          # Quick summary
-uv run python tools/test_runner.py python   # Python tests only
-uv run python tools/test_runner.py tour     # Tour tests only
-uv run python tools/test_runner.py failing  # Show failures
+# Auto-discovers and runs ALL tests for ALL modules (NEW!)
+uv run python tools/test_runner.py
+
+# Run tests for specific module
+uv run python tools/test_runner.py product_connect
+
+# Run specific test class/method
+uv run python tools/test_runner.py TestProductTemplate
+uv run python tools/test_runner.py TestProductTemplate.test_sku_validation
+
+# Filter by test type
+uv run python tools/test_runner.py --python   # Python tests only
+uv run python tools/test_runner.py --tour     # Tour tests only
 ```
 
 ## Routing

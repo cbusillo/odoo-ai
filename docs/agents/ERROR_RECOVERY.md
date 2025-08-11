@@ -148,7 +148,7 @@ def handle_large_context_task(files, task):
             print("Context too large for Claude, offloading to GPT...")
             return Task(
                 description=task,
-                prompt=f"@docs/agents/gpt.md\n\nUse GPT-4.1 for large context\n\n{task}",
+                prompt=f"@docs/agents/gpt.md\n\nUse GPT-5 for large context\n\n{task}",
                 subagent_type="gpt"
             )
 ```

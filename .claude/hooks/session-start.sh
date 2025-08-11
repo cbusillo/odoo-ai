@@ -1,12 +1,17 @@
-#!/bin/bash
+#!/bin/sh
 # SessionStart hook: Check if compaction occurred and inject CLAUDE.md reminder
 
-CLAUDE_DIR=".claude"
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Use absolute paths based on script location
+CLAUDE_DIR="$PROJECT_DIR/.claude"
 COMPACT_FLAG="$CLAUDE_DIR/.compacted"
 DEBUG_LOG="$CLAUDE_DIR/hook-debug.log"
 
 # Check if compaction flag exists
-if [[ -f "$COMPACT_FLAG" ]]; then
+if [ -f "$COMPACT_FLAG" ]; then
     # Remove flag to prevent duplicate reminders
     if rm "$COMPACT_FLAG" 2>/dev/null; then
         # Log the trigger

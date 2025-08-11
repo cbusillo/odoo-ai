@@ -57,10 +57,10 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "click", specifier = ">=8.1.0" },
+    { name = "click" },
     { name = "psutil" },
     { name = "rich" },
-    { name = "tomli", specifier = ">=2.0.0" },
+    { name = "tomli" },
 ]
 
 [[package]]

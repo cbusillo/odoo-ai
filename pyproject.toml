@@ -11,8 +11,8 @@ requires-python = ">=3.12"
 dependencies = [
     "psutil",
     "rich",
-    "click>=8.1.0",
-    "tomli>=2.0.0",
+    "click",
+    "tomli",
 ]
 
 [tool.setuptools.packages.find]

@@ -17,13 +17,6 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="/ir.model.access.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
       </map>
     </option>
   </component>

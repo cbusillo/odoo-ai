@@ -2,6 +2,14 @@
 
 Python-specific coding standards and patterns.
 
+## Guiding Philosophy
+
+Following the Zen of Python (PEP 20):
+
+- **Explicit is better than implicit**: Always specify return types, even `-> None`
+- **Readability counts**: Clear type hints improve code understanding
+- **In the face of ambiguity, refuse the temptation to guess**: Be precise with types
+
 ## Type Hints
 
 - **Use built-in types**: `list`, `dict`, `set` instead of `List`, `Dict`, `Set` from typing
@@ -9,6 +17,9 @@ Python-specific coding standards and patterns.
 - **Avoid unnecessary imports**: Prefer fewer imports when the result is the same
 - **Never use `Any` or `object`**: Be specific with types
 - **Use Odoo Plugin types**: `odoo.model.product_template`, `odoo.values.product_template`
+- **Always specify return types**: Include `-> None` for functions that don't return a value
+    - Explicit return types improve IDE support and catch bugs early
+    - Consistency: every function should have a return type annotation
 
 ## String Formatting
 
@@ -65,6 +76,25 @@ def method(self, vals: Optional[Dict]) -> List[str]:
 
 # After
 def method(self, vals: dict | None) -> list[str]:
+```
+
+**Return Type Annotations:**
+
+```python
+# Before (implicit None return)
+def update_record(self, vals: dict):
+    self.write(vals)
+
+# After (explicit is better)
+def update_record(self, vals: dict) -> None:
+    self.write(vals)
+    
+# Always specify return type
+def calculate_total(self) -> float:
+    return sum(self.amounts)
+    
+def get_name(self) -> str:
+    return self.name or "Unknown"
 ```
 
 **Field Definitions:**

@@ -2,11 +2,13 @@
 
 ## Overview
 
-This guide covers the modern UV-based test infrastructure that provides reliable, fast test execution for the Odoo 18 project.
+This guide covers the modern UV-based test infrastructure that provides reliable, fast test execution for the Odoo 18
+project.
 
 **Key Statistics:**
+
 - **334 test methods** across 40+ test files
-- **95%+ reliability** (vs ~60% with old system)  
+- **95%+ reliability** (vs ~60% with old system)
 - **< 30 minute total runtime** (vs 60+ minutes previously)
 - **Script-runner container** avoids circular imports
 - **Clean separation** of unit/integration/tour tests
@@ -54,11 +56,11 @@ graph TD
 
 ### Test Categories
 
-| Category | Tag | Purpose | Runtime | Database |
-|----------|-----|---------|---------|----------|
-| **Unit** | `unit_test` | Business logic, models | < 2 min | Fresh per run |
-| **Integration** | `integration_test` | Services, APIs | < 10 min | Stable snapshots |
-| **Tour** | `tour_test` | UI workflows | < 15 min | Staging with demo data |
+| Category        | Tag                | Purpose                | Runtime  | Database               |
+|-----------------|--------------------|------------------------|----------|------------------------|
+| **Unit**        | `unit_test`        | Business logic, models | < 2 min  | Fresh per run          |
+| **Integration** | `integration_test` | Services, APIs         | < 10 min | Stable snapshots       |
+| **Tour**        | `tour_test`        | UI workflows           | < 15 min | Staging with demo data |
 
 ### Project Structure
 
@@ -85,18 +87,21 @@ All tests MUST use proper tagging for discovery:
 ```python
 from odoo.tests import tagged
 
+
 # Unit tests
 @tagged("unit_test", "post_install", "-at_install")
 class TestExample(UnitTestCase):
     pass
+
 
 # Integration tests  
 @tagged("integration_test", "post_install", "-at_install")
 class TestShopifySync(IntegrationTestCase):
     pass
 
+
 # Tour tests
-@tagged("tour_test", "post_install", "-at_install") 
+@tagged("tour_test", "post_install", "-at_install")
 class TestWorkflow(TourTestCase):
     pass
 ```
@@ -110,7 +115,7 @@ def run_unit_tests():
     """Run fast unit tests using script-runner container."""
     cmd = [
         "docker", "exec", "odoo-opw-script-runner-1",
-        "/odoo/odoo-bin", 
+        "/odoo/odoo-bin",
         "--test-tags", "product_connect,unit_test",
         "--stop-after-init",
         "--addons-path", "/volumes/addons,/odoo/addons,/volumes/enterprise"
@@ -121,18 +126,21 @@ def run_unit_tests():
 ## Database Management
 
 ### Unit Tests
+
 - **Fresh database** created for each run
 - **Template-based creation** (< 2 seconds)
 - **Automatic cleanup** after completion
 - **No demo data** for speed
 
-### Integration Tests  
+### Integration Tests
+
 - **Stable test database** (`opw_integration`)
 - **Snapshot/restore mechanism** for consistency
 - **Reset between test classes**
 - **Shared within class** for efficiency
 
 ### Tour Tests
+
 - **Staging database** (`opw_staging`)
 - **Full demo data** loaded
 - **No reset during runs** for stability
@@ -147,6 +155,7 @@ For fast, isolated business logic tests:
 ```python
 from ..fixtures import UnitTestCase, ProductFactory
 
+
 @tagged("unit_test", "post_install", "-at_install")
 class TestProduct(UnitTestCase):
     def test_create_product(self):
@@ -158,6 +167,7 @@ class TestProduct(UnitTestCase):
 ```
 
 **Features:**
+
 - Fresh database per test class
 - Mock support for external services
 - Factory pattern for test data
@@ -170,6 +180,7 @@ For service layer and API integration tests:
 ```python
 from ..fixtures import IntegrationTestCase
 
+
 @tagged("integration_test", "post_install", "-at_install")
 class TestShopifySync(IntegrationTestCase):
     def test_product_sync(self):
@@ -179,6 +190,7 @@ class TestShopifySync(IntegrationTestCase):
 ```
 
 **Features:**
+
 - Stable test database with snapshots
 - Pre-configured mock services
 - Real integration testing capabilities
@@ -191,6 +203,7 @@ For browser-based UI workflow tests:
 ```python
 from ..fixtures import TourTestCase
 
+
 @tagged("tour_test", "post_install", "-at_install")
 class TestProductWorkflow(TourTestCase):
     def test_product_creation_flow(self):
@@ -198,6 +211,7 @@ class TestProductWorkflow(TourTestCase):
 ```
 
 **Features:**
+
 - Full staging environment
 - Complete demo data
 - Browser automation support
@@ -223,11 +237,11 @@ product = ProductFactory.create(self.env)
 
 ```python
 from ..fixtures import (
-    ProductFactory,      # Standard products with unique SKUs
-    PartnerFactory,      # Customers/vendors with contacts  
-    MotorFactory,        # Motor-specific products
-    ShopifyProductFactory, # Products with Shopify metadata
-    SaleOrderFactory,    # Orders with line items
+    ProductFactory,  # Standard products with unique SKUs
+    PartnerFactory,  # Customers/vendors with contacts  
+    MotorFactory,  # Motor-specific products
+    ShopifyProductFactory,  # Products with Shopify metadata
+    SaleOrderFactory,  # Orders with line items
 )
 
 # Single record
@@ -257,7 +271,7 @@ describe("Widget Tests", () => {
             resModel: "product.template",
             serverData: mockData,
         });
-        
+
         expect("input[name='name']").toHaveValue("Test");
     });
 });
@@ -338,7 +352,7 @@ scope = "class"    # Run test classes in parallel
 [project.scripts]
 # Core commands
 test-unit = "tools.test_commands:run_unit_tests"
-test-integration = "tools.test_commands:run_integration_tests"  
+test-integration = "tools.test_commands:run_integration_tests"
 test-tour = "tools.test_commands:run_tour_tests"
 test-all = "tools.test_commands:run_all_tests"
 
@@ -363,16 +377,20 @@ tour = 1800        # 30 minutes
 ### Common Issues
 
 #### Tests Not Discovered
+
 **Symptoms:** `0 tests found` or missing test cases
 **Solutions:**
+
 - Verify test tags: `@tagged("unit_test", "post_install", "-at_install")`
 - Check file naming: `test_*.py` in correct directories
 - Import base classes: `from ..fixtures import UnitTestCase`
 - Run `uv run test-stats` to see discovered tests
 
 #### Import Errors
+
 **Symptoms:** `ModuleNotFoundError` or import failures
 **Solutions:**
+
 ```python
 # Use relative imports from fixtures
 from ..fixtures import UnitTestCase, ProductFactory
@@ -382,8 +400,10 @@ from ..fixtures import UnitTestCase, ProductFactory
 ```
 
 #### Database Conflicts
+
 **Symptoms:** Constraint violations, existing data conflicts
 **Solutions:**
+
 ```bash
 # Clean up test databases
 uv run test-clean
@@ -393,8 +413,10 @@ product = ProductFactory.create(env)  # Always unique
 ```
 
 #### Container Issues
+
 **Symptoms:** Container not found, permission errors
 **Solutions:**
+
 ```bash
 # Check container status
 docker ps | grep script-runner
@@ -404,10 +426,12 @@ docker restart odoo-opw-script-runner-1
 ```
 
 #### Tour Failures
+
 **Symptoms:** Tour timeouts, element not found
 **Solutions:**
+
 - Use stable selectors (avoid complex CSS)
-- Increase timeouts for lazy-loaded components  
+- Increase timeouts for lazy-loaded components
 - Check for JavaScript errors in browser console
 - Use `/odoo` start URL, not `/web`
 
@@ -415,7 +439,7 @@ docker restart odoo-opw-script-runner-1
 
 1. **Statistics**: `uv run test-stats` shows discovered tests
 2. **Verbose output**: Add `--verbose` to any command
-3. **Clean slate**: `uv run test-clean` removes all artifacts  
+3. **Clean slate**: `uv run test-clean` removes all artifacts
 4. **Reports**: `uv run test-report` generates detailed HTML analysis
 5. **Logs**: Check `tmp/tests/` for detailed execution logs
 
@@ -426,13 +450,15 @@ docker restart odoo-opw-script-runner-1
 The project migrated from a monolithic 1572-line test_runner.py to this modern system:
 
 **Before:**
+
 - Single massive file with embedded logic
 - ~60% test reliability due to circular imports
-- 60+ minute runtime 
+- 60+ minute runtime
 - Manual database management
 - Complex command-line arguments
 
-**After:**  
+**After:**
+
 - Clean, modular UV-based system
 - 95%+ reliability using script-runner container
 - < 30 minute total runtime
@@ -450,7 +476,7 @@ The project migrated from a monolithic 1572-line test_runner.py to this modern s
 ### Migration Checklist
 
 - [x] Infrastructure complete (UV commands, containers, databases)
-- [x] Base test classes implemented  
+- [x] Base test classes implemented
 - [x] Factory pattern established
 - [x] Test directory structure organized
 - [ ] Update existing test imports (when needed)
@@ -461,12 +487,12 @@ The project migrated from a monolithic 1572-line test_runner.py to this modern s
 
 ### Target Performance
 
-| Test Type | Target | Current Status | Notes |
-|-----------|--------|----------------|-------|
-| Unit | < 2 min | ✅ Achieved | Fresh DB, no external deps |
-| Integration | < 10 min | ✅ Achieved | Stable DB, mocked services |  
-| Tour | < 15 min | ✅ Achieved | Full staging environment |
-| Total | < 30 min | ✅ Achieved | Parallel execution planned |
+| Test Type   | Target   | Current Status | Notes                      |
+|-------------|----------|----------------|----------------------------|
+| Unit        | < 2 min  | ✅ Achieved     | Fresh DB, no external deps |
+| Integration | < 10 min | ✅ Achieved     | Stable DB, mocked services |  
+| Tour        | < 15 min | ✅ Achieved     | Full staging environment   |
+| Total       | < 30 min | ✅ Achieved     | Parallel execution planned |
 
 ### Reliability Improvements
 
@@ -480,7 +506,7 @@ The project migrated from a monolithic 1572-line test_runner.py to this modern s
 
 1. **Parallel execution**: pytest-xdist integration
 2. **Watch mode**: Auto-rerun on file changes (TDD)
-3. **Coverage reporting**: Integrated code coverage  
+3. **Coverage reporting**: Integrated code coverage
 4. **Test selection**: Pattern-based test filtering
 5. **Performance monitoring**: Test execution time tracking
 
@@ -488,13 +514,13 @@ The project migrated from a monolithic 1572-line test_runner.py to this modern s
 
 For detailed technical information:
 
-- **UV Architecture**: See [UV Test Architecture](implementation/UV_TEST_ARCHITECTURE.md)
 - **Command Implementation**: Check `tools/test_commands.py`
 - **Base Classes**: Review `addons/product_connect/tests/fixtures/base.py`
 - **Factory Patterns**: See `addons/product_connect/tests/fixtures/factories.py`
 - **Test Writing**: Consult [@docs/agents/scout.md](agents/scout.md) for patterns
 
 The system is designed to be:
+
 - **Simple**: `uv run test-*` commands that just work
 - **Reliable**: 95%+ success rate with proper isolation
 - **Fast**: Optimized for development workflow

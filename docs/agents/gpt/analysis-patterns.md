@@ -2,11 +2,13 @@
 
 ## GPT-5 Unified Model (August 2025)
 
-GPT-5 on chatgpt.com uses a unified model with automatic routing. No manual model selection needed - just use prompt patterns to trigger the right capabilities.
+GPT-5 on chatgpt.com uses a unified model with automatic routing. No manual model selection needed - just use prompt
+patterns to trigger the right capabilities.
 
 ## Prompt Patterns by Task
 
 ### Code Review
+
 ```python
 # Standard review - auto-routes based on complexity
 "Review this Odoo code for issues"
@@ -16,6 +18,7 @@ GPT-5 on chatgpt.com uses a unified model with automatic routing. No manual mode
 ```
 
 ### Architecture & Design
+
 ```python
 # With web search for current best practices
 "Search the web: Current best practices for Odoo 18 multi-tenant architecture"
@@ -25,6 +28,7 @@ GPT-5 on chatgpt.com uses a unified model with automatic routing. No manual mode
 ```
 
 ### Performance Analysis
+
 ```python
 # Standard optimization
 "Analyze this query for performance bottlenecks"
@@ -34,6 +38,7 @@ GPT-5 on chatgpt.com uses a unified model with automatic routing. No manual mode
 ```
 
 ### Development Tasks
+
 ```python
 # Quick fixes
 "Fix this Python error: [code]"
@@ -46,6 +51,7 @@ GPT-5 on chatgpt.com uses a unified model with automatic routing. No manual mode
 ```
 
 ### Fact-Checking & Verification
+
 ```python
 # Verify information
 "Fact-check with sources: [claim or response]"
@@ -59,16 +65,17 @@ GPT-5 on chatgpt.com uses a unified model with automatic routing. No manual mode
 
 ## Mode Triggers
 
-| Intent | Prompt Pattern | Mode Activated |
-|--------|---------------|----------------|
-| Deep reasoning | "Think hard:", "Think step by step:" | Think longer mode |
-| Current info | "Search the web:", "Latest", "Current" | Web search |
-| Verification | "Fact-check:", "Verify with sources:" | Web search |
-| Research | "Research best practices for" | Deep research (if complex) |
+| Intent         | Prompt Pattern                         | Mode Activated             |
+|----------------|----------------------------------------|----------------------------|
+| Deep reasoning | "Think hard:", "Think step by step:"   | Think longer mode          |
+| Current info   | "Search the web:", "Latest", "Current" | Web search                 |
+| Verification   | "Fact-check:", "Verify with sources:"  | Web search                 |
+| Research       | "Research best practices for"          | Deep research (if complex) |
 
 ## Agent Collaboration Examples
 
 ### Debugger → GPT Flow
+
 ```python
 Task(
     description="Deep error analysis",
@@ -83,6 +90,7 @@ Focus on: root cause, similar issues, proven fixes""",
 ```
 
 ### Fact-Checking Claude
+
 ```python
 Task(
     description="Verify response",
@@ -101,6 +109,7 @@ Use web search if needed. Provide corrections with sources.""",
 ### When to Verify with GPT-5
 
 **Uncertainty indicators that should trigger verification:**
+
 - "I think..."
 - "It might be..."
 - "Possibly..."
@@ -110,6 +119,7 @@ Use web search if needed. Provide corrections with sources.""",
 - "Probably..."
 
 **When Claude uses these phrases, verify with GPT:**
+
 ```python
 # Example: When uncertain, route to GPT for verification
 Task(
@@ -125,6 +135,7 @@ Please fact-check with web search and provide the correct information.""",
 ## Best Practices
 
 ### DO ✅
+
 - Use natural language - GPT-5 understands intent
 - Add "think hard" for complex reasoning
 - Include "search the web" for current information
@@ -133,12 +144,14 @@ Please fact-check with web search and provide the correct information.""",
 - Batch similar verifications together
 
 ### DON'T ❌
+
 - Manually select models (auto-routing handles it)
 - Worry about model tiers (nano/mini/full is automatic)
 - Use Deep Research for simple queries (250/month quota)
 - Ignore web search for time-sensitive info
 
 ## Error Recovery
+
 - If response seems wrong → Ask to fact-check with web search
 - If stuck in loop → Start new chat
 - If timeout → Retry with longer timeout

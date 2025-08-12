@@ -9,7 +9,6 @@ agent has focused knowledge to avoid context pollution and ensure expertise in t
 
 **Quick reminder**: MCP tools (`mcp__*`) are 10-100x faster than Bash alternatives.
 
-
 ## Available Agents
 
 | Agent | Name                   | Specialty               | Primary Tools                                                                           |
@@ -148,7 +147,8 @@ For detailed performance benchmarks and real-world examples, see:
 
 ## Agent Collaboration (Your Team Works Together!)
 
-**Important**: Agents can and should call other agents (except themselves) when it helps complete the task. This is how your team collaborates effectively.
+**Important**: Agents can and should call other agents (except themselves) when it helps complete the task. This is how
+your team collaborates effectively.
 
 ### Key Collaboration Principles:
 
@@ -159,14 +159,14 @@ For detailed performance benchmarks and real-world examples, see:
 
 ### Common Collaboration Patterns:
 
-| Primary Agent | Calls | Purpose |
-|---------------|-------|---------|
-| 🦉 Owl | 🚢 Dock | Restart containers after frontend changes |
-| 🔬 Inspector | 🔧 Refactor | Fix systematic issues found in analysis |
-| 📋 Planner | 🏹 Archer | Research patterns before planning |
-| 🐛 Debugger | 🚢 Dock, 💬 GPT | Get logs, analyze complex errors |
-| 🔧 Refactor | 🏹 Archer, 🦉 Owl | Get patterns, delegate domain-specific changes |
-| 🔍 Scout | 🎭 Playwright | Browser test debugging |
+| Primary Agent | Calls             | Purpose                                        |
+|---------------|-------------------|------------------------------------------------|
+| 🦉 Owl        | 🚢 Dock           | Restart containers after frontend changes      |
+| 🔬 Inspector  | 🔧 Refactor       | Fix systematic issues found in analysis        |
+| 📋 Planner    | 🏹 Archer         | Research patterns before planning              |
+| 🐛 Debugger   | 🚢 Dock, 💬 GPT   | Get logs, analyze complex errors               |
+| 🔧 Refactor   | 🏹 Archer, 🦉 Owl | Get patterns, delegate domain-specific changes |
+| 🔍 Scout      | 🎭 Playwright     | Browser test debugging                         |
 
 ### Why This Matters:
 

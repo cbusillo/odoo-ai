@@ -7,7 +7,10 @@ project.
 
 **Key Statistics:**
 
-- **334 test methods** across 40+ test files
+- **337 total test methods** across 42 test files
+- **130 unit tests** (in 18 files)
+- **198 integration tests** (in 13 files)
+- **9 tour tests** (in 7 files)
 - **95%+ reliability** (vs ~60% with old system)
 - **< 30 minute total runtime** (vs 60+ minutes previously)
 - **Script-runner container** avoids circular imports
@@ -24,7 +27,7 @@ uv run test-integration   # Integration tests (< 10 min)
 uv run test-tour          # Browser UI tests (< 15 min)
 uv run test-all           # Complete test suite (< 30 min)
 uv run test-quick         # Quick verification tests
-uv run test-stats         # Show test statistics
+uv run test-stats         # Show test statistics (337 test methods across 40+ files)
 
 # Maintenance commands
 uv run test-setup         # Initialize test databases
@@ -82,28 +85,37 @@ addons/product_connect/tests/
 
 ### Test Tags (Critical)
 
-All tests MUST use proper tagging for discovery:
+All tests MUST use proper tagging for discovery using tag constants from base_types.py:
 
 ```python
-from odoo.tests import tagged
+from ..common_imports import tagged, UNIT_TAGS, INTEGRATION_TAGS, TOUR_TAGS
 
 
 # Unit tests
-@tagged("unit_test", "post_install", "-at_install")
+@tagged(*UNIT_TAGS)
 class TestExample(UnitTestCase):
     pass
 
 
 # Integration tests  
-@tagged("integration_test", "post_install", "-at_install")
+@tagged(*INTEGRATION_TAGS)
 class TestShopifySync(IntegrationTestCase):
     pass
 
 
 # Tour tests
-@tagged("tour_test", "post_install", "-at_install")
+@tagged(*TOUR_TAGS)
 class TestWorkflow(TourTestCase):
     pass
+```
+
+**Tag Constants (from base_types.py):**
+
+```python
+STANDARD_TAGS = ["post_install", "-at_install"]
+UNIT_TAGS = STANDARD_TAGS + ["unit_test"]
+INTEGRATION_TAGS = STANDARD_TAGS + ["integration_test"]
+TOUR_TAGS = STANDARD_TAGS + ["tour_test"]
 ```
 
 ### Command Implementation
@@ -153,10 +165,11 @@ def run_unit_tests():
 For fast, isolated business logic tests:
 
 ```python
+from ..common_imports import tagged, UNIT_TAGS
 from ..fixtures import UnitTestCase, ProductFactory
 
 
-@tagged("unit_test", "post_install", "-at_install")
+@tagged(*UNIT_TAGS)
 class TestProduct(UnitTestCase):
     def test_create_product(self):
         product = ProductFactory.create(self.env)
@@ -178,10 +191,11 @@ class TestProduct(UnitTestCase):
 For service layer and API integration tests:
 
 ```python
+from ..common_imports import tagged, INTEGRATION_TAGS
 from ..fixtures import IntegrationTestCase
 
 
-@tagged("integration_test", "post_install", "-at_install")
+@tagged(*INTEGRATION_TAGS)
 class TestShopifySync(IntegrationTestCase):
     def test_product_sync(self):
         with self.mock_shopify_client():
@@ -201,10 +215,11 @@ class TestShopifySync(IntegrationTestCase):
 For browser-based UI workflow tests:
 
 ```python
+from ..common_imports import tagged, TOUR_TAGS
 from ..fixtures import TourTestCase
 
 
-@tagged("tour_test", "post_install", "-at_install")
+@tagged(*TOUR_TAGS)
 class TestProductWorkflow(TourTestCase):
     def test_product_creation_flow(self):
         self.start_tour("/odoo", "product_creation_tour")
@@ -304,17 +319,34 @@ registry.category("web_tour.tours").add("product_workflow_tour", {
 4. **Error checking**: Monitor for JavaScript errors
 5. **Unique data**: Use timestamps to avoid conflicts
 
+## Current Known Issues
+
+### Test Discovery Fixes Applied
+
+- **Fixed**: Test discovery now properly detects `@tagged(*UNIT_TAGS)` patterns
+- **Fixed**: Import errors resolved with proper relative imports from fixtures
+- **Fixed**: Browser size format corrected to string `"1920x1080"` (not tuple)
+- **Fixed**: Test tags properly defined in `base_types.py` constants
+- **Fixed**: Missing imports like `secrets.randbelow()` now properly imported
+
+### PyCharm Inspection Warnings (Safe to Ignore)
+
+- **Type hints**: Odoo models don't use standard Python typing - inspection warnings about missing type annotations are expected
+- **Import suggestions**: PyCharm may suggest absolute imports, but relative imports from fixtures are correct
+- **Test class warnings**: Base test classes may show "unused" warnings - this is normal
+- **"odoo.values.*" types**: PyCharm warnings about these Odoo-specific types are false positives - ignore them
+
 ## Advanced Usage
 
-### Custom Test Selection (Planned)
+### Custom Test Selection (Not Yet Implemented)
 
 ```bash
-# Future capabilities
+# Planned capabilities (not yet implemented)
 uv run test-unit --pattern "test_motor*"
 uv run test-integration --tags "shopify"  
 uv run test-tour --exclude "slow"
 
-# Debug modes
+# Debug modes (not yet implemented)
 uv run test-unit --verbose --debug
 uv run test-all --coverage
 ```
@@ -334,10 +366,10 @@ uv run test-all            # Complete suite
 uv run test-report         # Analysis
 ```
 
-### Parallel Execution (Planned)
+### Parallel Execution (Not Yet Implemented)
 
 ```toml
-# pyproject.toml
+# pyproject.toml (not yet implemented)
 [tool.odoo-test.parallel]
 enabled = true
 workers = 4
@@ -381,7 +413,8 @@ tour = 1800        # 30 minutes
 **Symptoms:** `0 tests found` or missing test cases
 **Solutions:**
 
-- Verify test tags: `@tagged("unit_test", "post_install", "-at_install")`
+- Verify test tags: Use `@tagged(*UNIT_TAGS)` from `base_types.py`
+- Check imports: `from ..common_imports import tagged, UNIT_TAGS`
 - Check file naming: `test_*.py` in correct directories
 - Import base classes: `from ..fixtures import UnitTestCase`
 - Run `uv run test-stats` to see discovered tests
@@ -392,7 +425,8 @@ tour = 1800        # 30 minutes
 **Solutions:**
 
 ```python
-# Use relative imports from fixtures
+# Use relative imports from common_imports and fixtures
+from ..common_imports import tagged, UNIT_TAGS
 from ..fixtures import UnitTestCase, ProductFactory
 
 # Not absolute imports  
@@ -504,11 +538,11 @@ The project migrated from a monolithic 1572-line test_runner.py to this modern s
 
 ### Future Enhancements
 
-1. **Parallel execution**: pytest-xdist integration
-2. **Watch mode**: Auto-rerun on file changes (TDD)
-3. **Coverage reporting**: Integrated code coverage
-4. **Test selection**: Pattern-based test filtering
-5. **Performance monitoring**: Test execution time tracking
+1. **Parallel execution**: pytest-xdist integration (planned)
+2. **Watch mode**: Auto-rerun on file changes (planned)
+3. **Coverage reporting**: Integrated code coverage (planned)
+4. **Test selection**: Pattern-based test filtering (planned)
+5. **Performance monitoring**: Test execution time tracking (planned)
 
 ## Technical Implementation
 

@@ -4,7 +4,7 @@
 
 This project uses a modern UV-based test infrastructure with Odoo 18's testing framework. The system provides three test layers with clean separation and reliable execution.
 
-**Test Statistics**: 334 test methods across 40+ test files  
+**Test Statistics**: 337 test methods across 42 test files  
 **Total Runtime**: < 30 minutes for complete suite  
 **Infrastructure**: Uses script-runner container to avoid circular imports
 
@@ -25,7 +25,7 @@ uv run test-stats         # Show test statistics
 uv run test-setup         # Initialize test databases
 uv run test-clean         # Remove test artifacts  
 uv run test-report        # Generate HTML report
-uv run test-watch         # TDD watch mode (planned)
+# uv run test-watch       # TDD watch mode (not yet implemented)
 ```
 
 **That's it!** These commands handle all the complexity internally.
@@ -60,17 +60,17 @@ uv run test-watch         # TDD watch mode (planned)
 
 ## Advanced Usage
 
-### Custom Test Selection
+### Custom Test Selection (Not Yet Implemented)
 
 ```bash
-# Run specific test patterns (when implemented)
-uv run test-unit --pattern "test_motor*"
-uv run test-integration --tags "shopify"  
-uv run test-tour --exclude "slow"
+# Planned capabilities (not yet implemented)
+# uv run test-unit --pattern "test_motor*"
+# uv run test-integration --tags "shopify"  
+# uv run test-tour --exclude "slow"
 
-# Verbose output for debugging
-uv run test-unit --verbose
-uv run test-all --debug
+# Debug modes (not yet implemented)
+# uv run test-unit --verbose
+# uv run test-all --debug
 ```
 
 ### Development Workflow

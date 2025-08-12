@@ -109,9 +109,17 @@ def show_test_stats() -> int:
                 total_files += 1
                 with open(test_file) as f:
                     content = f.read()
-                    for category in categories:
-                        if f'"{category}"' in content or f"'{category}'" in content:
-                            categories[category] += 1
+                    # Look for @tagged decorator with our tag constants
+                    if "@tagged(*UNIT_TAGS)" in content or '"unit_test"' in content or "'unit_test'" in content:
+                        categories["unit_test"] += 1
+                    elif "@tagged(*INTEGRATION_TAGS)" in content or '"integration_test"' in content or "'integration_test'" in content:
+                        categories["integration_test"] += 1
+                    elif "@tagged(*TOUR_TAGS)" in content or '"tour_test"' in content or "'tour_test'" in content:
+                        categories["tour_test"] += 1
+                    elif ("validation" in test_file.name.lower() or 
+                          '"validation_test"' in content or 
+                          "'validation_test'" in content):
+                        categories["validation_test"] += 1
 
         print(f"  Total test files: {total_files}")
         for category, count in categories.items():

@@ -346,7 +346,6 @@ The infrastructure is complete and working. Any test failures are typically due 
 
 For implementation details, see:
 - [Test Runner Guide](TEST_RUNNER_GUIDE.md) - Architecture and advanced usage
-- [UV Test Architecture](implementation/UV_TEST_ARCHITECTURE.md) - Technical implementation
 - [@docs/agents/scout.md](agents/scout.md) - Test writing patterns and templates
 
 The test system is built on:

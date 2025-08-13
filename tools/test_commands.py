@@ -109,7 +109,6 @@ def show_test_stats() -> int:
                 total_files += 1
                 with open(test_file) as f:
                     content = f.read()
-                    # Look for @tagged decorator with our tag constants
                     if "@tagged(*UNIT_TAGS)" in content or '"unit_test"' in content or "'unit_test'" in content:
                         categories["unit_test"] += 1
                     elif "@tagged(*INTEGRATION_TAGS)" in content or '"integration_test"' in content or "'integration_test'" in content:

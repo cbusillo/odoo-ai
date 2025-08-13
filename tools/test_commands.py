@@ -45,32 +45,32 @@ def get_our_modules() -> list[str]:
 
 def run_unit_tests() -> int:
     modules = get_our_modules()
-    test_db_name = f"{get_production_db_name()}_test"
-    return run_docker_test_command("unit_test", test_db_name, modules)
+    test_db_name = f"{get_production_db_name()}_test_unit"
+    return run_docker_test_command("unit_test", test_db_name, modules, use_production_clone=False)
 
 
 def run_integration_tests() -> int:
     modules = get_our_modules()
-    test_db_name = f"{get_production_db_name()}_test"
-    return run_docker_test_command("integration_test", test_db_name, modules)
+    test_db_name = f"{get_production_db_name()}_test_integration"
+    return run_docker_test_command("integration_test", test_db_name, modules, timeout=600, use_production_clone=True)
 
 
 def run_tour_tests() -> int:
     modules = get_our_modules()
-    test_db_name = f"{get_production_db_name()}_test"
-    return run_docker_test_command("tour_test", test_db_name, modules)
+    test_db_name = f"{get_production_db_name()}_test_tour"
+    return run_docker_test_command("tour_test", test_db_name, modules, timeout=1800, use_production_clone=True)
 
 
 def run_all_tests() -> int:
     modules = get_our_modules()
-    test_db_name = f"{get_production_db_name()}_test"
-    return run_docker_test_command("post_install,-at_install", test_db_name, modules)
+    test_db_name = f"{get_production_db_name()}_test_all"
+    return run_docker_test_command("post_install,-at_install", test_db_name, modules, use_production_clone=True)
 
 
 def run_quick_tests() -> int:
     modules = get_our_modules()
-    test_db_name = f"{get_production_db_name()}_test"
-    return run_docker_test_command("unit_test", test_db_name, modules)
+    test_db_name = f"{get_production_db_name()}_test_unit"
+    return run_docker_test_command("unit_test", test_db_name, modules, use_production_clone=False)
 
 
 def show_test_stats() -> int:
@@ -150,26 +150,181 @@ def restart_script_runner_with_orphan_cleanup() -> None:
 
 
 def drop_and_create_test_database(db_name: str) -> None:
-    script_runner_service = get_script_runner_service()
-
-    drop_cmd = [
-        "docker",
-        "compose",
-        "run",
-        "--rm",
-        script_runner_service,
-        "/odoo/odoo-bin",
-        "--stop-after-init",
-        "--log-level=error",
-        "-d",
-        db_name,
-        "--uninstall",
-        "all",
+    print(f"🗄️  Cleaning up test database: {db_name}")
+    
+    # Step 1: Kill active connections to test database
+    print(f"   Terminating connections to {db_name}...")
+    
+    # First, get the connection count
+    check_connections_cmd = [
+        "docker", "exec", "odoo-opw-database-1",
+        "psql", "-U", "odoo", "-d", "postgres", "-t", "-c",
+        f"SELECT count(*) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();"
     ]
-    subprocess.run(drop_cmd, capture_output=True)
+    result = subprocess.run(check_connections_cmd, capture_output=True, text=True)
+    if result.returncode == 0:
+        connection_count = result.stdout.strip()
+        print(f"   Found {connection_count} active connections to {db_name}")
+    
+    # Kill the connections
+    kill_connections_cmd = [
+        "docker", "exec", "odoo-opw-database-1",
+        "psql", "-U", "odoo", "-d", "postgres", "-c",
+        f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();"
+    ]
+    result = subprocess.run(kill_connections_cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"   ⚠️  Warning: Could not kill connections: {result.stderr}")
+    else:
+        print(f"   Connection termination command executed")
+    
+    # Wait a moment for connections to close
+    import time
+    time.sleep(2)
+    
+    # Check again
+    result = subprocess.run(check_connections_cmd, capture_output=True, text=True)
+    if result.returncode == 0:
+        remaining_count = result.stdout.strip()
+        print(f"   {remaining_count} connections remaining after termination")
+    
+    # Step 2: Drop database
+    print(f"   Dropping database {db_name}...")
+    drop_cmd = [
+        "docker", "exec", "odoo-opw-database-1",
+        "psql", "-U", "odoo", "-d", "postgres", "-c",
+        f"DROP DATABASE IF EXISTS {db_name};"
+    ]
+    result = subprocess.run(drop_cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"   ❌ Failed to drop database: {result.stderr}")
+        return
+    
+    # Step 3: Verify drop succeeded
+    verify_drop_cmd = [
+        "docker", "exec", "odoo-opw-database-1",
+        "psql", "-U", "odoo", "-d", "postgres", "-t", "-c",
+        f"SELECT count(*) FROM pg_database WHERE datname = '{db_name}';"
+    ]
+    result = subprocess.run(verify_drop_cmd, capture_output=True, text=True)
+    if result.returncode == 0:
+        count = result.stdout.strip()
+        if count == "0":
+            print(f"   ✅ Database {db_name} successfully dropped")
+        else:
+            print(f"   ⚠️  Warning: Database {db_name} may still exist (count: {count})")
+    
+    # Step 4: Create fresh database
+    print(f"   Creating fresh database {db_name}...")
+    create_cmd = [
+        "docker", "exec", "odoo-opw-database-1",
+        "psql", "-U", "odoo", "-d", "postgres", "-c",
+        f"CREATE DATABASE {db_name};"
+    ]
+    result = subprocess.run(create_cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"   ❌ Failed to create database: {result.stderr}")
+        return
+    
+    # Step 5: Verify creation succeeded
+    verify_create_cmd = [
+        "docker", "exec", "odoo-opw-database-1",
+        "psql", "-U", "odoo", "-d", "postgres", "-t", "-c",
+        f"SELECT count(*) FROM pg_database WHERE datname = '{db_name}';"
+    ]
+    result = subprocess.run(verify_create_cmd, capture_output=True, text=True)
+    if result.returncode == 0:
+        count = result.stdout.strip()
+        if count == "1":
+            print(f"   ✅ Database {db_name} successfully created")
+        else:
+            print(f"   ⚠️  Warning: Database creation may have failed (count: {count})")
+    
+    print(f"🗄️  Database cleanup completed")
 
 
-def run_docker_test_command(test_tags: str, db_name: str, modules_to_install: list[str], timeout: int = 300) -> int:
+def clone_production_database(db_name: str) -> None:
+    production_db = get_production_db_name()
+    print(f"🗄️  Cloning production database: {production_db} → {db_name}")
+    
+    # Step 1: Kill active connections to test database
+    print(f"   Terminating connections to {db_name}...")
+    
+    # First, get the connection count
+    check_connections_cmd = [
+        "docker", "exec", "odoo-opw-database-1",
+        "psql", "-U", "odoo", "-d", "postgres", "-t", "-c",
+        f"SELECT count(*) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();"
+    ]
+    result = subprocess.run(check_connections_cmd, capture_output=True, text=True)
+    if result.returncode == 0:
+        connection_count = result.stdout.strip()
+        print(f"   Found {connection_count} active connections to {db_name}")
+    
+    # Kill the connections
+    kill_connections_cmd = [
+        "docker", "exec", "odoo-opw-database-1",
+        "psql", "-U", "odoo", "-d", "postgres", "-c",
+        f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();"
+    ]
+    result = subprocess.run(kill_connections_cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"   ⚠️  Warning: Could not kill connections: {result.stderr}")
+    else:
+        print(f"   Connection termination command executed")
+    
+    # Wait a moment for connections to close
+    import time
+    time.sleep(2)
+    
+    # Check again
+    result = subprocess.run(check_connections_cmd, capture_output=True, text=True)
+    if result.returncode == 0:
+        remaining_count = result.stdout.strip()
+        print(f"   {remaining_count} connections remaining after termination")
+    
+    # Step 2: Drop existing test database
+    print(f"   Dropping existing database {db_name}...")
+    drop_cmd = [
+        "docker", "exec", "odoo-opw-database-1",
+        "psql", "-U", "odoo", "-d", "postgres", "-c",
+        f"DROP DATABASE IF EXISTS {db_name};"
+    ]
+    result = subprocess.run(drop_cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"   ❌ Failed to drop database: {result.stderr}")
+        return
+    
+    # Step 3: Clone from production database
+    print(f"   Cloning from production database {production_db}...")
+    clone_cmd = [
+        "docker", "exec", "odoo-opw-database-1",
+        "psql", "-U", "odoo", "-d", "postgres", "-c",
+        f"CREATE DATABASE {db_name} WITH TEMPLATE {production_db};"
+    ]
+    result = subprocess.run(clone_cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"   ❌ Failed to clone database: {result.stderr}")
+        return
+    
+    # Step 4: Verify creation succeeded
+    verify_create_cmd = [
+        "docker", "exec", "odoo-opw-database-1",
+        "psql", "-U", "odoo", "-d", "postgres", "-t", "-c",
+        f"SELECT count(*) FROM pg_database WHERE datname = '{db_name}';"
+    ]
+    result = subprocess.run(verify_create_cmd, capture_output=True, text=True)
+    if result.returncode == 0:
+        count = result.stdout.strip()
+        if count == "1":
+            print(f"   ✅ Database {db_name} successfully cloned from {production_db}")
+        else:
+            print(f"   ⚠️  Warning: Database creation may have failed (count: {count})")
+    
+    print(f"🗄️  Database clone completed")
+
+
+def run_docker_test_command(test_tags: str, db_name: str, modules_to_install: list[str], timeout: int = 300, use_production_clone: bool = False) -> int:
     if modules_to_install is None:
         modules_to_install = get_our_modules()
 
@@ -182,7 +337,11 @@ def run_docker_test_command(test_tags: str, db_name: str, modules_to_install: li
     print("-" * 60)
 
     restart_script_runner_with_orphan_cleanup()
-    drop_and_create_test_database(db_name)
+    
+    if use_production_clone:
+        clone_production_database(db_name)
+    else:
+        drop_and_create_test_database(db_name)
 
     cmd = [
         "docker",
@@ -217,7 +376,11 @@ def run_docker_test_command(test_tags: str, db_name: str, modules_to_install: li
 
         print(f"\n⏱️  Completed in {elapsed:.2f}s")
 
-        drop_and_create_test_database(db_name)
+        # Cleanup - use same strategy as setup
+        if use_production_clone:
+            clone_production_database(db_name)
+        else:
+            drop_and_create_test_database(db_name)
 
         if result.returncode == 0:
             print("✅ Tests passed!")
@@ -228,17 +391,29 @@ def run_docker_test_command(test_tags: str, db_name: str, modules_to_install: li
 
     except subprocess.TimeoutExpired:
         print(f"\n❌ Tests timed out after {timeout} seconds")
-        drop_and_create_test_database(db_name)
+        # Cleanup on timeout
+        if use_production_clone:
+            clone_production_database(db_name)
+        else:
+            drop_and_create_test_database(db_name)
         return 1
 
     except KeyboardInterrupt:
         print("\n🛑 Tests interrupted by user")
-        drop_and_create_test_database(db_name)
+        # Cleanup on interrupt
+        if use_production_clone:
+            clone_production_database(db_name)
+        else:
+            drop_and_create_test_database(db_name)
         return 1
 
     except Exception as e:
         print(f"\n💥 Error running tests: {e}")
-        drop_and_create_test_database(db_name)
+        # Cleanup on error
+        if use_production_clone:
+            clone_production_database(db_name)
+        else:
+            drop_and_create_test_database(db_name)
         return 1
 
 

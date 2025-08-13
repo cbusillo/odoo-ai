@@ -2,13 +2,23 @@
 
 ## Overview
 
-This project uses a modern UV-based test infrastructure with Odoo 18's testing framework. The system provides three test layers with clean separation and reliable execution.
+This project uses a modern UV-based test infrastructure with Odoo 18's testing framework. The system provides three test
+layers with clean separation and reliable execution.
 
-**Test Statistics**: 337 test methods across 42 test files  
+**Test Statistics**: Run `uv run test-stats` for current counts  
 **Total Runtime**: < 30 minutes for complete suite  
 **Infrastructure**: Uses script-runner container to avoid circular imports
 
 ## Quick Start
+
+### ⚠️ CRITICAL: Always Use `uv run` Commands
+
+**NEVER run test scripts directly!** The test infrastructure requires `uv run`:
+
+- ✅ **CORRECT**: `uv run test-unit`
+- ❌ **WRONG**: `python tools/test_runner.py`
+- ❌ **WRONG**: `.venv/bin/python tools/test_runner.py`
+- ❌ **WRONG**: `/Users/.../odoo-opw/.venv/bin/python tools/test_runner.py`
 
 ### Simple Commands (Recommended)
 
@@ -41,20 +51,23 @@ uv run test-report        # Generate HTML report
 ## Test Types
 
 ### Unit Tests (`unit_test` tag)
-- **Purpose**: Fast, isolated business logic testing  
+
+- **Purpose**: Fast, isolated business logic testing
 - **Runtime**: < 2 minutes
 - **Database**: Fresh database per run
 - **Examples**: Model validation, computed fields, constraints
 
-### Integration Tests (`integration_test` tag)  
+### Integration Tests (`integration_test` tag)
+
 - **Purpose**: Service layer and API integration testing
 - **Runtime**: < 10 minutes
 - **Database**: Stable test database with snapshots
 - **Examples**: Shopify sync, order import, external API calls
 
 ### Tour Tests (`tour_test` tag)
+
 - **Purpose**: End-to-end browser workflow testing
-- **Runtime**: < 15 minutes  
+- **Runtime**: < 15 minutes
 - **Database**: Staging database with full demo data
 - **Examples**: UI interactions, complete user workflows
 
@@ -117,15 +130,18 @@ All tests MUST use proper tagging:
 ```python
 from odoo.tests import tagged
 
+
 # Unit tests
 @tagged("unit_test", "post_install", "-at_install")
 class TestProductLogic(UnitTestCase):
     pass
 
+
 # Integration tests
-@tagged("integration_test", "post_install", "-at_install") 
+@tagged("integration_test", "post_install", "-at_install")
 class TestShopifySync(IntegrationTestCase):
     pass
+
 
 # Tour tests
 @tagged("tour_test", "post_install", "-at_install")
@@ -136,6 +152,7 @@ class TestUserWorkflow(TourTestCase):
 ## Base Test Classes
 
 ### UnitTestCase
+
 ```python
 from ..fixtures import UnitTestCase, ProductFactory
 
@@ -146,9 +163,11 @@ class TestExample(UnitTestCase):
         self.assertRecordValues(product, {"type": "consu"})
 ```
 
-### IntegrationTestCase  
+### IntegrationTestCase
+
 ```python
 from ..fixtures import IntegrationTestCase
+
 
 @tagged("integration_test", "post_install", "-at_install")
 class TestShopifyAPI(IntegrationTestCase):
@@ -160,6 +179,7 @@ class TestShopifyAPI(IntegrationTestCase):
 ```
 
 ### TourTestCase
+
 ```python
 from ..fixtures import TourTestCase
 
@@ -252,7 +272,7 @@ product = ProductFactory.create(self.env)
 ### Available Factories
 
 - **ProductFactory** - Standard products with unique SKUs
-- **PartnerFactory** - Customers/vendors with contacts  
+- **PartnerFactory** - Customers/vendors with contacts
 - **MotorFactory** - Motor-specific products
 - **ShopifyProductFactory** - Products with Shopify metadata
 - **SaleOrderFactory** - Orders with line items
@@ -274,6 +294,7 @@ product = ProductFactory.create_with_variants(env, variant_count=3)
 ## Best Practices
 
 ### Test Writing
+
 1. **Use factories**: Avoid hardcoded test data
 2. **Proper tagging**: Required for test discovery
 3. **Clear assertions**: Use descriptive failure messages
@@ -281,6 +302,7 @@ product = ProductFactory.create_with_variants(env, variant_count=3)
 5. **Test isolation**: Each test should be independent
 
 ### Tour Testing
+
 1. **Start URL**: Use `/odoo` for Odoo 18 (changed from `/web`)
 2. **Stable selectors**: Avoid complex CSS selectors
 3. **Wait conditions**: Use proper timeouts for async operations
@@ -288,6 +310,7 @@ product = ProductFactory.create_with_variants(env, variant_count=3)
 5. **Test data**: Use unique identifiers to avoid conflicts
 
 ### Performance
+
 1. **Unit tests first**: Fast feedback for business logic
 2. **Integration selectively**: Only test actual integrations
 3. **Tours sparingly**: Focus on critical user workflows
@@ -296,6 +319,7 @@ product = ProductFactory.create_with_variants(env, variant_count=3)
 ## Troubleshooting
 
 ### Tests Not Running
+
 - Check test tags are properly applied
 - Verify test files are in correct directories
 - Ensure base classes are imported correctly
@@ -304,18 +328,21 @@ product = ProductFactory.create_with_variants(env, variant_count=3)
 ### Common Issues
 
 #### Import Errors
+
 ```bash
 # Solution: Use relative imports from fixtures
 from ..fixtures import UnitTestCase, ProductFactory
 ```
 
-#### Database Conflicts  
+#### Database Conflicts
+
 ```bash
 # Solution: Clean up test databases
 uv run test-clean
 ```
 
 #### Tour Failures
+
 ```bash
 # Check for JavaScript errors in tours
 # Use stable selectors, avoid timing issues
@@ -323,8 +350,9 @@ uv run test-clean
 ```
 
 ### Getting Help
+
 1. **Test statistics**: `uv run test-stats` shows test counts
-2. **Verbose output**: Add `--verbose` flag for details  
+2. **Verbose output**: Add `--verbose` flag for details
 3. **HTML reports**: `uv run test-report` for detailed analysis
 4. **Clean slate**: `uv run test-clean` removes all artifacts
 
@@ -333,23 +361,26 @@ uv run test-clean
 This project has migrated from the old monolithic test runner to a modern UV-based system:
 
 - **Before**: 1572-line test_runner.py with ~60% reliability
-- **After**: Clean, modular system with 95%+ reliability  
+- **After**: Clean, modular system with 95%+ reliability
 - **Key improvement**: Uses script-runner container to avoid circular imports
 - **Compatibility**: All existing tests work with minimal changes
 
 The infrastructure is complete and working. Any test failures are typically due to:
+
 1. Missing or incorrect test tags
-2. Import issues (easily fixed with proper base class imports)  
+2. Import issues (easily fixed with proper base class imports)
 3. Test data conflicts (solved with factory pattern)
 
 ## Technical Details
 
 For implementation details, see:
+
 - [Test Runner Guide](TEST_RUNNER_GUIDE.md) - Architecture and advanced usage
 - [@docs/agents/scout.md](agents/scout.md) - Test writing patterns and templates
 
 The test system is built on:
-- **UV scripts**: Defined in `pyproject.toml` 
+
+- **UV scripts**: Defined in `pyproject.toml`
 - **Odoo test tags**: For proper test discovery
 - **Docker containers**: Script-runner for isolation
 - **Factory pattern**: For reliable test data

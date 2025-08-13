@@ -32,7 +32,11 @@ Following the Zen of Python (PEP 20):
     - Descriptive names using full words (no abbreviations)
     - Clear function/variable names that state their purpose
     - Method chains that read like sentences
-- **Exception**: Comments allowed in config files when not clear what something does or why it's set to a value
+- **Exceptions allowed (use very rarely, only when absolutely necessary):**
+    - Comments in config files when not clear what something does or why it's set to a value
+    - `# noinspection` comments (only when absolutely necessary for IDE directives, e.g., suppressing spell check on
+      base64 strings)
+    - `# TODO:` comments for temporary code that needs to be fixed later (shows in PyCharm TODO list)
 
 ## Control Flow
 
@@ -72,7 +76,10 @@ from odoo.addons.product_connect.models.product_template import ProductTemplate
 ```python
 # Before
 from typing import Optional, List, Dict
+
+
 def method(self, vals: Optional[Dict]) -> List[str]:
+
 
 # After
 def method(self, vals: dict | None) -> list[str]:
@@ -85,14 +92,17 @@ def method(self, vals: dict | None) -> list[str]:
 def update_record(self, vals: dict):
     self.write(vals)
 
+
 # After (explicit is better)
 def update_record(self, vals: dict) -> None:
     self.write(vals)
-    
+
+
 # Always specify return type
 def calculate_total(self) -> float:
     return sum(self.amounts)
-    
+
+
 def get_name(self) -> str:
     return self.name or "Unknown"
 ```

@@ -1,12 +1,8 @@
 # 🚢 Dock - Docker Operations Agent
 
-I'm Dock, your specialized agent for Docker container management. I know which MCP tools to use and which containers serve what purpose.
-
-## Tool Priority
+## My Tools
 
 MCP Docker tools provide structured data and instant results. See [Tool Selection Guide](../TOOL_SELECTION.md).
-
-## My Tools (MCP FIRST!)
 
 ### Docker Operations
 - `mcp__docker__list_containers` - Status check
@@ -92,6 +88,8 @@ Always use script-runner with `--stop-after-init`
 - **Troubleshooting issues** → `Model: sonnet-4` (log analysis, debugging)
 
 ```python
+# ← Program Manager or other agents delegate to Dock
+
 # Standard container operations (default Haiku 3.5)
 Task(
     description="Check container status",
@@ -102,14 +100,12 @@ Task(
 # Complex orchestration (upgrade to Sonnet 4)
 Task(
     description="Complex deployment",
-    prompt="@docs/agents/dock.md\n\nModel: sonnet-4\n\nCoordinate rolling update with zero-downtime deployment across multiple environments",
-    subagent_type="dock"
-)
-
-# Simple log check (stay with Haiku 3.5)
-Task(
-    description="Quick log check",
-    prompt="@docs/agents/dock.md\n\nModel: haiku-3.5\n\nGet last 50 lines of web container logs",
+    prompt="@docs/agents/dock.md\n\nModel: sonnet-4\n\nCoordinate rolling update deployment",
     subagent_type="dock"
 )
 ```
+
+## Need More?
+
+- **Detailed patterns**: Load @docs/agent-patterns/dock-patterns.md
+- **Model selection**: Load @docs/system/MODEL_SELECTION.md

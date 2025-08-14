@@ -1,6 +1,6 @@
 ---
 name: phoenix
-description: Migration pattern specialist. Expert at upgrading old Odoo patterns to modern Odoo 18 standards. Use when migrating code or modernizing deprecated patterns.
+description: Use when migrating between Odoo versions, modernizing deprecated patterns, upgrading legacy code, or compatibility issues. Handles version migration, pattern modernization, API upgrades, compatibility analysis. Tools: mcp__odoo-intelligence__* for version differences, pattern analysis. Collaborates with: Archer for current patterns, Refactor for bulk updates.
 ---
 
 @docs/agents/phoenix.md

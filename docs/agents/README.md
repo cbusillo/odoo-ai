@@ -11,45 +11,27 @@ agent has focused knowledge to avoid context pollution and ensure expertise in t
 
 ## Available Agents
 
-| Agent | Name                   | Specialty               | Primary Tools                                                                           |
-|-------|------------------------|-------------------------|-----------------------------------------------------------------------------------------|
-| 🏹    | **Archer**             | Odoo Source Research    | `mcp__odoo-intelligence__search_*`, Docker paths                                        |
-| 🔍    | **Scout**              | Test Writing            | `.venv/bin/python tools/test_runner.py` via Bash, test templates                        |
-| 🔬    | **Inspector**          | Code Quality            | `mcp__odoo-intelligence__*` (project-wide), `mcp__inspection-pycharm__*` (current file) |
-| 🔍    | **QC**                 | Quality Control         | Multi-agent coordination, enforcement, `mcp__odoo-intelligence__*`                      |
-| 🚢    | **Dock**               | Docker Operations       | `mcp__docker__*`, container management                                                  |
-| 🛍️   | **Shopkeeper**         | Shopify Integration     | `mcp__odoo-intelligence__*`, GraphQL patterns                                           |
-| 🦉    | **Owl**                | Frontend Development    | Owl.js patterns, `mcp__pycharm__*` for JS files                                         |
-| 🔥    | **Phoenix**            | Migration Patterns      | `mcp__odoo-intelligence__*`, version differences                                        |
-| ⚡     | **Flash**              | Performance Analysis    | `mcp__odoo-intelligence__performance_*`, optimization                                   |
-| 🐛    | **Debugger**           | Error Analysis          | `mcp__docker__get-logs`, stack trace investigation                                      |
-| 📋    | **Planner**            | Implementation Planning | `TodoWrite`, architecture design, task breakdown                                        |
-| 🔧    | **Refactor**           | Code Improvement        | `MultiEdit`, bulk operations, pattern replacement                                       |
-| 🎭    | **Playwright**         | Browser Testing         | `mcp__playwright__*`, tour test execution, UI debugging                                 |
-| 🧙    | **Odoo Engineer**      | Core Developer Mindset  | Framework patterns, idiomatic Odoo                                                      |
-| 🤖    | **Anthropic Engineer** | Claude Best Practices   | AI optimization, context management                                                     |
-| 💬    | **GPT**                | ChatGPT Consultation    | `mcp__chatgpt_automation__*`, GPT-5 models, thinking mode, web search                   |
-| 📝    | **Doc**                | Documentation Updates   | Maintain accurate docs, track changes, update guides                                    |
+| Agent | Name                   | Purpose                                  |
+|-------|------------------------|------------------------------------------|
+| 🏹    | **Archer**             | Odoo source research and pattern finding |
+| 🔍    | **Scout**              | Test writing and test infrastructure     |
+| 🔬    | **Inspector**          | Code quality and performance analysis    |
+| 🔍    | **QC**                 | Multi-agent quality coordination         |
+| 🚢    | **Dock**               | Docker and container operations          |
+| 🛍️   | **Shopkeeper**         | Shopify integration and sync             |
+| 🦉    | **Owl**                | Frontend development (Owl.js/JS)         |
+| 🔥    | **Phoenix**            | Version migration and upgrades           |
+| ⚡     | **Flash**              | Performance optimization                 |
+| 🐛    | **Debugger**           | Error analysis and debugging             |
+| 📋    | **Planner**            | Implementation planning                  |
+| 🔧    | **Refactor**           | Bulk code improvements                   |
+| 🎭    | **Playwright**         | Browser automation and UI testing        |
+| 🧙    | **Odoo Engineer**      | Framework expertise                      |
+| 🤖    | **Anthropic Engineer** | Claude optimization                      |
+| 💬    | **GPT**                | External verification via ChatGPT        |
+| 📝    | **Doc**                | Documentation maintenance                |
 
-## Quick Agent Selection Guide
-
-| Scenario                   | Primary Agent    | Supporting Agents                 |
-|----------------------------|------------------|-----------------------------------|
-| "Error in traceback"       | 🐛 Debugger      | 🚢 Dock (logs), 💬 GPT (analysis) |
-| "Write tests for X"        | 🔍 Scout         | 🏹 Archer (examples)              |
-| "Optimize performance"     | ⚡ Flash          | 🔬 Inspector (quality)            |
-| "Fix code quality issues"  | 🔬 Inspector     | 🔧 Refactor (bulk fixes)          |
-| "Quality audit/review"     | 🔍 QC            | 🔬 Inspector, ⚡ Flash, 🔍 Scout   |
-| "Implement new feature"    | 📋 Planner       | 🏹 Archer (research)              |
-| "Debug UI/browser issue"   | 🎭 Playwright    | 🦉 Owl (frontend)                 |
-| "Shopify integration"      | 🛍️ Shopkeeper   | 🏹 Archer (patterns)              |
-| "Frontend development"     | 🦉 Owl           | 🎭 Playwright (testing)           |
-| "Container problems"       | 🚢 Dock          | 🐛 Debugger (logs)                |
-| "Complex code review"      | 💬 GPT           | 🔬 Inspector (quality)            |
-| "Migration issues"         | 🔥 Phoenix       | 🏹 Archer (patterns)              |
-| "Architecture design"      | 🧙 Odoo Engineer | 📋 Planner (implementation)       |
-| **"Large implementation"** | 💬 **GPT (4.1)** | **Claude analyzes, GPT codes**    |
-| "Update documentation"     | 📝 Doc           | 🏹 Archer (technical details)     |
+**Note**: Full trigger conditions and collaboration details are in each agent's description (visible in Task tool).
 
 ## Using Agents
 
@@ -109,7 +91,7 @@ Task(
 
 For detailed performance benchmarks and real-world examples, see:
 
-- [Tool Selection Performance Guide](../TOOL_SELECTION_PERFORMANCE_GUIDE.md) - Complete patterns and anti-patterns
+- [Tool Selection Guide](../TOOL_SELECTION.md) - Complete patterns, anti-patterns, and performance analysis
 - [Performance Reference Guide](../PERFORMANCE_REFERENCE.md) - Agent-specific improvements
 
 ### Quick Performance Summary
@@ -145,14 +127,14 @@ For detailed performance benchmarks and real-world examples, see:
 ✅ Simple file edits or reads
 ✅ Discussing architecture or planning
 
-## Agent Collaboration (Your Team Works Together!)
+## Agent Collaboration
 
-**Important**: Agents can and should call other agents (except themselves) when it helps complete the task. This is how
-your team collaborates effectively.
+**Important**: Agents can and should call other agents (except themselves) when it helps complete the task. This enables
+efficient task routing to specialists.
 
 ### Key Collaboration Principles:
 
-1. **Cross-functional teamwork**: Agents call specialists in other domains
+1. **Cross-functional coordination**: Agents call specialists in other domains
 2. **No recursive calls**: Agents cannot call themselves
 3. **Context preservation**: Each agent works in its own context window
 4. **Parallel execution**: Multiple agents can work simultaneously
@@ -220,9 +202,9 @@ if bulk_issues_found:
 - **Always include agent doc**: Use @mention to include the agent's instructions
 - **Be specific**: Clear, focused prompts get better results
 - **Check agent specialties**: Use the right agent for the job
-- **Shared tools**: See `docs/agents/SHARED_TOOLS.md` for tools ALL agents should know about
-- **Model selection**: See `docs/agents/MODEL_SELECTION_GUIDE.md` for model selection syntax and optimization
-- **Agent safeguards**: See `docs/agents/AGENT_SAFEGUARDS.md` for preventing recursive calls
+- **Shared tools**: See `docs/system/SHARED_TOOLS.md` for tools ALL agents should know about
+- **Model selection**: See `docs/system/MODEL_SELECTION.md` for model selection syntax and optimization
+- **Agent safeguards**: See `docs/system/AGENT_SAFEGUARDS.md` for preventing recursive calls
 
 ## Tool Examples Appendix
 

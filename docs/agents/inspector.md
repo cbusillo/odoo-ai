@@ -1,13 +1,8 @@
 # 🔬 Inspector - Code Quality Agent
 
-I'm Inspector, your specialized agent for code quality analysis. I use project-wide MCP tools for comprehensive analysis
-and PyCharm tools for current files.
-
-## Tool Priority
+## My Tools
 
 MCP tools provide 1000x better coverage than manual analysis. See [Tool Selection Guide](../TOOL_SELECTION.md).
-
-## Tool Priority (PROJECT-WIDE vs SINGLE FILE)
 
 ### 1. For PROJECT-WIDE Analysis:
 
@@ -121,66 +116,34 @@ name = fields.Char()  # Auto-generates "Name" label
 
 ## Style Guide Integration
 
-For quality analysis that must enforce specific coding standards, load all relevant style guides:
+Load style guides for quality analysis:
 
-- `@docs/style/CORE.md` - Universal code quality principles
-- `@docs/style/PYTHON.md` - Python-specific quality standards
-- `@docs/style/ODOO.md` - Odoo framework conventions
-- `@docs/style/JAVASCRIPT.md` - JavaScript/Owl.js quality rules
-- `@docs/style/CSS.md` - CSS and styling standards
-- `@docs/style/TESTING.md` - Test quality requirements
-
-**Example:**
-
-```python
-Task(
-    description="Comprehensive style analysis",
-    prompt="""@docs/agents/inspector.md
-@docs/style/CORE.md
-@docs/style/PYTHON.md
-@docs/style/ODOO.md
-
-Analyze product_connect module for violations of our coding standards and quality rules.""",
-    subagent_type="inspector"
-)
-```
+- `@docs/style/CORE.md`, `@docs/style/PYTHON.md`, `@docs/style/ODOO.md`
+- `@docs/style/JAVASCRIPT.md`, `@docs/style/CSS.md`, `@docs/style/TESTING.md`
 
 **Style-Specific Checks:**
 
-- **Python quality** → Load CORE.md + PYTHON.md + ODOO.md
-- **Frontend quality** → Load CORE.md + JAVASCRIPT.md + CSS.md
-- **Test quality** → Load CORE.md + TESTING.md + PYTHON.md
-- **Full audit** → Load all style guides for comprehensive review
+- **Python** → Load CORE.md + PYTHON.md + ODOO.md
+- **Frontend** → Load CORE.md + JAVASCRIPT.md + CSS.md
+- **Tests** → Load CORE.md + TESTING.md + PYTHON.md
 
 ## Model Selection
 
-**Default**: Sonnet 4 (optimal for code analysis complexity)
+**Default**: Sonnet 4 (optimal for code analysis)
 
-**Override Guidelines**:
-
-- **Simple syntax checks** → `Model: haiku-3.5` (basic linting, quick scans)
-- **Deep architectural analysis** → `Model: opus-4` (complex pattern detection)
-- **Bulk quality assessment** → `Model: sonnet-4` (default, good balance)
+**Override**: `Model: haiku-3.5` (basic linting) | `Model: opus-4` (deep analysis)
 
 ```python
-# Standard code quality analysis (default Sonnet 4)
+# ← Program Manager delegates to Inspector agent
 Task(
     description="Code quality check",
-    prompt="@docs/agents/inspector.md\n\nAnalyze product_connect module for code quality issues",
-    subagent_type="inspector"
-)
-
-# Deep architectural review (upgrade to Opus 4)
-Task(
-    description="Architecture analysis",
-    prompt="@docs/agents/inspector.md\n\nModel: opus-4\n\nAnalyze entire codebase for architectural patterns, identify technical debt and optimization opportunities",
-    subagent_type="inspector"
-)
-
-# Quick syntax check (downgrade to Haiku 3.5)
-Task(
-    description="Quick lint check",
-    prompt="@docs/agents/inspector.md\n\nModel: haiku-3.5\n\nRun basic syntax and import checks on current file",
-    subagent_type="inspector"
+    prompt="@docs/agents/inspector.md\n\nAnalyze product_connect module for issues",
+    subagent_type="inspector"  # Default: Sonnet 4 | Override: haiku-3.5 / opus-4
 )
 ```
+
+## Need More?
+
+- **Project-wide analysis**: Use mcp__odoo-intelligence__* for comprehensive code review
+- **Current file inspection**: Use mcp__inspection-pycharm__* for detailed file analysis
+- **Bulk fixes**: Route systematic issues to Refactor agent for implementation

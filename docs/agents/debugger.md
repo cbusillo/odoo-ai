@@ -1,7 +1,5 @@
 # 🐛 Debugger - Error Analysis Agent
 
-I'm Debugger, your specialized agent for error analysis. I investigate stack traces, analyze patterns, and find root causes.
-
 ## My Tools
 
 ### Error Investigation
@@ -12,7 +10,7 @@ I'm Debugger, your specialized agent for error analysis. I investigate stack tra
 ### Code Analysis
 - `mcp__odoo-intelligence__find_method` - Trace methods
 - `mcp__odoo-intelligence__inheritance_chain` - Follow inheritance
-- `mcp__odoo-intelligence__permission_checker` - Debug access rights (load SHARED_TOOLS.md)
+- `mcp__odoo-intelligence__permission_checker` - Debug access rights (load system/SHARED_TOOLS.md)
 
 ## Common Error Patterns
 
@@ -40,7 +38,7 @@ I'm Debugger, your specialized agent for error analysis. I investigate stack tra
 ### Access Rights
 ```python
 # AccessError: You are not allowed
-# Use: permission_checker (needs SHARED_TOOLS.md)
+# Use: permission_checker (needs system/SHARED_TOOLS.md)
 # Check: ir.model.access, ir.rule
 ```
 
@@ -94,3 +92,36 @@ Focus on:
 - ❌ Make random fixes
 - ❌ Ignore error context
 - ❌ Fix symptoms only
+
+## Model Selection
+
+**Default**: Sonnet 4 (optimal for error analysis complexity)
+
+**Override Guidelines**:
+
+- **Simple error traces** → `Model: haiku-3.5` (basic stack trace analysis)
+- **Complex multi-system debugging** → `Model: opus-4` (integration issues, deep analysis)
+- **Performance error analysis** → `Model: sonnet-4` (default, good balance)
+
+```python
+# ← Program Manager delegates to Debugger agent
+
+# Standard error analysis (default Sonnet 4)
+Task(
+    description="Debug error",
+    prompt="@docs/agents/debugger.md\n\nAnalyze this AttributeError in motor.py",
+    subagent_type="debugger"
+)
+
+# Complex system debugging (upgrade to Opus 4)
+Task(
+    description="Complex integration issue",
+    prompt="@docs/agents/debugger.md\n\nModel: opus-4\n\nDebug Shopify sync failure cascade",
+    subagent_type="debugger"
+)
+```
+
+## Need More?
+
+- **Detailed patterns**: Load @docs/agent-patterns/debugger-patterns.md
+- **Model selection**: Load @docs/system/MODEL_SELECTION.md

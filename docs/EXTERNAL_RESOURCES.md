@@ -1,15 +1,8 @@
-# Documentation Resources
+# External Resources
 
-This project includes various documentation resources for development.
+This document provides links to external documentation and API references for the technologies used in this project.
 
-## Project Documentation
-
-- **`TESTING.md`** - Testing guide and requirements for the project
-- **`TEST_RUNNER_GUIDE.md`** - Complete guide to the UV-based test infrastructure (337 test methods)
-- **`TEST_WRITING_GUIDE.md`** - How to write effective tests using proper tagging and factories
-- **`style/`** - Domain-specific code style guides (CORE, PYTHON, JAVASCRIPT, TESTING, ODOO)
-- **`todo/`** - Work-in-progress documents and notes (in gitignore)
-- **`../addons/product_connect/docs/AUTOMATED_TOUR_TESTING.md`** - Guide for creating and running automated tour tests
+**For project-specific documentation, see [CLAUDE.md Navigation Hub](../CLAUDE.md#-navigation-hub).**
 
 ## External Documentation
 

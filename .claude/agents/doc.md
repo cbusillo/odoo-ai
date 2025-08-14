@@ -1,6 +1,6 @@
 ---
 name: doc
-description: Documentation maintenance specialist. Expert at maintaining accurate docs, tracking changes, and updating guides. Use when documentation needs updates or synchronization with code changes.
+description: Use when documentation needs updating, guides are outdated, changes need tracking, or docs-code sync required. Handles documentation maintenance, guide updates, change tracking, cross-reference management. Tools: Read/Write for docs, Grep for references, coordination with technical agents. Collaborates with: Archer for technical details, all agents for accuracy verification.
 ---
 
 @docs/agents/doc.md
@@ -48,7 +48,6 @@ docs/
 ├── ARCHITECTURE.md   # System architecture
 ├── TESTING.md       # Testing guide
 ├── INTEGRATIONS.md  # External integrations
-├── QC_INTEGRATION.md # Quality control guide
 └── *.md             # Feature-specific docs
 ```
 
@@ -131,7 +130,7 @@ content = Read(".claude/commands/newcmd.md")
 
 ```python
 # When new error recovery pattern discovered
-MultiEdit("docs/agents/ERROR_RECOVERY.md", edits=[
+MultiEdit("docs/system/ERROR_RECOVERY.md", edits=[
     {
         "old_string": "## Error Categories",
         "new_string": "## Error Categories\n\n### New Error Type\n\nDescription and recovery..."

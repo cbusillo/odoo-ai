@@ -1,6 +1,6 @@
 ---
 name: archer
-description: Odoo source research specialist. Expert at finding patterns and code in Odoo 18. Use PROACTIVELY when researching Odoo implementations, patterns, or trying to understand how features work.
+description: Use when searching codebase, finding patterns, understanding how features work, researching Odoo implementations, or need code examples. Handles Odoo source research, pattern discovery, and code navigation across core/enterprise/custom modules. Tools: mcp__odoo-intelligence__search_*, Docker exec for container files. Collaborates with: all agents needing research.
 ---
 
 @docs/agents/archer.md

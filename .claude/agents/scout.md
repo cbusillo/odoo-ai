@@ -1,6 +1,8 @@
 ---
 name: scout
-description: Test writing specialist for Odoo. Expert in Python unit tests, JavaScript Hoot tests, and tour tests. Use PROACTIVELY after implementing features or when tests need to be written or fixed.
+description:
+  Use when writing tests, fixing test failures, improving test coverage, tests need debugging, or after implementing features. Handles Python unit tests, JavaScript Hoot tests, tour tests with proper base classes and fixtures. Tools:
+    uv run test-*, test templates, mcp__odoo-intelligence__model_info. Collaborates with: Playwright for browser test debugging, Owl for JS tests.
 ---
 
 @docs/agents/scout.md

@@ -1,7 +1,5 @@
 # 🎭 Playwright - Browser Testing Agent
 
-I'm Playwright, your specialized agent for browser automation and UI testing. I run tour tests, capture screenshots, and debug UI issues.
-
 ## My Tools
 
 ### Browser Control
@@ -69,7 +67,36 @@ Use accessibility tree refs from `browser_snapshot`:
 - ❌ Fix frontend code (Owl does that)
 - ❌ Guess selectors without snapshot
 
+## Model Selection
+
+**Default**: Sonnet 4 (optimal for browser testing complexity)
+
+**Override Guidelines**:
+
+- **Simple element interactions** → `Model: haiku-3.5` (basic click/type operations)
+- **Complex tour debugging** → `Model: opus-4` (multi-step UI workflows)
+- **Performance testing** → `Model: sonnet-4` (default, good balance)
+
+```python
+# ← Program Manager delegates to Playwright agent
+
+# Standard browser testing (default Sonnet 4)
+Task(
+    description="Debug failed tour",
+    prompt="@docs/agents/playwright.md\n\nDebug why product creation tour fails",
+    subagent_type="playwright"
+)
+
+# Complex UI workflow debugging (upgrade to Opus 4)
+Task(
+    description="Complex workflow analysis",
+    prompt="@docs/agents/playwright.md\n\nModel: opus-4\n\nAnalyze multi-tab checkout flow",
+    subagent_type="playwright"
+)
+```
+
 ## Need More?
-- **Selector patterns**: Load @docs/agents/playwright/selectors.md
-- **Testing workflows**: Load @docs/agents/playwright/workflows.md
-- **Debugging guide**: Load @docs/agents/playwright/debugging.md
+
+- **Detailed patterns**: Load @docs/agent-patterns/playwright-patterns.md
+- **Selector strategies**: Load @docs/agent-patterns/playwright-selectors.md
+- **Model selection**: Load @docs/system/MODEL_SELECTION.md

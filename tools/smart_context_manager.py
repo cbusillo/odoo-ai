@@ -409,7 +409,7 @@ class SmartContextManager:
         # Add shared tools for specific scenarios
         shared_tools = ""
         if analysis.recommended_agent == "debugger" and "access" in task_description.lower():
-            shared_tools = "\n@docs/agents/SHARED_TOOLS.md"
+            shared_tools = "\n@docs/system/SHARED_TOOLS.md"
 
         prompt = f"""{agent_doc}{shared_tools}
 

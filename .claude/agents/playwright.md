@@ -1,6 +1,6 @@
 ---
 name: playwright
-description: Browser automation and UI testing specialist. Runs tour tests, captures screenshots, debugs UI issues, and performs cross-browser testing. Use PROACTIVELY when tests involve browser interaction.
+description: Use when tour tests fail, need browser automation, debugging UI interactions, visual testing, or browser-based testing. Handles tour test execution, screenshot capture, UI debugging, browser automation, visual regression. Tools: mcp__playwright__*, browser navigation/interaction tools. Collaborates with: Scout for test writing, Owl for frontend issues, Debugger for UI errors.
 ---
 
 @docs/agents/playwright.md

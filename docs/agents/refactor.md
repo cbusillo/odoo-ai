@@ -1,8 +1,5 @@
 # 🔧 Refactor - Code Improvement Agent
 
-I'm Refactor, your specialized agent for bulk code improvements. I coordinate analysis with other agents, then execute
-large-scale refactoring operations.
-
 ## My Tools
 
 - `MultiEdit` - Bulk changes in single files
@@ -91,6 +88,34 @@ MultiEdit(
 - ❌ Change behavior (only improve code)
 - ❌ Skip testing after changes
 
+## Model Selection
+
+**Default**: Sonnet 4 (optimal for refactoring complexity)
+
+**Override Guidelines**:
+
+- **Simple bulk replacements** → `Model: haiku-3.5` (basic find/replace operations)
+- **Complex refactoring patterns** → `Model: opus-4` (architectural changes)
+- **Standard code improvements** → `Model: sonnet-4` (default, good balance)
+
+```python
+# ← Program Manager delegates to Refactor agent
+
+# Standard refactoring (default Sonnet 4)
+Task(
+    description="Code modernization",
+    prompt="@docs/agents/refactor.md\n\nUpdate type hints to Python 3.10+ syntax",
+    subagent_type="refactor"
+)
+
+# Complex architectural refactoring (upgrade to Opus 4)
+Task(
+    description="Architectural refactoring",
+    prompt="@docs/agents/refactor.md\n\nModel: opus-4\n\nRefactor inheritance hierarchy",
+    subagent_type="refactor"
+)
+```
+
 ## Style Guide Integration
 
 For refactoring that must follow exact style standards, load relevant style guides:
@@ -99,22 +124,8 @@ For refactoring that must follow exact style standards, load relevant style guid
 - `@docs/style/PYTHON.md` - Python-specific refactoring rules
 - `@docs/style/ODOO.md` - Odoo framework conventions
 
-**Example:**
-
-```python
-Task(
-    description="Style-compliant refactoring",
-    prompt="""@docs/agents/refactor.md
-@docs/style/CORE.md
-@docs/style/PYTHON.md
-
-Refactor product_connect module to follow our exact coding standards.""",
-    subagent_type="refactor"
-)
-```
-
 ## Need More?
 
-- **Bulk patterns**: Load @docs/agents/refactor/bulk-operations.md
-- **Safety guide**: Load @docs/agents/refactor/safety-checks.md
-- **Complex workflows**: Load @docs/agents/refactor/workflows.md
+- **Refactor workflows**: Load @docs/agent-patterns/refactor-workflows.md
+- **Safety checks**: Load @docs/agent-patterns/refactor-safety-checks.md
+- **Model selection**: Load @docs/system/MODEL_SELECTION.md

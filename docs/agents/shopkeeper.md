@@ -1,7 +1,5 @@
 # 🛍️ Shopkeeper - Shopify Integration Agent
 
-I'm Shopkeeper, your specialized agent for Shopify integration. I understand GraphQL, sync patterns, and Shopify-specific rules.
-
 ## My Tools
 
 ### Model Analysis
@@ -71,7 +69,35 @@ result = client.execute(query, variables)
 - ❌ Forget skip_shopify_sync context
 - ❌ Create sync loops
 
+## Model Selection
+
+**Default**: Sonnet 4 (optimal for integration complexity)
+
+**Override Guidelines**:
+
+- **Simple GraphQL queries** → `Model: haiku-3.5` (basic schema queries)
+- **Complex sync patterns** → `Model: opus-4` (multi-system integration)
+- **Standard integration** → `Model: sonnet-4` (default, good balance)
+
+```python
+# ← Program Manager delegates to Shopkeeper agent
+
+# Standard integration work (default Sonnet 4)
+Task(
+    description="Shopify sync",
+    prompt="@docs/agents/shopkeeper.md\n\nImplement product sync from Shopify to Odoo",
+    subagent_type="shopkeeper"
+)
+
+# Complex integration debugging (upgrade to Opus 4)
+Task(
+    description="Complex sync issues",
+    prompt="@docs/agents/shopkeeper.md\n\nModel: opus-4\n\nDebug webhook cascade failures",
+    subagent_type="shopkeeper"
+)
+```
+
 ## Need More?
-- **GraphQL patterns**: Load @docs/agents/shopkeeper/graphql-patterns.md
-- **Sync workflows**: Load @docs/agents/shopkeeper/sync-patterns.md
-- **Webhook handling**: Load @docs/agents/shopkeeper/webhooks.md
+
+- **GraphQL patterns**: Load @docs/agent-patterns/graphql-patterns.md
+- **Model selection**: Load @docs/system/MODEL_SELECTION.md

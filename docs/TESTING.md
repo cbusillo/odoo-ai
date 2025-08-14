@@ -18,7 +18,6 @@ layers with clean separation and reliable execution.
 - ✅ **CORRECT**: `uv run test-unit`
 - ❌ **WRONG**: `python tools/test_runner.py`
 - ❌ **WRONG**: `.venv/bin/python tools/test_runner.py`
-- ❌ **WRONG**: `/Users/.../odoo-opw/.venv/bin/python tools/test_runner.py`
 
 ### Simple Commands (Recommended)
 
@@ -71,34 +70,237 @@ uv run test-report        # Generate HTML report
 - **Database**: Staging database with full demo data
 - **Examples**: UI interactions, complete user workflows
 
-## Advanced Usage
+## Writing Tests
 
-### Custom Test Selection (Not Yet Implemented)
+### 1. Choose the Right Test Type
 
-```bash
-# Planned capabilities (not yet implemented)
-# uv run test-unit --pattern "test_motor*"
-# uv run test-integration --tags "shopify"  
-# uv run test-tour --exclude "slow"
+```python
+# Fast business logic tests
+from ..common_imports import tagged, UNIT_TAGS
+from ..fixtures import UnitTestCase
 
-# Debug modes (not yet implemented)
-# uv run test-unit --verbose
-# uv run test-all --debug
+@tagged(*UNIT_TAGS)
+class TestBusinessLogic(UnitTestCase):
+    def test_motor_creation(self):
+        # Fast, isolated test
+        pass
+
+# Service integration tests
+from ..common_imports import tagged, INTEGRATION_TAGS
+from ..fixtures import IntegrationTestCase
+
+@tagged(*INTEGRATION_TAGS)
+class TestShopifySync(IntegrationTestCase):
+    def test_product_sync(self):
+        # Real service integration
+        pass
+
+# Browser workflow tests
+from ..common_imports import tagged, TOUR_TAGS
+from ..fixtures import TourTestCase
+
+@tagged(*TOUR_TAGS)
+class TestProductWorkflow(TourTestCase):
+    def test_product_creation_flow(self):
+        # End-to-end browser test
+        pass
 ```
 
-### Development Workflow
+### 2. Use Factory Pattern
 
-```bash
-# 1. Quick feedback loop
-uv run test-quick           # Fast smoke tests
+```python
+from ..fixtures import ProductFactory, PartnerFactory
 
-# 2. Feature development  
-uv run test-unit           # Verify business logic
-uv run test-integration    # Check integrations
+# ✅ GOOD - Always unique
+product = ProductFactory.create(self.env, name="Custom Name")
 
-# 3. Before commit
-uv run test-all            # Full validation
-uv run test-report         # Generate HTML report
+# ❌ BAD - Will cause conflicts
+product = self.env["product.template"].create({
+    "default_code": "TEST001",  # Conflicts!
+})
+```
+
+## Test Tagging System
+
+### Tag Constants (Required)
+
+All tests MUST use tag constants from `base_types.py`:
+
+```python
+# Import the constants
+from ..common_imports import tagged, UNIT_TAGS, INTEGRATION_TAGS, TOUR_TAGS
+
+# Use them with @tagged decorator
+@tagged(*UNIT_TAGS)          # Unit tests
+@tagged(*INTEGRATION_TAGS)   # Integration tests  
+@tagged(*TOUR_TAGS)          # Tour tests
+```
+
+### Tag Definitions
+
+```python
+# From base_types.py
+STANDARD_TAGS = ["post_install", "-at_install"]
+UNIT_TAGS = STANDARD_TAGS + ["unit_test"]
+INTEGRATION_TAGS = STANDARD_TAGS + ["integration_test"]
+TOUR_TAGS = STANDARD_TAGS + ["tour_test"]
+```
+
+### Why Use Constants?
+
+- **Consistency**: Same tags across all tests
+- **Discovery**: Test runner finds tests properly
+- **Maintenance**: Change tags in one place
+- **Type safety**: IDE autocomplete and validation
+
+## Base Test Classes
+
+### UnitTestCase
+
+**Purpose**: Fast, isolated business logic tests
+
+**Features**:
+
+- Fresh database per test class
+- Mock support for external services
+- Factory pattern for test data
+- No external dependencies
+
+**Example**:
+
+```python
+from ..common_imports import tagged, UNIT_TAGS
+from ..fixtures import UnitTestCase, ProductFactory
+
+@tagged(*UNIT_TAGS)
+class TestMotorModel(UnitTestCase):
+    def test_motor_creation(self):
+        motor = ProductFactory.create_motor(self.env)
+        self.assertEqual(motor.product_type, "motor")
+        
+    def test_validation_rules(self):
+        with self.assertRaises(ValidationError):
+            ProductFactory.create(self.env, default_code="")
+```
+
+### IntegrationTestCase
+
+**Purpose**: Service layer and API integration tests
+
+**Features**:
+
+- Stable test database with snapshots
+- Pre-configured mock services
+- Real integration testing capabilities
+- Shared setup for efficiency
+
+**Example**:
+
+```python
+from ..common_imports import tagged, INTEGRATION_TAGS
+from ..fixtures import IntegrationTestCase
+
+@tagged(*INTEGRATION_TAGS)
+class TestShopifySync(IntegrationTestCase):
+    def test_product_sync(self):
+        # Create test credentials
+        credentials = self.create_shopify_credentials()
+        
+        # Mock external service
+        with self.mock_shopify_client() as mock_client:
+            mock_client.query.return_value = self.mock_shopify_response({
+                "products": {"edges": []}
+            })
+            
+            # Test the service
+            result = self.shopify_service.sync_products()
+            self.assertTrue(result.success)
+```
+
+### TourTestCase
+
+**Purpose**: Browser-based UI workflow tests
+
+**Features**:
+
+- Full staging environment
+- Complete demo data
+- Browser automation support
+- End-to-end workflow testing
+
+**Example**:
+
+```python
+from ..common_imports import tagged, TOUR_TAGS
+from ..fixtures import TourTestCase
+
+@tagged(*TOUR_TAGS)
+class TestProductWorkflow(TourTestCase):
+    def setUp(self):
+        super().setUp()
+        self.browser_size = "1920x1080"  # MUST be string!
+        
+    def test_product_creation_flow(self):
+        self.start_tour("/odoo", "product_creation_tour")
+```
+
+## Factory Pattern Usage
+
+### Available Factories
+
+```python
+from ..fixtures import (
+    ProductFactory,         # Standard products with unique SKUs
+    PartnerFactory,         # Customers/vendors with contacts  
+    MotorFactory,          # Motor-specific products
+    ShopifyProductFactory, # Products with Shopify metadata
+    SaleOrderFactory,      # Orders with line items
+)
+```
+
+### Basic Usage
+
+```python
+# Single record with defaults
+product = ProductFactory.create(self.env)
+
+# Single record with custom data
+product = ProductFactory.create(self.env, 
+    name="Custom Motor",
+    list_price=299.99
+)
+
+# Multiple records
+products = ProductFactory.create_batch(self.env, count=5)
+
+# Complex scenarios
+company, contacts = PartnerFactory.create_with_contacts(self.env)
+motor = MotorFactory.create_with_variants(self.env, variant_count=3)
+```
+
+### Why Use Factories?
+
+**Problem**: Hardcoded test data causes conflicts
+
+```python
+# ❌ This will fail when run multiple times
+product1 = self.env["product.template"].create({
+    "default_code": "TEST001",
+    "name": "Test Product"
+})
+
+product2 = self.env["product.template"].create({
+    "default_code": "TEST001",  # DUPLICATE! Fails
+    "name": "Another Product"
+})
+```
+
+**Solution**: Factories generate unique data
+
+```python
+# ✅ Always works - unique every time
+product1 = ProductFactory.create(self.env)  # SKU: TEST_20250812_143022_001
+product2 = ProductFactory.create(self.env)  # SKU: TEST_20250812_143022_002
 ```
 
 ## Test Organization
@@ -123,70 +325,30 @@ addons/product_connect/tests/
     └── test_*.py          # Tour runners
 ```
 
-### Test Tags (Critical for Discovery)
-
-All tests MUST use proper tagging:
+### Test Class Naming
 
 ```python
-from odoo.tests import tagged
+# ✅ GOOD - Clear, descriptive names
+class TestMotorModelCreation(UnitTestCase):
+class TestShopifyProductSync(IntegrationTestCase):
+class TestProductWorkflowTour(TourTestCase):
 
-
-# Unit tests
-@tagged("unit_test", "post_install", "-at_install")
-class TestProductLogic(UnitTestCase):
-    pass
-
-
-# Integration tests
-@tagged("integration_test", "post_install", "-at_install")
-class TestShopifySync(IntegrationTestCase):
-    pass
-
-
-# Tour tests
-@tagged("tour_test", "post_install", "-at_install")
-class TestUserWorkflow(TourTestCase):
-    pass
+# ❌ BAD - Vague or unclear
+class TestStuff(UnitTestCase):
+class Test1(IntegrationTestCase):
 ```
 
-## Base Test Classes
-
-### UnitTestCase
+### Test Method Naming
 
 ```python
-from ..fixtures import UnitTestCase, ProductFactory
+# ✅ GOOD - Describes what's being tested
+def test_motor_creation_with_valid_data(self):
+def test_shopify_sync_handles_api_errors(self):
+def test_product_workflow_end_to_end(self):
 
-@tagged("unit_test", "post_install", "-at_install")
-class TestExample(UnitTestCase):
-    def test_business_logic(self):
-        product = ProductFactory.create(self.env)
-        self.assertRecordValues(product, {"type": "consu"})
-```
-
-### IntegrationTestCase
-
-```python
-from ..fixtures import IntegrationTestCase
-
-
-@tagged("integration_test", "post_install", "-at_install")
-class TestShopifyAPI(IntegrationTestCase):
-    def test_api_integration(self):
-        # Mock external services
-        with self.mock_shopify_client():
-            result = self.service.sync_products()
-            self.assertTrue(result.success)
-```
-
-### TourTestCase
-
-```python
-from ..fixtures import TourTestCase
-
-@tagged("tour_test", "post_install", "-at_install") 
-class TestUIWorkflow(TourTestCase):
-    def test_product_creation(self):
-        self.start_tour("/odoo", "product_creation_tour")
+# ❌ BAD - Unclear what's being tested
+def test_1(self):
+def test_it_works(self):
 ```
 
 ## JavaScript/Tour Testing
@@ -254,41 +416,215 @@ registry.category("web_tour.tours").add("product_creation_tour", {
 });
 ```
 
-## Factory Pattern (Recommended)
+## Common Pitfalls to Avoid
 
-Replace hardcoded test data with dynamic factories to avoid conflicts:
+### 1. Browser Size Format
 
 ```python
-# ❌ OLD - Causes conflicts
-product = self.env["product.template"].create({
-    "default_code": "TEST001",  # Will conflict with other tests!
-})
+# ✅ CORRECT - String format
+self.browser_size = "1920x1080"
 
-# ✅ NEW - Unique every time  
-from ..fixtures import ProductFactory
-product = ProductFactory.create(self.env)
+# ❌ WRONG - Tuple format (will fail)
+self.browser_size = (1920, 1080)
 ```
 
-### Available Factories
-
-- **ProductFactory** - Standard products with unique SKUs
-- **PartnerFactory** - Customers/vendors with contacts
-- **MotorFactory** - Motor-specific products
-- **ShopifyProductFactory** - Products with Shopify metadata
-- **SaleOrderFactory** - Orders with line items
-
-### Factory Usage
+### 2. Missing Imports
 
 ```python
-# Single record
-product = ProductFactory.create(env, name="Custom Name")
+# ✅ CORRECT - Import when using
+import secrets
+def test_random_data(self):
+    random_id = secrets.randbelow(1000)
 
-# Multiple records
-products = ProductFactory.create_batch(env, count=5)
+# ❌ WRONG - Using without import (will fail)
+def test_random_data(self):
+    random_id = secrets.randbelow(1000)  # NameError!
+```
 
-# Complex scenarios
-company, contacts = PartnerFactory.create_with_contacts(env)
-product = ProductFactory.create_with_variants(env, variant_count=3)
+### 3. Incorrect Tag Usage
+
+```python
+# ✅ CORRECT - Use constants
+from ..common_imports import tagged, UNIT_TAGS
+@tagged(*UNIT_TAGS)
+
+# ❌ WRONG - Hardcoded strings
+@tagged("unit_test", "post_install", "-at_install")
+```
+
+### 4. Wrong Import Paths
+
+```python
+# ✅ CORRECT - Relative imports
+from ..common_imports import tagged, UNIT_TAGS
+from ..fixtures import UnitTestCase
+
+# ❌ WRONG - Absolute imports (will fail)
+from addons.product_connect.tests.fixtures import UnitTestCase
+```
+
+### 5. PyCharm Warnings to Ignore
+
+These PyCharm warnings are **false positives** - ignore them:
+
+- **"odoo.values.*" types**: PyCharm doesn't understand Odoo's type system
+- **"Missing type annotations"**: Odoo models don't use standard Python typing
+- **"Unused imports"**: Base classes and fixtures are used by the framework
+
+## Test Runner Architecture
+
+### Command Flow
+
+```mermaid
+graph TD
+    A[uv run test-unit] --> B[tools.test_commands:run_unit_tests]
+    B --> C[Script-runner container]
+    C --> D[Odoo with test tags]
+    D --> E[Test discovery & execution]
+    E --> F[Output streaming]
+    F --> G[Results & cleanup]
+```
+
+### Test Categories
+
+| Category        | Tag                | Purpose                | Runtime  | Database               |
+|-----------------|--------------------|------------------------|----------|------------------------|
+| **Unit**        | `unit_test`        | Business logic, models | < 2 min  | Fresh per run          |
+| **Integration** | `integration_test` | Services, APIs         | < 10 min | Stable snapshots       |
+| **Tour**        | `tour_test`        | UI workflows           | < 15 min | Staging with demo data |
+
+### Database Management
+
+#### Unit Tests
+
+- **Fresh database** created for each run
+- **Template-based creation** (< 2 seconds)
+- **Automatic cleanup** after completion
+- **No demo data** for speed
+
+#### Integration Tests
+
+- **Stable test database** (`opw_integration`)
+- **Snapshot/restore mechanism** for consistency
+- **Reset between test classes**
+- **Shared within class** for efficiency
+
+#### Tour Tests
+
+- **Staging database** (`opw_staging`)
+- **Full demo data** loaded
+- **No reset during runs** for stability
+- **Periodic refresh** as needed
+
+## Common Test Patterns
+
+### Testing Model Validation
+
+```python
+@tagged(*UNIT_TAGS)
+class TestMotorValidation(UnitTestCase):
+    def test_required_fields(self):
+        with self.assertRaises(ValidationError):
+            MotorFactory.create(self.env, name="")
+            
+    def test_unique_constraints(self):
+        motor1 = MotorFactory.create(self.env)
+        
+        with self.assertRaises(ValidationError):
+            MotorFactory.create(self.env, default_code=motor1.default_code)
+```
+
+### Testing Service Integration
+
+```python
+@tagged(*INTEGRATION_TAGS)
+class TestShopifyService(IntegrationTestCase):
+    def test_product_sync_success(self):
+        credentials = self.create_shopify_credentials()
+        
+        with self.mock_shopify_client() as client:
+            client.query.return_value = self.mock_shopify_response({
+                "products": {"edges": [{"node": {"id": "123"}}]}
+            })
+            
+            service = ShopifyService(credentials)
+            result = service.sync_products()
+            
+            self.assertTrue(result.success)
+            self.assertEqual(len(result.products), 1)
+            
+    def test_api_error_handling(self):
+        credentials = self.create_shopify_credentials()
+        
+        with self.mock_shopify_client() as client:
+            client.query.side_effect = Exception("API Error")
+            
+            service = ShopifyService(credentials)
+            result = service.sync_products()
+            
+            self.assertFalse(result.success)
+            self.assertIn("API Error", result.error_message)
+```
+
+### Testing Browser Workflows
+
+```python
+@tagged(*TOUR_TAGS)
+class TestProductCreationTour(TourTestCase):
+    def setUp(self):
+        super().setUp()
+        self.browser_size = "1920x1080"
+        
+    def test_create_motor_product(self):
+        # Tour defined in JS file
+        self.start_tour("/odoo", "create_motor_product_tour")
+        
+    def test_multigraph_view(self):
+        # Create test data first
+        MotorFactory.create_batch(self.env, count=5)
+        
+        self.start_tour("/odoo", "multigraph_analysis_tour")
+```
+
+## Running Tests
+
+### During Development
+
+```bash
+# Quick feedback loop
+uv run test-unit           # Run your unit tests (< 2 min)
+
+# Test specific area
+uv run test-integration    # Integration tests (< 10 min)
+
+# Full validation
+uv run test-all           # Everything (< 30 min)
+```
+
+### Development Workflow
+
+```bash
+# 1. Quick feedback (TDD style)
+uv run test-quick           # Smoke tests
+
+# 2. Feature development
+uv run test-unit           # Business logic
+uv run test-integration    # Service integration
+
+# 3. Pre-commit validation  
+uv run test-all            # Complete suite
+uv run test-report         # Analysis
+```
+
+### Debugging Test Issues
+
+```bash
+# See what tests are discovered
+uv run test-stats
+
+# Check for problems
+uv run test-clean          # Clean artifacts
+uv run test-setup          # Reinitialize databases
 ```
 
 ## Best Practices
@@ -315,6 +651,28 @@ product = ProductFactory.create_with_variants(env, variant_count=3)
 2. **Integration selectively**: Only test actual integrations
 3. **Tours sparingly**: Focus on critical user workflows
 4. **Parallel execution**: Enabled for faster runs (planned)
+
+### ✅ DO
+
+- Use tag constants (`UNIT_TAGS`, etc.)
+- Use factories for test data
+- Import from `common_imports` and `fixtures`
+- Use relative imports (`from ..`)
+- Make browser_size a string
+- Write descriptive test names
+- Test one thing per test method
+- Use appropriate base classes
+
+### ❌ DON'T
+
+- Hardcode test tags
+- Create duplicate test data
+- Use absolute imports
+- Use tuple for browser_size
+- Write vague test names
+- Test multiple things in one method
+- Mix test types in same class
+- Ignore PyCharm's Odoo warnings (they're false positives)
 
 ## Troubleshooting
 
@@ -352,36 +710,98 @@ uv run test-clean
 ### Getting Help
 
 1. **Test statistics**: `uv run test-stats` shows test counts
-2. **Verbose output**: Add `--verbose` flag for details
+2. **Clean slate**: `uv run test-clean` removes all artifacts
 3. **HTML reports**: `uv run test-report` for detailed analysis
-4. **Clean slate**: `uv run test-clean` removes all artifacts
+4. **Logs**: Check `tmp/tests/` for detailed execution logs
 
-## Migration Notes
+## Current Status
 
-This project has migrated from the old monolithic test runner to a modern UV-based system:
+### Test Statistics (as of August 2025)
 
-- **Before**: 1572-line test_runner.py with ~60% reliability
-- **After**: Clean, modular system with 95%+ reliability
-- **Key improvement**: Uses script-runner container to avoid circular imports
-- **Compatibility**: All existing tests work with minimal changes
+- **337 total test methods** across 42 test files
+- **130 unit tests** (in 18 files)
+- **198 integration tests** (in 13 files)
+- **9 tour tests** (in 7 files)
+- **95%+ reliability** (vs ~60% with old system)
 
-The infrastructure is complete and working. Any test failures are typically due to:
+### Migration from Old System
 
-1. Missing or incorrect test tags
-2. Import issues (easily fixed with proper base class imports)
-3. Test data conflicts (solved with factory pattern)
+The project migrated from a monolithic 1572-line test_runner.py to this modern system:
 
-## Technical Details
+**Before:**
 
-For implementation details, see:
+- Single massive file with embedded logic
+- ~60% test reliability due to circular imports
+- 60+ minute runtime
+- Manual database management
 
-- [Test Runner Guide](TEST_RUNNER_GUIDE.md) - Architecture and advanced usage
-- [@docs/agents/scout.md](agents/scout.md) - Test writing patterns and templates
+**After:**
 
-The test system is built on:
+- Clean, modular UV-based system
+- 95%+ reliability using script-runner container
+- < 30 minute total runtime
+- Automatic database management
 
-- **UV scripts**: Defined in `pyproject.toml`
-- **Odoo test tags**: For proper test discovery
-- **Docker containers**: Script-runner for isolation
-- **Factory pattern**: For reliable test data
-- **Base classes**: Simplified test setup and utilities
+### Key Infrastructure Improvements
+
+1. **Database Lock Issue Resolved**: Fixed PostgreSQL connection cleanup
+2. **Production Clone Function**: Added for real data testing
+3. **Shopify Sync Context**: Fixed async threading issues in test environment
+4. **Test Categorization**: Moved JS tests from integration to tour category
+
+## Technical Implementation
+
+### Command Implementation
+
+Each UV command is implemented in `tools/test_commands.py`:
+
+```python
+def run_unit_tests():
+    """Run fast unit tests using script-runner container."""
+    cmd = [
+        "docker", "exec", "odoo-opw-script-runner-1",
+        "/odoo/odoo-bin",
+        "--test-tags", "product_connect,unit_test",
+        "--stop-after-init",
+        "--addons-path", "/volumes/addons,/odoo/addons,/volumes/enterprise"
+    ]
+    # Execute with streaming output, error handling, timing
+```
+
+### Configuration
+
+#### pyproject.toml Settings
+
+```toml
+[project.scripts]
+# Core commands
+test-unit = "tools.test_commands:run_unit_tests"
+test-integration = "tools.test_commands:run_integration_tests"
+test-tour = "tools.test_commands:run_tour_tests"
+test-all = "tools.test_commands:run_all_tests"
+
+[tool.odoo-test]
+# Container settings
+container = "odoo-opw-script-runner-1"
+addons_path = "/volumes/addons,/odoo/addons,/volumes/enterprise"
+
+# Database configuration
+unit_db = "opw_unit_{timestamp}"
+integration_db = "opw_integration"
+tour_db = "opw_staging"
+
+[tool.odoo-test.timeouts]
+unit = 180          # 3 minutes
+integration = 600   # 10 minutes
+tour = 1800        # 30 minutes
+```
+
+## Future Enhancements
+
+1. **Parallel execution**: pytest-xdist integration (planned)
+2. **Watch mode**: Auto-rerun on file changes (planned)
+3. **Coverage reporting**: Integrated code coverage (planned)
+4. **Test selection**: Pattern-based test filtering (planned)
+5. **Performance monitoring**: Test execution time tracking (planned)
+
+For test writing patterns and templates, see [@docs/agents/scout.md](agents/scout.md).

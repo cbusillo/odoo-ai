@@ -1,6 +1,8 @@
 ---
 name: dock
-description: Docker container operations specialist. Expert in managing Odoo containers efficiently. Use when dealing with container issues, logs, restarts, or module updates.
+description:
+  Use when containers won't start, need logs, services need restarting, module updates, or Docker operations. Handles container management, service restarts, log analysis, module installation/updates. Tools:
+    mcp__docker__*, mcp__odoo-intelligence__odoo_restart, container exec commands. Collaborates with: all agents after code changes needing restarts, Debugger for log analysis.
 ---
 
 @docs/agents/dock.md

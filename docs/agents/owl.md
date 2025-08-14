@@ -1,8 +1,5 @@
 # 🦉 Owl - Frontend Development Agent
 
-I'm Owl, your specialized agent for Odoo 18 frontend development. I know Owl.js 2.0, modern JavaScript patterns, and
-what NOT to use.
-
 ## My Tools
 
 - `mcp__odoo-intelligence__search_code` with `file_type="js"` - Find JS patterns
@@ -120,6 +117,8 @@ test("component works", async () => {
 - **Framework migrations** → `Model: opus-4` (jQuery to Owl conversion)
 
 ```python
+# ← Program Manager delegates to Owl agent
+
 # Standard component development (default Sonnet 4)
 Task(
     description="Create component",
@@ -129,66 +128,25 @@ Task(
 
 # Complex component system (upgrade to Opus 4)
 Task(
-    description="Complex component architecture",
-    prompt="@docs/agents/owl.md\n\nModel: opus-4\n\nDesign and implement a real-time inventory dashboard with multiple interconnected components",
-    subagent_type="owl"
-)
-
-# Simple styling fix (downgrade to Haiku 3.5)
-Task(
-    description="Fix CSS issue",
-    prompt="@docs/agents/owl.md\n\nModel: haiku-3.5\n\nFix button alignment in mobile view",
+    description="Complex component architecture", 
+    prompt="@docs/agents/owl.md\n\nModel: opus-4\n\nDesign real-time inventory dashboard",
     subagent_type="owl"
 )
 ```
 
 ## Style Guide Integration
 
-For quality checks or when style compliance is important, load relevant style guides:
+Load style guides when quality compliance is important:
 
-- `@docs/style/JAVASCRIPT.md` - JavaScript/Owl coding standards
-- `@docs/style/CORE.md` - Universal style principles
-
-**Example:**
-
-```python
-Task(
-    description="Create style-compliant component",
-    prompt="""@docs/agents/owl.md
-@docs/style/JAVASCRIPT.md
-@docs/style/CORE.md
-
-Create a product selector component following our exact JavaScript style standards.""",
-    subagent_type="owl"
-)
-```
-
-## Style Guide Integration
-
-For quality checks or when style compliance is important, load relevant style guides:
-
-- `@docs/style/JAVASCRIPT.md` - JavaScript/Owl.js specific standards
+- `@docs/style/JAVASCRIPT.md` - JavaScript/Owl.js standards
 - `@docs/style/CSS.md` - CSS and styling conventions
-- `@docs/style/CORE.md` - Universal style principles
-
-**Example:**
-
-```python
-Task(
-    description="Create style-compliant component",
-    prompt="""@docs/agents/owl.md
-@docs/style/JAVASCRIPT.md
-@docs/style/CSS.md
-
-Create a product selector component following our exact JavaScript and CSS standards.""",
-    subagent_type="owl"
-)
-```
+- `@docs/style/CORE.md` - Universal principles
 
 ## Need More?
 
-- **Model selection details**: Load @docs/agents/MODEL_SELECTION_GUIDE.md
-- **Component examples**: Load @docs/agents/owl/component-patterns.md
-- **Hoot test patterns**: Load @docs/agents/owl/hoot-testing.md
-- **Service usage**: Load @docs/agents/owl/service-patterns.md
-- **Common issues**: Load @docs/agents/owl/troubleshooting.md
+- **Model selection details**: Load @docs/system/MODEL_SELECTION.md
+- **Component examples**: Load @docs/agent-patterns/component-patterns.md
+- **Hoot test patterns**: Load @docs/agent-patterns/hoot-testing.md
+- **Service usage**: Load @docs/agent-patterns/service-patterns.md
+- **Common issues**: Load @docs/agent-patterns/owl-troubleshooting.md
+- **Advanced Hoot patterns**: Load @docs/references/hoot-testing-patterns.md

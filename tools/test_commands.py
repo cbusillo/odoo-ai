@@ -139,6 +139,7 @@ def show_test_stats() -> int:
     print("  uv run test-tour        # Browser tours")
     print("  uv run test-all         # All tests")
     print("  uv run test-quick       # Subset of unit tests")
+    print("  uv run test-clean       # Clean up test artifacts")
 
     return 0
 
@@ -203,14 +204,44 @@ def cleanup_test_databases(production_db: str = None) -> None:
             print(f"   ⚠️  Failed to drop {db}: {result.stderr}")
 
 
+def create_filestore_symlink(test_db_name: str, production_db: str) -> None:
+    production_filestore = f"/volumes/data/filestore/{production_db}"
+    test_filestore = f"/volumes/data/filestore/{test_db_name}"
+
+    cleanup_cmd = [
+        "docker",
+        "exec",
+        "odoo-opw-script-runner-1",
+        "sh",
+        "-c",
+        f"if [ -e '{test_filestore}' ]; then rm -rf '{test_filestore}'; fi",
+    ]
+    result = subprocess.run(cleanup_cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"   ⚠️  Warning: Could not clean existing filestore: {result.stderr}")
+
+    symlink_cmd = [
+        "docker",
+        "exec",
+        "odoo-opw-script-runner-1",
+        "ln",
+        "-s",
+        production_filestore,
+        test_filestore,
+    ]
+    result = subprocess.run(symlink_cmd, capture_output=True, text=True)
+    if result.returncode == 0:
+        print(f"   ✅ Created filestore symlink: {test_filestore} → {production_filestore}")
+    else:
+        print(f"   ❌ Failed to create filestore symlink: {result.stderr}")
+
+
 def cleanup_test_filestores(production_db: str = None) -> None:
-    """Remove test filestore directories matching pattern ${PRODUCTION_DB}_test_*"""
     if production_db is None:
         production_db = get_production_db_name()
 
     print(f"🧹 Cleaning up test filestores for {production_db}...")
 
-    # List filestore directories
     list_cmd = [
         "docker",
         "exec",
@@ -230,10 +261,27 @@ def cleanup_test_filestores(production_db: str = None) -> None:
 
     for filestore in test_filestores:
         if filestore:
-            rm_cmd = ["docker", "exec", "odoo-opw-script-runner-1", "rm", "-rf", filestore]
+            check_symlink_cmd = [
+                "docker",
+                "exec",
+                "odoo-opw-script-runner-1",
+                "sh",
+                "-c",
+                f"if [ -L '{filestore}' ]; then echo 'symlink'; elif [ -d '{filestore}' ]; then echo 'directory'; else echo 'unknown'; fi",
+            ]
+            check_result = subprocess.run(check_symlink_cmd, capture_output=True, text=True)
+            is_symlink = check_result.stdout.strip() == "symlink"
+
+            if is_symlink:
+                rm_cmd = ["docker", "exec", "odoo-opw-script-runner-1", "rm", filestore]
+            else:
+                rm_cmd = ["docker", "exec", "odoo-opw-script-runner-1", "rm", "-rf", filestore]
+
             result = subprocess.run(rm_cmd, capture_output=True, text=True)
             if result.returncode == 0:
-                print(f"   ✅ Removed {filestore.split('/')[-1]}")
+                filestore_name = filestore.split("/")[-1]
+                type_str = "symlink" if is_symlink else "directory"
+                print(f"   ✅ Removed {type_str}: {filestore_name}")
             else:
                 print(f"   ⚠️  Failed to remove {filestore}: {result.stderr}")
 
@@ -249,6 +297,19 @@ def cleanup_all_test_artifacts() -> None:
 
     print("=" * 60)
     print("✅ Test cleanup completed")
+
+
+def cleanup_chrome_processes() -> None:
+    """Kill any lingering Chrome/Chromium processes in script runner container"""
+    script_runner_service = get_script_runner_service()
+    # Try to kill Chrome processes gracefully first
+    subprocess.run(["docker", "exec", f"odoo-opw-{script_runner_service}-1", "pkill", "chrome"], capture_output=True)
+    subprocess.run(["docker", "exec", f"odoo-opw-{script_runner_service}-1", "pkill", "chromium"], capture_output=True)
+    # Force kill if still running
+    subprocess.run(["docker", "exec", f"odoo-opw-{script_runner_service}-1", "pkill", "-9", "chrome"], capture_output=True)
+    subprocess.run(["docker", "exec", f"odoo-opw-{script_runner_service}-1", "pkill", "-9", "chromium"], capture_output=True)
+    # Clean up zombie processes
+    subprocess.run(["docker", "exec", f"odoo-opw-{script_runner_service}-1", "sh", "-c", "ps aux | grep defunct | awk '{print $2}' | xargs -r kill -9"], capture_output=True)
 
 
 def restart_script_runner_with_orphan_cleanup() -> None:
@@ -548,6 +609,12 @@ def run_docker_test_command(
 
     if use_production_clone:
         clone_production_database(db_name)
+        # Create symlink after container restart for tour tests
+        if "tour" in test_tags:
+            print(f"   Creating filestore symlink for tour tests...")
+            create_filestore_symlink(db_name, production_db)
+            print(f"   Cleaning up Chrome processes...")
+            cleanup_chrome_processes()
     else:
         drop_and_create_test_database(db_name)
 
@@ -641,12 +708,12 @@ if __name__ == "__main__":
             sys.exit(run_quick_tests())
         elif command == "stats":
             sys.exit(show_test_stats())
-        elif command == "cleanup":
+        elif command == "clean" or command == "cleanup":
             cleanup_all_test_artifacts()
             sys.exit(0)
         else:
             print(f"Unknown command: {command}")
             sys.exit(1)
     else:
-        print("Usage: python test_commands.py [unit|integration|tour|all|quick|stats|cleanup]")
+        print("Usage: python test_commands.py [unit|integration|tour|all|quick|stats|clean]")
         sys.exit(1)

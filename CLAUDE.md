@@ -93,6 +93,9 @@ Task(
 )
 ```
 
+**Agent Types:** Use the agent name as `subagent_type` (e.g., `"scout"`, `"archer"`, `"owl"`). Available agents are in
+`.claude/agents/` directory.
+
 **For permissions/data analysis**: Add `@docs/system/SHARED_TOOLS.md` to prompt
 
 ## When to Act vs Delegate
@@ -125,9 +128,8 @@ Task(
     - `uv run test-stats` - Show current test statistics
 
 - **Test Utilities**:
-    - `uv run test-setup` - Initialize test databases
-    - `uv run test-clean` - Remove test artifacts
-    - `uv run test-report` - Generate HTML report
+    - `uv run test-clean` - Remove test artifacts and databases
+    - `uv run test-stats` - Show test statistics
 
 - **Format**: `uv run ruff format . && uv run ruff check --fix`
 

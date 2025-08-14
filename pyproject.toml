@@ -27,7 +27,7 @@ test-tour = "tools.test_commands:run_tour_tests"
 test-all = "tools.test_commands:run_all_tests"
 test-quick = "tools.test_commands:run_quick_tests"
 test-stats = "tools.test_commands:show_test_stats"
-test-cleanup = "tools.test_commands:cleanup_all_test_artifacts"
+test-clean = "tools.test_commands:cleanup_all_test_artifacts"
 
 [tool.odoo-test.timeouts]
 unit = 180          # 3 minutes

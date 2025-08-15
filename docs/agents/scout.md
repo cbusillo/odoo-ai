@@ -6,7 +6,7 @@ See [Tool Selection Guide](../TOOL_SELECTION.md). Key: MCP tools are 10x faster 
 
 - `mcp__odoo-intelligence__model_info` - Understand what to test
 - `mcp__odoo-intelligence__field_usages` - See how fields are used
-- `.venv/bin/python tools/test_runner.py` via Bash - Run tests
+- `uv run` commands via Bash - Run tests (NEVER use Python directly)
 - `Write` - Create test files
 - `MultiEdit` - Add test methods
 
@@ -60,19 +60,20 @@ class TestFeature(ProductConnectTransactionCase):
 **See [Testing Guide](../TESTING.md) for complete documentation**
 
 ```bash
-# Auto-discovers and runs ALL tests for ALL modules (NEW!)
-uv run python tools/test_runner.py
+# IMPORTANT: Always use uv run commands - NEVER call Python scripts directly!
 
-# Run tests for specific module
-uv run python tools/test_runner.py product_connect
+# Quick test commands (recommended)
+uv run test-unit        # Fast unit tests (< 2 min)
+uv run test-integration # Integration tests (< 10 min)
+uv run test-tour       # Browser UI tests (< 15 min)
+uv run test-all        # Complete test suite (< 30 min)
 
-# Run specific test class/method
-uv run python tools/test_runner.py TestProductTemplate
-uv run python tools/test_runner.py TestProductTemplate.test_sku_validation
-
-# Filter by test type
-uv run python tools/test_runner.py --python   # Python tests only
-uv run python tools/test_runner.py --tour     # Tour tests only
+# Advanced test runner (for specific filtering)
+uv run python tools/test_runner.py product_connect                        # Run tests for specific module
+uv run python tools/test_runner.py TestProductTemplate                    # Run specific test class
+uv run python tools/test_runner.py TestProductTemplate.test_sku_validation # Run specific test method
+uv run python tools/test_runner.py --python                              # Python tests only (legacy)
+uv run python tools/test_runner.py --tour-only                          # Tour tests only
 ```
 
 ## Routing

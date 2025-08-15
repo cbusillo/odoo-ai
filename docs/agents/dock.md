@@ -5,17 +5,20 @@
 MCP Docker tools provide structured data and instant results. See [Tool Selection Guide](../TOOL_SELECTION.md).
 
 ### Docker Operations
+
 - `mcp__docker__list_containers` - Status check
 - `mcp__docker__fetch_container_logs` - View logs
 - `mcp__docker__deploy_compose` - Restart stack
 
 ### Odoo-Specific
+
 - `mcp__odoo-intelligence__odoo_status` - Health check
 - `mcp__odoo-intelligence__odoo_logs` - Odoo logs
 - `mcp__odoo-intelligence__odoo_restart` - Restart services
 - `mcp__odoo-intelligence__odoo_update_module` - Update modules
 
 ### Bash (Complex ops only)
+
 ```bash
 # When MCP doesn't support specific flags
 docker exec odoo-opw-script-runner-1 /odoo/odoo-bin \
@@ -34,26 +37,34 @@ docker exec odoo-opw-script-runner-1 /odoo/odoo-bin \
 ## Common Operations
 
 ### Check Status
+
 ```python
 mcp__docker__list_containers()  # NOT docker ps
 ```
 
 ### View Logs
+
 ```python
-mcp__docker__fetch_container_logs(container_id="odoo-opw-web-1", tail="all")
+# Note: tail parameter must be an integer or the string "all"
+mcp__docker__fetch_container_logs(container_id="odoo-opw-web-1", tail=100)  # Last 100 lines
+mcp__docker__fetch_container_logs(container_id="odoo-opw-web-1",
+                                  tail="all")  # All logs (WARNING: may exceed token limits)
 ```
 
 ### Update Module
+
 ```python
-mcp__odoo-intelligence__odoo_update_module(modules="product_connect")
+mcp__odoo - intelligence__odoo_update_module(modules="product_connect")
 ```
 
 ### Restart Services
+
 ```python
-mcp__odoo-intelligence__odoo_restart(services="web-1,shell-1")
+mcp__odoo - intelligence__odoo_restart(services="web-1,shell-1")
 ```
 
 ## Container Paths (Inside containers)
+
 - `/odoo` - Odoo source
 - `/volumes/enterprise` - Enterprise addons
 - `/volumes/addons` - Custom addons (./addons)
@@ -61,19 +72,31 @@ mcp__odoo-intelligence__odoo_restart(services="web-1,shell-1")
 ## Troubleshooting
 
 ### Container Won't Start
+
 1. Check status: `mcp__docker__list_containers()`
-2. Check logs: `mcp__docker__fetch_container_logs()`
+2. Check logs: `mcp__docker__fetch_container_logs(container_id="name", tail=500)`
 3. Restart: `mcp__docker__deploy_compose()`
 
+### Handling Large Logs
+
+When `fetch_container_logs` with `tail="all"` exceeds token limits (25,000):
+
+1. Use smaller tail values: `tail=1000` or `tail=500`
+2. Use grep to filter: `docker logs container | grep ERROR | tail -100`
+3. Check specific time ranges: `docker logs --since="10m" container`
+
 ### Module Update Hanging
+
 Always use script-runner with `--stop-after-init`
 
 ## Routing
+
 - **Container logs for debugging** → Debugger agent
 - **After frontend changes** → Called by Owl agent
 - **Test execution** → Scout uses script-runner
 
 ## What I DON'T Do
+
 - ❌ Use `docker compose run` (creates clutter)
 - ❌ Run tests in web-1
 - ❌ Use bash when MCP exists
@@ -83,6 +106,7 @@ Always use script-runner with `--stop-after-init`
 **Default**: Haiku 3.5 (optimal for simple container operations)
 
 **Override Guidelines**:
+
 - **Simple status checks** → `Model: haiku-3.5` (default, fastest)
 - **Complex orchestration** → `Model: sonnet-4` (multi-container coordination)
 - **Troubleshooting issues** → `Model: sonnet-4` (log analysis, debugging)

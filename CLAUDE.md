@@ -24,7 +24,7 @@ collaboration details.
 
 ### 📈 Live Status
 
-- **Tests**: ✅ 97.9% passing (184/188) [Details](docs/TEST_STATUS.md)
+- **Tests**: ✅ 97.9% passing (184/188) [Details](docs/status/TEST_STATUS.md)
 - **Quality**: ⚠️ 102 issues identified [Fix Guide](docs/agents/inspector.md)
 - **Architecture**: [View](docs/ARCHITECTURE.md) | [Odoo Workflow](docs/ODOO_WORKFLOW.md)
 
@@ -53,7 +53,7 @@ collaboration details.
 ### 📖 Guides
 
 - [Tour Recording](docs/TOUR_RECORDING_GUIDE.md) - Create tests from recordings
-- [Test Status](docs/TEST_TAG_DECISION_2025-01-27.md) - Current test configuration
+- [Test Decision Log](docs/status/TEST_TAG_DECISION_2025-01-27.md) - Test configuration decisions
 
 ## Work Delegation Priority
 

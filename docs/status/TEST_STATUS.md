@@ -1,6 +1,6 @@
 # 🗂️ Current Test Infrastructure Status
 
-**CRITICAL SESSION OUTCOMES - August 13, 2025:**
+**LAST UPDATED - August 16, 2025:**
 
 ## Test Database Strategy (IMPLEMENTED)
 
@@ -12,7 +12,7 @@
 
 - ✅ **Unit Tests**: 100% passing (130/130 tests)
 - ✅ **Integration Tests**: 100% passing (188/188 tests) - All tests fixed!
-- ⚠️ **Tour Tests**: Filestore issue fixed with symlink approach, JS module loading issue pending
+- 🔴 **Tour Tests**: Test discovery FIXED, Chrome launches, but authentication fails
 
 ## Key Infrastructure Fixes Made
 
@@ -21,6 +21,8 @@
 3. **Tour Test Filestore Fix**: Implemented symlink approach to share production assets without 70GB copying
 4. **Shopify Sync Context**: Fixed async threading issues in test environment
 5. **Test Categorization**: Moved JS tests from integration to tour category
+6. **Tour Test Discovery Fixed**: Corrected test tags from `module/tests` to `post_install,-at_install`
+7. **JavaScript Module Loading**: Resolved with shared test helper bundle configuration
 
 ## Critical Files Modified
 
@@ -31,9 +33,9 @@
 
 ## Remaining Priority Work
 
-1. **Fix 4 Integration Test Failures**: Specific test analysis needed
-2. **Tour Test Completion**: Monitor final test results (filestore issue resolved)
-3. **Code Quality Issues**: 102 issues found, prioritized for fixing
+1. **Fix Tour Test Authentication**: Tests execute but fail at login - need to fix user/password setup
+2. **Code Quality Issues**: 102 issues found, prioritized for fixing
+3. **Performance Optimization**: Address N+1 queries identified by Flash agent
 
 ## Performance Improvements
 
@@ -41,8 +43,8 @@
 - **Database operations**: Robust connection handling, no more timeouts
 - **Test reliability**: 100% completion rate vs previous hanging issues
 
-**Next Session Goals**: Fix remaining 4 integration test failures, resolve tour authentication, address priority code
-quality issues.
+**Next Session Goals**: Fix tour test authentication issue (tests run but can't log in), address priority code quality
+issues.
 
 ---
-[← Back to Main Guide](/CLAUDE.md)
+[← Back to Main Guide](/CLAUDE.md) | [Test Decision Log](TEST_TAG_DECISION_2025-01-27.md)

@@ -8,22 +8,22 @@
 
 ```python
 # Step 1: Find how Odoo does it
-mcp__odoo_intelligence__search_code(
+mcp__odoo-intelligence__search_code(
     pattern="widget.*many2many_tags",
     file_type="xml"
 )
 
 # Step 2: Understand structure  
-mcp__odoo_intelligence__model_info(model_name="product.template")
-mcp__odoo_intelligence__inheritance_chain(model_name="product.template")
+mcp__odoo-intelligence__model_info(model_name="product.template")
+mcp__odoo-intelligence__inheritance_chain(model_name="product.template")
 
 # Step 3: Test theories
-mcp__odoo_intelligence__execute_code(
+mcp__odoo-intelligence__execute_code(
     code="env['ir.ui.view'].search([('type','=','tree')]).mapped('arch')[:100]"
 )
 
 # Step 4: Read specific implementations
-mcp__odoo_intelligence__read_odoo_file(
+mcp__odoo-intelligence__read_odoo_file(
     file_path="sale/views/sale_views.xml"
 )
 ```
@@ -48,7 +48,7 @@ mcp__odoo_intelligence__read_odoo_file(
 ### ❌ What I DON'T Call:
 
 - Self-referencing - NEVER call my own agent type
-- `subagent_type="general-purpose"` - Use specialists
+- Undefined agents - Use specific specialists instead
 
 ### ✅ Who I CAN Call:
 
@@ -137,32 +137,33 @@ record.sudo().write()  # Why: [explanation]
 
 ## What I DON'T Do
 
+- ❌ **Cannot call myself** (Odoo Engineer agent → Odoo Engineer agent loops prohibited)
 - ❌ Write implementation code (I advise, others implement)
-- ❌ Call myself recursively (anti-recursion safeguard)
-- ❌ Guess without research evidence
+- ❌ Guess without research evidence (always verify with MCP tools)
 - ❌ Recommend non-idiomatic patterns
+- ❌ Skip research before giving advice
 
 ## Model Selection
 
-**Default**: Opus 4 (optimal for complex framework analysis)
+**Default**: Opus (optimal for complex framework analysis)
 
 **Override Guidelines**:
 
-- **Simple pattern lookup** → `Model: sonnet-4` (basic Odoo pattern searches)
-- **Deep architectural review** → `Model: opus-4` (default, complex framework knowledge)
-- **Quick consultations** → `Model: sonnet-4` (standard advice)
+- **Simple pattern lookup** → `Model: sonnet` (basic Odoo pattern searches)
+- **Deep architectural review** → `Model: opus` (default, complex framework knowledge)
+- **Quick consultations** → `Model: sonnet` (standard advice)
 
 ```python
 # ← Program Manager delegates to Odoo Engineer agent
 
-# Standard framework consultation (downgrade to Sonnet 4)
+# Standard framework consultation (downgrade to Sonnet)
 Task(
     description="Odoo pattern advice",
-    prompt="@docs/agents/odoo-engineer.md\n\nModel: sonnet-4\n\nHow to implement computed fields correctly?",
+    prompt="@docs/agents/odoo-engineer.md\n\nModel: sonnet\n\nHow to implement computed fields correctly?",
     subagent_type="odoo-engineer"
 )
 
-# Complex architectural review (default Opus 4)
+# Complex architectural review (default Opus)
 Task(
     description="Architecture review",
     prompt="@docs/agents/odoo-engineer.md\n\nReview entire product_connect module for framework compliance",

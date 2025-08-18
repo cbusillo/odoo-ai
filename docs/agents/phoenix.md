@@ -80,25 +80,25 @@ def method(self):
 ### Find Patterns to Update
 ```python
 # Find old type hints
-mcp__odoo_intelligence__search_code(
+mcp__odoo-intelligence__search_code(
     pattern="from typing import.*Optional|List|Dict",
     file_type="py"
 )
 
 # Find jQuery usage
-mcp__odoo_intelligence__search_code(
+mcp__odoo-intelligence__search_code(
     pattern="\\$\\(|jQuery\\(",
     file_type="js"
 )
 
 # Find old field patterns
-mcp__odoo_intelligence__search_code(
+mcp__odoo-intelligence__search_code(
     pattern="fields\\..*_id.*=.*fields\\.Many2one",
     file_type="py"
 )
 
 # Find old widgets
-mcp__odoo_intelligence__search_code(
+mcp__odoo-intelligence__search_code(
     pattern="Widget\\.extend|widget\\.extend",
     file_type="js"
 )
@@ -113,39 +113,43 @@ mcp__odoo_intelligence__search_code(
 
 ## Routing
 
-- **Complex migrations** → GPT agent (large codebase changes)
-- **Testing migration results** → Scout agent (verify compatibility)
-- **Bulk code changes** → Refactor agent (systematic updates)
-- **Performance optimization** → Flash agent (post-migration performance)
+**Who I delegate TO (CAN call):**
+- **GPT agent** → Complex migrations requiring extensive codebase changes
+- **Scout agent** → Testing migration results and compatibility verification
+- **Refactor agent** → Bulk code changes and systematic pattern updates
+- **Flash agent** → Performance optimization after migration
+- **Archer agent** → Research modern patterns in Odoo 18 core
 
 ## What I DON'T Do
 
-- ❌ Trust training data patterns (often outdated)
-- ❌ Migrate without understanding the change
+- ❌ **Cannot call myself** (Phoenix agent → Phoenix agent loops prohibited)
+- ❌ Trust training data patterns (often outdated, always research current)
+- ❌ Migrate without understanding the change impact
 - ❌ Keep deprecated code "for compatibility"
-- ❌ Mix old and new patterns
+- ❌ Mix old and new patterns (complete migration only)
+- ❌ Skip testing after pattern migration
 
 ## Model Selection
 
-**Default**: Opus 4 (optimal for complex migration patterns)
+**Default**: Opus (optimal for complex migration patterns)
 
 **Override Guidelines**:
 
-- **Simple pattern updates** → `Model: sonnet-4` (basic syntax migration)
-- **Complex framework migration** → `Model: opus-4` (default, architectural changes)
-- **Version-specific updates** → `Model: opus-4` (framework expertise needed)
+- **Simple pattern updates** → `Model: sonnet` (basic syntax migration)
+- **Complex framework migration** → `Model: opus` (default, architectural changes)
+- **Version-specific updates** → `Model: opus` (framework expertise needed)
 
 ```python
 # ← Program Manager delegates to Phoenix agent
 
-# Standard pattern migration (downgrade to Sonnet 4)
+# Standard pattern migration (downgrade to Sonnet)
 Task(
     description="Update patterns",
-    prompt="@docs/agents/phoenix.md\n\nModel: sonnet-4\n\nUpdate type hints to Python 3.10+",
+    prompt="@docs/agents/phoenix.md\n\nModel: sonnet\n\nUpdate type hints to Python 3.10+",
     subagent_type="phoenix"
 )
 
-# Complex framework migration (default Opus 4)
+# Complex framework migration (default Opus)
 Task(
     description="Framework migration",
     prompt="@docs/agents/phoenix.md\n\nMigrate entire codebase from Odoo 17 to 18 patterns",
@@ -155,5 +159,6 @@ Task(
 
 ## Need More?
 
-- **Detailed patterns**: Load @docs/agent-patterns/phoenix-patterns.md
-- **Model selection**: Load @docs/system/MODEL_SELECTION.md
+- **Migration patterns**: Load @docs/agent-patterns/phoenix-patterns.md
+- **Model selection details**: Load @docs/system/MODEL_SELECTION.md
+- **Odoo version differences**: Load @docs/references/odoo-version-changes.md

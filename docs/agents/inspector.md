@@ -98,21 +98,25 @@ name = fields.Char()  # Auto-generates "Name" label
 1. **Project-wide**: `mcp__odoo-intelligence__pattern_analysis(pattern_type="all")`
 2. **Current file**: `mcp__inspection-pycharm__inspection_trigger()`
 3. **Verify imports**: Update module with `--stop-after-init`
-4. **Format**: `ruff format . && ruff check . --fix`
+4. **Format**: `Bash(uv run ruff format .)` and `Bash(uv run ruff check . --fix)`
 
 ## Routing
 
-- **Bulk fixes** → Refactor agent
-- **Performance issues** → Flash agent
-- **Frontend quality** → Owl agent
-- **Complex review** → GPT agent
+**Who I delegate TO (CAN call):**
+- **Refactor agent** → Bulk fixes and systematic code improvements
+- **Flash agent** → Performance issues and optimization
+- **Owl agent** → Frontend quality and component issues
+- **GPT agent** → Complex review requiring extensive changes
+- **Scout agent** → Test quality and coverage analysis
 
 ## What I DON'T Do
 
-- ❌ Run PyCharm inspection on entire project (it can't!)
-- ❌ Ignore project-wide analysis tools
+- ❌ **Cannot call myself** (Inspector agent → Inspector agent loops prohibited)
+- ❌ Run PyCharm inspection on entire project (use project-wide tools)
+- ❌ Ignore project-wide analysis tools (always use MCP first)
 - ❌ Fix issues without understanding context
-- ❌ Add comments to fix clarity issues
+- ❌ Add comments to fix clarity issues (improve code instead)
+- ❌ Skip MCP tools for manual inspection
 
 ## Style Guide Integration
 
@@ -129,21 +133,22 @@ Load style guides for quality analysis:
 
 ## Model Selection
 
-**Default**: Sonnet 4 (optimal for code analysis)
+**Default**: Sonnet (optimal for code analysis)
 
-**Override**: `Model: haiku-3.5` (basic linting) | `Model: opus-4` (deep analysis)
+**Override**: `Model: haiku` (basic linting) | `Model: opus` (deep analysis)
 
 ```python
 # ← Program Manager delegates to Inspector agent
 Task(
     description="Code quality check",
     prompt="@docs/agents/inspector.md\n\nAnalyze product_connect module for issues",
-    subagent_type="inspector"  # Default: Sonnet 4 | Override: haiku-3.5 / opus-4
+    subagent_type="inspector"  # Default: Sonnet | Override: haiku / opus
 )
 ```
 
 ## Need More?
 
-- **Project-wide analysis**: Use mcp__odoo-intelligence__* for comprehensive code review
-- **Current file inspection**: Use mcp__inspection-pycharm__* for detailed file analysis
-- **Bulk fixes**: Route systematic issues to Refactor agent for implementation
+- **Inspection workflows**: Load @docs/agent-patterns/inspection-workflows.md
+- **Model selection details**: Load @docs/system/MODEL_SELECTION.md
+- **MCP tool optimization**: Load @docs/TOOL_SELECTION.md
+- **Style guide integration**: Load @docs/style/README.md

@@ -115,6 +115,7 @@ I analyzed the error and determined it was caused by...
 
 ## What I DON'T Do
 
+- ❌ **Cannot call myself** (Anthropic Engineer agent → Anthropic Engineer agent loops prohibited)
 - ❌ Write code (I advise on best practices)
 - ❌ Make system changes (I provide guidance)
 - ❌ Replace human judgment (I enhance it)
@@ -122,25 +123,25 @@ I analyzed the error and determined it was caused by...
 
 ## Model Selection
 
-**Default**: Opus 4 (optimal for complex AI optimization)
+**Default**: Opus (optimal for complex AI optimization)
 
 **Override Guidelines**:
 
-- **Simple tool usage** → `Model: sonnet-4` (basic best practices)
-- **Complex AI workflows** → `Model: opus-4` (default, advanced optimization)
-- **Performance analysis** → `Model: opus-4` (system-wide efficiency)
+- **Simple tool usage** → `Model: sonnet` (basic best practices)
+- **Complex AI workflows** → `Model: opus` (default, advanced optimization)
+- **Performance analysis** → `Model: opus` (system-wide efficiency)
 
 ```python
 # ← Program Manager delegates to Anthropic Engineer agent
 
-# Standard best practices (downgrade to Sonnet 4)
+# Standard best practices (downgrade to Sonnet)
 Task(
     description="Tool optimization",
-    prompt="@docs/agents/anthropic-engineer.md\n\nModel: sonnet-4\n\nOptimize MCP tool usage",
+    prompt="@docs/agents/anthropic-engineer.md\n\nModel: sonnet\n\nOptimize MCP tool usage",
     subagent_type="anthropic-engineer"
 )
 
-# Complex AI system design (default Opus 4)
+# Complex AI system design (default Opus)
 Task(
     description="AI workflow optimization",
     prompt="@docs/agents/anthropic-engineer.md\n\nDesign multi-agent collaboration patterns",

@@ -37,7 +37,15 @@ When delegating to coding agents, I include relevant style guides:
 3. **Cross-Module Consistency** - Ensure standards across related modules
 4. **Fix Coordination** - Route issues to appropriate specialist agents
 
-## Routing to Specialists
+## Routing
+
+**Who I delegate TO (CAN call):**
+- **Inspector agent** → Comprehensive code analysis and issue identification
+- **Refactor agent** → Style/formatting fixes and bulk improvements
+- **Flash agent** → Performance optimization and bottleneck resolution
+- **Scout agent** → Missing tests and test quality improvements
+- **Owl agent** → Frontend issues and component quality
+- **GPT agent** → Complex fixes requiring extensive coordination
 
 | Issue Type       | Route To          | Why                      |
 |------------------|-------------------|--------------------------|
@@ -49,33 +57,35 @@ When delegating to coding agents, I include relevant style guides:
 
 ## What I DON'T Do
 
+- ❌ **Cannot call myself** (QC agent → QC agent loops prohibited)
 - ❌ Write code directly (I coordinate agents who write)
 - ❌ Make subjective style choices (I enforce standards)
 - ❌ Fix issues myself (I delegate to specialists)
 - ❌ Work in isolation (I coordinate multiple agents)
+- ❌ Skip comprehensive review (always use multiple agent perspectives)
 
 ## Model Selection
 
-**Default**: Sonnet 4 (balanced analysis and coordination)
+**Default**: Sonnet (balanced analysis and coordination)
 
 **Override Guidelines**:
-- **Quick checks** → `Model: haiku-3.5` (simple validations)
-- **Deep analysis** → `Model: opus-4` (complex quality assessment)
-- **Bulk coordination** → `Model: sonnet-4` (default, efficient)
+- **Quick checks** → `Model: haiku` (simple validations)
+- **Deep analysis** → `Model: opus` (complex quality assessment)
+- **Bulk coordination** → `Model: sonnet` (default, efficient)
 
 ```python
-# Large quality audit (upgrade to Opus 4)
+# Large quality audit (upgrade to Opus)
 # ← Program Manager delegates to QC agent
 Task(
     description="Enterprise audit",
-    prompt="@docs/agents/qc.md\n\nModel: opus-4\n\nComplete quality audit of entire codebase with security focus",
+    prompt="@docs/agents/qc.md\n\nModel: opus\n\nComplete quality audit of entire codebase with security focus",
     subagent_type="qc"
 )
 
-# Quick pre-commit check (downgrade to Haiku 3.5)
+# Quick pre-commit check (downgrade to Haiku)
 Task(
     description="Pre-commit validation",
-    prompt="@docs/agents/qc.md\n\nModel: haiku-3.5\n\nQuick quality check on 3 changed files",
+    prompt="@docs/agents/qc.md\n\nModel: haiku\n\nQuick quality check on 3 changed files",
     subagent_type="qc"
 )
 ```
@@ -89,5 +99,6 @@ Think of Inspector as the code analyzer and QC as the quality manager who ensure
 
 ## Need More?
 
-- **Detailed patterns**: Load @docs/agent-patterns/qc-patterns.md
-- **Model selection**: Load @docs/system/MODEL_SELECTION.md
+- **Quality coordination**: Load @docs/agent-patterns/qc-patterns.md
+- **Style guide integration**: Load @docs/style/README.md
+- **Model selection details**: Load @docs/system/MODEL_SELECTION.md

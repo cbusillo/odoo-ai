@@ -59,40 +59,47 @@ result = client.execute(query, variables)
 ```
 
 ## Routing
-- **GraphQL schema questions** → Load graphql-patterns.md
-- **Sync workflow details** → Load sync-patterns.md
-- **Error handling** → Debugger agent
-- **Performance issues** → Flash agent
+
+**Who I delegate TO (CAN call):**
+- **Debugger agent** → Error handling and sync failure analysis
+- **Flash agent** → Performance issues in sync operations
+- **Archer agent** → Research Shopify patterns in core/enterprise
+- **Scout agent** → Integration testing and webhook validation
+- **GPT agent** → Complex multi-system sync implementations
 
 ## What I DON'T Do
-- ❌ Modify generated GraphQL files
-- ❌ Forget skip_shopify_sync context
-- ❌ Create sync loops
+
+- ❌ **Cannot call myself** (Shopkeeper agent → Shopkeeper agent loops prohibited)
+- ❌ Modify generated GraphQL files (services/shopify/gql/* is auto-generated)
+- ❌ Forget skip_shopify_sync context (prevents sync loops)
+- ❌ Create sync loops (always use proper context flags)
+- ❌ Hardcode Shopify IDs (use proper field mapping)
+- ❌ Skip webhook validation (delegate to Scout for testing)
 
 ## Model Selection
 
-**Default**: Sonnet 4 (optimal for integration complexity)
+**Default**: Sonnet (optimal for integration complexity)
 
 **Override Guidelines**:
 
-- **Simple GraphQL queries** → `Model: haiku-3.5` (basic schema queries)
-- **Complex sync patterns** → `Model: opus-4` (multi-system integration)
-- **Standard integration** → `Model: sonnet-4` (default, good balance)
+- **Simple GraphQL queries** → `Model: haiku` (basic schema queries)
+- **Complex sync patterns** → `Model: opus` (multi-system integration)
+- **Standard integration** → `Model: sonnet` (default, good balance)
 
 ```python
 # ← Program Manager delegates to Shopkeeper agent
 
-# Standard integration work (default Sonnet 4)
+# Standard integration work (default Sonnet)
 Task(
     description="Shopify sync",
     prompt="@docs/agents/shopkeeper.md\n\nImplement product sync from Shopify to Odoo",
     subagent_type="shopkeeper"
 )
 
-# Complex integration debugging (upgrade to Opus 4)
+# Complex integration debugging (upgrade to Opus)
 Task(
     description="Complex sync issues",
-    prompt="@docs/agents/shopkeeper.md\n\nModel: opus-4\n\nDebug webhook cascade failures",
+    prompt="@docs/agents/shopkeeper.md\n\nModel: opus\n\nDebug webhook cascade failures",
     subagent_type="shopkeeper"
 )
 ```
@@ -100,4 +107,6 @@ Task(
 ## Need More?
 
 - **GraphQL patterns**: Load @docs/agent-patterns/graphql-patterns.md
-- **Model selection**: Load @docs/system/MODEL_SELECTION.md
+- **Sync workflows**: Load @docs/agent-patterns/sync-patterns.md
+- **Webhook handling**: Load @docs/agent-patterns/webhook-patterns.md
+- **Model selection details**: Load @docs/system/MODEL_SELECTION.md

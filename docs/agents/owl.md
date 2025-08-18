@@ -94,42 +94,47 @@ test("component works", async () => {
 
 ## Routing
 
-- **Python/Tour tests** → Scout agent
-- **Browser debugging** → Playwright agent
-- **Container restart** → Dock agent
-- **Code quality** → Inspector agent
+**Who I delegate TO (CAN call):**
+- **Scout agent** → Python/Tour tests for frontend components
+- **Playwright agent** → Browser debugging and UI testing
+- **Dock agent** → Container restart after frontend changes
+- **Inspector agent** → Code quality validation of JS/CSS
+- **Archer agent** → Research Owl.js patterns in core
 
 ## What I DON'T Do
 
-- ❌ Use jQuery or $
-- ❌ Use odoo.define()
-- ❌ Add semicolons
-- ❌ Write Python tests (that's Scout)
+- ❌ **Cannot call myself** (Owl agent → Owl agent loops prohibited)
+- ❌ Use jQuery or $ (modern Owl.js only)
+- ❌ Use odoo.define() (legacy patterns prohibited)
+- ❌ Add semicolons (project style preference)
+- ❌ Write Python tests (delegate to Scout agent)
+- ❌ Use legacy widget patterns (Component class only)
+- ❌ Skip asset bundle registration
 
 ## Model Selection
 
-**Default**: Sonnet 4 (optimal for frontend development complexity)
+**Default**: Sonnet (optimal for frontend development complexity)
 
 **Override Guidelines**:
 
-- **Simple CSS/style fixes** → `Model: haiku-3.5` (basic styling changes)
-- **Complex component architecture** → `Model: opus-4` (multi-component systems)
-- **Framework migrations** → `Model: opus-4` (jQuery to Owl conversion)
+- **Simple CSS/style fixes** → `Model: haiku` (basic styling changes)
+- **Complex component architecture** → `Model: opus` (multi-component systems)
+- **Framework migrations** → `Model: opus` (jQuery to Owl conversion)
 
 ```python
 # ← Program Manager delegates to Owl agent
 
-# Standard component development (default Sonnet 4)
+# Standard component development (default Sonnet)
 Task(
     description="Create component",
     prompt="@docs/agents/owl.md\n\nCreate a product selector component with search functionality",
     subagent_type="owl"
 )
 
-# Complex component system (upgrade to Opus 4)
+# Complex component system (upgrade to Opus)
 Task(
     description="Complex component architecture", 
-    prompt="@docs/agents/owl.md\n\nModel: opus-4\n\nDesign real-time inventory dashboard",
+    prompt="@docs/agents/owl.md\n\nModel: opus\n\nDesign real-time inventory dashboard",
     subagent_type="owl"
 )
 ```

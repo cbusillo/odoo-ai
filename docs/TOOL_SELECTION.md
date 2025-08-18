@@ -62,7 +62,7 @@ docker exec odoo-opw-web-1 /odoo/odoo-bin --dev=all --stop-after-init
 - **docker**: Container management (status, logs, deployment)
 - **pycharm**: IDE operations (single file scope)
 - **playwright**: Browser automation
-- **chatgpt-automation**: AI consultation
+- **gpt-codex**: AI consultation via Codex CLI
 
 ### Built-in Tools
 
@@ -134,7 +134,7 @@ bash("docker exec odoo-opw-web-1 grep -r 'class.*Controller' /odoo/addons/")
 
 ```python
 # Returns in <1 second with structured data
-mcp__odoo_intelligence__search_code(
+mcp__odoo-intelligence__search_code(
     pattern="class.*Controller",
     file_type="py"
 )
@@ -203,8 +203,8 @@ mcp__inspection_pycharm__inspection_get_problems()
 
 ```python
 # Analyzes entire codebase systematically
-mcp__odoo_intelligence__pattern_analysis(pattern_type="all")
-mcp__odoo_intelligence__performance_analysis(model_name="product.template")
+mcp__odoo-intelligence__pattern_analysis(pattern_type="all")
+mcp__odoo-intelligence__performance_analysis(model_name="product.template")
 ```
 
 **Benefits**:
@@ -222,7 +222,7 @@ mcp__odoo_intelligence__performance_analysis(model_name="product.template")
 
 ```python
 # ✅ RIGHT: Single optimized search
-models = mcp__odoo_intelligence__search_decorators(decorator="depends")
+models = mcp__odoo-intelligence__search_decorators(decorator="depends")
 # Time: <2 seconds for entire codebase
 
 # ❌ WRONG: Multiple file reads
@@ -239,7 +239,7 @@ for file in files[:100]:  # Can only handle subset
 
 ```python
 # ✅ RIGHT: Targeted restart
-mcp__odoo_intelligence__odoo_restart(services="web-1,shell-1")
+mcp__odoo-intelligence__odoo_restart(services="web-1,shell-1")
 # Time: 5 seconds
 
 # ❌ WRONG: Full stack restart
@@ -254,12 +254,12 @@ bash("docker-compose down && docker-compose up -d")
 ```python
 # ✅ RIGHT: Integrated workflow
 # 1. Update with proper flags
-mcp__odoo_intelligence__odoo_update_module(
+mcp__odoo-intelligence__odoo_update_module(
     modules="product_connect",
     force_install=True
 )
 # 2. Check logs efficiently  
-mcp__odoo_intelligence__odoo_logs(lines=100)
+mcp__odoo-intelligence__odoo_logs(lines=100)
 # Total time: 10 seconds
 
 # ❌ WRONG: Manual process
@@ -279,7 +279,7 @@ bash("docker logs odoo-opw-web-1")
 bash("find . -name '*.xml' -exec grep -l 'ir.ui.view' {} \\;")
 
 # ✅ DO: Fast and structured
-mcp__odoo_intelligence__search_code(
+mcp__odoo-intelligence__search_code(
     pattern='model="ir.ui.view"',
     file_type="xml"
 )
@@ -293,7 +293,7 @@ bash("docker exec odoo-opw-web-1 ls /odoo/addons")
 bash("docker exec odoo-opw-web-1 cat /odoo/addons/base/__manifest__.py")
 
 # ✅ DO: Use appropriate tools
-mcp__odoo_intelligence__module_structure(module_name="base")
+mcp__odoo-intelligence__module_structure(module_name="base")
 ```
 
 #### Anti-Pattern 3: Parsing Unstructured Output
@@ -373,6 +373,7 @@ Need Odoo operations?
 - **Not sure which tool?** → Check the quick reference above
 - **Complex task?** → Route to appropriate agent
 - **Tool not working?** → Document the issue, use fallback
+- **Want benchmarks?** → See [Performance Reference Guide](PERFORMANCE_REFERENCE.md)
 
 ## Conclusion
 

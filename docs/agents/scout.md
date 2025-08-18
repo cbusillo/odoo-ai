@@ -78,42 +78,46 @@ uv run python tools/test_runner.py --tour-only                          # Tour t
 
 ## Routing
 
-- **Hoot tests (JS)** → Owl agent
-- **Browser debugging** → Playwright agent
-- **Performance issues** → Flash agent
-- **Code quality** → Inspector agent
+**Who I delegate TO (CAN call):**
+- **Owl agent** → Hoot tests (JS component testing)
+- **Playwright agent** → Browser debugging and tour troubleshooting
+- **Flash agent** → Performance issues in tests
+- **Inspector agent** → Code quality validation of test files
+- **Archer agent** → Research test patterns in core Odoo
 
 ## What I DON'T Do
 
-- ❌ Create products without base classes
-- ❌ Forget test tags
-- ❌ Use jQuery in tours (:visible, :contains)
-- ❌ Write frontend component tests (that's Owl)
+- ❌ **Cannot call myself** (Scout agent → Scout agent loops prohibited)
+- ❌ Create products without base classes (always use ProductConnectTransactionCase)
+- ❌ Forget test tags (always include @tagged decorators)
+- ❌ Use jQuery in tours (:visible, :contains selectors prohibited)
+- ❌ Write frontend component tests (delegate to Owl agent)
+- ❌ Skip base class inheritance (always extend from fixtures)
 
 ## Model Selection
 
-**Default**: Sonnet 4 (optimal for test writing complexity)
+**Default**: Sonnet (optimal for test writing complexity)
 
 **Override Guidelines**:
 
-- **Simple unit tests** → `Model: haiku-3.5` (basic CRUD testing)
-- **Complex architecture tests** → `Model: opus-4` (multi-system integration)
-- **Bulk test generation** → `Model: haiku-3.5` (repetitive patterns)
+- **Simple unit tests** → `Model: haiku` (basic CRUD testing)
+- **Complex architecture tests** → `Model: opus` (multi-system integration)
+- **Bulk test generation** → `Model: haiku` (repetitive patterns)
 
 ```python
 # ← Program Manager delegates to Scout agent
 
-# Standard test writing (default Sonnet 4)
+# Standard test writing (default Sonnet)
 Task(
     description="Write unit tests",
     prompt="@docs/agents/scout.md\n\nWrite tests for motor model CRUD operations",
     subagent_type="scout"
 )
 
-# Complex test architecture (upgrade to Opus 4)
+# Complex test architecture (upgrade to Opus)
 Task(
     description="Complex test suite",
-    prompt="@docs/agents/scout.md\n\nModel: opus-4\n\nDesign test suite for Shopify integration",
+    prompt="@docs/agents/scout.md\n\nModel: opus\n\nDesign test suite for Shopify integration",
     subagent_type="scout"
 )
 ```

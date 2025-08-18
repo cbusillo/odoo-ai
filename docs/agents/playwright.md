@@ -58,45 +58,52 @@ Use accessibility tree refs from `browser_snapshot`:
 - **ref**: Exact selector from snapshot
 
 ## Routing
-- **Write tour tests** → Scout agent  
-- **Frontend issues** → Owl agent
-- **Test failures** → Debugger agent
+
+**Who I delegate TO (CAN call):**
+- **Scout agent** → Write tour tests based on browser debugging findings
+- **Owl agent** → Fix frontend issues discovered in browser
+- **Debugger agent** → Analyze test failures and error patterns
+- **GPT agent** → Complex browser automation requiring multiple tools
 
 ## What I DON'T Do
-- ❌ Write test code (Scout does that)
-- ❌ Fix frontend code (Owl does that)
-- ❌ Guess selectors without snapshot
+
+- ❌ **Cannot call myself** (Playwright agent → Playwright agent loops prohibited)
+- ❌ Write test code (delegate to Scout agent)
+- ❌ Fix frontend code (delegate to Owl agent)
+- ❌ Guess selectors without snapshot (always use accessibility tree)
+- ❌ Run tour tests directly (use dedicated test runner)
 
 ## Model Selection
 
-**Default**: Sonnet 4 (optimal for browser testing complexity)
+**Default**: Sonnet (optimal for browser testing complexity)
 
 **Override Guidelines**:
 
-- **Simple element interactions** → `Model: haiku-3.5` (basic click/type operations)
-- **Complex tour debugging** → `Model: opus-4` (multi-step UI workflows)
-- **Performance testing** → `Model: sonnet-4` (default, good balance)
+- **Simple element interactions** → `Model: haiku` (basic click/type operations)
+- **Complex tour debugging** → `Model: opus` (multi-step UI workflows)
+- **Performance testing** → `Model: sonnet` (default, good balance)
 
 ```python
 # ← Program Manager delegates to Playwright agent
 
-# Standard browser testing (default Sonnet 4)
+# Standard browser testing (default Sonnet)
 Task(
     description="Debug failed tour",
     prompt="@docs/agents/playwright.md\n\nDebug why product creation tour fails",
     subagent_type="playwright"
 )
 
-# Complex UI workflow debugging (upgrade to Opus 4)
+# Complex UI workflow debugging (upgrade to Opus)
 Task(
     description="Complex workflow analysis",
-    prompt="@docs/agents/playwright.md\n\nModel: opus-4\n\nAnalyze multi-tab checkout flow",
+    prompt="@docs/agents/playwright.md\n\nModel: opus\n\nAnalyze multi-tab checkout flow",
     subagent_type="playwright"
 )
 ```
 
 ## Need More?
 
-- **Detailed patterns**: Load @docs/agent-patterns/playwright-patterns.md
+- **Browser testing patterns**: Load @docs/agent-patterns/playwright-patterns.md
 - **Selector strategies**: Load @docs/agent-patterns/playwright-selectors.md
-- **Model selection**: Load @docs/system/MODEL_SELECTION.md
+- **Tour debugging**: Load @docs/agent-patterns/tour-debugging.md
+- **Model selection details**: Load @docs/system/MODEL_SELECTION.md

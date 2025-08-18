@@ -73,7 +73,7 @@ def verify_version_references():
 # Model documentation coverage
 def verify_model_documentation():
     # Find all models in codebase
-    models = mcp__odoo_intelligence__search_models(pattern=".*")
+    models = mcp__odoo-intelligence__search_models(pattern=".*")
     
     # Check each model has documentation
     undocumented = []
@@ -147,7 +147,7 @@ def comprehensive_assessment():
     # Module structure analysis
     modules = ['product_connect', 'disable_odoo_online']
     for module in modules:
-        structure = mcp__odoo_intelligence__module_structure(module_name=module)
+        structure = mcp__odoo-intelligence__module_structure(module_name=module)
         doc_coverage = assess_documentation_coverage(structure)
         
     # Documentation index verification
@@ -172,7 +172,7 @@ def technical_verification():
     # Model information accuracy
     documented_models = extract_documented_models()
     for model_name in documented_models:
-        actual_info = mcp__odoo_intelligence__model_info(model_name=model_name)
+        actual_info = mcp__odoo-intelligence__model_info(model_name=model_name)
         doc_info = extract_model_doc_info(model_name)
         discrepancies = compare_model_info(actual_info, doc_info)
         

@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+import os
+import secrets
+import string
 import subprocess
 import sys
 import time
@@ -46,25 +49,34 @@ def get_our_modules() -> list[str]:
 def run_unit_tests() -> int:
     modules = get_our_modules()
     test_db_name = f"{get_production_db_name()}_test_unit"
-    return run_docker_test_command("unit_test", test_db_name, modules, use_production_clone=False)
+    test_tags = ",".join([f"/{module}" for module in modules])
+    return run_docker_test_command(test_tags, test_db_name, modules, use_production_clone=False, use_module_prefix=False)
 
 
 def run_integration_tests() -> int:
     modules = get_our_modules()
     test_db_name = f"{get_production_db_name()}_test_integration"
-    return run_docker_test_command("integration_test", test_db_name, modules, timeout=600, use_production_clone=True)
+    test_tags = ",".join([f"/{module}" for module in modules])
+    return run_docker_test_command(test_tags, test_db_name, modules, timeout=600, use_production_clone=True, use_module_prefix=False)
 
 
 def run_tour_tests() -> int:
+    print("🧪 Starting tour tests...")
     modules = get_our_modules()
     test_db_name = f"{get_production_db_name()}_test_tour"
-    return run_docker_test_command("tour_test", test_db_name, modules, timeout=1800, use_production_clone=True)
+    print(f"   Database: {test_db_name}")
+    print(f"   Modules: {', '.join(modules)}")
+    test_tags = ",".join([f"/{module}" for module in modules])
+    return run_docker_test_command(
+        test_tags, test_db_name, modules, timeout=1800, use_production_clone=True, is_tour_test=True, use_module_prefix=False
+    )
 
 
 def run_all_tests() -> int:
     modules = get_our_modules()
     test_db_name = f"{get_production_db_name()}_test_all"
-    return run_docker_test_command("post_install,-at_install", test_db_name, modules, use_production_clone=True)
+    test_tags = ",".join([f"/{module}" for module in modules])
+    return run_docker_test_command(test_tags, test_db_name, modules, use_production_clone=True, use_module_prefix=False)
 
 
 def run_quick_tests() -> int:
@@ -208,10 +220,41 @@ def create_filestore_symlink(test_db_name: str, production_db: str) -> None:
     production_filestore = f"/volumes/data/filestore/{production_db}"
     test_filestore = f"/volumes/data/filestore/{test_db_name}"
 
+    # Find the running script-runner container
+    script_runner_service = get_script_runner_service()
+
+    # First try to use any running script-runner container
+    list_cmd = ["docker", "ps", "-q", "-f", f"name=odoo-opw-{script_runner_service}", "-f", "status=running"]
+    result = subprocess.run(list_cmd, capture_output=True, text=True)
+
+    if result.returncode == 0 and result.stdout.strip():
+        # Use the first running container
+        container_id = result.stdout.strip().split()[0]
+        container_name = container_id[:12]  # Use short ID
+    else:
+        # Fallback to creating the symlink on the host via docker compose run
+        print(f"   Creating filestore symlink via docker compose run...")
+        symlink_cmd = [
+            "docker",
+            "compose",
+            "run",
+            "--rm",
+            script_runner_service,
+            "sh",
+            "-c",
+            f"if [ -e '{test_filestore}' ]; then rm -rf '{test_filestore}'; fi && ln -s '{production_filestore}' '{test_filestore}'",
+        ]
+        result = subprocess.run(symlink_cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            print(f"   ✅ Created filestore symlink: {test_filestore} → {production_filestore}")
+        else:
+            print(f"   ❌ Failed to create filestore symlink: {result.stderr}")
+        return
+
     cleanup_cmd = [
         "docker",
         "exec",
-        "odoo-opw-script-runner-1",
+        container_name,
         "sh",
         "-c",
         f"if [ -e '{test_filestore}' ]; then rm -rf '{test_filestore}'; fi",
@@ -223,7 +266,7 @@ def create_filestore_symlink(test_db_name: str, production_db: str) -> None:
     symlink_cmd = [
         "docker",
         "exec",
-        "odoo-opw-script-runner-1",
+        container_name,
         "ln",
         "-s",
         production_filestore,
@@ -309,7 +352,17 @@ def cleanup_chrome_processes() -> None:
     subprocess.run(["docker", "exec", f"odoo-opw-{script_runner_service}-1", "pkill", "-9", "chrome"], capture_output=True)
     subprocess.run(["docker", "exec", f"odoo-opw-{script_runner_service}-1", "pkill", "-9", "chromium"], capture_output=True)
     # Clean up zombie processes
-    subprocess.run(["docker", "exec", f"odoo-opw-{script_runner_service}-1", "sh", "-c", "ps aux | grep defunct | awk '{print $2}' | xargs -r kill -9"], capture_output=True)
+    subprocess.run(
+        [
+            "docker",
+            "exec",
+            f"odoo-opw-{script_runner_service}-1",
+            "sh",
+            "-c",
+            "ps aux | grep defunct | awk '{print $2}' | xargs -r kill -9",
+        ],
+        capture_output=True,
+    )
 
 
 def restart_script_runner_with_orphan_cleanup() -> None:
@@ -458,7 +511,52 @@ def drop_and_create_test_database(db_name: str) -> None:
     print(f"🗄️  Database cleanup completed")
 
 
-def clone_production_database(db_name: str) -> None:
+def setup_test_authentication(db_name: str) -> str:
+    """Set up test authentication in the cloned database.
+
+    Generates a secure random password and updates the admin user's password
+    in the test database. Returns the generated password.
+    """
+    # Generate a secure random password
+    alphabet = string.ascii_letters + string.digits
+    password = "".join(secrets.choice(alphabet) for _ in range(16))
+
+    print(f"   Setting up test authentication...")
+
+    # Hash the password using Odoo's password hashing
+    # We'll use a simple approach - set the password directly via SQL
+    # Odoo will hash it on first authentication
+
+    # Update the admin user's password in the database
+    # Note: We're setting a plain password that Odoo will hash on first use
+    # This is simpler than trying to generate the correct hash format
+    update_password_cmd = [
+        "docker",
+        "exec",
+        "odoo-opw-database-1",
+        "psql",
+        "-U",
+        "odoo",
+        "-d",
+        db_name,
+        "-c",
+        f"UPDATE res_users SET password = '{password}' WHERE login = 'admin';",
+    ]
+
+    result = subprocess.run(update_password_cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"   ⚠️  Warning: Failed to update admin password: {result.stderr}")
+        # Don't fail completely, tests might still work
+    else:
+        print(f"   ✅ Test authentication configured (admin user)")
+
+    # Set environment variable for this session
+    os.environ["ODOO_TEST_PASSWORD"] = password
+
+    return password
+
+
+def clone_production_database(db_name: str) -> str:
     production_db = get_production_db_name()
     print(f"🗄️  Cloning production database: {production_db} → {db_name}")
 
@@ -533,7 +631,30 @@ def clone_production_database(db_name: str) -> None:
         print(f"   ❌ Failed to drop database: {result.stderr}")
         return
 
-    # Step 3: Clone from production database
+    # Step 3: Terminate connections to production database before cloning
+    print(f"   Terminating connections to production database {production_db}...")
+    kill_prod_connections_cmd = [
+        "docker",
+        "exec",
+        "odoo-opw-database-1",
+        "psql",
+        "-U",
+        "odoo",
+        "-d",
+        "postgres",
+        "-c",
+        f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{production_db}' AND pid <> pg_backend_pid();",
+    ]
+    result = subprocess.run(kill_prod_connections_cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"   ⚠️  Warning: Could not kill production connections: {result.stderr}")
+    else:
+        print(f"   Production connection termination executed")
+
+    # Wait for connections to close
+    time.sleep(2)
+
+    # Step 4: Clone from production database
     print(f"   Cloning from production database {production_db}...")
     clone_cmd = [
         "docker",
@@ -576,6 +697,9 @@ def clone_production_database(db_name: str) -> None:
 
     print(f"🗄️  Database clone completed")
 
+    # Set up test authentication for tour tests
+    return setup_test_authentication(db_name)
+
 
 def run_docker_test_command(
     test_tags: str,
@@ -585,6 +709,8 @@ def run_docker_test_command(
     use_production_clone: bool = False,
     cleanup_before: bool = True,
     cleanup_after: bool = True,
+    is_tour_test: bool = False,
+    use_module_prefix: bool = True,
 ) -> int:
     if modules_to_install is None:
         modules_to_install = get_our_modules()
@@ -593,7 +719,10 @@ def run_docker_test_command(
     script_runner_service = get_script_runner_service()
     production_db = get_production_db_name()
 
-    print(f"🧪 Running tests: {test_tags}")
+    if is_tour_test:
+        print(f"🧪 Running TOUR tests (HttpCase-based tests)")
+    else:
+        print(f"🧪 Running tests: {test_tags}")
     print(f"📦 Modules: {modules_str}")
     print(f"📊 Database: {db_name}")
     print("-" * 60)
@@ -607,38 +736,96 @@ def run_docker_test_command(
 
     restart_script_runner_with_orphan_cleanup()
 
+    test_password = None
     if use_production_clone:
-        clone_production_database(db_name)
+        test_password = clone_production_database(db_name)
         # Create symlink after container restart for tour tests
-        if "tour" in test_tags:
+        if is_tour_test or "tour" in test_tags:
             print(f"   Creating filestore symlink for tour tests...")
             create_filestore_symlink(db_name, production_db)
             print(f"   Cleaning up Chrome processes...")
             cleanup_chrome_processes()
+
+            # Mark modules as uninstalled to force test module loading
+            print(f"   Marking modules as uninstalled to force test discovery...")
+            for module in modules_to_install:
+                cmd_uninstall = [
+                    "docker",
+                    "compose",
+                    "exec",
+                    "-T",
+                    "database",
+                    "psql",
+                    "-U",
+                    "odoo",
+                    "-d",
+                    db_name,
+                    "-c",
+                    f"UPDATE ir_module_module SET state = 'uninstalled' WHERE name = '{module}';",
+                ]
+                subprocess.run(cmd_uninstall, capture_output=True)
+            print(f"   ✅ Modules marked for reinstallation")
     else:
         drop_and_create_test_database(db_name)
+
+    # Build test tags - optionally with module prefix to only run our module tests
+    # Format: module_name:test_tag for each module (when use_module_prefix=True)
+    if not test_tags:
+        # No tags specified, just use module names
+        test_tags_final = ",".join(modules_to_install)
+    elif not use_module_prefix:
+        # Use tags as-is without module prefix (for tour tests)
+        test_tags_final = test_tags
+    elif "," in test_tags:
+        # Complex tags with multiple components - apply module prefix to last tag
+        # e.g., "post_install,-at_install,unit_test" -> "module:unit_test"
+        tags = test_tags.split(",")
+        last_tag = tags[-1].strip()
+        test_tags_final = ",".join([f"{module}:{last_tag}" for module in modules_to_install])
+    elif test_tags.startswith("-"):
+        # Negative tags - use as-is
+        test_tags_final = test_tags
+    else:
+        # Simple tags - use module prefixes
+        test_tags_final = ",".join([f"{module}:{test_tags}" for module in modules_to_install])
+
+    print(f"🏷️  Final test tags: {test_tags_final}")
+
+    # For tests, always use -i (install) to force test module loading
+    # Even with production clones, we need -i to trigger test discovery
+    # Odoo doesn't load test modules during update (-u), only during install
+    module_flag = "-i"
 
     cmd = [
         "docker",
         "compose",
         "run",
         "--rm",
-        script_runner_service,
-        "/odoo/odoo-bin",
-        "-d",
-        db_name,
-        "-i",
-        modules_str,
-        "--test-tags",
-        test_tags,
-        "--test-enable",
-        "--stop-after-init",
-        "--max-cron-threads=0",
-        "--workers=0",
-        f"--db-filter=^{db_name}$",
-        "--log-level=test",
-        "--without-demo=all",
     ]
+
+    # Add environment variable for test password if we have one
+    if test_password:
+        cmd.extend(["-e", f"ODOO_TEST_PASSWORD={test_password}"])
+
+    cmd.extend(
+        [
+            script_runner_service,
+            "/odoo/odoo-bin",
+            "-d",
+            db_name,
+            module_flag,
+            modules_str,
+            "--test-tags",
+            test_tags_final,
+            "--test-enable",
+            "--stop-after-init",
+            "--max-cron-threads=0",
+            "--workers=0",
+            f"--db-filter=^{db_name}$",
+            "--log-level=test",
+            "--without-demo=all",
+        ]
+    )
 
     print(f"🚀 Command: {' '.join(cmd)}")
     print()
@@ -646,7 +833,8 @@ def run_docker_test_command(
     start_time = time.time()
 
     try:
-        result = subprocess.run(cmd, timeout=timeout)
+        # Don't capture output, let it stream to console
+        result = subprocess.run(cmd, timeout=timeout, text=True)
         elapsed = time.time() - start_time
 
         print(f"\n⏱️  Completed in {elapsed:.2f}s")

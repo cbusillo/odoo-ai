@@ -10,13 +10,13 @@ This file contains detailed Odoo framework patterns and examples extracted from 
 # Step 1: Search for Patterns
 def research_odoo_patterns(feature_type):
     # Find existing implementations
-    patterns = mcp__odoo_intelligence__search_code(
+    patterns = mcp__odoo-intelligence__search_code(
         pattern=f"widget.*{feature_type}|class.*{feature_type}",
         file_type="xml"  # or "py", "js" as needed
     )
     
     # Get related code patterns  
-    py_patterns = mcp__odoo_intelligence__search_code(
+    py_patterns = mcp__odoo-intelligence__search_code(
         pattern=f"def.*{feature_type}|{feature_type}.*field",
         file_type="py"
     )
@@ -26,16 +26,16 @@ def research_odoo_patterns(feature_type):
 # Step 2: Deep Structure Analysis
 def analyze_odoo_structure(model_name):
     # Understand the complete model
-    model_info = mcp__odoo_intelligence__model_info(model_name=model_name)
+    model_info = mcp__odoo-intelligence__model_info(model_name=model_name)
     
     # See how it's used in views
-    view_usage = mcp__odoo_intelligence__view_model_usage(model_name=model_name)
+    view_usage = mcp__odoo-intelligence__view_model_usage(model_name=model_name)
     
     # Trace complete inheritance
-    inheritance = mcp__odoo_intelligence__inheritance_chain(model_name=model_name)
+    inheritance = mcp__odoo-intelligence__inheritance_chain(model_name=model_name)
     
     # Find performance considerations
-    performance = mcp__odoo_intelligence__performance_analysis(model_name=model_name)
+    performance = mcp__odoo-intelligence__performance_analysis(model_name=model_name)
     
     return {
         'model': model_info,
@@ -47,20 +47,20 @@ def analyze_odoo_structure(model_name):
 # Step 3: Theory Validation
 def validate_theories(test_code):
     # Test assumptions in Odoo shell
-    result = mcp__odoo_intelligence__execute_code(code=test_code)
+    result = mcp__odoo-intelligence__execute_code(code=test_code)
     return result
 
 # Step 4: File-Specific Research
 def research_specific_implementations(pattern):
     # Read core Odoo implementations
-    core_file = mcp__odoo_intelligence__read_odoo_file(
+    core_file = mcp__odoo-intelligence__read_odoo_file(
         file_path=f"sale/views/sale_views.xml",
         pattern=pattern,
         context_lines=10
     )
     
     # Read custom implementations for comparison
-    custom_files = mcp__odoo_intelligence__find_files(
+    custom_files = mcp__odoo-intelligence__find_files(
         pattern=f"*{pattern}*.xml"
     )
     

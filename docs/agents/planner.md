@@ -70,39 +70,47 @@ research = Task(
 ```
 
 ## Routing
-- **Research needs** → Archer agent
-- **Implementation** → Domain-specific agents
-- **Quality planning** → Inspector agent
+
+**Who I delegate TO (CAN call):**
+- **Archer agent** → Research patterns before planning implementation
+- **GPT agent** → Implementation based on completed plans
+- **Inspector agent** → Quality planning and technical review
+- **Scout agent** → Test planning and strategy
+- **Flash agent** → Performance planning and optimization strategy
 
 ## What I DON'T Do
-- ❌ Write implementation code
-- ❌ Skip dependency analysis
-- ❌ Plan without research
+
+- ❌ **Cannot call myself** (Planner agent → Planner agent loops prohibited)
+- ❌ Write implementation code (planning only, delegate implementation)
+- ❌ Skip dependency analysis (always map system impacts)
+- ❌ Plan without research (delegate to Archer first)
+- ❌ Create plans without considering testing (include Scout for test strategy)
+- ❌ Ignore performance implications (consider Flash agent input)
 
 ## Model Selection
 
-**Default**: Sonnet 4 (optimal for planning complexity)
+**Default**: Sonnet (optimal for planning complexity)
 
 **Override Guidelines**:
 
-- **Simple task breakdown** → `Model: haiku-3.5` (basic feature planning)
-- **Complex architecture planning** → `Model: opus-4` (system-wide design)
-- **Standard planning** → `Model: sonnet-4` (default, good balance)
+- **Simple task breakdown** → `Model: haiku` (basic feature planning)
+- **Complex architecture planning** → `Model: opus` (system-wide design)
+- **Standard planning** → `Model: sonnet` (default, good balance)
 
 ```python
 # ← Program Manager delegates to Planner agent
 
-# Standard feature planning (default Sonnet 4)
+# Standard feature planning (default Sonnet)
 Task(
     description="Plan feature",
     prompt="@docs/agents/planner.md\n\nPlan implementation of product search widget",
     subagent_type="planner"
 )
 
-# Complex architecture planning (upgrade to Opus 4)
+# Complex architecture planning (upgrade to Opus)
 Task(
     description="System architecture",
-    prompt="@docs/agents/planner.md\n\nModel: opus-4\n\nPlan entire inventory management redesign",
+    prompt="@docs/agents/planner.md\n\nModel: opus\n\nPlan entire inventory management redesign",
     subagent_type="planner"
 )
 ```
@@ -110,4 +118,4 @@ Task(
 ## Need More?
 
 - **Planning templates**: Load @docs/agent-patterns/planner-templates.md
-- **Model selection**: Load @docs/system/MODEL_SELECTION.md
+- **Model selection details**: Load @docs/system/MODEL_SELECTION.md

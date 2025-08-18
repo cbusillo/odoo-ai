@@ -118,42 +118,46 @@ recent = orders.filtered(lambda o: o.state == 'sale')[:100]
 
 ## Routing
 
-- **Implementation fixes** → Refactor agent
-- **Code quality** → Inspector agent
-- **Complex optimization** → GPT agent
-- **Database issues** → Dock agent
+**Who I delegate TO (CAN call):**
+- **Refactor agent** → Implementation of performance fixes
+- **Inspector agent** → Code quality issues affecting performance
+- **GPT agent** → Complex optimization requiring extensive changes
+- **Dock agent** → Database configuration and container issues
+- **Archer agent** → Research performance patterns in Odoo core
 
 ## What I DON'T Do
 
-- ❌ Optimize without measuring
-- ❌ Add indexes everywhere (they slow writes)
-- ❌ Use raw SQL unnecessarily
+- ❌ **Cannot call myself** (Flash agent → Flash agent loops prohibited)
+- ❌ Optimize without measuring (always profile first)
+- ❌ Add indexes everywhere (they slow writes, be strategic)
+- ❌ Use raw SQL unnecessarily (ORM is usually sufficient)
 - ❌ Cache without invalidation strategy
+- ❌ Optimize prematurely without identifying bottlenecks
 
 ## Model Selection
 
-**Default**: Sonnet 4 (optimal for performance analysis complexity)
+**Default**: Sonnet (optimal for performance analysis complexity)
 
 **Override Guidelines**:
 
-- **Simple performance checks** → `Model: haiku-3.5` (basic N+1 detection)
-- **Complex optimization strategies** → `Model: opus-4` (architectural performance)
-- **Standard analysis** → `Model: sonnet-4` (default, good balance)
+- **Simple performance checks** → `Model: haiku` (basic N+1 detection)
+- **Complex optimization strategies** → `Model: opus` (architectural performance)
+- **Standard analysis** → `Model: sonnet` (default, good balance)
 
 ```python
 # ← Program Manager delegates to Flash agent
 
-# Standard performance analysis (default Sonnet 4)
+# Standard performance analysis (default Sonnet)
 Task(
     description="Performance check",
     prompt="@docs/agents/flash.md\n\nAnalyze product.template model for performance issues",
     subagent_type="flash"
 )
 
-# Complex optimization (upgrade to Opus 4)
+# Complex optimization (upgrade to Opus)
 Task(
     description="Complex optimization",
-    prompt="@docs/agents/flash.md\n\nModel: opus-4\n\nOptimize entire Shopify sync pipeline",
+    prompt="@docs/agents/flash.md\n\nModel: opus\n\nOptimize entire Shopify sync pipeline",
     subagent_type="flash"
 )
 ```
@@ -176,4 +180,4 @@ duration = time.time() - start
 ## Need More?
 
 - **Performance patterns**: Load @docs/agent-patterns/flash-patterns.md
-- **Model selection**: Load @docs/system/MODEL_SELECTION.md
+- **Model selection details**: Load @docs/system/MODEL_SELECTION.md

@@ -5,14 +5,17 @@
 Claude Code agents can request specific AI models based on task complexity, enabling rate limit preservation and
 performance optimization.
 
-## Quick Reference
+## Canonical Model Matrix
 
-| Model         | Speed | Tokens    | Rate Limit | Best For                       |
-|---------------|-------|-----------|------------|--------------------------------|
-| **Haiku 3.5** | <1s   | 1K-5K     | LOW        | Simple queries, status checks  |
-| **Sonnet 4**  | ~5s   | 15K-50K   | MEDIUM     | Standard development (default) |
-| **Opus 4**    | ~15s  | 100K-300K | HIGH       | Complex analysis               |
-| **GPT-5**     | ~30s  | 0 Claude  | NONE       | Large implementations          |
+| Model Family | Model Name | Speed | Tokens    | Rate Limit | Best For                       |
+|--------------|------------|-------|-----------|------------|--------------------------------|
+| **Claude**   | Haiku      | <1s   | 1K-5K     | LOW        | Simple queries, status checks  |
+| **Claude**   | Sonnet     | ~5s   | 15K-50K   | MEDIUM     | Standard development (default) |
+| **Claude**   | Opus       | ~15s  | 100K-300K | HIGH       | Complex analysis               |
+| **OpenAI**   | o3-mini    | ~10s  | 0 Claude  | NONE       | Fast reasoning tasks           |
+| **OpenAI**   | o3         | ~30s  | 0 Claude  | NONE       | Large implementations          |
+
+**Note**: Model availability changes over time. The GPT agent supports multiple OpenAI models via Codex CLI.
 
 ## Syntax
 
@@ -30,33 +33,33 @@ Task details...""",
 
 ## Default Models by Agent
 
-| Agent          | Default   | Reasoning                   |
-|----------------|-----------|-----------------------------|
-| 🚢 Dock        | Haiku 3.5 | Simple container operations |
-| 🏹 Archer      | Haiku 3.5 | Fast pattern searches       |
-| 🔍 Scout       | Sonnet 4  | Test writing complexity     |
-| 🦉 Owl         | Sonnet 4  | Frontend development        |
-| 🔬 Inspector   | Sonnet 4  | Code analysis               |
-| 🛍️ Shopkeeper | Sonnet 4  | Business logic              |
-| 🎭 Playwright  | Sonnet 4  | Browser automation          |
-| 🔧 Refactor    | Opus 4    | Systematic changes          |
-| ⚡ Flash        | Opus 4    | Performance analysis        |
-| 🐛 Debugger    | Opus 4    | Complex reasoning           |
-| 📋 Planner     | Opus 4    | Architecture design         |
-| 💬 GPT         | Opus 4    | Match ChatGPT capability    |
-| 🔥 Phoenix     | Opus 4    | Migration complexity        |
+| Agent          | Default | Reasoning                   |
+|----------------|---------|-------------------------------|
+| 🚢 Dock        | Haiku   | Simple container operations |
+| 🏹 Archer      | Haiku   | Fast pattern searches       |
+| 🔍 Scout       | Sonnet  | Test writing complexity     |
+| 🦉 Owl         | Sonnet  | Frontend development        |
+| 🔬 Inspector   | Sonnet  | Code analysis               |
+| 🛍️ Shopkeeper | Sonnet  | Business logic              |
+| 🎭 Playwright  | Sonnet  | Browser automation          |
+| 🔧 Refactor    | Opus    | Systematic changes          |
+| ⚡ Flash        | Opus    | Performance analysis        |
+| 🐛 Debugger    | Opus    | Complex reasoning           |
+| 📋 Planner     | Opus    | Architecture design         |
+| 💬 GPT         | o3      | External model capability   |
+| 🔥 Phoenix     | Opus    | Migration complexity        |
 
 ## Override Examples
 
 ### Downgrade for Simple Tasks
 
 ```python
-# Quick syntax check (normally Sonnet 4)
+# Quick syntax check (normally Sonnet)
 Task(
     description="Quick lint check",
     prompt="""@docs/agents/inspector.md
 
-Model: haiku-3.5
+Model: haiku
 
 Run basic syntax check on current file""",
     subagent_type="inspector"
@@ -66,27 +69,27 @@ Run basic syntax check on current file""",
 ### Upgrade for Complex Tasks
 
 ```python
-# Complex test architecture (normally Sonnet 4)
+# Complex test architecture (normally Sonnet)
 Task(
     description="Complex test suite",
     prompt="""@docs/agents/scout.md
 
-Model: opus-4
+Model: opus
 
 Design comprehensive test suite for multi-tenant system""",
     subagent_type="scout"
 )
 ```
 
-### Offload to GPT
+### Offload to External Models
 
 ```python
 # Preserve Claude tokens for large tasks
 Task(
-    description="Large refactoring via GPT",
+    description="Large refactoring via external model",
     prompt="""@docs/agents/gpt.md
 
-Use GPT-5 for this 50+ file refactoring""",
+Use o3 for this 50+ file refactoring""",
     subagent_type="gpt"
 )
 ```
@@ -95,23 +98,23 @@ Use GPT-5 for this 50+ file refactoring""",
 
 ### Response Times
 
-| Task Type             | Model     | Response Time | Success Rate |
-|-----------------------|-----------|---------------|--------------|
-| Container status      | Haiku 3.5 | <1s           | 98%          |
-| Write unit test       | Sonnet 4  | ~5s           | 85%          |
-| Architecture analysis | Opus 4    | ~15s          | 94%          |
-| 50-file refactor      | GPT-5     | ~30s          | 92%          |
+| Task Type             | Model   | Response Time | Success Rate |
+|-----------------------|---------|---------------|--------------|
+| Container status      | Haiku   | <1s           | 98%          |
+| Write unit test       | Sonnet  | ~5s           | 85%          |
+| Architecture analysis | Opus    | ~15s          | 94%          |
+| 50-file refactor      | o3      | ~30s          | 92%          |
 
 ### Task Success Rates
 
-| Task Type       | Haiku 3.5 | Sonnet 4 | Opus 4 |
-|-----------------|-----------|----------|--------|
-| Simple file ops | 98%       | 99%      | 99%    |
-| Code writing    | 65%       | 87%      | 92%    |
-| Test writing    | 72%       | 85%      | 89%    |
-| Bug fixing      | 45%       | 78%      | 91%    |
-| Architecture    | 25%       | 68%      | 94%    |
-| Performance opt | 15%       | 52%      | 89%    |
+| Task Type       | Haiku | Sonnet | Opus |
+|-----------------|-------|--------|------|
+| Simple file ops | 98%   | 99%    | 99%  |
+| Code writing    | 65%   | 87%    | 92%  |
+| Test writing    | 72%   | 85%    | 89%  |
+| Bug fixing      | 45%   | 78%    | 91%  |
+| Architecture    | 25%   | 68%    | 94%  |
+| Performance opt | 15%   | 52%    | 89%  |
 
 **Key Insight**: Haiku is 3-15x faster but with lower success on complex tasks.
 
@@ -119,17 +122,17 @@ Use GPT-5 for this 50+ file refactoring""",
 
 ### Strategy
 
-1. **High-volume operations** → Use Haiku 3.5
-2. **Standard development** → Use Sonnet 4 (default)
-3. **Complex analysis** → Use Opus 4 sparingly
-4. **Large implementations** → Offload to GPT-5 (preserves 100% Claude tokens)
+1. **High-volume operations** → Use Haiku
+2. **Standard development** → Use Sonnet (default)
+3. **Complex analysis** → Use Opus sparingly
+4. **Large implementations** → Offload to o3 (preserves 100% Claude tokens)
 
 ### Token Usage
 
-- **Haiku 3.5**: 1K-5K tokens → Minimal impact
-- **Sonnet 4**: 15K-50K tokens → Moderate usage
-- **Opus 4**: 100K-300K tokens → Heavy usage
-- **GPT-5**: 0 Claude tokens → Zero impact (free via ChatGPT Pro)
+- **Haiku**: 1K-5K tokens → Minimal impact
+- **Sonnet**: 15K-50K tokens → Moderate usage
+- **Opus**: 100K-300K tokens → Heavy usage
+- **o3/o3-mini**: 0 Claude tokens → Zero impact (via Codex CLI)
 
 ## Best Practices
 
@@ -172,6 +175,17 @@ manager = SmartContextManager()
 analysis = manager.analyze_task("Check container status")
 # analysis.recommended_model = ModelTier.HAIKU
 ```
+
+## Model Availability Notice
+
+**Important**: Model availability and capabilities change over time as providers update their offerings. The model names and features described in this guide reflect the current state as of documentation writing.
+
+- **Claude models** (Haiku, Sonnet, Opus) are subject to Anthropic's release schedule
+- **OpenAI models** (o3, o3-mini) availability depends on OpenAI's API access
+- **Version numbers** are deliberately simplified to focus on capability tiers rather than specific versions
+- **New models** may be added to any tier as they become available
+
+When models are unavailable, the framework will automatically suggest fallback options based on capability requirements.
 
 ## Related Documentation
 

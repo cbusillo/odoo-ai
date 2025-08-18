@@ -22,7 +22,7 @@ The error recovery framework (`tools/error_recovery.py`) provides:
 | **PERMISSION**         | "403 Forbidden", "access denied"           | Fail immediately   | No recovery possible   |
 | **RESOURCE_NOT_FOUND** | "404 Not Found", "file not found"          | Try fallback       | Alternative approach   |
 | **MODEL_UNAVAILABLE**  | "claude-3-opus unavailable"                | Fallback model     | Use simpler model      |
-| **CONTEXT_LIMIT**      | "context too long", "token limit"          | Offload to GPT     | Preserve Claude tokens |
+| **CONTEXT_LIMIT**      | "context too long", "token limit"          | Offload to GPT     | Hooks will remind to reload CLAUDE.md |
 | **AGENT_FAILURE**      | Agent crashes or fails                     | Fallback agent     | Use alternative agent  |
 
 ## Agent Fallback Chains
@@ -32,9 +32,9 @@ When an agent fails, the framework automatically suggests fallback agents:
 ```python
 FALLBACK_CHAINS = {
     "flash": ["inspector", "archer"],              # Performance analysis
-    "inspector": ["archer", "general-purpose"],    # Code quality
-    "scout": ["general-purpose"],                  # Test writing
-    "owl": ["general-purpose"],                    # Frontend
+    "inspector": ["archer", "gpt"],                # Code quality
+    "scout": ["gpt"],                              # Test writing
+    "owl": ["gpt"],                                # Frontend
     "debugger": ["gpt", "anthropic-engineer"],    # Complex reasoning
     "planner": ["gpt", "anthropic-engineer"],     # Architecture
 }
@@ -148,7 +148,7 @@ def handle_large_context_task(files, task):
             print("Context too large for Claude, offloading to GPT...")
             return Task(
                 description=task,
-                prompt=f"@docs/agents/gpt.md\n\nUse GPT-5 for large context\n\n{task}",
+                prompt=f"@docs/agents/gpt.md\n\nUse o3 for large context\n\n{task}",
                 subagent_type="gpt"
             )
 ```

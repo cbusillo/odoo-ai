@@ -9,6 +9,16 @@ layers with clean separation and reliable execution.
 **Total Runtime**: < 30 minutes for complete suite  
 **Infrastructure**: Uses script-runner container to avoid circular imports
 
+## Advanced Testing Documentation
+
+For comprehensive testing patterns including:
+- Computed fields with cache management
+- Security and access rights testing
+- Multi-company scenarios
+- Performance testing
+
+See: [Advanced Testing Patterns](odoo18/TESTING_ADVANCED.md)
+
 ## Quick Start
 
 ### ⚠️ CRITICAL: Always Use `uv run` Commands

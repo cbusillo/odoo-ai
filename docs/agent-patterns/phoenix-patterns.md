@@ -273,31 +273,31 @@ class TestModern(TransactionCase):
 
 ```python
 # Find old type hints
-mcp__odoo_intelligence__search_code(
+mcp__odoo-intelligence__search_code(
     pattern="from typing import.*Optional|List|Dict",
     file_type="py"
 )
 
 # Find jQuery usage
-mcp__odoo_intelligence__search_code(
+mcp__odoo-intelligence__search_code(
     pattern="\\$\\(|jQuery\\(",
     file_type="js"
 )
 
 # Find old field patterns
-mcp__odoo_intelligence__search_code(
+mcp__odoo-intelligence__search_code(
     pattern="fields\\..*_id.*=.*fields\\.Many2one",
     file_type="py"
 )
 
 # Find deprecated decorators
-mcp__odoo_intelligence__search_code(
+mcp__odoo-intelligence__search_code(
     pattern="@api\\.(multi|one|model_cr)",
     file_type="py"
 )
 
 # Find old widget patterns
-mcp__odoo_intelligence__search_code(
+mcp__odoo-intelligence__search_code(
     pattern="Widget\\.extend|widget\\.extend",
     file_type="js"
 )
@@ -435,7 +435,7 @@ def validate_migration():
     ]
     
     for pattern in old_patterns:
-        results = mcp__odoo_intelligence__search_code(
+        results = mcp__odoo-intelligence__search_code(
             pattern=pattern,
             file_type="py"
         )

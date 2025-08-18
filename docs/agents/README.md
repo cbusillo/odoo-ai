@@ -28,7 +28,7 @@ agent has focused knowledge to avoid context pollution and ensure expertise in t
 | 🎭    | **Playwright**         | Browser automation and UI testing        |
 | 🧙    | **Odoo Engineer**      | Framework expertise                      |
 | 🤖    | **Anthropic Engineer** | Claude optimization                      |
-| 💬    | **GPT**                | External verification via ChatGPT        |
+| 💬    | **GPT**                | External verification via Codex CLI      |
 | 📝    | **Doc**                | Documentation maintenance                |
 
 **Note**: Full trigger conditions and collaboration details are in each agent's description (visible in Task tool).
@@ -206,43 +206,9 @@ if bulk_issues_found:
 - **Model selection**: See `docs/system/MODEL_SELECTION.md` for model selection syntax and optimization
 - **Agent safeguards**: See `docs/system/AGENT_SAFEGUARDS.md` for preventing recursive calls
 
-## Tool Examples Appendix
+## Tool Examples Reference
 
-### Container Logs
+For detailed tool examples, performance comparisons, and anti-patterns, see:
 
-```python
-# ✅ RIGHT: Clean log retrieval with pagination
-mcp__docker__fetch_container_logs(
-    container_id="odoo-opw-web-1",
-    tail="all"
-)
-# Returns: Clean log output, handles large files efficiently
-
-# ❌ WRONG: Raw docker logs with potential memory issues
-bash("docker logs odoo-opw-web-1")
-# Can: Overwhelm output, no pagination, harder to process
-```
-
-### File Operations
-
-```python
-# ✅ RIGHT: Token-efficient file access
-Read("addons/product_connect/models/motor.py")
-# Benefits: Precise content retrieval, optimized for AI processing
-
-# ❌ WRONG: Bash file operations  
-bash("cat addons/product_connect/models/motor.py")
-# Issues: Less efficient token usage, no built-in error handling
-```
-
-### Odoo Module Updates
-
-```python
-# ✅ RIGHT: Proper environment with error handling
-mcp__odoo - intelligence__odoo_update_module(modules="product_connect")
-# Uses: Dedicated script-runner container, proper flags, clean output
-
-# ❌ WRONG: Direct docker exec without proper environment
-bash("docker exec odoo-opw-web-1 /odoo/odoo-bin -u product_connect")
-# Risks: Interferes with web requests, missing flags, no error handling
-```
+- **[Tool Selection Guide](../TOOL_SELECTION.md)** - Complete decision trees and performance benchmarks
+- **[Performance Reference Guide](../PERFORMANCE_REFERENCE.md)** - Real-world examples and metrics

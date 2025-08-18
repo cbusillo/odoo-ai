@@ -54,13 +54,13 @@ mcp__docker__fetch_container_logs(container_id="odoo-opw-web-1",
 ### Update Module
 
 ```python
-mcp__odoo - intelligence__odoo_update_module(modules="product_connect")
+mcp__odoo-intelligence__odoo_update_module(modules="product_connect")
 ```
 
 ### Restart Services
 
 ```python
-mcp__odoo - intelligence__odoo_restart(services="web-1,shell-1")
+mcp__odoo-intelligence__odoo_restart(services="web-1,shell-1")
 ```
 
 ## Container Paths (Inside containers)
@@ -91,45 +91,54 @@ Always use script-runner with `--stop-after-init`
 
 ## Routing
 
-- **Container logs for debugging** → Debugger agent
-- **After frontend changes** → Called by Owl agent
-- **Test execution** → Scout uses script-runner
+**Who I delegate TO (CAN call):**
+- **Debugger agent** → Container log analysis for error debugging
+- **GPT agent** → Complex container orchestration issues
+- **Flash agent** → Database performance container optimization
+
+**Who calls ME:**
+- **Owl agent** → After frontend changes requiring restart
+- **Scout agent** → For test execution in script-runner container
+- **All agents** → For container status and operations
 
 ## What I DON'T Do
 
-- ❌ Use `docker compose run` (creates clutter)
-- ❌ Run tests in web-1
-- ❌ Use bash when MCP exists
+- ❌ **Cannot call myself** (Dock agent → Dock agent loops prohibited)
+- ❌ Use `docker compose run` (creates clutter containers)
+- ❌ Run tests in web-1 (use script-runner container)
+- ❌ Use bash when MCP exists (prefer structured data)
+- ❌ Mix environments (keep development containers isolated)
 
 ## Model Selection
 
-**Default**: Haiku 3.5 (optimal for simple container operations)
+**Default**: Haiku (optimal for simple container operations)
 
 **Override Guidelines**:
 
-- **Simple status checks** → `Model: haiku-3.5` (default, fastest)
-- **Complex orchestration** → `Model: sonnet-4` (multi-container coordination)
-- **Troubleshooting issues** → `Model: sonnet-4` (log analysis, debugging)
+- **Simple status checks** → `Model: haiku` (default, fastest)
+- **Complex orchestration** → `Model: sonnet` (multi-container coordination)
+- **Troubleshooting issues** → `Model: sonnet` (log analysis, debugging)
 
 ```python
 # ← Program Manager or other agents delegate to Dock
 
-# Standard container operations (default Haiku 3.5)
+# Standard container operations (default Haiku)
 Task(
     description="Check container status",
     prompt="@docs/agents/dock.md\n\nCheck if all Odoo containers are running and restart if needed",
     subagent_type="dock"
 )
 
-# Complex orchestration (upgrade to Sonnet 4)
+# Complex orchestration (upgrade to Sonnet)
 Task(
     description="Complex deployment",
-    prompt="@docs/agents/dock.md\n\nModel: sonnet-4\n\nCoordinate rolling update deployment",
+    prompt="@docs/agents/dock.md\n\nModel: sonnet\n\nCoordinate rolling update deployment",
     subagent_type="dock"
 )
 ```
 
 ## Need More?
 
-- **Detailed patterns**: Load @docs/agent-patterns/dock-patterns.md
-- **Model selection**: Load @docs/system/MODEL_SELECTION.md
+- **Container patterns**: Load @docs/agent-patterns/dock-patterns.md
+- **Model selection details**: Load @docs/system/MODEL_SELECTION.md
+- **Container architecture**: Load @docs/system/CONTAINER_ARCHITECTURE.md

@@ -29,7 +29,7 @@ claude --version
 
 ```bash
 # PREFERRED: uv-based Python projects (environment isolation)
-claude mcp add-json -s user chatgpt-automation '{
+claude mcp add-json -s user python-mcp-server '{
   "command": "uv", 
   "args": ["run", "--project", "/absolute/path/to/project", "entry-point"]
 }'
@@ -200,7 +200,7 @@ grep - r
 "pattern"
 
 # GOOD: Purpose-built tools
-mcp__odoo - intelligence__search_code(pattern="pattern")
+mcp__odoo-intelligence__search_code(pattern="pattern")
 ```
 
 ### 3. Verbose Outputs

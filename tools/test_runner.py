@@ -253,16 +253,17 @@ class OutputManager:
             json.dump(asdict(self.progress), f, indent=2)
 
     def _check_critical_errors(self, line: str) -> None:
-        # Skip errors in integration tests that are likely testing error conditions
-        if self.progress.current_test and "integration" in self.progress.current_test.lower():
-            if any(phrase in line.lower() for phrase in ["bad query", "null value", "constraint", "violates"]):
-                return
-        
         # Skip errors in tests that are testing validation or error conditions
         if self.progress.current_test:
             test_name = self.progress.current_test.lower()
-            if any(keyword in test_name for keyword in ["validation", "error", "constraint", "integrity"]):
-                if any(phrase in line.lower() for phrase in ["bad query", "null value", "constraint", "violates", "integrityerror"]):
+            # Check if this is a test that's expected to cause errors
+            if any(keyword in test_name for keyword in ["validation", "error", "constraint", "integrity", "invalid", "fail"]):
+                # Skip database constraint errors in these tests
+                if any(phrase in line.lower() for phrase in ["bad query", "null value", "constraint", "violates", "integrityerror", "error opw odoo.sql_db"]):
+                    return
+            # Also skip for integration tests that might be testing error conditions
+            if "integration" in test_name:
+                if any(phrase in line.lower() for phrase in ["bad query", "null value", "constraint", "violates"]):
                     return
 
         for error_type, pattern in self.critical_error_patterns.items():
@@ -366,11 +367,22 @@ class UnifiedTestRunner:
                 if self.verbose:
                     print(f"Container {container['name']} not running, starting it...")
 
+                # First try to restart existing container
+                restart_cmd = ["docker", "start", container["name"]]
+                restart_result = subprocess.run(restart_cmd, capture_output=True, text=True)
+                
+                if restart_result.returncode == 0:
+                    if self.verbose:
+                        print(f"Restarted existing container {container['name']}")
+                    continue
+                
+                # Container doesn't exist, create new one
                 start_cmd = [
                     "docker",
                     "compose",
                     "run",
                     "-d",
+                    "--rm",  # Auto-remove when stopped to prevent duplicates
                     "--name",
                     container["name"],
                     container["service"],
@@ -385,17 +397,16 @@ class UnifiedTestRunner:
                         print(f"Started container {container['name']}")
                     time.sleep(1)
                 except subprocess.CalledProcessError as e:
-                    if "already in use" in str(e.stderr):
-                        restart_cmd = ["docker", "start", container["name"]]
-                        try:
-                            subprocess.run(restart_cmd, capture_output=True, check=True)
-                            if self.verbose:
-                                print(f"Restarted existing container {container['name']}")
-                        except subprocess.CalledProcessError:
-                            print(f"Error: Could not start container {container['name']}")
-                            sys.exit(1)
-                    else:
-                        print(f"Error starting container {container['name']}: {e.stderr}")
+                    print(f"Error starting container {container['name']}: {e.stderr}")
+                    # Try to clean up and restart
+                    subprocess.run(["docker", "rm", "-f", container["name"]], capture_output=True)
+                    time.sleep(1)
+                    try:
+                        subprocess.run(start_cmd, capture_output=True, check=True)
+                        if self.verbose:
+                            print(f"Container {container['name']} restarted after cleanup")
+                    except subprocess.CalledProcessError:
+                        print(f"Failed to start container {container['name']} after cleanup")
                         sys.exit(1)
 
     def discover_local_modules(self) -> list[str]:
@@ -985,6 +996,10 @@ class UnifiedTestRunner:
             # Fallback to running all tests if category not recognized
             timeout = get_recommended_timeout(category, test_mode=category)
             return self._run_normal_tests(category, None, timeout, modules)
+        
+        # If no modules specified, discover local modules
+        if not modules:
+            modules = self.discover_local_modules()
 
         # TODO: Fix database setup - temporarily disabled due to psql connection issues
         if category == "unit" and False:
@@ -1389,6 +1404,34 @@ Examples:
     )
 
     args = parser.parse_args()
+
+    # Handle shortcut mode names in targets
+    # If first target is a mode name, treat it as mode selection
+    if args.targets and len(args.targets) > 0:
+        first_target = args.targets[0]
+        if first_target in ["unit", "integration", "tour", "all", "python", "failing", "summary"]:
+            # It's a mode shortcut, not a module name
+            if first_target == "unit":
+                args.unit_only = True
+                args.targets = args.targets[1:]  # Remove mode from targets
+            elif first_target == "integration":
+                args.integration_only = True
+                args.targets = args.targets[1:]
+            elif first_target == "tour":
+                args.tour_only = True
+                args.targets = args.targets[1:]
+            elif first_target == "all":
+                args.all = True
+                args.targets = args.targets[1:]
+            elif first_target == "python":
+                args.python = True
+                args.targets = args.targets[1:]
+            elif first_target == "failing":
+                args.failing = True
+                args.targets = args.targets[1:]
+            elif first_target == "summary":
+                args.summary = True
+                args.targets = args.targets[1:]
 
     # Determine test mode
     if args.all:

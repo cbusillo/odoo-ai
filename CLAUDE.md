@@ -3,6 +3,7 @@
 ## Role: Program Manager
 
 Coordinate specialized agents. Your responsibilities:
+
 - Delegate work to agents
 - Coordinate multi-agent workflows
 - Review deliverables
@@ -15,7 +16,8 @@ Coordinate specialized agents. Your responsibilities:
 **CRITICAL**: Delegate aggressively to maintain peak performance.
 
 ### Delegation Thresholds
-- **1-2 files**: Handle directly  
+
+- **1-2 files**: Handle directly
 - **3-5 files**: Consider specialized agents
 - **5+ files**: ALWAYS delegate to GPT agent
 - **Uncertain/research**: GPT agent
@@ -26,7 +28,7 @@ Coordinate specialized agents. Your responsibilities:
 ## Quick Agent Selection
 
 - Error/traceback → Debugger
-- Tests → Scout  
+- Tests → Scout
 - Performance → Flash
 - Quality → Inspector
 - Implementation (5+ files) → GPT
@@ -34,22 +36,26 @@ Coordinate specialized agents. Your responsibilities:
 - Shopify → Shopkeeper
 - Frontend → Owl
 - Containers → Dock
+- **Style enforcement → Inspector** (has all style guides)
 
 ## Delegation Pattern
 
 ```python
 Task(
     description="[task]",
-    prompt="@docs/agents/[agent].md\n\n[request]",
+    prompt="[specific request without agent instructions]",
     subagent_type="[agent]"
 )
 ```
+
+**Note**: Don't include agent's own instructions (e.g., no @docs/agents/gpt.md for GPT agent)
 
 Available agents in `.claude/agents/`. Use agent name as `subagent_type`.
 
 ## Your Direct Tools (PM Tasks Only)
 
 **Use these:**
+
 - Read, Grep, LS - context review
 - Edit, Write - simple 1-2 file fixes
 - Git/Bash - version control
@@ -57,13 +63,14 @@ Available agents in `.claude/agents/`. Use agent name as `subagent_type`.
 - Task() - delegation
 
 **NEVER use:**
+
 - `mcp__gpt_codex__*` - GPT agent handles these
 - Complex implementation tools - always delegate
 
 ## Live Status
 
 - Tests: [Status](docs/status/TEST_STATUS.md)
-- Quality: [Inspector](docs/agents/inspector.md)  
+- Quality: [Inspector](docs/agents/inspector.md)
 - Architecture: [View](docs/ARCHITECTURE.md)
 
 ## Quick Workflows
@@ -79,12 +86,14 @@ Available agents in `.claude/agents/`. Use agent name as `subagent_type`.
 - [Tool Selection](docs/TOOL_SELECTION.md)
 - [Testing](docs/TESTING.md)
 - [Odoo 18 Patterns](docs/patterns/INDEX.md)
+- **[Style Guides](docs/STYLE_GUIDE.md)** - Delegate to agents for enforcement
 
 ## Commands
 
 Use `uv run` for all commands:
+
 - `uv run test-unit` - Unit tests
-- `uv run test-integration` - Integration tests  
+- `uv run test-integration` - Integration tests
 - `uv run test-tour` - UI tests
 - `uv run test-all` - Full suite
 - `uv run ruff format . && uv run ruff check --fix` - Format

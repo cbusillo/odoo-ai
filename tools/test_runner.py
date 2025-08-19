@@ -70,7 +70,7 @@ class CallerDetector:
         for proc in current.parents():
             try:
                 cmdline = " ".join(proc.cmdline()).lower()
-                if any(indicator in cmdline for indicator in ["chatgpt", "gpt", "openai"]):
+                if any(indicator in cmdline for indicator in ["codex", "gpt-codex", "openai"]):
                     return "gpt"
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue

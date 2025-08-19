@@ -1,0 +1,62 @@
+# Project-specific Codex configuration for Odoo OPW
+
+[project]
+name = "odoo-opw"
+description = "Odoo 18 Enterprise for Outboard Parts Warehouse"
+
+[instructions]
+# Load project context and style guides
+system_files = [
+  "CODEX.md",
+  "docs/style/CORE.md",
+  "docs/style/PYTHON.md",
+  "docs/style/JAVASCRIPT.md",
+  "docs/style/TESTING.md",
+  "docs/style/ODOO.md"
+]
+
+[files]
+# Which files Codex should consider
+include = [
+  "addons/**/*.py",
+  "addons/**/*.js",
+  "addons/**/*.xml",
+  "addons/**/*.scss",
+  "addons/**/*.css",
+  "docs/**/*.md",
+  "tools/**/*.py",
+  "*.md",
+  "*.toml",
+  "*.yaml"
+]
+
+exclude = [
+  "**/.git/**",
+  "**/__pycache__/**",
+  "**/node_modules/**",
+  "**/.venv/**",
+  "**/venv/**",
+  "tmp/**",
+  "addons/product_connect/graphql/schema/**",
+  "addons/product_connect/services/shopify/gql/**"
+]
+
+[formatting]
+python = {
+  formatter = "ruff",
+  line_length = 133
+}
+
+javascript = {
+  formatter = "none",  # PyCharm/IntelliJ handles this
+  semicolons = false
+}
+
+[project_rules]
+# Project-specific rules
+python_line_length = 133
+js_semicolons = "never"
+use_uv_run = true
+mcp_tools_first = true
+container_paths = "/volumes/"
+database = "opw"

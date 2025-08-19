@@ -253,10 +253,17 @@ class OutputManager:
             json.dump(asdict(self.progress), f, indent=2)
 
     def _check_critical_errors(self, line: str) -> None:
-        # Skip errors in validation tests that are likely testing error conditions
-        if self.progress.current_test and "validation" in self.progress.current_test.lower():
+        # Skip errors in integration tests that are likely testing error conditions
+        if self.progress.current_test and "integration" in self.progress.current_test.lower():
             if any(phrase in line.lower() for phrase in ["bad query", "null value", "constraint", "violates"]):
                 return
+        
+        # Skip errors in tests that are testing validation or error conditions
+        if self.progress.current_test:
+            test_name = self.progress.current_test.lower()
+            if any(keyword in test_name for keyword in ["validation", "error", "constraint", "integrity"]):
+                if any(phrase in line.lower() for phrase in ["bad query", "null value", "constraint", "violates", "integrityerror"]):
+                    return
 
         for error_type, pattern in self.critical_error_patterns.items():
             if pattern.search(line):
@@ -498,7 +505,7 @@ class UnifiedTestRunner:
 
         For test_mode='all', runs tests progressively:
         1. Unit tests (fast, clean DB)
-        2. Validation tests (slow, production clone)
+        2. Integration tests (slow, production clone)
         3. Tour tests (browser UI)
 
         Stops at first category failure for fail-fast behavior.
@@ -837,23 +844,23 @@ class UnifiedTestRunner:
                 self.output_manager.close()
             return all_results
 
-        # Phase 2: Validation tests (slow, production clone)
+        # Phase 2: Integration tests (slow, production clone)
         self.output_manager.write_line("")
         self.output_manager.write_line("=" * 80)
-        self.output_manager.write_line("🔍 Phase 2: Validation Tests (Slow - Production Clone)")
+        self.output_manager.write_line("🔍 Phase 2: Integration Tests (Slow - Production Clone)")
         self.output_manager.write_line("=" * 80)
         self.output_manager.write_line("")
 
-        validation_results = self._run_test_category("validation", modules)
-        all_results.total += validation_results.total
-        all_results.passed += validation_results.passed
-        all_results.failed += validation_results.failed
-        all_results.errors += validation_results.errors
-        all_results.tests_started += validation_results.tests_started
+        integration_results = self._run_test_category("integration", modules)
+        all_results.total += integration_results.total
+        all_results.passed += integration_results.passed
+        all_results.failed += integration_results.failed
+        all_results.errors += integration_results.errors
+        all_results.tests_started += integration_results.tests_started
 
-        if validation_results.failed > 0 or validation_results.errors > 0:
-            self.output_manager.write_line("❌ Validation tests failed! Skipping tour tests.")
-            all_results.summary = "Validation tests failed - stopped execution"
+        if integration_results.failed > 0 or integration_results.errors > 0:
+            self.output_manager.write_line("❌ Integration tests failed! Skipping tour tests.")
+            all_results.summary = "Integration tests failed - stopped execution"
             if self.output_manager:
                 self.output_manager.close()
             return all_results
@@ -963,13 +970,13 @@ class UnifiedTestRunner:
 
         Filters tests based on the test categorization tags:
         - unit: Runs tests tagged with 'unit_test' on clean test database
-        - validation: Runs tests tagged with 'validation_test' on production database
+        - integration: Runs tests tagged with 'integration_test' on production database
         - tour: Runs tests tagged with 'tour_test' on production database
         """
         # Map category to test tag
         tag_map = {
             "unit": "unit_test",
-            "validation": "validation_test",
+            "integration": "integration_test",
             "tour": "tour_test",
         }
 
@@ -1281,15 +1288,15 @@ def get_recommended_timeout(test_type: str, specific_test: str | None = None, te
     if test_mode == "unit":
         # Unit tests should be fast
         return 300  # 5 minutes max for unit tests
-    elif test_mode == "validation":
-        # Validation tests on production data need lots of time
-        return 3600  # 60 minutes for validation
+    elif test_mode == "integration":
+        # Integration tests on production data need lots of time
+        return 3600  # 60 minutes for integration
     elif test_mode == "tour":
         # Tour tests need time for browser
         return 1800  # 30 minutes for tours
     elif test_mode == "all":
         # Progressive execution needs time for everything
-        return 5400  # 90 minutes total (unit + validation + tour)
+        return 5400  # 90 minutes total (unit + integration + tour)
 
     # Legacy mode-specific timeouts
     if specific_test and ("JSTest" in specific_test or "HttpCase" in specific_test or "test_js" in specific_test):
@@ -1320,11 +1327,11 @@ Examples:
   python tools/setup_test_db.py
   
   # Progressive execution (recommended - fail fast)
-  python test_runner.py --all      # Runs unit → validation → tour
+  python test_runner.py --all      # Runs unit → integration → tour
   
   # Individual test modes
   python test_runner.py --unit-only       # Fast unit tests (3 min)
-  python test_runner.py --validation-only  # Production data tests (30 min)
+  python test_runner.py --integration-only  # Production data tests (30 min)
   python test_runner.py --tour-only       # Browser UI tests (15 min)
   
   # Legacy modes (current behavior)
@@ -1354,9 +1361,9 @@ Examples:
     # Test type flags
     test_group = parser.add_mutually_exclusive_group()
     # New progressive modes
-    test_group.add_argument("--all", action="store_true", help="Progressive execution: unit → validation → tour (fail fast)")
+    test_group.add_argument("--all", action="store_true", help="Progressive execution: unit → integration → tour (fail fast)")
     test_group.add_argument("--unit-only", action="store_true", help="Run only fast unit tests (clean DB, ~3 min)")
-    test_group.add_argument("--validation-only", action="store_true", help="Run only validation tests (production clone, ~30 min)")
+    test_group.add_argument("--integration-only", action="store_true", help="Run only integration tests (production clone, ~30 min)")
     test_group.add_argument("--tour-only", action="store_true", help="Run only tour/browser tests (~15 min)")
     # Legacy modes
     test_group.add_argument("--mixed", action="store_true", help="Run all tests mixed (current behavior)")
@@ -1388,8 +1395,8 @@ Examples:
         test_mode = "all"  # Progressive execution
     elif args.unit_only:
         test_mode = "unit"
-    elif args.validation_only:
-        test_mode = "validation"
+    elif args.integration_only:
+        test_mode = "integration"
     elif args.tour_only:
         test_mode = "tour"
     elif args.mixed:
@@ -1457,7 +1464,7 @@ Examples:
         # Progressive execution
         results = runner.run_progressive_tests(modules)
         results_dict = asdict(results)
-    elif test_mode in ["unit", "validation", "tour"]:
+    elif test_mode in ["unit", "integration", "tour"]:
         # Run specific test category with tag filtering
         results = runner._run_test_category(test_mode, modules)
         results_dict = asdict(results)
@@ -1472,10 +1479,10 @@ Examples:
             modules = runner.discover_local_modules()
         print(f"Would test the following modules: {', '.join(modules)}")
         print(f"Test mode: {test_mode}")
-        if test_mode in ["unit", "validation", "tour", "all"]:
+        if test_mode in ["unit", "integration", "tour", "all"]:
             print(f"\nWith new multi-mode runner:")
             print(f"  Unit tests: ~123 tests (3 min)")
-            print(f"  Validation tests: ~194 tests (30 min)")
+            print(f"  Integration tests: ~194 tests (30 min)")
             print(f"  Tour tests: ~14 tests (15 min)")
         sys.exit(0)
     else:

@@ -5,6 +5,7 @@ Patterns for effective GPT agent session management and workflow optimization.
 ## Session Management Patterns
 
 ### Session Initialization
+
 ```python
 def initialize_gpt_session(task_context):
     """Set up optimal GPT session configuration"""
@@ -25,23 +26,25 @@ def initialize_gpt_session(task_context):
 ```
 
 ### Model Selection Strategy
+
 ```python
 def determine_optimal_model(task_context):
     """Choose the best model for the task"""
-    
+
     model_selection = {
-        'quick_fixes': 'o4-mini',        # Fast, efficient for simple tasks
-        'complex_analysis': 'o3',         # Deep reasoning capabilities
-        'code_generation': 'o3',          # Best for complex implementations
-        'research_tasks': 'o3',           # Superior for web research
-        'bulk_operations': 'o4-mini'      # Efficient for repetitive tasks
+        'quick_fixes': 'gpt-5',  # Fast, capable for simple tasks
+        'complex_analysis': 'gpt-5',  # Deep reasoning capabilities
+        'code_generation': 'gpt-5',  # Best for complex implementations
+        'research_tasks': 'gpt-5',  # Superior for web research
+        'bulk_operations': 'gpt-5'  # Efficient for repetitive tasks
     }
-    
+
     task_type = classify_task_type(task_context)
-    return model_selection.get(task_type, 'o3')  # Default to o3
+    return model_selection.get(task_type, 'gpt-5')  # Default to gpt-5
 ```
 
 ### Session Continuation Patterns
+
 ```python
 def continue_gpt_session(session_id, new_prompt):
     """Continue existing session with context preservation"""
@@ -59,6 +62,7 @@ def continue_gpt_session(session_id, new_prompt):
 ## Task Orchestration Patterns
 
 ### Multi-Step Workflow Management
+
 ```python
 def orchestrate_complex_workflow(workflow_definition):
     """Manage complex multi-step workflows through GPT"""
@@ -86,6 +90,7 @@ def orchestrate_complex_workflow(workflow_definition):
 ```
 
 ### Dynamic Task Adaptation
+
 ```python
 def adapt_task_execution(initial_task, execution_feedback):
     """Adapt task execution based on real-time feedback"""
@@ -106,6 +111,7 @@ def adapt_task_execution(initial_task, execution_feedback):
 ```
 
 ### Parallel Task Coordination
+
 ```python
 def coordinate_parallel_gpt_tasks(task_list):
     """Coordinate multiple GPT sessions for parallel execution"""
@@ -142,6 +148,7 @@ def coordinate_parallel_gpt_tasks(task_list):
 ## Context Management Patterns
 
 ### Context Preservation
+
 ```python
 def preserve_session_context(session_id):
     """Preserve important context across session boundaries"""
@@ -160,6 +167,7 @@ def preserve_session_context(session_id):
 ```
 
 ### Context Injection
+
 ```python
 def inject_contextual_information(base_prompt, context_type):
     """Inject relevant context into GPT prompts"""
@@ -181,6 +189,7 @@ def inject_contextual_information(base_prompt, context_type):
 ```
 
 ### Smart Context Reduction
+
 ```python
 def optimize_context_size(session_data):
     """Intelligently reduce context size while preserving relevance"""
@@ -205,6 +214,7 @@ def optimize_context_size(session_data):
 ## Error Handling and Recovery
 
 ### Session Failure Recovery
+
 ```python
 def handle_session_failure(session_id, failure_reason):
     """Recover from session failures with minimal context loss"""
@@ -222,6 +232,7 @@ def handle_session_failure(session_id, failure_reason):
 ```
 
 ### Graceful Degradation
+
 ```python
 def implement_graceful_degradation(session_issues):
     """Implement graceful degradation for degraded performance"""
@@ -245,6 +256,7 @@ def implement_graceful_degradation(session_issues):
 ```
 
 ### State Validation and Repair
+
 ```python
 def validate_and_repair_session_state(session_id):
     """Validate session state and repair inconsistencies"""
@@ -272,6 +284,7 @@ def validate_and_repair_session_state(session_id):
 ## Performance Optimization
 
 ### Session Performance Monitoring
+
 ```python
 def monitor_session_performance(session_id):
     """Monitor and optimize session performance"""
@@ -295,6 +308,7 @@ def monitor_session_performance(session_id):
 ```
 
 ### Intelligent Caching
+
 ```python
 def implement_intelligent_caching(session_patterns):
     """Implement smart caching for common session patterns"""
@@ -312,6 +326,7 @@ def implement_intelligent_caching(session_patterns):
 ```
 
 ### Resource Management
+
 ```python
 def manage_session_resources(session_id):
     """Manage computational resources for optimal performance"""
@@ -338,6 +353,7 @@ def manage_session_resources(session_id):
 ## Best Practices and Patterns
 
 ### Session Lifecycle Management
+
 ```python
 def manage_session_lifecycle():
     """Best practices for session lifecycle management"""
@@ -358,6 +374,7 @@ def manage_session_lifecycle():
 ```
 
 ### Quality Assurance
+
 ```python
 def ensure_session_quality():
     """Quality assurance patterns for GPT sessions"""

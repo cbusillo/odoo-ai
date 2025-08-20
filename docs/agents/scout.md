@@ -84,6 +84,7 @@ uv run python tools/test_runner.py --tour-only                          # Tour t
 - **Flash agent** → Performance issues in tests
 - **Inspector agent** → Code quality validation of test files
 - **Archer agent** → Research test patterns in core Odoo
+- **GPT agent** → Large implementations (5+ files)
 
 ## What I DON'T Do
 

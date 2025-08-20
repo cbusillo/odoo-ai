@@ -12,8 +12,8 @@ performance optimization.
 | **Claude**   | Haiku      | <1s   | 1K-5K     | LOW        | Simple queries, status checks  |
 | **Claude**   | Sonnet     | ~5s   | 15K-50K   | MEDIUM     | Standard development (default) |
 | **Claude**   | Opus       | ~15s  | 100K-300K | HIGH       | Complex analysis               |
-| **OpenAI**   | o3-mini    | ~10s  | 0 Claude  | NONE       | Fast reasoning tasks           |
-| **OpenAI**   | o3         | ~30s  | 0 Claude  | NONE       | Large implementations          |
+| **OpenAI**   | gpt-5      | ~10s  | 0 Claude  | NONE       | Primary GPT choice             |
+| **OpenAI**   | gpt-4.1    | ~15s  | 0 Claude  | NONE       | 1M+ context alternative        |
 
 **Note**: Model availability changes over time. The GPT agent supports multiple OpenAI models via Codex CLI.
 
@@ -34,7 +34,7 @@ Task details...""",
 ## Default Models by Agent
 
 | Agent          | Default | Reasoning                   |
-|----------------|---------|-------------------------------|
+|----------------|---------|-----------------------------|
 | 🚢 Dock        | Haiku   | Simple container operations |
 | 🏹 Archer      | Haiku   | Fast pattern searches       |
 | 🔍 Scout       | Sonnet  | Test writing complexity     |
@@ -46,7 +46,7 @@ Task details...""",
 | ⚡ Flash        | Opus    | Performance analysis        |
 | 🐛 Debugger    | Opus    | Complex reasoning           |
 | 📋 Planner     | Opus    | Architecture design         |
-| 💬 GPT         | o3      | External model capability   |
+| 💬 GPT         | gpt-5   | External model capability   |
 | 🔥 Phoenix     | Opus    | Migration complexity        |
 
 ## Override Examples
@@ -89,7 +89,7 @@ Task(
     description="Large refactoring via external model",
     prompt="""@docs/agents/gpt.md
 
-Use o3 for this 50+ file refactoring""",
+Use gpt-5 for this 50+ file refactoring""",
     subagent_type="gpt"
 )
 ```
@@ -98,12 +98,12 @@ Use o3 for this 50+ file refactoring""",
 
 ### Response Times
 
-| Task Type             | Model   | Response Time | Success Rate |
-|-----------------------|---------|---------------|--------------|
-| Container status      | Haiku   | <1s           | 98%          |
-| Write unit test       | Sonnet  | ~5s           | 85%          |
-| Architecture analysis | Opus    | ~15s          | 94%          |
-| 50-file refactor      | o3      | ~30s          | 92%          |
+| Task Type             | Model  | Response Time | Success Rate |
+|-----------------------|--------|---------------|--------------|
+| Container status      | Haiku  | <1s           | 98%          |
+| Write unit test       | Sonnet | ~5s           | 85%          |
+| Architecture analysis | Opus   | ~15s          | 94%          |
+| 50-file refactor      | gpt-5  | ~30s          | 92%          |
 
 ### Task Success Rates
 
@@ -125,14 +125,14 @@ Use o3 for this 50+ file refactoring""",
 1. **High-volume operations** → Use Haiku
 2. **Standard development** → Use Sonnet (default)
 3. **Complex analysis** → Use Opus sparingly
-4. **Large implementations** → Offload to o3 (preserves 100% Claude tokens)
+4. **Large implementations** → Offload to gpt-5 (preserves 100% Claude tokens)
 
 ### Token Usage
 
 - **Haiku**: 1K-5K tokens → Minimal impact
 - **Sonnet**: 15K-50K tokens → Moderate usage
 - **Opus**: 100K-300K tokens → Heavy usage
-- **o3/o3-mini**: 0 Claude tokens → Zero impact (via Codex CLI)
+- **gpt-5/gpt-4.1**: 0 Claude tokens → Zero impact (via Codex CLI)
 
 ## Best Practices
 
@@ -178,10 +178,11 @@ analysis = manager.analyze_task("Check container status")
 
 ## Model Availability Notice
 
-**Important**: Model availability and capabilities change over time as providers update their offerings. The model names and features described in this guide reflect the current state as of documentation writing.
+**Important**: Model availability and capabilities change over time as providers update their offerings. The model names
+and features described in this guide reflect the current state as of documentation writing.
 
 - **Claude models** (Haiku, Sonnet, Opus) are subject to Anthropic's release schedule
-- **OpenAI models** (o3, o3-mini) availability depends on OpenAI's API access
+- **OpenAI models** (gpt-5, gpt-4.1) availability depends on OpenAI's API access
 - **Version numbers** are deliberately simplified to focus on capability tiers rather than specific versions
 - **New models** may be added to any tier as they become available
 

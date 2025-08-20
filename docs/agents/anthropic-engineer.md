@@ -108,10 +108,12 @@ I analyzed the error and determined it was caused by...
 
 ## Routing
 
+**Who I delegate TO (CAN call):**
 - **Tool optimization** → Analyze and recommend better tool choices
 - **Context management** → Help structure agent workflows
 - **Performance issues** → Identify bottlenecks in AI workflows
 - **Best practices** → Provide guidance on Claude Code patterns
+- **GPT agent** → Large implementations (5+ files)
 
 ## What I DON'T Do
 

@@ -40,15 +40,28 @@ Coordinate specialized agents. Your responsibilities:
 
 ## Delegation Pattern
 
+**For GPT Agent (SPECIAL CASE - uses MCP directly):**
+
+```python
+mcp__gpt - codex__codex(
+    prompt="[specific request]",
+    sandbox="workspace-write",  # or "danger-full-access", "read-only"
+    model="gpt-5",
+    approval - policy = "never"
+)
+```
+
+**For All Other Agents (use Task):**
+
 ```python
 Task(
     description="[task]",
     prompt="[specific request without agent instructions]",
-    subagent_type="[agent]"
+    subagent_type="[agent]"  # e.g., "scout", "debugger", "owl"
 )
 ```
 
-**Note**: Don't include agent's own instructions (e.g., no @docs/agents/gpt.md for GPT agent)
+**Note**: GPT agent uses Codex MCP tools directly, NOT Task()
 
 Available agents in `.claude/agents/`. Use agent name as `subagent_type`.
 

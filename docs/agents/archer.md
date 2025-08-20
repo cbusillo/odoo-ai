@@ -47,14 +47,14 @@ Read("../../../../odoo/addons/web/...")  # No relative paths!
 ### Find Models
 
 ```python
-mcp__odoo - intelligence__search_models(pattern="product")
-mcp__odoo - intelligence__model_info(model_name="product.template")
+mcp__odoo-intelligence__search_models(pattern="product")
+mcp__odoo-intelligence__model_info(model_name="product.template")
 ```
 
 ### Find Patterns
 
 ```python
-mcp__odoo - intelligence__search_code(
+mcp__odoo-intelligence__search_code(
     pattern="class.*GraphController",
     file_type="js"
 )
@@ -63,7 +63,7 @@ mcp__odoo - intelligence__search_code(
 ### Trace Inheritance
 
 ```python
-mcp__odoo - intelligence__inheritance_chain(model_name="sale.order")
+mcp__odoo-intelligence__inheritance_chain(model_name="sale.order")
 ```
 
 ## Research Workflow

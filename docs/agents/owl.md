@@ -100,6 +100,7 @@ test("component works", async () => {
 - **Dock agent** → Container restart after frontend changes
 - **Inspector agent** → Code quality validation of JS/CSS
 - **Archer agent** → Research Owl.js patterns in core
+- **GPT agent** → Large implementations (5+ files)
 
 ## What I DON'T Do
 

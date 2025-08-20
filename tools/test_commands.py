@@ -73,10 +73,39 @@ def run_tour_tests() -> int:
 
 
 def run_all_tests() -> int:
-    modules = get_our_modules()
-    test_db_name = f"{get_production_db_name()}_test_all"
-    test_tags = ",".join([f"/{module}" for module in modules])
-    return run_docker_test_command(test_tags, test_db_name, modules, use_production_clone=True, use_module_prefix=False)
+    """Run all test categories without hanging.
+
+    Runs unit → integration → tour in separate test sessions to avoid
+    cross-category interference and long single-run initialization that
+    can hang. Each category uses its tuned timeout and cleanup.
+    """
+    print("🧪 Running ALL tests (unit → integration → tour)")
+    print("=" * 60)
+
+    rc = 0
+
+    # 1) Unit tests on clean DB
+    print("\n▶️  Phase 1: Unit tests")
+    rc_unit = run_unit_tests()
+    rc |= (rc_unit != 0)
+
+    # 2) Integration tests on cloned DB
+    print("\n▶️  Phase 2: Integration tests")
+    rc_integration = run_integration_tests() if rc_unit == 0 else rc_unit
+    rc |= (rc_integration != 0)
+
+    # 3) Tour tests (browser) on cloned DB
+    print("\n▶️  Phase 3: Tour tests")
+    rc_tour = run_tour_tests() if rc_integration == 0 else rc_integration
+    rc |= (rc_tour != 0)
+
+    if rc == 0:
+        print("\n✅ All categories passed")
+        return 0
+    else:
+        print("\n❌ Some categories failed")
+        # Return first non-zero code for conventional CI semantics
+        return rc_unit or rc_integration or rc_tour or 1
 
 
 def run_quick_tests() -> int:

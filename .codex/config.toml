@@ -1,62 +1,51 @@
 # Project-specific Codex configuration for Odoo OPW
 
-[project]
-name = "odoo-opw"
-description = "Odoo 18 Enterprise for Outboard Parts Warehouse"
+# Default model and settings
+model = "gpt-5"
+approval_policy = "never"
+sandbox_mode = "workspace-write"
 
-[instructions]
-# Load project context and style guides
-system_files = [
-  "CODEX.md",
-  "docs/style/CORE.md",
-  "docs/style/PYTHON.md",
-  "docs/style/JAVASCRIPT.md",
-  "docs/style/TESTING.md",
-  "docs/style/ODOO.md"
-]
+# Project documentation to include
+project_doc = "CODEX.md"
+project_doc_max_bytes = 32768
 
-[files]
-# Which files Codex should consider
-include = [
-  "addons/**/*.py",
-  "addons/**/*.js",
-  "addons/**/*.xml",
-  "addons/**/*.scss",
-  "addons/**/*.css",
-  "docs/**/*.md",
-  "tools/**/*.py",
-  "*.md",
-  "*.toml",
-  "*.yaml"
-]
+# Profiles for different use cases
+[profiles.default]
+model = "gpt-5"
+approval_policy = "never"
+sandbox_mode = "workspace-write"
 
-exclude = [
-  "**/.git/**",
-  "**/__pycache__/**",
-  "**/node_modules/**",
-  "**/.venv/**",
-  "**/venv/**",
-  "tmp/**",
-  "addons/product_connect/graphql/schema/**",
-  "addons/product_connect/services/shopify/gql/**"
-]
+[profiles.high-performance]
+model = "gpt-5"
+model_reasoning_effort = "high"
+model_reasoning_summary = "detailed"
+approval_policy = "never"
+sandbox_mode = "workspace-write"
 
-[formatting]
-python = {
-  formatter = "ruff",
-  line_length = 133
-}
+[profiles.high-performance.sandbox_workspace_write]
+network_access = true
 
-javascript = {
-  formatter = "none",  # PyCharm/IntelliJ handles this
-  semicolons = false
-}
+[profiles.production]
+model = "gpt-5"
+sandbox_mode = "read-only"
+approval_policy = "on-request"
+disable_response_storage = true
 
-[project_rules]
-# Project-specific rules
-python_line_length = 133
-js_semicolons = "never"
-use_uv_run = true
-mcp_tools_first = true
-container_paths = "/volumes/"
-database = "opw"
+# Shell environment configuration
+[shell_environment_policy]
+inherit = "all"
+set = { PYTHONPATH = "/volumes/addons:/odoo/addons:/volumes/enterprise", DATABASE = "opw" }
+
+# Sandbox configuration
+[sandbox_workspace_write]
+network_access = false
+exclude_tmpdir_env_var = false
+exclude_slash_tmp = false
+
+[mcp_servers.odoo-intelligence]
+command = "uv"
+args = ["run", "--project", "/Users/cbusillo/Developer/odoo-intelligence-mcp", "odoo-intelligence-mcp"]
+
+[mcp_servers.inspection-pycharm]
+command = "node"
+args = ["/Users/cbusillo/Developer/jetbrains-inspection-api/mcp-server/server.js"]

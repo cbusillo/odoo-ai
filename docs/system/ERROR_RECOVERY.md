@@ -14,16 +14,16 @@ The error recovery framework (`tools/error_recovery.py`) provides:
 
 ## Error Categories & Recovery Strategies
 
-| Category               | Examples                                   | Strategy           | Details                |
-|------------------------|--------------------------------------------|--------------------|------------------------|
-| **RATE_LIMIT**         | "429 Too Many Requests", "quota exceeded"  | Retry with backoff | 30s delay, 5 retries   |
-| **TIMEOUT**            | "operation timed out", "deadline exceeded" | Retry with backoff | 5s delay, 3 retries    |
-| **NETWORK**            | "connection error", "DNS failed"           | Immediate retry    | 2s delay, 3 retries    |
-| **PERMISSION**         | "403 Forbidden", "access denied"           | Fail immediately   | No recovery possible   |
-| **RESOURCE_NOT_FOUND** | "404 Not Found", "file not found"          | Try fallback       | Alternative approach   |
-| **MODEL_UNAVAILABLE**  | "claude-3-opus unavailable"                | Fallback model     | Use simpler model      |
+| Category               | Examples                                   | Strategy           | Details                               |
+|------------------------|--------------------------------------------|--------------------|---------------------------------------|
+| **RATE_LIMIT**         | "429 Too Many Requests", "quota exceeded"  | Retry with backoff | 30s delay, 5 retries                  |
+| **TIMEOUT**            | "operation timed out", "deadline exceeded" | Retry with backoff | 5s delay, 3 retries                   |
+| **NETWORK**            | "connection error", "DNS failed"           | Immediate retry    | 2s delay, 3 retries                   |
+| **PERMISSION**         | "403 Forbidden", "access denied"           | Fail immediately   | No recovery possible                  |
+| **RESOURCE_NOT_FOUND** | "404 Not Found", "file not found"          | Try fallback       | Alternative approach                  |
+| **MODEL_UNAVAILABLE**  | "claude-3-opus unavailable"                | Fallback model     | Use simpler model                     |
 | **CONTEXT_LIMIT**      | "context too long", "token limit"          | Offload to GPT     | Hooks will remind to reload CLAUDE.md |
-| **AGENT_FAILURE**      | Agent crashes or fails                     | Fallback agent     | Use alternative agent  |
+| **AGENT_FAILURE**      | Agent crashes or fails                     | Fallback agent     | Use alternative agent                 |
 
 ## Agent Fallback Chains
 
@@ -31,12 +31,12 @@ When an agent fails, the framework automatically suggests fallback agents:
 
 ```python
 FALLBACK_CHAINS = {
-    "flash": ["inspector", "archer"],              # Performance analysis
-    "inspector": ["archer", "gpt"],                # Code quality
-    "scout": ["gpt"],                              # Test writing
-    "owl": ["gpt"],                                # Frontend
-    "debugger": ["gpt", "anthropic-engineer"],    # Complex reasoning
-    "planner": ["gpt", "anthropic-engineer"],     # Architecture
+    "flash": ["inspector", "archer"],  # Performance analysis
+    "inspector": ["archer", "gpt"],  # Code quality
+    "scout": ["gpt"],  # Test writing
+    "owl": ["gpt"],  # Frontend
+    "debugger": ["gpt", "anthropic-engineer"],  # Complex reasoning
+    "planner": ["gpt", "anthropic-engineer"],  # Architecture
 }
 ```
 

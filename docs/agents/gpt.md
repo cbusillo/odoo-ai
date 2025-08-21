@@ -12,7 +12,7 @@ mcp__gpt - codex__codex(
     model="gpt-5",  # Default, or "gpt-4.1" for 1M+ token context
     approval - policy = "never",  # or "untrusted", "on-failure", "on-request"
     # Optional parameters:
-profile = "profile-name",  # Config profile from ~/.codex/config.toml
+profile = "odoo-high-performance",  # Available: odoo-high-performance, odoo-production
 cwd = "/path/to/dir",  # Working directory
 base - instructions = "custom",  # Replace default instructions
 include - plan - tool = true,  # Include plan tool
@@ -52,9 +52,36 @@ See: [CODEX_MCP_REFERENCE.md#sandbox-selection-for-odoo-tasks](../system/CODEX_M
 4. **Debug & fix**: Actually fix code, not just analyze
 5. **Code execution**: Run tests, profile, optimize
 
+## Odoo-Specific Profiles
+
+**Available profiles in ~/.codex/config.toml:**
+
+- **`odoo-high-performance`**: Complex Odoo tasks with deep reasoning
+    - High reasoning effort for architectural decisions
+    - Network access enabled for package installation
+    - Best for: Complex refactoring, performance optimization, debugging
+
+- **`odoo-production`**: Safe production operations
+    - Read-only sandbox for safety
+    - Approval required for actions
+    - Best for: Production analysis, audits, reports
+
 ## Quick Patterns
 
 ```python
+# Complex Odoo task with high reasoning
+mcp__gpt - codex__codex(
+    prompt="Optimize ORM queries in product_connect module",
+    profile="odoo-high-performance",
+    sandbox="workspace-write"
+)
+
+# Production safety check
+mcp__gpt - codex__codex(
+    prompt="Analyze production database performance",
+    profile="odoo-production"
+)
+
 # Fact-check with web search
 mcp__gpt - codex__codex(
     prompt="Verify: [claim]. Search web if needed.",
@@ -166,6 +193,7 @@ is unavailable.
 - **Complete MCP reference**: [CODEX_MCP_REFERENCE.md](../system/CODEX_MCP_REFERENCE.md)
 - **Basic usage examples**: [usage.md](../codex/usage.md)
 - **Advanced configuration**: [advanced.md](../codex/advanced.md)
+- **Odoo profiles & config**: [CODEX_CONFIG.md](../CODEX_CONFIG.md)
 
 ### Project-Specific Patterns
 

@@ -212,3 +212,4 @@ For detailed tool examples, performance comparisons, and anti-patterns, see:
 
 - **[Tool Selection Guide](../TOOL_SELECTION.md)** - Complete decision trees and performance benchmarks
 - **[Performance Reference Guide](../PERFORMANCE_REFERENCE.md)** - Real-world examples and metrics
+- **[Codex Configuration](../CODEX_CONFIG.md)** - Profiles and settings for GPT agent (Codex CLI)

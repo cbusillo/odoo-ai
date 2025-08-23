@@ -562,10 +562,14 @@ class UnifiedTestRunner:
 
         Stops at first category failure for fail-fast behavior.
         """
-        # Initialize output manager
-        self.output_manager = OutputManager(self.output_dir, self.caller_type)
+        # Initialize output manager only if not already created (e.g., by run_progressive_tests)
+        self._should_close_output_manager = False
+        if not self.output_manager:
+            self.output_manager = OutputManager(self.output_dir, self.caller_type)
+            self._should_close_output_manager = True  # We created it, so we should close it
 
         # Use provided modules or discover them
+        explicit_modules = bool(modules)  # Track if user explicitly provided modules
         if modules:
             self.modules = modules
         elif not self.modules:
@@ -645,15 +649,13 @@ class UnifiedTestRunner:
             "--without-demo=all",  # Prevent loading demo data that conflicts with production DB
         ]
 
-        # Use test-tags to run ONLY our module tests (not dependency tests)
-        # This prevents running core Odoo tests that cause constraint violations
+        # Apply module filtering to avoid running core Odoo tests that cause constraint violations
+        # This ensures we only run tests from our custom addons
         if self.modules and not specific_test:
-            # Use module-specific tags to run ALL tests in our modules
-            # This includes tests with any tags (post_install, standard, at_install, etc.)
             module_tags = [f"/{mod}" for mod in self.modules]
             cmd.extend(["--test-tags", ",".join(module_tags)])
             if self.verbose or self.debug:
-                self.output_manager.write_line(f"DEBUG: Running ALL tests for modules: {', '.join(self.modules)}")
+                self.output_manager.write_line(f"DEBUG: Running tests for modules: {', '.join(self.modules)}")
 
         # Add test filtering if specific test requested
         elif specific_test:
@@ -702,6 +704,8 @@ class UnifiedTestRunner:
             "PYTHONIOENCODING=utf-8",  # Ensure UTF-8 output encoding
             self.container_name,
         ] + cmd
+        # Enable Python faulthandler to allow SIGUSR1 stack dumps on stalls
+        docker_cmd = docker_cmd[:2] + ["-e", "PYTHONFAULTHANDLER=1"] + docker_cmd[2:]
 
         # Improve headless browser stability for tour/JS tests
         try:
@@ -709,21 +713,11 @@ class UnifiedTestRunner:
                 (test_type and "tour" in str(test_type).lower())
                 or (specific_test and any(k in specific_test for k in ["HttpCase", "JSTest", "test_js"]))
             ):
-                # Inject Chromium runtime flags for stability in headless Docker
+                # Simplified Chrome flags for Docker compatibility
                 chrome_flags = " ".join([
                     "--headless=new",
                     "--disable-dev-shm-usage",
                     "--no-sandbox",
-                    "--disable-gpu",
-                    "--disable-software-rasterizer",
-                    "--no-first-run",
-                    "--no-default-browser-check",
-                    "--disable-extensions",
-                    "--disable-background-networking",
-                    "--disable-renderer-backgrounding",
-                    "--disable-features=Translate,site-per-process,CalculateNativeWinOcclusion",
-                    "--user-data-dir=/tmp/chrome-test-profile",
-                    "--remote-debugging-port=0",
                 ])
                 browser_env = [
                     "-e",
@@ -751,7 +745,7 @@ class UnifiedTestRunner:
         output_lines = []
 
         try:
-            # Start process with real-time output
+            # Start process with real-time output and improved buffering
             process = subprocess.Popen(
                 docker_cmd,
                 stdout=subprocess.PIPE,
@@ -760,10 +754,12 @@ class UnifiedTestRunner:
                 bufsize=1,  # Line buffered
                 universal_newlines=True,
             )
+            
             last_output_time = time.time()
             stall_warnings = 0
-            max_stall_warnings = 10  # Terminate after 10 consecutive stall warnings
+            max_stall_warnings = 20  # Increased to be more tolerant of long operations
 
+            took_stall_diagnostics = False
             while True:
                 # Check if process is still running
                 if process.poll() is not None:
@@ -772,26 +768,21 @@ class UnifiedTestRunner:
                 # Check for critical errors - stop immediately if detected
                 if self.output_manager.critical_error_detected:
                     self.output_manager.write_line("Terminating test process due to critical error...")
-                    process.terminate()
-                    time.sleep(2)
-                    if process.poll() is None:
-                        process.kill()
+                    self._safe_terminate_process(process)
                     break
 
                 # Check for timeout first
                 current_time = time.time()
                 if current_time - start_time > timeout:
                     self.output_manager.write_line(f"TIMEOUT: Test execution exceeded {timeout} seconds")
-                    process.terminate()
-                    time.sleep(2)
-                    if process.poll() is None:
-                        process.kill()
+                    self._safe_terminate_process(process)
                     break
 
                 # Try to read line with non-blocking select
                 try:
-                    # Use select to check if data is available (with 1-second timeout)
-                    ready, _, _ = select.select([process.stdout], [], [], 1.0)
+                    # Use select to check if data is available (with adaptive timeout)
+                    select_timeout = self._get_adaptive_select_timeout()
+                    ready, _, _ = select.select([process.stdout], [], [], select_timeout)
 
                     if ready:
                         # Data is available, read it
@@ -803,31 +794,44 @@ class UnifiedTestRunner:
                             last_output_time = time.time()
                             stall_warnings = 0  # Reset stall warnings on new output
                     else:
-                        # No data available within 1 second
-                        # Check for stall warning
-                        if current_time - last_output_time > self.output_manager.progress.stall_threshold:
+                        # No data available within select timeout
+                        # Only check for stall if we're past the adaptive threshold
+                        stall_threshold = self._get_adaptive_stall_threshold()
+                        if current_time - last_output_time > stall_threshold:
                             stall_warnings += 1
+                            last_test = getattr(self.output_manager.progress, "current_test", "") or "unknown"
+                            phase = getattr(self.output_manager.progress, "phase", "") or "unknown"
                             self.output_manager.write_line(
-                                f"WARNING: No output for {current_time - last_output_time:.1f}s (stall threshold: {self.output_manager.progress.stall_threshold}s) [{stall_warnings}/{max_stall_warnings}]"
+                                f"WARNING: No output for {current_time - last_output_time:.1f}s "
+                                f"(threshold: {stall_threshold}s) [{stall_warnings}/{max_stall_warnings}] "
+                                f"(phase={phase}, last_test={last_test})"
                             )
+                            # On first significant stall, capture diagnostics and try SIGUSR1 stack dump
+                            if not took_stall_diagnostics and stall_warnings >= 3:
+                                self._capture_stall_diagnostics()
+                                took_stall_diagnostics = True
 
-                            # Terminate if too many stall warnings
+                            # Terminate if too many stall warnings (increased threshold)
                             if stall_warnings >= max_stall_warnings:
                                 self.output_manager.write_line(
                                     f"STALLED: Process appears to be stuck after {stall_warnings} warnings. Terminating..."
                                 )
-                                process.terminate()
-                                time.sleep(2)
-                                if process.poll() is None:
-                                    process.kill()
+                                self._safe_terminate_process(process)
                                 break
 
                 except Exception as e:
                     self.output_manager.write_line(f"Error reading process output: {e}")
-                    break
+                    # Don't break immediately - try to recover
+                    time.sleep(0.1)
+                    continue
 
-            # Get final return code
-            return_code = process.wait()
+            # Get final return code with timeout to prevent hanging
+            try:
+                return_code = process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                self.output_manager.write_line("WARNING: Process did not exit cleanly, forcing termination")
+                self._safe_terminate_process(process)
+                return_code = -1
             elapsed = time.time() - start_time
 
             # Override return code if critical error detected
@@ -840,18 +844,42 @@ class UnifiedTestRunner:
                 else:
                     return_code = -12
 
-            # Get any remaining output
+            # Get any remaining output with improved timeout handling
             try:
-                remaining_output, _ = process.communicate(timeout=5)
-                if remaining_output:
-                    for line in remaining_output.split("\n"):
-                        if line.strip():
-                            output_lines.append(line.strip())
-                            # Don't check for critical errors in remaining output
-                            if not self.output_manager.critical_error_detected:
-                                self.output_manager.write_line(line.strip())
-            except subprocess.TimeoutExpired:
-                pass  # Ignore timeout on final output collection
+                # Use non-blocking approach to collect remaining output
+                remaining_lines = []
+                start_collect = time.time()
+                max_collect_time = 10  # Maximum time to spend collecting remaining output
+                
+                while time.time() - start_collect < max_collect_time and process.poll() is None:
+                    try:
+                        ready, _, _ = select.select([process.stdout], [], [], 0.1)
+                        if ready:
+                            line = process.stdout.readline()
+                            if line:
+                                line = line.rstrip()
+                                if line.strip():
+                                    remaining_lines.append(line)
+                                    output_lines.append(line)
+                                    # Don't check for critical errors in remaining output
+                                    if not self.output_manager.critical_error_detected:
+                                        self.output_manager.write_line(line)
+                            else:
+                                # No more data available
+                                break
+                        else:
+                            # No data ready, exit collection
+                            break
+                    except Exception:
+                        # Error reading remaining data, exit collection
+                        break
+                        
+                if remaining_lines:
+                    self.output_manager.write_line(f"Collected {len(remaining_lines)} remaining output lines")
+                    
+            except Exception as e:
+                self.output_manager.write_line(f"Error collecting remaining output: {e}")
+                # Don't let this crash the entire test run
 
         except subprocess.TimeoutExpired:
             self.output_manager.write_line(f"Process timed out after {timeout} seconds")
@@ -861,6 +889,18 @@ class UnifiedTestRunner:
             self.output_manager.write_line(f"Unexpected error during test execution: {e}")
             return_code = -2
             elapsed = time.time() - start_time
+        finally:
+            # Ensure process cleanup to prevent zombies
+            try:
+                if 'process' in locals() and process is not None:
+                    if process.poll() is None:
+                        self.output_manager.write_line("Cleaning up running process...")
+                        self._safe_terminate_process(process)
+            except Exception as e:
+                if self.output_manager:
+                    self.output_manager.write_line(f"Error during final cleanup: {e}")
+                else:
+                    print(f"Error during final cleanup: {e}")
 
         self.output_manager.write_line("-" * 80)
         self.output_manager.write_line(f"Tests completed in {elapsed:.1f} seconds with return code: {return_code}")
@@ -912,10 +952,119 @@ class UnifiedTestRunner:
         # Write final summary
         self._write_summary(results)
 
-        # Close output manager
-        self.output_manager.close()
+        # Close output manager only if we created it in this method
+        if self._should_close_output_manager:
+            self.output_manager.close()
 
         return results
+
+    def _safe_terminate_process(self, process: subprocess.Popen) -> None:
+        """Safely terminate a process with proper cleanup and deadlock prevention."""
+        try:
+            # First attempt: gentle termination
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    # Wait for graceful termination with timeout
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    # Force kill if it doesn't terminate gracefully
+                    if process.poll() is None:
+                        process.kill()
+                        try:
+                            process.wait(timeout=2)
+                        except subprocess.TimeoutExpired:
+                            # Process is truly stuck - log warning
+                            self.output_manager.write_line("WARNING: Process failed to terminate cleanly")
+        except Exception as e:
+            self.output_manager.write_line(f"Error during process termination: {e}")
+
+    
+    def _capture_stall_diagnostics(self) -> None:
+        """Capture helpful diagnostics when output stalls to pinpoint the hang."""
+        try:
+            self.output_manager.write_line("🩺 Capturing stall diagnostics (process list, Python stacks)...")
+            # Show process list inside container (first/last lines for brevity)
+            ps_cmd = ["docker", "exec", self.container_name, "ps", "-ef"]
+            ps = subprocess.run(ps_cmd, capture_output=True, text=True, timeout=10)
+            if ps.returncode == 0 and ps.stdout:
+                lines = ps.stdout.strip().splitlines()
+                show = []
+                show.extend(lines[:25])
+                if len(lines) > 50:
+                    show.append("... (snip) ...")
+                    show.extend(lines[-25:])
+                for ln in show:
+                    self.output_manager.write_line(f"[ps] {ln}")
+            else:
+                self.output_manager.write_line(f"⚠️  Unable to collect process list: {ps.stderr.strip() if ps.stderr else 'no output'}")
+            # Try to dump Python stacks via SIGUSR1 (enabled by PYTHONFAULTHANDLER=1)
+            find_pid_cmd = [
+                "docker", "exec", self.container_name, "sh", "-c",
+                "pgrep -f 'python.*odoo|odoo-bin' || true"
+            ]
+            pid_res = subprocess.run(find_pid_cmd, capture_output=True, text=True, timeout=5)
+            pids = [p for p in pid_res.stdout.strip().split() if p.isdigit()]
+            if pids:
+                for pid in pids[:3]:
+                    self.output_manager.write_line(f"🔎 Sending SIGUSR1 to PID {pid} for Python traceback dump")
+                    subprocess.run(["docker", "exec", self.container_name, "kill", "-USR1", pid], capture_output=True, text=True, timeout=5)
+            else:
+                self.output_manager.write_line("ℹ️  No Odoo Python PID found for SIGUSR1 dump")
+        except Exception as e:
+            self.output_manager.write_line(f"⚠️  Stall diagnostics error: {e}")
+
+    def _get_adaptive_select_timeout(self) -> float:
+        """Get adaptive select timeout based on current test phase."""
+        if not hasattr(self, 'output_manager') or not self.output_manager:
+            return 3.0  # Default fallback
+            
+        phase = self.output_manager.progress.phase
+        
+        # Longer timeouts for phases that legitimately take time
+        phase_timeouts = {
+            "starting": 5.0,
+            "loading": 5.0,
+            "modules_loaded": 3.0,
+            "testing": 2.0,
+            "javascript_tests": 10.0,  # JS tests can have long gaps
+            "hoot_tests": 10.0,
+            "tour": 8.0,
+        }
+        
+        return phase_timeouts.get(phase, 3.0)
+
+    def _get_adaptive_stall_threshold(self) -> int:
+        """Get adaptive stall threshold that considers test phase and recent activity."""
+        if not hasattr(self, 'output_manager') or not self.output_manager:
+            return 180  # Default fallback
+            
+        phase = self.output_manager.progress.phase
+        output_lines = self.output_manager.progress.output_lines_since_test
+        
+        # Base thresholds for different phases
+        base_thresholds = {
+            "starting": 180,      # Startup can be slow
+            "loading": 180,       # Module loading
+            "modules_loaded": 120, # Should start tests soon
+            "ready_for_tests": 120,
+            "testing": 240,       # Regular tests - increased from 120
+            "javascript_tests": 900, # JS tests need much more time - increased from 600
+            "hoot_tests": 900,    # Hoot tests - increased from 600
+            "tour": 600,          # Tours - increased from 300
+        }
+        
+        base_threshold = base_thresholds.get(phase, 180)
+        
+        # Adjust based on recent activity
+        if output_lines < 50:
+            # Recent activity, allow more time
+            return int(base_threshold * 1.5)
+        elif output_lines > 200:
+            # Lots of output, might be stuck in a loop
+            return int(base_threshold * 0.8)
+        else:
+            return base_threshold
 
     def run_progressive_tests(self, modules: list[str] | None = None) -> TestResults:
         """Run tests progressively: unit → validation → tour.
@@ -941,12 +1090,10 @@ class UnifiedTestRunner:
         all_results.failed += unit_results.failed
         all_results.errors += unit_results.errors
 
+        # Continue even if unit tests fail to run all tests
         if unit_results.failed > 0 or unit_results.errors > 0:
-            self.output_manager.write_line("❌ Unit tests failed! Skipping remaining tests.")
-            all_results.summary = "Unit tests failed - stopped execution"
             if self.output_manager:
-                self.output_manager.close()
-            return all_results
+                self.output_manager.write_line("⚠️ Unit tests had failures but continuing with remaining tests...")
 
         # Phase 2: Integration tests (slow, production clone)
         self.output_manager.write_line("")
@@ -961,12 +1108,10 @@ class UnifiedTestRunner:
         all_results.failed += integration_results.failed
         all_results.errors += integration_results.errors
 
+        # Continue even if integration tests fail to run all tests
         if integration_results.failed > 0 or integration_results.errors > 0:
-            self.output_manager.write_line("❌ Integration tests failed! Skipping tour tests.")
-            all_results.summary = "Integration tests failed - stopped execution"
             if self.output_manager:
-                self.output_manager.close()
-            return all_results
+                self.output_manager.write_line("⚠️ Integration tests had failures but continuing with remaining tests...")
 
         # Phase 3: Tour tests (browser UI)
         self.output_manager.write_line("")
@@ -1245,9 +1390,8 @@ class UnifiedTestRunner:
             timeout = get_recommended_timeout(category, test_mode=category)
             return self._run_normal_tests(category, None, timeout, modules)
         
-        # If no modules specified, discover local modules
-        if not modules:
-            modules = self.discover_local_modules()
+        # Track whether modules were explicitly provided by the user
+        explicit_modules = bool(modules)
 
         # Prepare isolated database per category
         original_db = self.database
@@ -1312,9 +1456,14 @@ class UnifiedTestRunner:
                 # Run tests with specific tag in specific modules
                 test_tags = ",".join([f"{test_tag}/{module}" for module in modules])
             else:
-                # Run tests with specific tag in all local modules
-                local_modules = self.discover_local_modules()
-                test_tags = ",".join([f"{test_tag}/{module}" for module in local_modules])
+                # Discover our custom modules and run tests only for them
+                # This prevents running Odoo core tests that may cause conflicts
+                discovered_modules = self.discover_local_modules()
+                if discovered_modules:
+                    test_tags = ",".join([f"{test_tag}/{module}" for module in discovered_modules])
+                else:
+                    # Fallback if no modules discovered
+                    test_tags = test_tag
 
         # Get appropriate timeout for this category
         timeout = get_recommended_timeout(category, test_mode=category)
@@ -1840,11 +1989,30 @@ Examples:
         # Run specific test category with tag filtering (supports specific tests too)
         results = runner._run_test_category(test_mode, modules, specific_test)
         results_dict = asdict(results)
+    elif test_type == "python":
+        # Python tests should run ALL categories to get 350+ tests
+        # Use progressive runner which handles output manager properly
+        results = runner.run_progressive_tests(modules)
+        results_dict = asdict(results)
     elif test_type == "failing":
-        # Quick implementation for failing tests
-        results = runner.run_tests_with_streaming(timeout=timeout, modules=modules)
-        failing = results.failures + results.errors_list
-        results_dict = {"failing_tests": failing, "count": len(failing)}
+        # Quick implementation - just check recent test results
+        import glob
+        import json
+        
+        # Find most recent test summary
+        test_dirs = sorted(glob.glob("tmp/tests/odoo-tests-*/summary.json"), reverse=True)
+        if test_dirs:
+            with open(test_dirs[0], 'r') as f:
+                recent = json.load(f)
+                failing = recent.get("failures", []) + recent.get("errors_list", [])
+                print(f"Recent failing tests from {test_dirs[0]}:")
+                for test in failing:
+                    print(f"  ❌ {test}")
+                if not failing:
+                    print("  ✅ No failing tests in most recent run")
+        else:
+            print("No recent test runs found. Run tests first.")
+        sys.exit(0)
     elif test_type == "summary":
         # Just show what would be tested
         if not modules:

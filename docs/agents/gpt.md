@@ -6,16 +6,16 @@
 
 ```python
 # Start conversation (session_id comes via 'codex/event' notification)
-mcp__gpt - codex__codex(
+mcp__gpt_codex__codex(
     prompt="Your request",
     sandbox="danger-full-access",  # or "workspace-write", "read-only"
     model="gpt-5",  # Default, or "gpt-4.1" for 1M+ token context
-    approval - policy = "never",  # or "untrusted", "on-failure", "on-request"
+    approval_policy = "never",  # or "untrusted", "on-failure", "on-request"
     # Optional parameters:
-profile = "odoo-high-performance",  # Available: odoo-high-performance, odoo-production
+profile = "deep-reasoning",  # Available: deep-reasoning, dev-standard, test-runner, safe-production, quick
 cwd = "/path/to/dir",  # Working directory
-base - instructions = "custom",  # Replace default instructions
-include - plan - tool = true,  # Include plan tool
+base_instructions = "custom",  # Replace default instructions
+include_plan_tool = true,  # Include plan tool
     # Advanced config overrides:
 config = {
     "model_reasoning_effort": "high",  # For complex tasks
@@ -26,7 +26,7 @@ config = {
 )
 
 # Continue session (use session_id from notification)
-mcp__gpt - codex__codex - reply(
+mcp__gpt_codex__codex_reply(
     prompt="Follow-up request",
     sessionId="uuid-from-notification"
 )
@@ -52,58 +52,89 @@ See: [CODEX_MCP_REFERENCE.md#sandbox-selection-for-odoo-tasks](../system/CODEX_M
 4. **Debug & fix**: Actually fix code, not just analyze
 5. **Code execution**: Run tests, profile, optimize
 
-## Odoo-Specific Profiles
+## Codex Profiles
 
 **Available profiles in ~/.codex/config.toml:**
 
-- **`odoo-high-performance`**: Complex Odoo tasks with deep reasoning
+- **`deep-reasoning`**: Complex multi-step tasks with gpt-5, high reasoning effort, detailed summaries
     - High reasoning effort for architectural decisions
     - Network access enabled for package installation
     - Best for: Complex refactoring, performance optimization, debugging
 
-- **`odoo-production`**: Safe production operations
-    - Read-only sandbox for safety
-    - Approval required for actions
+- **`dev-standard`**: Standard development with gpt-5, medium reasoning, auto-approval
+    - Medium reasoning effort for typical development tasks
+    - Workspace write access with auto-approval
+    - Best for: Standard implementation, bug fixes, routine development
+
+- **`test-runner`**: Test execution and debugging with medium reasoning
+    - Medium reasoning effort for test analysis
+    - Requires --sandbox danger-full-access CLI flag
+    - Best for: Running tests, test debugging, CI/CD tasks
+
+- **`safe-production`**: Production/analysis tasks with approval required
+    - Medium reasoning effort for production tasks
+    - Approval required for actions (on-request)
+    - No response storage for security
     - Best for: Production analysis, audits, reports
+
+- **`quick`**: Lightweight profile for simple, fast tasks
+    - Low reasoning effort for speed
+    - No reasoning summary for faster responses
+    - Best for: Simple bug fixes, quick implementations
 
 ## Quick Patterns
 
 ```python
 # Complex Odoo task with high reasoning
-mcp__gpt - codex__codex(
+mcp__gpt_codex__codex(
     prompt="Optimize ORM queries in product_connect module",
-    profile="odoo-high-performance",
+    profile="deep-reasoning",
     sandbox="workspace-write"
 )
 
 # Production safety check
-mcp__gpt - codex__codex(
+mcp__gpt_codex__codex(
     prompt="Analyze production database performance",
-    profile="odoo-production"
+    profile="safe-production",
+    sandbox="read-only"
 )
 
 # Fact-check with web search
-mcp__gpt - codex__codex(
+mcp__gpt_codex__codex(
     prompt="Verify: [claim]. Search web if needed.",
     sandbox="danger-full-access",
     model="gpt-5"  # Default, or "gpt-4.1" for 1M+ context
 )
 
 # Implement across codebase
-mcp__gpt - codex__codex(
+mcp__gpt_codex__codex(
     prompt="Refactor @addons/product_connect/ to async pattern",
-    sandbox="workspace-write",
-    model="gpt-5"  # Default, or "gpt-4.1" if needed
+    profile="dev-standard",
+    sandbox="workspace-write"
+)
+
+# Quick fix with fast profile
+mcp__gpt_codex__codex(
+    prompt="Fix syntax error in views",
+    profile="quick",
+    sandbox="workspace-write"
+)
+
+# Test execution with test runner
+mcp__gpt_codex__codex(
+    prompt="Run unit tests and fix failures",
+    profile="test-runner",
+    sandbox="danger-full-access"
 )
 
 # Multi-step with session
-response = mcp__gpt - codex__codex(prompt="Analyze architecture", sandbox="read-only",
+response = mcp__gpt_codex__codex(prompt="Analyze architecture", sandbox="read-only",
                                    model="gpt-5")  # Or "gpt-4.1" for huge contexts
 # Get session_id from notification, then:
-mcp__gpt - codex__codex - reply(prompt="Now optimize it", sessionId="uuid")
+mcp__gpt_codex__codex_reply(prompt="Now optimize it", sessionId="uuid")
 
 # Deep thinking with HIGH reasoning
-mcp__gpt - codex__codex(
+mcp__gpt_codex__codex(
     prompt="Think step by step: [complex problem]",
     model="gpt-5",  # Default, or "gpt-4.1" for 1M+ contexts
     config={
@@ -119,7 +150,7 @@ mcp__gpt - codex__codex(
 
 ```python
 # Initial call creates session
-response = mcp__gpt - codex__codex(
+response = mcp__gpt_codex__codex(
     prompt="Analyze this codebase structure",
     sandbox="read-only"
 )
@@ -130,7 +161,7 @@ response = mcp__gpt - codex__codex(
 
 ```python
 # Use session_id from notification for follow-ups
-mcp__gpt - codex__codex - reply(
+mcp__gpt_codex__codex_reply(
     prompt="Now implement the changes we discussed",
     sessionId="uuid-captured-from-notification"
 )

@@ -121,23 +121,58 @@ Use predefined profiles from ~/.codex/config.toml:
 
 ```toml
 # In ~/.codex/config.toml
-[profiles.high-performance]
+[profiles.deep-reasoning]
 model = "gpt-5"
 model_reasoning_effort = "high"
 model_reasoning_summary = "detailed"
 approval_policy = "never"
-sandbox_mode = "workspace-write"
+# Note: sandbox_mode cannot be set in profiles - use CLI flags
 
-[profiles.high-performance.sandbox_workspace_write]
+[profiles.deep-reasoning.sandbox_workspace_write]
 network_access = true
+
+[profiles.dev-standard]
+model = "gpt-5"
+model_reasoning_effort = "medium"
+approval_policy = "never"
+# Note: sandbox_mode cannot be set in profiles - use CLI flags
+
+[profiles.test-runner]
+model = "gpt-5"
+model_reasoning_effort = "medium"
+approval_policy = "never"
+# Note: requires --sandbox danger-full-access CLI flag
+
+[profiles.safe-production]
+model = "gpt-5"
+model_reasoning_effort = "medium"
+approval_policy = "on-request"
+disable_response_storage = true
+# Note: sandbox_mode cannot be set in profiles - use CLI flags
+
+[profiles.quick]
+model = "gpt-5"
+model_reasoning_effort = "low"
+model_reasoning_summary = "none"
+approval_policy = "never"
+# Note: sandbox_mode cannot be set in profiles - use CLI flags
 ```
 
 Then use:
 
 ```python
-mcp__gpt - codex__codex(
+# Use profiles with appropriate sandbox flags
+mcp__gpt_codex__codex(
     prompt="Your task",
-    profile="high-performance"
+    profile="deep-reasoning",
+    sandbox="workspace-write"  # Must specify sandbox explicitly
+)
+
+# Test runner profile requires danger-full-access
+mcp__gpt_codex__codex(
+    prompt="Run tests",
+    profile="test-runner",
+    sandbox="danger-full-access"  # Required for test execution
 )
 ```
 
@@ -183,12 +218,11 @@ mcp__gpt-codex__codex(
 For production environments:
 
 ```python
-mcp__gpt-codex__codex(
+mcp__gpt_codex__codex(
     prompt="Production task",
+    profile="safe-production",  # Use safe-production profile
     sandbox="read-only",
-    approval-policy="on-request",
     config={
-        "disable_response_storage": true,  # For ZDR
         "shell_environment_policy.inherit": "none",
         "shell_environment_policy.set": {
             "NODE_ENV": "production"
@@ -215,13 +249,41 @@ mcp__gpt-codex__codex(
 
 **Solution**: Override with `model_context_window` or switch to gpt-4.1 for 1M+ tokens
 
+## Profile Limitations
+
+### Sandbox Mode Cannot Be Set in Profiles
+
+**CRITICAL**: Sandbox mode must be specified via CLI flags or config overrides, never in profiles:
+
+```bash
+# Correct: CLI flag
+codex exec "Task" --profile deep-reasoning --sandbox danger-full-access
+
+# Correct: Config override
+codex exec "Task" --profile dev-standard -c 'sandbox_mode="workspace-write"'
+
+# Via MCP (always specify sandbox explicitly)
+mcp__gpt_codex__codex(
+    prompt="Task",
+    profile="deep-reasoning",
+    sandbox="workspace-write"  # Required - profiles cannot set this
+)
+```
+
+**Why this matters:**
+
+- Profiles define reasoning, approval, and environment settings
+- Sandbox mode is a security boundary that must be explicit
+- Test runner profile requires `danger-full-access` for full test execution
+
 ## Best Practices
 
 1. **Start with defaults**: Only add config overrides when needed
 2. **Use profiles**: Define common configurations in ~/.codex/config.toml
-3. **Reasoning vs Speed**: High reasoning = slower but more thorough
-4. **Security first**: Start with restrictive sandbox, escalate only when needed
-5. **Monitor tokens**: Use `model_max_output_tokens` to prevent excessive output
+3. **Explicit sandbox**: Always specify sandbox mode explicitly, never rely on profile defaults
+4. **Reasoning vs Speed**: High reasoning = slower but more thorough
+5. **Security first**: Start with restrictive sandbox, escalate only when needed
+6. **Monitor tokens**: Use `model_max_output_tokens` to prevent excessive output
 
 ## Reference
 

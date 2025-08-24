@@ -460,9 +460,31 @@ class UnifiedTestRunner:
                     subprocess.run(cmd, capture_output=True, text=True, timeout=5)
                 except (subprocess.TimeoutExpired, subprocess.SubprocessError):
                     continue  # Ignore cleanup failures
+            
+            # Enhanced cleanup: clear shared memory and orphaned resources  
+            enhanced_cleanup_commands = [
+                # Clear shared memory segments
+                ["docker", "exec", container_name, "sh", "-c", "ipcs -m | awk '/^0x/ {print $2}' | xargs -r ipcrm -m || true"],
+                # Clear semaphores
+                ["docker", "exec", container_name, "sh", "-c", "ipcs -s | awk '/^0x/ {print $2}' | xargs -r ipcrm -s || true"],
+                # Remove socket files
+                ["docker", "exec", container_name, "find", "/tmp", "-name", "*.sock", "-type", "s", "-delete"],
+                # Clean up temp files
+                ["docker", "exec", container_name, "sh", "-c", "find /tmp -name 'odoo-*' -type f -delete || true"],
+                ["docker", "exec", container_name, "sh", "-c", "find /tmp -name 'chrome*' -type d -exec rm -rf {} + || true"],
+                # Add chromedriver to browser cleanup
+                ["docker", "exec", container_name, "pkill", "-f", "chromedriver"],
+                ["docker", "exec", container_name, "pkill", "-9", "-f", "chromedriver"],
+            ]
+            
+            for cmd in enhanced_cleanup_commands:
+                try:
+                    subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                except (subprocess.TimeoutExpired, subprocess.SubprocessError):
+                    continue  # Ignore cleanup failures
                     
             if self.verbose:
-                print("DEBUG: Process cleanup completed")
+                print("DEBUG: Enhanced process cleanup completed")
                 
         except Exception as e:
             if self.verbose:
@@ -1060,8 +1082,15 @@ class UnifiedTestRunner:
                         try:
                             process.wait(timeout=2)
                         except subprocess.TimeoutExpired:
-                            # Process is truly stuck - log warning
-                            self.output_manager.write_line("WARNING: Process failed to terminate cleanly")
+                            # Process is truly stuck - log warning and force cleanup
+                            self.output_manager.write_line("WARNING: Process failed to terminate cleanly - forcing container cleanup")
+                            
+            # Additional cleanup: kill any remaining test processes in container
+            try:
+                self._force_terminate_test_processes()
+            except Exception as cleanup_error:
+                self.output_manager.write_line(f"Warning during process cleanup: {cleanup_error}")
+                
         except Exception as e:
             self.output_manager.write_line(f"Error during process termination: {e}")
 
@@ -1163,61 +1192,72 @@ class UnifiedTestRunner:
         if self.output_manager is None:
             self.output_manager = OutputManager(self.output_dir, self.caller_type)
 
-        # Phase 1: Unit tests (fast, clean DB)
-        self.output_manager.write_line("")
-        self.output_manager.write_line("=" * 80)
-        self.output_manager.write_line("🏃 Phase 1: Unit Tests (Fast - Clean Database)")
-        self.output_manager.write_line("=" * 80)
-        self.output_manager.write_line("")
+        try:
+            # Phase 1: Unit tests (fast, clean DB)
+            self.output_manager.write_line("")
+            self.output_manager.write_line("=" * 80)
+            self.output_manager.write_line("🏃 Phase 1: Unit Tests (Fast - Clean Database)")
+            self.output_manager.write_line("=" * 80)
+            self.output_manager.write_line("")
 
-        unit_results = self._run_test_category("unit", modules, None)
-        all_results.total += unit_results.total
-        all_results.passed += unit_results.passed
-        all_results.failed += unit_results.failed
-        all_results.errors += unit_results.errors
+            unit_results = self._run_test_category("unit", modules, None)
+            all_results.total += unit_results.total
+            all_results.passed += unit_results.passed
+            all_results.failed += unit_results.failed
+            all_results.errors += unit_results.errors
 
-        # Continue even if unit tests fail to run all tests
-        if unit_results.failed > 0 or unit_results.errors > 0:
+            # Continue even if unit tests fail to run all tests
+            if unit_results.failed > 0 or unit_results.errors > 0:
+                if self.output_manager:
+                    self.output_manager.write_line("⚠️ Unit tests had failures but continuing with remaining tests...")
+
+            # Comprehensive cleanup between phases
+            self._deep_cleanup_between_phases("unit", "integration")
+
+            # Phase 2: Integration tests (slow, production clone)
+            self.output_manager.write_line("")
+            self.output_manager.write_line("=" * 80)
+            self.output_manager.write_line("🔍 Phase 2: Integration Tests (Slow - Production Clone)")
+            self.output_manager.write_line("=" * 80)
+            self.output_manager.write_line("")
+
+            integration_results = self._run_test_category("integration", modules, None)
+            all_results.total += integration_results.total
+            all_results.passed += integration_results.passed
+            all_results.failed += integration_results.failed
+            all_results.errors += integration_results.errors
+
+            # Continue even if integration tests fail to run all tests
+            if integration_results.failed > 0 or integration_results.errors > 0:
+                if self.output_manager:
+                    self.output_manager.write_line("⚠️ Integration tests had failures but continuing with remaining tests...")
+
+            # Comprehensive cleanup between phases
+            self._deep_cleanup_between_phases("integration", "tour")
+
+            # Phase 3: Tour tests (browser UI)
+            self.output_manager.write_line("")
+            self.output_manager.write_line("=" * 80)
+            self.output_manager.write_line("🌐 Phase 3: Tour Tests (Browser UI)")
+            self.output_manager.write_line("=" * 80)
+            self.output_manager.write_line("")
+
+            tour_results = self._run_test_category("tour", modules, None)
+            all_results.total += tour_results.total
+            all_results.passed += tour_results.passed
+            all_results.failed += tour_results.failed
+            all_results.errors += tour_results.errors
+
+            # Final summary
+            all_results.summary = f"All tests completed: {all_results.passed}/{all_results.total} passed"
+
+        finally:
+            # Final comprehensive cleanup
+            self._deep_cleanup_between_phases("tour", "final")
+            
+            # Close output manager
             if self.output_manager:
-                self.output_manager.write_line("⚠️ Unit tests had failures but continuing with remaining tests...")
-
-        # Phase 2: Integration tests (slow, production clone)
-        self.output_manager.write_line("")
-        self.output_manager.write_line("=" * 80)
-        self.output_manager.write_line("🔍 Phase 2: Integration Tests (Slow - Production Clone)")
-        self.output_manager.write_line("=" * 80)
-        self.output_manager.write_line("")
-
-        integration_results = self._run_test_category("integration", modules, None)
-        all_results.total += integration_results.total
-        all_results.passed += integration_results.passed
-        all_results.failed += integration_results.failed
-        all_results.errors += integration_results.errors
-
-        # Continue even if integration tests fail to run all tests
-        if integration_results.failed > 0 or integration_results.errors > 0:
-            if self.output_manager:
-                self.output_manager.write_line("⚠️ Integration tests had failures but continuing with remaining tests...")
-
-        # Phase 3: Tour tests (browser UI)
-        self.output_manager.write_line("")
-        self.output_manager.write_line("=" * 80)
-        self.output_manager.write_line("🌐 Phase 3: Tour Tests (Browser UI)")
-        self.output_manager.write_line("=" * 80)
-        self.output_manager.write_line("")
-
-        tour_results = self._run_test_category("tour", modules, None)
-        all_results.total += tour_results.total
-        all_results.passed += tour_results.passed
-        all_results.failed += tour_results.failed
-        all_results.errors += tour_results.errors
-
-        # Final summary
-        all_results.summary = f"All tests completed: {all_results.passed}/{all_results.total} passed"
-
-        # Close output manager
-        if self.output_manager:
-            self.output_manager.close()
+                self.output_manager.close()
 
         return all_results
 
@@ -1353,7 +1393,24 @@ class UnifiedTestRunner:
             "-c",
             f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();",
         ]
-        subprocess.run(terminate_cmd, capture_output=True, text=True)
+        result = subprocess.run(terminate_cmd, capture_output=True, text=True, timeout=30)
+        
+        # Also try to cancel any running queries on this database
+        cancel_cmd = [
+            "docker",
+            "exec",
+            "-e", 
+            f"PGPASSWORD={db_password}",
+            db_container,
+            "psql",
+            "-U",
+            "odoo", 
+            "-d",
+            "postgres",
+            "-c",
+            f"SELECT pg_cancel_backend(pid) FROM pg_stat_activity WHERE datname = '{db_name}' AND state = 'active';",
+        ]
+        subprocess.run(cancel_cmd, capture_output=True, text=True, timeout=10)
 
     def _drop_database_safely(self, db_name: str) -> None:
         import os
@@ -1454,6 +1511,183 @@ class UnifiedTestRunner:
         path = f"/volumes/data/filestore/{test_db}"
         cmd = ["docker", "exec", self.container_name, "sh", "-c", f"[ -L '{path}' ] && rm '{path}' || true"]
         subprocess.run(cmd, capture_output=True, text=True)
+
+    def _deep_cleanup_between_phases(self, from_phase: str, to_phase: str) -> None:
+        """Perform comprehensive cleanup between test phases to prevent hangs."""
+        if self.output_manager:
+            self.output_manager.write_line("")
+            self.output_manager.write_line(f"🧹 Deep cleanup: {from_phase} → {to_phase}")
+            self.output_manager.write_line("-" * 40)
+        
+        try:
+            # 1. Force terminate all test-related processes
+            self._force_terminate_test_processes()
+            
+            # 2. Clean up database connections
+            self._cleanup_database_connections()
+            
+            # 3. Reset Docker container state
+            self._reset_container_state()
+            
+            # 4. Clean up temporary files and locks
+            self._cleanup_temp_files_and_locks()
+            
+            # 5. Wait for container to stabilize
+            import time
+            time.sleep(3)
+            
+            if self.output_manager:
+                self.output_manager.write_line("✅ Deep cleanup completed")
+                self.output_manager.write_line("")
+                
+        except Exception as e:
+            if self.output_manager:
+                self.output_manager.write_line(f"⚠️ Cleanup warning: {e}")
+
+    def _force_cleanup_category_processes(self, category: str) -> None:
+        """Force cleanup of processes specific to a test category."""
+        try:
+            # Kill any remaining processes for this category
+            process_patterns = [
+                "odoo-bin.*test-enable",
+                "python.*odoo-bin",
+                "timeout.*odoo-bin",
+            ]
+            
+            # Add browser processes for tour tests
+            if category == "tour":
+                process_patterns.extend([
+                    "chromium",
+                    "chrome",
+                    "chrome_crashpad",
+                    "chromedriver",
+                ])
+            
+            for pattern in process_patterns:
+                cmd = ["docker", "exec", self.container_name, "pkill", "-f", pattern]
+                subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                
+            # Force kill any stubborn processes
+            for pattern in process_patterns:
+                cmd = ["docker", "exec", self.container_name, "pkill", "-9", "-f", pattern]
+                subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                
+        except Exception as e:
+            if self.output_manager:
+                self.output_manager.write_line(f"⚠️ Process cleanup warning: {e}")
+
+    def _force_terminate_test_processes(self) -> None:
+        """Aggressively terminate all test-related processes."""
+        try:
+            if self.output_manager:
+                self.output_manager.write_line("   🔄 Terminating test processes...")
+            
+            # Get all test-related PIDs
+            find_pids_cmd = [
+                "docker", "exec", self.container_name, "sh", "-c",
+                "pgrep -f 'odoo-bin.*test|python.*odoo|timeout.*odoo|chromium|chrome' || true"
+            ]
+            
+            result = subprocess.run(find_pids_cmd, capture_output=True, text=True, timeout=10)
+            pids = [p.strip() for p in result.stdout.split() if p.strip().isdigit()]
+            
+            if pids:
+                if self.output_manager:
+                    self.output_manager.write_line(f"     Found {len(pids)} processes to terminate")
+                
+                # Try graceful termination first
+                for pid in pids:
+                    cmd = ["docker", "exec", self.container_name, "kill", "-TERM", pid]
+                    subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                
+                # Wait a moment for graceful shutdown
+                import time
+                time.sleep(2)
+                
+                # Force kill any remaining processes
+                for pid in pids:
+                    cmd = ["docker", "exec", self.container_name, "kill", "-KILL", pid]
+                    subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                    
+        except Exception as e:
+            if self.output_manager:
+                self.output_manager.write_line(f"     ⚠️ Process termination warning: {e}")
+
+    def _cleanup_database_connections(self) -> None:
+        """Clean up database connections and reset connection pool."""
+        try:
+            if self.output_manager:
+                self.output_manager.write_line("   🗄️ Cleaning database connections...")
+            
+            # Terminate connections to all test databases
+            db_patterns = [
+                f"{self.database}_test",
+                f"{self.database}_test_unit", 
+                f"{self.database}_test_integration",
+                f"{self.database}_test_tour"
+            ]
+            
+            for db_pattern in db_patterns:
+                try:
+                    self._terminate_db_connections(db_pattern)
+                except Exception:
+                    pass  # Ignore errors for non-existent databases
+                    
+        except Exception as e:
+            if self.output_manager:
+                self.output_manager.write_line(f"     ⚠️ DB connection cleanup warning: {e}")
+
+    def _reset_container_state(self) -> None:
+        """Reset Docker container state without full restart."""
+        try:
+            if self.output_manager:
+                self.output_manager.write_line("   🐳 Resetting container state...")
+            
+            # Clear shared memory segments
+            cmd = ["docker", "exec", self.container_name, "sh", "-c", "ipcs -m | awk '/^0x/ {print $2}' | xargs -r ipcrm -m || true"]
+            subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            
+            # Clear semaphores
+            cmd = ["docker", "exec", self.container_name, "sh", "-c", "ipcs -s | awk '/^0x/ {print $2}' | xargs -r ipcrm -s || true"]
+            subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            
+            # Clear orphaned sockets
+            cmd = ["docker", "exec", self.container_name, "sh", "-c", "find /tmp -name '*.sock' -type s -delete || true"]
+            subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            
+        except Exception as e:
+            if self.output_manager:
+                self.output_manager.write_line(f"     ⚠️ Container reset warning: {e}")
+
+    def _cleanup_temp_files_and_locks(self) -> None:
+        """Clean up temporary files and locks that might cause hangs."""
+        try:
+            if self.output_manager:
+                self.output_manager.write_line("   🗂️ Cleaning temporary files and locks...")
+            
+            # Clean up Odoo temporary files
+            cleanup_commands = [
+                # Remove Odoo cache and session files
+                "find /tmp -name 'openerp-*' -type f -delete || true",
+                "find /tmp -name 'odoo-*' -type f -delete || true",
+                "find /tmp -name '.odoo_*' -type f -delete || true",
+                # Remove browser cache and temp files
+                "find /tmp -name 'chrome*' -type d -exec rm -rf {} + || true",
+                "find /tmp -name 'chromium*' -type d -exec rm -rf {} + || true",
+                # Remove stale lock files
+                "find /tmp -name '*.lock' -type f -delete || true",
+                "find /tmp -name '*.pid' -type f -delete || true",
+                # Clean up core dumps
+                "find /tmp -name 'core.*' -type f -delete || true",
+            ]
+            
+            for cleanup_cmd in cleanup_commands:
+                cmd = ["docker", "exec", self.container_name, "sh", "-c", cleanup_cmd]
+                subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                
+        except Exception as e:
+            if self.output_manager:
+                self.output_manager.write_line(f"     ⚠️ Temp file cleanup warning: {e}")
 
     def _run_test_category(self, category: str, modules: list[str] | None, specific_test: str | None = None) -> TestResults:
         """Run a specific category of tests.
@@ -1572,6 +1806,9 @@ class UnifiedTestRunner:
                 finally:
                     # Restore original database name for subsequent phases
                     self.database = original_db
+                    
+                    # Ensure full process cleanup after each category
+                    self._force_cleanup_category_processes(category)
 
     def _run_tests_with_tags(self, test_tags: str, timeout: int, modules: list[str] | None, category: str) -> TestResults:
         """Run tests with specific tag filtering.

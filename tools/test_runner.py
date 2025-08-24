@@ -363,6 +363,10 @@ class UnifiedTestRunner:
         
         if self.verbose:
             print("DEBUG: Checking containers...")
+        
+        # Clean up any zombie browser processes first
+        self._cleanup_zombie_processes(f"{container_prefix}-script-runner-1")
+        
         containers_to_check = [
             {"name": f"{container_prefix}-script-runner-1", "service": "script-runner"},
             {"name": f"{container_prefix}-shell-1", "service": "shell"},
@@ -417,6 +421,52 @@ class UnifiedTestRunner:
                     except subprocess.CalledProcessError:
                         print(f"Failed to start container {container['name']} after cleanup")
                         sys.exit(1)
+
+    def _cleanup_zombie_processes(self, container_name: str) -> None:
+        """Clean up zombie processes in the container to prevent database locks."""
+        try:
+            if self.verbose:
+                print(f"DEBUG: Cleaning up zombie processes in {container_name}...")
+            
+            # Kill all Odoo test processes first (they hold database locks)
+            odoo_cleanup_commands = [
+                ["docker", "exec", container_name, "pkill", "-f", "odoo-bin.*test-enable"],
+                ["docker", "exec", container_name, "pkill", "-f", "python3.*odoo-bin"],
+                ["docker", "exec", container_name, "pkill", "-f", "timeout.*odoo-bin"],
+            ]
+            
+            for cmd in odoo_cleanup_commands:
+                try:
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                    if self.verbose and result.returncode == 0:
+                        print(f"DEBUG: Killed processes with: {' '.join(cmd[-2:])}")
+                except (subprocess.TimeoutExpired, subprocess.SubprocessError):
+                    continue  # Ignore cleanup failures
+            
+            # Wait for processes to terminate gracefully
+            import time
+            time.sleep(2)
+            
+            # Kill zombie chromium/browser processes
+            browser_cleanup_commands = [
+                ["docker", "exec", container_name, "pkill", "-f", "chromium"],
+                ["docker", "exec", container_name, "pkill", "-f", "chrome"],
+                ["docker", "exec", container_name, "pkill", "-f", "chrome_crashpad"],
+                ["docker", "exec", container_name, "pkill", "-9", "-f", "chromium"],  # Force kill if needed
+            ]
+            
+            for cmd in browser_cleanup_commands:
+                try:
+                    subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                except (subprocess.TimeoutExpired, subprocess.SubprocessError):
+                    continue  # Ignore cleanup failures
+                    
+            if self.verbose:
+                print("DEBUG: Process cleanup completed")
+                
+        except Exception as e:
+            if self.verbose:
+                print(f"DEBUG: Process cleanup warning: {e}")
 
     def discover_local_modules(self) -> list[str]:
         """Discover all modules in the local addons directory."""
@@ -648,6 +698,15 @@ class UnifiedTestRunner:
             "--log-level=test",  # Changed from info to test for better visibility
             "--without-demo=all",  # Prevent loading demo data that conflicts with production DB
         ]
+        
+        # For tour tests, add additional optimizations to prevent hanging
+        if (test_type and "tour" in str(test_type).lower()) or (specific_test and any(k in specific_test for k in ["HttpCase", "JSTest", "test_js", "Tour"])):
+            cmd.extend([
+                "--limit-time-cpu=300",  # 5 minute CPU limit
+                "--limit-time-real=600", # 10 minute real time limit
+                "--limit-request=8192",  # Increase request limit
+                "--limit-memory-hard=2684354560",  # 2.5GB memory limit
+            ])
 
         # Apply module filtering to avoid running core Odoo tests that cause constraint violations
         # This ensures we only run tests from our custom addons
@@ -678,11 +737,16 @@ class UnifiedTestRunner:
                     # Multiple modules - try without module prefix
                     cmd.extend(["--test-tags", specific_test])
             elif specific_test.startswith("Test"):
-                # TestClass format
+                # TestClass format - for tour tests, ensure we include the module
                 if len(self.modules) == 1:
+                    # For single module, use module prefix to ensure proper discovery
                     cmd.extend(["--test-tags", f"/{self.modules[0]}:{specific_test}"])
                 else:
+                    # Multiple modules or no modules specified - try global search
                     cmd.extend(["--test-tags", specific_test])
+            elif specific_test.startswith("/"):
+                # Already a full tag format
+                cmd.extend(["--test-tags", specific_test])
             else:
                 # If not resolved above, treat as raw tag expression
                 cmd.extend(["--test-tags", specific_test])
@@ -711,23 +775,27 @@ class UnifiedTestRunner:
         try:
             if (
                 (test_type and "tour" in str(test_type).lower())
-                or (specific_test and any(k in specific_test for k in ["HttpCase", "JSTest", "test_js"]))
+                or (specific_test and any(k in specific_test for k in ["HttpCase", "JSTest", "test_js", "Tour"]))
             ):
-                # Simplified Chrome flags for Docker compatibility
-                chrome_flags = " ".join([
-                    "--headless=new",
-                    "--disable-dev-shm-usage",
-                    "--no-sandbox",
-                ])
+                # Enhanced browser configuration for tour tests to prevent hanging
                 browser_env = [
-                    "-e",
-                    f"CHROMIUM_FLAGS={chrome_flags}",
-                    "-e",
-                    "HEADLESS_CHROMIUM=1",
+                    "-e", "HEADLESS_CHROMIUM=1",
+                    "-e", "CHROMIUM_BIN=/usr/bin/chromium",
+                    "-e", "DISPLAY=:99",  # Set virtual display
+                    # Override CHROMIUM_FLAGS with tour-specific optimizations
+                    "-e", "CHROMIUM_FLAGS=--headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-software-rasterizer --window-size=1920,1080 --no-first-run --no-default-browser-check --disable-web-security --disable-features=VizDisplayCompositor,TranslateUI,site-per-process,IsolateOrigins,BlockInsecurePrivateNetworkRequests --virtual-time-budget=30000 --run-all-compositor-stages-before-draw --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-extensions --disable-plugins --disable-sync --disable-web-bluetooth --disable-web-usb",
+                    # Additional environment variables to prevent hanging after tour completion
+                    "-e", "ODOO_TEST_BROWSER_TIMEOUT=60",
+                    "-e", "ODOO_TEST_TIMEOUT=300", 
+                    "-e", "ODOO_TOUR_DISABLE_WEBSOCKET=1",  # Disable websockets that cause hanging
+                    "-e", "ODOO_DISABLE_WEBSOCKET=1",  # Global websocket disable for tests
                 ]
                 docker_cmd = docker_cmd[:2] + browser_env + docker_cmd[2:]
-        except Exception:
-            # Non-critical; proceed without extra flags
+                self.output_manager.write_line("Applied enhanced browser configuration for tour tests")
+        except Exception as e:
+            # Log error but proceed - don't let browser setup break the test
+            if self.output_manager:
+                self.output_manager.write_line(f"Warning: Browser setup failed: {e}")
             pass
 
         if self.debug or self.verbose:
@@ -760,6 +828,8 @@ class UnifiedTestRunner:
             max_stall_warnings = 20  # Increased to be more tolerant of long operations
 
             took_stall_diagnostics = False
+            tour_completed = False  # Track if tour has completed successfully
+            is_tour_test = (test_type and "tour" in str(test_type).lower()) or (specific_test and any(k in specific_test for k in ["HttpCase", "JSTest", "test_js", "Tour"]))
             while True:
                 # Check if process is still running
                 if process.poll() is not None:
@@ -793,8 +863,24 @@ class UnifiedTestRunner:
                             self.output_manager.write_line(line)
                             last_output_time = time.time()
                             stall_warnings = 0  # Reset stall warnings on new output
+                            
+                            # Check if tour has completed successfully
+                            if is_tour_test and not tour_completed:
+                                if "Test completed successfully" in line or "test_basic_tour: ok" in line:
+                                    tour_completed = True
+                                    self.output_manager.write_line("✅ Tour completed successfully - waiting for clean shutdown...")
+                                    # Give process 30 seconds to shutdown cleanly after tour completion
+                                    tour_completion_timeout = time.time() + 30
                     else:
                         # No data available within select timeout
+                        
+                        # For tour tests, check if we should force terminate after completion
+                        if is_tour_test and tour_completed:
+                            if current_time > tour_completion_timeout:
+                                self.output_manager.write_line("⚠️  Tour completed but process didn't exit cleanly - forcing termination")
+                                self._safe_terminate_process(process)
+                                break
+                        
                         # Only check for stall if we're past the adaptive threshold
                         stall_threshold = self._get_adaptive_stall_threshold()
                         if current_time - last_output_time > stall_threshold:
@@ -1988,6 +2074,10 @@ Examples:
     elif test_mode in ["unit", "integration", "tour"]:
         # Run specific test category with tag filtering (supports specific tests too)
         results = runner._run_test_category(test_mode, modules, specific_test)
+        results_dict = asdict(results)
+    elif test_mode == "mixed":
+        # Mixed mode - run all tests together (legacy behavior)
+        results = runner.run_tests_with_streaming(test_type, specific_test, timeout, modules)
         results_dict = asdict(results)
     elif test_type == "python":
         # Python tests should run ALL categories to get 350+ tests

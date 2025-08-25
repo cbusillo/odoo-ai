@@ -77,7 +77,7 @@ specialization.
 # ❌ SLOW: Bash approach (30+ seconds)
 docker
 exec
-odoo - opw - web - 1
+${ODOO_CONTAINER_PREFIX}-web-1
 find / odoo - name
 "*.py" | xargs
 grep - l

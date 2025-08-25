@@ -4,9 +4,9 @@
 
 ## Test Database Strategy (IMPLEMENTED)
 
-- **Unit Tests**: Use blank database (`opw_test_unit`) - Fast, isolated testing
-- **Integration Tests**: Use production clone (`opw_test_integration`) - Real data scenarios
-- **Tour Tests**: Use production clone (`opw_test_tour`) - Real UI workflows
+- **Unit Tests**: Use blank database (`${ODOO_DB_NAME}_test_unit`) - Fast, isolated testing
+- **Integration Tests**: Use production clone (`${ODOO_DB_NAME}_test_integration`) - Real data scenarios
+- **Tour Tests**: Use production clone (`${ODOO_DB_NAME}_test_tour`) - Real UI workflows
 
 ## Test Results Achieved
 

@@ -131,7 +131,7 @@ Run the test script to verify setup:
 Codex can pass environment variables to commands:
 
 - `PYTHONPATH`: Set to Odoo module paths
-- `DATABASE`: Set to "opw"
+- `DATABASE`: Set to "${ODOO_DB_NAME}"
 
 ## Quick Commands
 
@@ -151,7 +151,7 @@ codex exec "Task" --sandbox danger-full-access
 # Multiple config overrides
 codex exec "Task" \
   -c 'model_reasoning_effort="high"' \
-  -c 'shell_environment_policy.set={"DATABASE":"opw"}'
+  -c 'shell_environment_policy.set={"DATABASE":"${ODOO_DB_NAME}"}'
 ```
 
 ## GPT Agent Usage

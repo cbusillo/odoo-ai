@@ -7,17 +7,36 @@ Tracks the agent call stack and prevents agents from calling themselves.
 import json
 import sys
 from pathlib import Path
+import os
+import time
+import hashlib
 
-# File to track the current agent call stack
-STACK_FILE = Path("/tmp/claude_agent_stack.json")
+def _stack_file() -> Path:
+    """
+    Use a per-project stack file so different projects don't share state.
+    Falls back to a global file if project dir isn't provided.
+    """
+    proj = os.environ.get("CLAUDE_PROJECT_DIR")
+    if proj:
+        h = hashlib.sha256(proj.encode("utf-8")).hexdigest()[:12]
+        return Path(f"/tmp/claude_agent_stack_{h}.json")
+    return Path("/tmp/claude_agent_stack.json")
 
 
 def get_current_stack():
     """Get the current agent call stack."""
-    if STACK_FILE.exists():
+    stack_path = _stack_file()
+    if stack_path.exists():
         try:
-            with open(STACK_FILE, "r") as f:
-                return json.load(f)
+            # Reset stale stacks older than 2 hours to avoid permanent lockouts
+            if time.time() - stack_path.stat().st_mtime > 2 * 60 * 60:
+                return []
+            with open(stack_path, "r") as f:
+                data = json.load(f)
+                # ensure list of strings
+                if isinstance(data, list):
+                    return [str(x) for x in data]
+                return []
         except:
             return []
     return []
@@ -25,7 +44,8 @@ def get_current_stack():
 
 def save_stack(stack):
     """Save the agent call stack."""
-    with open(STACK_FILE, "w") as f:
+    stack_path = _stack_file()
+    with open(stack_path, "w") as f:
         json.dump(stack, f)
 
 
@@ -54,8 +74,6 @@ def main():
         if target_agent in stack:
             # RECURSION DETECTED!
             output = {
-                "continue": False,
-                "stopReason": f"RECURSION PREVENTED: {target_agent} agent is already active in the call stack",
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",
                     "permissionDecision": "deny",
@@ -63,14 +81,14 @@ def main():
                 },
             }
             print(json.dumps(output))
-            sys.exit(2)  # Exit code 2 blocks the tool call
+            # Exit 0 so the platform respects the deny decision without retries
+            sys.exit(0)
 
         # Check stack depth to prevent deep chains
-        MAX_DEPTH = 5
+        # Keep chains shallow to prevent ping-pong loops from growing
+        MAX_DEPTH = 3
         if len(stack) >= MAX_DEPTH:
             output = {
-                "continue": False,
-                "stopReason": f"MAX DEPTH REACHED: Agent call stack depth limit ({MAX_DEPTH}) exceeded",
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",
                     "permissionDecision": "deny",
@@ -78,7 +96,7 @@ def main():
                 },
             }
             print(json.dumps(output))
-            sys.exit(2)
+            sys.exit(0)
 
         # No recursion detected, add to stack for tracking
         # Note: We'll need a PostToolUse hook to remove from stack

@@ -18,7 +18,7 @@ services:
       - "8069:8069"
     volumes:
       - ~/.ssh:/home/ubuntu/.ssh:ro
-      - odoo_data:/volumes/data
+      - data:/volumes/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -26,7 +26,7 @@ services:
     image: postgres:17
     restart: unless-stopped
     volumes:
-      - odoo-db-data:/var/lib/postgresql/data
+      - db:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=postgres
       - POSTGRES_PASSWORD=${ODOO_DB_PASSWORD}
@@ -50,5 +50,5 @@ services:
     ports: [ ]
 
 volumes:
-  odoo_data:
-  odoo-db-data:
+  data:
+  db:

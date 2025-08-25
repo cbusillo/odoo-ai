@@ -259,7 +259,7 @@ class OutputManager:
             # Check if this is a test that's expected to cause errors
             if any(keyword in test_name for keyword in ["validation", "error", "constraint", "integrity", "invalid", "fail"]):
                 # Skip database constraint errors in these tests
-                if any(phrase in line.lower() for phrase in ["bad query", "null value", "constraint", "violates", "integrityerror", "error opw odoo.sql_db"]):
+                if any(phrase in line.lower() for phrase in ["bad query", "null value", "constraint", "violates", "integrityerror", "error odoo.sql_db"]):
                     return
             # Also skip for integration tests that might be testing error conditions
             if "integration" in test_name:
@@ -314,7 +314,7 @@ class UnifiedTestRunner:
         verbose: bool = False,
         debug: bool = False,
         container: str = None,
-        database: str = "opw",
+        database: str = None,
         addons_path: str = "/volumes/addons,/odoo/addons,/volumes/enterprise",
         test_mode: str = "mixed",  # mixed, unit, validation, tour, all
     ) -> None:
@@ -327,6 +327,10 @@ class UnifiedTestRunner:
             container_prefix = os.environ.get("ODOO_CONTAINER_PREFIX", "odoo")
             container = f"{container_prefix}-script-runner-1"
         self.container_name = container
+        
+        # Set database name using environment variable if not provided
+        if database is None:
+            database = os.environ.get("ODOO_DB_NAME", "odoo_dev")
         self.database = database
         self.addons_path = addons_path
         self.test_tags: str | None = None  # Track specific test requested
@@ -1932,7 +1936,7 @@ class UnifiedTestRunner:
                 reasons.append(f"Missing module: {module_match.group(1)}")
 
         # Only check for @tagged if we see no tests starting (module-wide runs don't show @tagged)
-        if "@tagged" not in output and "Starting Test" not in output and "INFO opw odoo.addons" not in output:
+        if "@tagged" not in output and "Starting Test" not in output and "INFO odoo.addons" not in output:
             reasons.append("No @tagged decorator found - tests must have @tagged('post_install', '-at_install')")
 
         if "test_" not in output.lower():
@@ -2193,7 +2197,7 @@ Examples:
     parser.add_argument("-t", "--timeout", type=int, default=None, help="Timeout in seconds")
     parser.add_argument("-j", "--json", action="store_true", help="Output results as JSON")
     parser.add_argument("-c", "--container", type=str, default=None, help="Docker container name (defaults to ODOO_CONTAINER_PREFIX-script-runner-1)")
-    parser.add_argument("-d", "--database", type=str, default="opw", help="Database name (unit tests will use {database}_test)")
+    parser.add_argument("-d", "--database", type=str, default=None, help="Database name (defaults to ODOO_DB_NAME env var, unit tests will use {database}_test)")
     parser.add_argument(
         "-p", "--addons-path", type=str, default="/volumes/addons,/odoo/addons,/volumes/enterprise", help="Addons path"
     )

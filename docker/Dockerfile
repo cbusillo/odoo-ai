@@ -93,7 +93,7 @@ RUN cd / && \
 
 # Common final steps
 ENV HOOK_SETUP_FILE=/volumes/scripts/hook_setup
-RUN if [ -f "$HOOK_SETUP_FILE" ]; then cp "$HOOK_SETUP_FILE" /; else echo "hook_setup file not found in /volumes/scrips, skipping"; fi
+RUN if [ -f "$HOOK_SETUP_FILE" ]; then cp "$HOOK_SETUP_FILE" /; else echo "hook_setup file not found in /volumes/scripts, skipping"; fi
 
 RUN ln -sf /etc/ssl/certs/ca-certificates.crt /usr/lib/ssl/cert.pem
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt

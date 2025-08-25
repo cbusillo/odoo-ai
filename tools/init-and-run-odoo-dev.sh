@@ -2,9 +2,9 @@
 set -e
 
 # Configuration for syncing from production
-PROD_SERVER="opw-prod"
-PROD_DB="opw"
-PROD_DB_USER="odoo"
+PROD_SERVER="${ODOO_UPSTREAM_HOST:-prod-server}"
+PROD_DB="${ODOO_UPSTREAM_DB_NAME:-prod_db}"
+PROD_DB_USER="${ODOO_UPSTREAM_DB_USER:-odoo}"
 PROD_FILESTORE_PATH="/opt/odoo/local_data/filestore"
 TEMP_DB_BACKUP="/tmp/${PROD_DB}_dump.gz"
 

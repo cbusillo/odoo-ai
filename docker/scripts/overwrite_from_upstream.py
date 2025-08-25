@@ -77,7 +77,10 @@ class ShopifySettings(BaseSettings):
     webhook_key: str = Field(..., alias="SHOPIFY_WEBHOOK_KEY")
 
     def validate_safe_environment(self) -> None:
-        production_indicators = ["yps-your-part-supplier", "outboardpartswarehouse", "opw-prod", "production", "live"]
+        # Get production indicators from environment or use defaults
+        import os
+        indicators_str = os.environ.get("PRODUCTION_INDICATORS", "production,live,prod-")
+        production_indicators = [ind.strip() for ind in indicators_str.split(",")]
 
         shop_url_lower = self.shop_url_key.lower()
         for indicator in production_indicators:
@@ -242,7 +245,9 @@ class OdooUpstreamRestorer:
         settings = ShopifySettings()
 
         # Safety check: prevent setting production values, allow replacing production with development
-        production_indicators = ["yps-your-part-supplier", "outboardpartswarehouse", "opw-prod", "production", "live"]
+        import os
+        indicators_str = os.environ.get("PRODUCTION_INDICATORS", "production,live,prod-")
+        production_indicators = [ind.strip() for ind in indicators_str.split(",")]
 
         # Check if we're trying to SET a production value (dangerous)
         new_value_lower = settings.shop_url_key.lower()

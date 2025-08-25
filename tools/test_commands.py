@@ -9,6 +9,11 @@ import time
 from pathlib import Path
 
 
+def get_container_prefix() -> str:
+    """Get the container prefix from environment or use default."""
+    return os.environ.get("ODOO_CONTAINER_PREFIX", "odoo")
+
+
 def get_production_db_name() -> str:
     result = subprocess.run(["docker", "compose", "config", "--format", "json"], capture_output=True, text=True)
     if result.returncode == 0:
@@ -19,12 +24,12 @@ def get_production_db_name() -> str:
             if "web" in service_name.lower():
                 env = service.get("environment", {})
                 if isinstance(env, dict):
-                    return env.get("ODOO_DB", "opw")
+                    return env.get("ODOO_DB", "odoo_dev")
                 elif isinstance(env, list):
                     for env_var in env:
                         if env_var.startswith("ODOO_DB="):
                             return env_var.split("=", 1)[1]
-    return "opw"
+    return "odoo_dev"
 
 
 def get_script_runner_service() -> str:
@@ -196,7 +201,7 @@ def cleanup_test_databases(production_db: str = None) -> None:
     list_cmd = [
         "docker",
         "exec",
-        "odoo-opw-database-1",
+        f"{get_container_prefix()}-database-1",
         "psql",
         "-U",
         "odoo",
@@ -225,7 +230,7 @@ def cleanup_test_databases(production_db: str = None) -> None:
         kill_cmd = [
             "docker",
             "exec",
-            "odoo-opw-database-1",
+            f"{get_container_prefix()}-database-1",
             "psql",
             "-U",
             "odoo",
@@ -237,7 +242,7 @@ def cleanup_test_databases(production_db: str = None) -> None:
         subprocess.run(kill_cmd, capture_output=True)
 
         # Drop database
-        drop_cmd = ["docker", "exec", "odoo-opw-database-1", "dropdb", "-U", "odoo", "--if-exists", db]
+        drop_cmd = ["docker", "exec", f"{get_container_prefix()}-database-1", "dropdb", "-U", "odoo", "--if-exists", db]
         result = subprocess.run(drop_cmd, capture_output=True, text=True)
         if result.returncode == 0:
             print(f"   ✅ Dropped {db}")
@@ -253,7 +258,7 @@ def create_filestore_symlink(test_db_name: str, production_db: str) -> None:
     script_runner_service = get_script_runner_service()
 
     # First try to use any running script-runner container
-    list_cmd = ["docker", "ps", "-q", "-f", f"name=odoo-opw-{script_runner_service}", "-f", "status=running"]
+    list_cmd = ["docker", "ps", "-q", "-f", f"name={get_container_prefix()}-{script_runner_service}", "-f", "status=running"]
     result = subprocess.run(list_cmd, capture_output=True, text=True)
 
     if result.returncode == 0 and result.stdout.strip():
@@ -317,7 +322,7 @@ def cleanup_test_filestores(production_db: str = None) -> None:
     list_cmd = [
         "docker",
         "exec",
-        "odoo-opw-script-runner-1",
+        f"{get_container_prefix()}-script-runner-1",
         "sh",
         "-c",
         f"ls -d /volumes/data/filestore/{production_db}_test_* 2>/dev/null || true",
@@ -336,7 +341,7 @@ def cleanup_test_filestores(production_db: str = None) -> None:
             check_symlink_cmd = [
                 "docker",
                 "exec",
-                "odoo-opw-script-runner-1",
+                f"{get_container_prefix()}-script-runner-1",
                 "sh",
                 "-c",
                 f"if [ -L '{filestore}' ]; then echo 'symlink'; elif [ -d '{filestore}' ]; then echo 'directory'; else echo 'unknown'; fi",
@@ -345,9 +350,9 @@ def cleanup_test_filestores(production_db: str = None) -> None:
             is_symlink = check_result.stdout.strip() == "symlink"
 
             if is_symlink:
-                rm_cmd = ["docker", "exec", "odoo-opw-script-runner-1", "rm", filestore]
+                rm_cmd = ["docker", "exec", f"{get_container_prefix()}-script-runner-1", "rm", filestore]
             else:
-                rm_cmd = ["docker", "exec", "odoo-opw-script-runner-1", "rm", "-rf", filestore]
+                rm_cmd = ["docker", "exec", f"{get_container_prefix()}-script-runner-1", "rm", "-rf", filestore]
 
             result = subprocess.run(rm_cmd, capture_output=True, text=True)
             if result.returncode == 0:
@@ -375,17 +380,17 @@ def cleanup_chrome_processes() -> None:
     """Kill any lingering Chrome/Chromium processes in script runner container"""
     script_runner_service = get_script_runner_service()
     # Try to kill Chrome processes gracefully first
-    subprocess.run(["docker", "exec", f"odoo-opw-{script_runner_service}-1", "pkill", "chrome"], capture_output=True)
-    subprocess.run(["docker", "exec", f"odoo-opw-{script_runner_service}-1", "pkill", "chromium"], capture_output=True)
+    subprocess.run(["docker", "exec", f"{get_container_prefix()}-{script_runner_service}-1", "pkill", "chrome"], capture_output=True)
+    subprocess.run(["docker", "exec", f"{get_container_prefix()}-{script_runner_service}-1", "pkill", "chromium"], capture_output=True)
     # Force kill if still running
-    subprocess.run(["docker", "exec", f"odoo-opw-{script_runner_service}-1", "pkill", "-9", "chrome"], capture_output=True)
-    subprocess.run(["docker", "exec", f"odoo-opw-{script_runner_service}-1", "pkill", "-9", "chromium"], capture_output=True)
+    subprocess.run(["docker", "exec", f"{get_container_prefix()}-{script_runner_service}-1", "pkill", "-9", "chrome"], capture_output=True)
+    subprocess.run(["docker", "exec", f"{get_container_prefix()}-{script_runner_service}-1", "pkill", "-9", "chromium"], capture_output=True)
     # Clean up zombie processes
     subprocess.run(
         [
             "docker",
             "exec",
-            f"odoo-opw-{script_runner_service}-1",
+            f"{get_container_prefix()}-{script_runner_service}-1",
             "sh",
             "-c",
             "ps aux | grep defunct | awk '{print $2}' | xargs -r kill -9",
@@ -410,7 +415,7 @@ def drop_and_create_test_database(db_name: str) -> None:
     check_connections_cmd = [
         "docker",
         "exec",
-        "odoo-opw-database-1",
+        f"{get_container_prefix()}-database-1",
         "psql",
         "-U",
         "odoo",
@@ -429,7 +434,7 @@ def drop_and_create_test_database(db_name: str) -> None:
     kill_connections_cmd = [
         "docker",
         "exec",
-        "odoo-opw-database-1",
+        f"{get_container_prefix()}-database-1",
         "psql",
         "-U",
         "odoo",
@@ -460,7 +465,7 @@ def drop_and_create_test_database(db_name: str) -> None:
     drop_cmd = [
         "docker",
         "exec",
-        "odoo-opw-database-1",
+        f"{get_container_prefix()}-database-1",
         "psql",
         "-U",
         "odoo",
@@ -478,7 +483,7 @@ def drop_and_create_test_database(db_name: str) -> None:
     verify_drop_cmd = [
         "docker",
         "exec",
-        "odoo-opw-database-1",
+        f"{get_container_prefix()}-database-1",
         "psql",
         "-U",
         "odoo",
@@ -501,7 +506,7 @@ def drop_and_create_test_database(db_name: str) -> None:
     create_cmd = [
         "docker",
         "exec",
-        "odoo-opw-database-1",
+        f"{get_container_prefix()}-database-1",
         "psql",
         "-U",
         "odoo",
@@ -519,7 +524,7 @@ def drop_and_create_test_database(db_name: str) -> None:
     verify_create_cmd = [
         "docker",
         "exec",
-        "odoo-opw-database-1",
+        f"{get_container_prefix()}-database-1",
         "psql",
         "-U",
         "odoo",
@@ -562,7 +567,7 @@ def setup_test_authentication(db_name: str) -> str:
     update_password_cmd = [
         "docker",
         "exec",
-        "odoo-opw-database-1",
+        f"{get_container_prefix()}-database-1",
         "psql",
         "-U",
         "odoo",
@@ -596,7 +601,7 @@ def clone_production_database(db_name: str) -> str:
     check_connections_cmd = [
         "docker",
         "exec",
-        "odoo-opw-database-1",
+        f"{get_container_prefix()}-database-1",
         "psql",
         "-U",
         "odoo",
@@ -615,7 +620,7 @@ def clone_production_database(db_name: str) -> str:
     kill_connections_cmd = [
         "docker",
         "exec",
-        "odoo-opw-database-1",
+        f"{get_container_prefix()}-database-1",
         "psql",
         "-U",
         "odoo",
@@ -646,7 +651,7 @@ def clone_production_database(db_name: str) -> str:
     drop_cmd = [
         "docker",
         "exec",
-        "odoo-opw-database-1",
+        f"{get_container_prefix()}-database-1",
         "psql",
         "-U",
         "odoo",
@@ -665,7 +670,7 @@ def clone_production_database(db_name: str) -> str:
     kill_prod_connections_cmd = [
         "docker",
         "exec",
-        "odoo-opw-database-1",
+        f"{get_container_prefix()}-database-1",
         "psql",
         "-U",
         "odoo",
@@ -688,7 +693,7 @@ def clone_production_database(db_name: str) -> str:
     clone_cmd = [
         "docker",
         "exec",
-        "odoo-opw-database-1",
+        f"{get_container_prefix()}-database-1",
         "psql",
         "-U",
         "odoo",
@@ -706,7 +711,7 @@ def clone_production_database(db_name: str) -> str:
     verify_create_cmd = [
         "docker",
         "exec",
-        "odoo-opw-database-1",
+        f"{get_container_prefix()}-database-1",
         "psql",
         "-U",
         "odoo",

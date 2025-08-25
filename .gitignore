@@ -150,6 +150,7 @@ celerybeat.pid
 # Environments
 .env*
 .venv
+*.local.md
 env/
 venv/
 ENV/

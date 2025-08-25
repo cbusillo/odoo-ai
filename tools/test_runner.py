@@ -324,7 +324,7 @@ class UnifiedTestRunner:
         
         # Set container name using environment variable
         if container is None:
-            container_prefix = os.environ.get("ODOO_CONTAINER_PREFIX", "odoo-opw")
+            container_prefix = os.environ.get("ODOO_CONTAINER_PREFIX", "odoo")
             container = f"{container_prefix}-script-runner-1"
         self.container_name = container
         self.database = database
@@ -359,7 +359,7 @@ class UnifiedTestRunner:
 
     def _ensure_containers_running(self) -> None:
         import os
-        container_prefix = os.environ.get("ODOO_CONTAINER_PREFIX", "odoo-opw")
+        container_prefix = os.environ.get("ODOO_CONTAINER_PREFIX", "odoo")
         
         if self.verbose:
             print("DEBUG: Checking containers...")
@@ -1274,7 +1274,7 @@ class UnifiedTestRunner:
         if not db_password:
             raise RuntimeError("ODOO_DB_PASSWORD environment variable not set")
         
-        container_prefix = os.environ.get("ODOO_CONTAINER_PREFIX", "odoo-opw")
+        container_prefix = os.environ.get("ODOO_CONTAINER_PREFIX", "odoo")
         db_container = f"{container_prefix}-database-1"
 
         print(f"Setting up clean test database: {test_db}")
@@ -1376,7 +1376,7 @@ class UnifiedTestRunner:
         if not db_password:
             raise RuntimeError("ODOO_DB_PASSWORD environment variable not set")
         
-        container_prefix = os.environ.get("ODOO_CONTAINER_PREFIX", "odoo-opw")
+        container_prefix = os.environ.get("ODOO_CONTAINER_PREFIX", "odoo")
         db_container = f"{container_prefix}-database-1"
         
         terminate_cmd = [
@@ -1423,7 +1423,7 @@ class UnifiedTestRunner:
             if not db_password:
                 raise RuntimeError("ODOO_DB_PASSWORD environment variable not set")
             
-            container_prefix = os.environ.get("ODOO_CONTAINER_PREFIX", "odoo-opw")
+            container_prefix = os.environ.get("ODOO_CONTAINER_PREFIX", "odoo")
             db_container = f"{container_prefix}-database-1"
             
             drop_cmd = [
@@ -1461,7 +1461,7 @@ class UnifiedTestRunner:
         if not db_password:
             raise RuntimeError("ODOO_DB_PASSWORD environment variable not set")
         
-        container_prefix = os.environ.get("ODOO_CONTAINER_PREFIX", "odoo-opw")
+        container_prefix = os.environ.get("ODOO_CONTAINER_PREFIX", "odoo")
         db_container = f"{container_prefix}-database-1"
         
         clone_cmd = [

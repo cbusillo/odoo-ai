@@ -33,14 +33,13 @@ uv run ruff check --fix   # Fix Python issues
 
 ## Project Structure
 
-- **Custom addons**: `./addons/product_connect/`
-- **Database**: `opw`
+- **Custom addons**: `./addons/`
 - **Odoo version**: 18 Enterprise
-- **DO NOT MODIFY**: `services/shopify/gql/*`, `graphql/schema/*`
+- **DO NOT MODIFY**: `services/shopify/gql/*`, `graphql/schema/*` (if present)
 
 ## Container Paths
 
-- **Host paths**: `/Users/cbusillo/Developer/odoo-opw/`
+- **Host paths**: Project root directory
 - **Container paths**: `/volumes/` (mapped from host)
 - **Never run Python directly**: Always use Odoo environment
 

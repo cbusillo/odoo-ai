@@ -69,7 +69,11 @@ Universal rules that apply to all agents and development work.
 ## Development Workflow
 
 - **Never run Python files directly**: Always use proper Odoo environment
-- **Temporary files**: Use clear prefixes (`test_*`, `temp_*`) and clean up when done
+- **Temporary files**: Use the project `tmp/` directory structure:
+    - `tmp/scripts/` - One-off analysis and utility scripts
+    - `tmp/tests/` - Test runner output and test files
+    - `tmp/data/` - Export files and analysis results
+    - See `tmp/README.md` for complete structure and guidelines
 - **Incremental changes**: Make small, focused changes rather than large refactors
 
 This file contains only the universal rules that all agents need to know.

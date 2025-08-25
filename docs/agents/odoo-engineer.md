@@ -156,18 +156,20 @@ record.sudo().write()  # Why: [explanation]
 ```python
 # ← Program Manager delegates to Odoo Engineer agent
 
-# Standard framework consultation (downgrade to Sonnet)
+# ← Odoo-engineer agent delegating to domain specialists
+
+# After framework analysis, delegate tests
 Task(
-    description="Odoo pattern advice",
-    prompt="@docs/agents/odoo-engineer.md\n\nModel: sonnet\n\nHow to implement computed fields correctly?",
-    subagent_type="odoo-engineer"
+    description="Write framework tests",
+    prompt="@docs/agents/scout.md\n\nWrite tests for the computed fields pattern",
+    subagent_type="scout"
 )
 
-# Complex architectural review (default Opus)
+# For frontend framework components
 Task(
-    description="Architecture review",
-    prompt="@docs/agents/odoo-engineer.md\n\nReview entire product_connect module for framework compliance",
-    subagent_type="odoo-engineer"
+    description="Implement view components",
+    prompt="@docs/agents/owl.md\n\nImplement the Owl components for this view",
+    subagent_type="owl"
 )
 ```
 

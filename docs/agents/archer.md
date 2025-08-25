@@ -102,20 +102,20 @@ mcp__odoo-intelligence__inheritance_chain(model_name="sale.order")
 - **Deep inheritance chains** → `Model: sonnet` (complex relationships)
 
 ```python
-# ← Program Manager delegates to Archer agent
+# ← Archer agent delegating to specialists after research
 
-# Standard research (default Haiku)
+# After finding patterns, delegate implementation to GPT
 Task(
-    description="Find patterns",
-    prompt="@docs/agents/archer.md\n\nFind all models that inherit from product.template",
-    subagent_type="archer"
+    description="Implement pattern",
+    prompt="@docs/agents/gpt.md\n\nImplement the factory pattern I found for product creation",
+    subagent_type="gpt"
 )
 
-# Complex pattern analysis (upgrade to Sonnet)
+# After research, delegate planning to Planner
 Task(
-    description="Complex research",
-    prompt="@docs/agents/archer.md\n\nModel: sonnet\n\nAnalyze complete Shopify integration patterns",
-    subagent_type="archer"
+    description="Plan architecture",
+    prompt="@docs/agents/planner.md\n\nBased on these patterns, design the integration architecture",
+    subagent_type="planner"
 )
 ```
 

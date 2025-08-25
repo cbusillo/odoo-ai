@@ -87,17 +87,18 @@ Use accessibility tree refs from `browser_snapshot`:
 # ← Program Manager delegates to Playwright agent
 
 # Standard browser testing (default Sonnet)
+# After debugging browser issues, delegate test writing
 Task(
-    description="Debug failed tour",
-    prompt="@docs/agents/playwright.md\n\nDebug why product creation tour fails",
-    subagent_type="playwright"
+    description="Write tour tests",
+    prompt="@docs/agents/scout.md\n\nWrite tour tests for the workflow I debugged",
+    subagent_type="scout"
 )
 
-# Complex UI workflow debugging (upgrade to Opus)
+# Delegate frontend fixes to Owl
 Task(
-    description="Complex workflow analysis",
-    prompt="@docs/agents/playwright.md\n\nModel: opus\n\nAnalyze multi-tab checkout flow",
-    subagent_type="playwright"
+    description="Fix frontend issues",
+    prompt="@docs/agents/owl.md\n\nFix the component errors I found in browser console",
+    subagent_type="owl"
 )
 ```
 

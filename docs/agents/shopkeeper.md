@@ -89,18 +89,20 @@ result = client.execute(query, variables)
 ```python
 # ← Program Manager delegates to Shopkeeper agent
 
-# Standard integration work (default Sonnet)
+# ← Shopkeeper agent delegating after Shopify work
+
+# When sync fails, delegate error analysis
 Task(
-    description="Shopify sync",
-    prompt="@docs/agents/shopkeeper.md\n\nImplement product sync from Shopify to Odoo",
-    subagent_type="shopkeeper"
+    description="Debug sync failure",
+    prompt="@docs/agents/debugger.md\n\nAnalyze this Shopify webhook error",
+    subagent_type="debugger"
 )
 
-# Complex integration debugging (upgrade to Opus)
+# For performance issues in sync
 Task(
-    description="Complex sync issues",
-    prompt="@docs/agents/shopkeeper.md\n\nModel: opus\n\nDebug webhook cascade failures",
-    subagent_type="shopkeeper"
+    description="Optimize sync performance",
+    prompt="@docs/agents/flash.md\n\nProfile slow Shopify bulk operations",
+    subagent_type="flash"
 )
 ```
 

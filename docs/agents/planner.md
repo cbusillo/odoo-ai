@@ -100,18 +100,20 @@ research = Task(
 ```python
 # ← Program Manager delegates to Planner agent
 
-# Standard feature planning (default Sonnet)
+# ← Planner agent delegating after creating plans
+
+# Research patterns before planning
 Task(
-    description="Plan feature",
-    prompt="@docs/agents/planner.md\n\nPlan implementation of product search widget",
-    subagent_type="planner"
+    description="Research patterns",
+    prompt="@docs/agents/archer.md\n\nFind existing widget patterns in Odoo",
+    subagent_type="archer"
 )
 
-# Complex architecture planning (upgrade to Opus)
+# After planning, delegate implementation
 Task(
-    description="System architecture",
-    prompt="@docs/agents/planner.md\n\nModel: opus\n\nPlan entire inventory management redesign",
-    subagent_type="planner"
+    description="Implement plan",
+    prompt="@docs/agents/gpt.md\n\nImplement the architecture I designed",
+    subagent_type="gpt"
 )
 ```
 

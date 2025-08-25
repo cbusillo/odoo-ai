@@ -125,18 +125,20 @@ test("component works", async () => {
 ```python
 # ← Program Manager delegates to Owl agent
 
-# Standard component development (default Sonnet)
+# ← Owl agent delegating after frontend work
+
+# After creating components, delegate testing
 Task(
-    description="Create component",
-    prompt="@docs/agents/owl.md\n\nCreate a product selector component with search functionality",
-    subagent_type="owl"
+    description="Write component tests",
+    prompt="@docs/agents/scout.md\n\nWrite Hoot tests for the product selector component",
+    subagent_type="scout"
 )
 
-# Complex component system (upgrade to Opus)
+# After changes, restart containers
 Task(
-    description="Complex component architecture", 
-    prompt="@docs/agents/owl.md\n\nModel: opus\n\nDesign real-time inventory dashboard",
-    subagent_type="owl"
+    description="Restart containers", 
+    prompt="@docs/agents/dock.md\n\nRestart web container for frontend changes",
+    subagent_type="dock"
 )
 ```
 

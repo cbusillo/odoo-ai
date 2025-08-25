@@ -142,18 +142,20 @@ mcp__odoo-intelligence__search_code(
 ```python
 # ← Program Manager delegates to Phoenix agent
 
-# Standard pattern migration (downgrade to Sonnet)
+# ← Phoenix agent delegating migration tasks
+
+# For complex migrations, delegate to GPT
 Task(
-    description="Update patterns",
-    prompt="@docs/agents/phoenix.md\n\nModel: sonnet\n\nUpdate type hints to Python 3.10+",
-    subagent_type="phoenix"
+    description="Implement migration",
+    prompt="@docs/agents/gpt.md\n\nImplement the migration patterns I identified",
+    subagent_type="gpt"
 )
 
-# Complex framework migration (default Opus)
+# After migration, test compatibility
 Task(
-    description="Framework migration",
-    prompt="@docs/agents/phoenix.md\n\nMigrate entire codebase from Odoo 17 to 18 patterns",
-    subagent_type="phoenix"
+    description="Test migration",
+    prompt="@docs/agents/scout.md\n\nWrite tests to verify migration compatibility",
+    subagent_type="scout"
 )
 ```
 

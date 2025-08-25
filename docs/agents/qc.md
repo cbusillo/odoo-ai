@@ -74,19 +74,20 @@ When delegating to coding agents, I include relevant style guides:
 - **Bulk coordination** → `Model: sonnet` (default, efficient)
 
 ```python
-# Large quality audit (upgrade to Opus)
-# ← Program Manager delegates to QC agent
+# ← QC agent coordinating quality checks
+
+# First, analyze code quality
 Task(
-    description="Enterprise audit",
-    prompt="@docs/agents/qc.md\n\nModel: opus\n\nComplete quality audit of entire codebase with security focus",
-    subagent_type="qc"
+    description="Analyze code quality",
+    prompt="@docs/agents/inspector.md\n\nPerform comprehensive quality analysis",
+    subagent_type="inspector"
 )
 
-# Quick pre-commit check (downgrade to Haiku)
+# Then coordinate fixes with Refactor
 Task(
-    description="Pre-commit validation",
-    prompt="@docs/agents/qc.md\n\nModel: haiku\n\nQuick quality check on 3 changed files",
-    subagent_type="qc"
+    description="Fix quality issues",
+    prompt="@docs/agents/refactor.md\n\nFix all style and formatting issues found",
+    subagent_type="refactor"
 )
 ```
 

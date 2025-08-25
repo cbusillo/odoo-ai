@@ -62,7 +62,7 @@ def emergency_restart():
     
     # Stop all containers
     containers = mcp__docker__list_containers()
-    odoo_containers = [c for c in containers if 'odoo-opw' in c['Names'][0]]
+    odoo_containers = [c for c in containers if '${ODOO_CONTAINER_PREFIX}' in c['Names'][0]]
     
     for container in odoo_containers:
         mcp__docker__stop_container(container_id=container['Id'])
@@ -165,7 +165,7 @@ def analyze_system_logs():
     
     # Get logs from all Odoo containers
     containers = mcp__docker__list_containers()
-    odoo_containers = [c for c in containers if 'odoo-opw' in c['Names'][0]]
+    odoo_containers = [c for c in containers if '${ODOO_CONTAINER_PREFIX}' in c['Names'][0]]
     
     log_analysis = {}
     
@@ -304,7 +304,7 @@ def monitor_container_resources():
     resource_stats = {}
     
     for container in containers:
-        if 'odoo-opw' in container['Names'][0]:
+        if '${ODOO_CONTAINER_PREFIX}' in container['Names'][0]:
             # Note: Would need additional Docker API access for full stats
             # This is a pattern for when that's available
             container_name = container['Names'][0]
@@ -352,7 +352,7 @@ def optimize_container_performance():
     for action in optimization_actions:
         if action['action'] == 'restart':
             mcp__odoo-intelligence__odoo_restart(
-                services=action['container'].replace('odoo-opw-', '').replace('-1', '')
+                services=action['container'].replace('${ODOO_CONTAINER_PREFIX}-', '').replace('-1', '')
             )
     
     return optimization_actions
@@ -372,7 +372,7 @@ def diagnose_network_issues():
     
     # Check if containers can reach each other
     for container in containers:
-        if 'odoo-opw' in container['Names'][0]:
+        if '${ODOO_CONTAINER_PREFIX}' in container['Names'][0]:
             container_name = container['Names'][0]
             
             # Basic connectivity check through logs
@@ -431,7 +431,7 @@ def create_container_backup():
     # Get current container state
     containers = mcp__docker__list_containers()
     for container in containers:
-        if 'odoo-opw' in container['Names'][0]:
+        if '${ODOO_CONTAINER_PREFIX}' in container['Names'][0]:
             backup_info['containers'].append({
                 'name': container['Names'][0],
                 'image': container['Image'],
@@ -461,7 +461,7 @@ def disaster_recovery_procedure():
     try:
         containers = mcp__docker__list_containers()
         for container in containers:
-            if 'odoo-opw' in container['Names'][0]:
+            if '${ODOO_CONTAINER_PREFIX}' in container['Names'][0]:
                 mcp__docker__stop_container(container_id=container['Id'])
         recovery_steps.append("Stopped all containers")
     except Exception as e:
@@ -479,7 +479,7 @@ def disaster_recovery_procedure():
         
         # Start application containers
         app_containers = [c for c in containers 
-                         if 'odoo-opw' in c['Names'][0] and 'database' not in c['Names'][0]]
+                         if '${ODOO_CONTAINER_PREFIX}' in c['Names'][0] and 'database' not in c['Names'][0]]
         for container in app_containers:
             mcp__docker__start_container(container_id=container['Id'])
             time.sleep(5)
@@ -613,7 +613,7 @@ def clean_container_environment():
     # Clear old logs (conceptual - would need log rotation setup)
     containers = mcp__docker__list_containers()
     for container in containers:
-        if 'odoo-opw' in container['Names'][0]:
+        if '${ODOO_CONTAINER_PREFIX}' in container['Names'][0]:
             logs = mcp__docker__fetch_container_logs(
                 container_id=container['Id'],
                 tail=10

@@ -1,4 +1,4 @@
-# Codex MCP Reference for Odoo-OPW
+# Codex MCP Reference for Odoo Development
 
 ## Overview
 
@@ -45,7 +45,7 @@ mcp__gpt-codex__codex(
 
 1. **Working Directory**: Use `/volumes/` (container path) not host paths
 2. **Python Execution**: Never run Python directly, use Odoo's environment
-3. **Database Context**: Include `--database opw` in Odoo commands
+3. **Database Context**: Include `--database ${ODOO_DB_NAME}` in Odoo commands
 4. **Test Commands**: Use `uv run` commands defined in pyproject.toml
 
 ## Quick Reference

@@ -75,7 +75,7 @@ grep -r "import httpx" addons/product_connect/
 grep -r "type \|match \|case " addons/product_connect/
 
 # Check PostgreSQL version
-docker exec odoo-opw-database-1 psql -U odoo -c "SELECT version();"
+docker exec ${ODOO_CONTAINER_PREFIX}-database-1 psql -U odoo -c "SELECT version();"
 
 # Search Shopify schema for specific types
 grep -A10 "^type Product" addons/product_connect/graphql/schema/shopify_schema_2025-04.sdl

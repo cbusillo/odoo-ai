@@ -1,20 +1,19 @@
-# 🏗️ Odoo OPW Architecture
+# 🏗️ Odoo Architecture
 
-This document outlines the architecture and structure of the Odoo 18 Enterprise project for Outboard Parts Warehouse (
-OPW).
+This document outlines the architecture and structure of an Odoo 18 Enterprise deployment.
 
 ## 🎯 Project Overview
 
 **Purpose**: Custom Odoo implementation for motor parts management with Shopify integration  
 **Stack**: Python 3.12+, PostgreSQL 17, Owl.js 2.0, Docker, GraphQL  
-**Database**: `opw`
+**Database**: `${ODOO_DB_NAME}`
 
 ## 📁 Directory Structure
 
 ### Root Level
 
 ```
-/odoo-opw/
+/odoo-ai/
 ├── addons/                 # Custom addons (accessible from host)
 ├── docs/                   # Documentation
 ├── tools/                  # Development utilities
@@ -72,11 +71,11 @@ addons/product_connect/
 ## 🐳 Container Architecture
 
 ### Container Purposes
-
-- **odoo-opw-web-1**: Main web server (user requests)
-- **odoo-opw-shell-1**: Interactive shell operations
-- **odoo-opw-script-runner-1**: Module updates, tests, one-off scripts
-- **odoo-opw-database-1**: PostgreSQL database
+	
+- **${ODOO_CONTAINER_PREFIX}-web-1**: Main web server (user requests)
+- **${ODOO_CONTAINER_PREFIX}-shell-1**: Interactive shell operations
+- **${ODOO_CONTAINER_PREFIX}-script-runner-1**: Module updates, tests, one-off scripts
+- **${ODOO_CONTAINER_PREFIX}-database-1**: PostgreSQL database
 
 ### Container Paths (READ-ONLY)
 
@@ -88,9 +87,9 @@ addons/product_connect/
 - `/volumes/data/*` - Filestore data
 
 ### Path Access Rules
-
+	
 - ✅ **Custom addons**: Use `Read("addons/product_connect/...")`
-- ✅ **Odoo core**: Use `docker exec odoo-opw-web-1 cat /odoo/addons/...`
+- ✅ **Odoo core**: Use `docker exec ${ODOO_CONTAINER_PREFIX}-web-1 cat /odoo/addons/...`
 - ❌ **NEVER**: Use `Read("/odoo/...")` - path doesn't exist on host!
 
 ## 🧩 Component Architecture

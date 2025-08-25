@@ -64,18 +64,18 @@ class ShopifyService:
 - `/volumes/addons/*` - Custom addons (mapped to `./addons`)
 
 ### Path Access Rules
-
+	
 - ✅ **Custom addons**: Use `Read("addons/product_connect/...")`
-- ✅ **Odoo core**: Use `docker exec odoo-opw-web-1 cat /odoo/addons/...`
+- ✅ **Odoo core**: Use `docker exec ${ODOO_CONTAINER_PREFIX}-web-1 cat /odoo/addons/...`
 - ❌ **NEVER**: Use `Read("/odoo/...")` - path doesn't exist on host!
 
 ## Development Environment
 
 - **Never run Python files directly**: Always use proper Odoo environment
 - **Container purposes**:
-    - **odoo-opw-web-1**: Main web server (user requests)
-    - **odoo-opw-shell-1**: Interactive shell operations
-    - **odoo-opw-script-runner-1**: Module updates, tests, one-off scripts
+    - **${ODOO_CONTAINER_PREFIX}-web-1**: Main web server (user requests)
+    - **${ODOO_CONTAINER_PREFIX}-shell-1**: Interactive shell operations
+    - **${ODOO_CONTAINER_PREFIX}-script-runner-1**: Module updates, tests, one-off scripts
 
 ## Data Patterns
 

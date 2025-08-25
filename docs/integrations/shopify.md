@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide covers the Shopify integration architecture for Outboard Parts Warehouse (OPW), including data flow patterns, GraphQL boundaries, rate limiting strategies, and debugging techniques.
+This guide covers the Shopify integration architecture, including data flow patterns, GraphQL boundaries, rate limiting strategies, and debugging techniques.
 
 ## Architecture Overview
 

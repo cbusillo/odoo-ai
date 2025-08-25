@@ -27,7 +27,7 @@
 ## Architecture Patterns
 
 **Addons**: `product_connect` (core), `disable_odoo_online`  
-**Key Paths**: `./addons` (custom), Database: `opw`  
+**Key Paths**: `./addons` (custom), Database: `${ODOO_DB_NAME}`  
 **DO NOT MODIFY**: `services/shopify/gql/*` (generated), `graphql/schema/*`
 
 ## Research Resources

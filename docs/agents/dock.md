@@ -21,16 +21,16 @@ MCP Docker tools provide structured data and instant results. See [Tool Selectio
 
 ```bash
 # When MCP doesn't support specific flags
-docker exec odoo-opw-script-runner-1 /odoo/odoo-bin \
+docker exec ${ODOO_CONTAINER_PREFIX}-script-runner-1 /odoo/odoo-bin \
   -u product_connect --dev=all --stop-after-init
 ```
 
 ## Container Purposes
-
-- **odoo-opw-web-1** - Web server (user requests)
-- **odoo-opw-shell-1** - Interactive shell
-- **odoo-opw-script-runner-1** - Updates, tests, scripts
-- **odoo-opw-database-1** - PostgreSQL
+	
+- **${ODOO_CONTAINER_PREFIX}-web-1** - Web server (user requests)
+- **${ODOO_CONTAINER_PREFIX}-shell-1** - Interactive shell
+- **${ODOO_CONTAINER_PREFIX}-script-runner-1** - Updates, tests, scripts
+- **${ODOO_CONTAINER_PREFIX}-database-1** - PostgreSQL
 
 **CRITICAL**: Use dedicated containers! Don't run tests in web-1!
 
@@ -46,8 +46,8 @@ mcp__docker__list_containers()  # NOT docker ps
 
 ```python
 # Note: tail parameter must be an integer or the string "all"
-mcp__docker__fetch_container_logs(container_id="odoo-opw-web-1", tail=100)  # Last 100 lines
-mcp__docker__fetch_container_logs(container_id="odoo-opw-web-1",
+mcp__docker__fetch_container_logs(container_id="${ODOO_CONTAINER_PREFIX}-web-1", tail=100)  # Last 100 lines
+mcp__docker__fetch_container_logs(container_id="${ODOO_CONTAINER_PREFIX}-web-1",
                                   tail="all")  # All logs (WARNING: may exceed token limits)
 ```
 

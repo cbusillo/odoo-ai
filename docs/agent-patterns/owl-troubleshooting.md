@@ -11,7 +11,7 @@ Common frontend issues and solutions.
 Cmd+Shift+R (Mac) or Ctrl+Shift+R (PC)
 
 # Solution 2: Update module
-docker exec odoo-opw-script-runner-1 /odoo/odoo-bin \
+docker exec ${ODOO_CONTAINER_PREFIX}-script-runner-1 /odoo/odoo-bin \
   -u product_connect --stop-after-init
 
 # Solution 3: Restart containers

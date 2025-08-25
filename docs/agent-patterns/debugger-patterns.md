@@ -12,7 +12,7 @@ def investigate_error(error_traceback):
     
     # Phase 2: Gather logs and context
     container_logs = mcp__docker__fetch_container_logs(
-        container_id="odoo-opw-web-1",
+        container_id="${ODOO_CONTAINER_PREFIX}-web-1",
         tail="all"
     )
     
@@ -237,7 +237,7 @@ def debug_shopify_webhook_error(webhook_data):
     
     # Get recent webhook logs
     webhook_logs = mcp__docker__fetch_container_logs(
-        container_id="odoo-opw-web-1",
+        container_id="${ODOO_CONTAINER_PREFIX}-web-1",
         tail=50
     )
     

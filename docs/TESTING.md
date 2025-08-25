@@ -514,14 +514,14 @@ graph TD
 
 #### Integration Tests
 
-- **Stable test database** (`opw_integration`)
+- **Stable test database** (`${ODOO_DB_NAME}_integration`)
 - **Snapshot/restore mechanism** for consistency
 - **Reset between test classes**
 - **Shared within class** for efficiency
 
 #### Tour Tests
 
-- **Staging database** (`opw_staging`)
+- **Staging database** (`${ODOO_DB_NAME}_staging`)
 - **Full demo data** loaded
 - **No reset during runs** for stability
 - **Periodic refresh** as needed
@@ -769,7 +769,7 @@ Each UV command is implemented in `tools/test_commands.py`:
 def run_unit_tests():
     """Run fast unit tests using script-runner container."""
     cmd = [
-        "docker", "exec", "odoo-opw-script-runner-1",
+        "docker", "exec", "${ODOO_CONTAINER_PREFIX}-script-runner-1",
         "/odoo/odoo-bin",
         "--test-tags", "product_connect,unit_test",
         "--stop-after-init",
@@ -792,13 +792,13 @@ test-all = "tools.test_commands:run_all_tests"
 
 [tool.odoo-test]
 # Container settings
-container = "odoo-opw-script-runner-1"
+container = "${ODOO_CONTAINER_PREFIX}-script-runner-1"
 addons_path = "/volumes/addons,/odoo/addons,/volumes/enterprise"
 
 # Database configuration
-unit_db = "opw_unit_{timestamp}"
-integration_db = "opw_integration"
-tour_db = "opw_staging"
+unit_db = "${ODOO_DB_NAME}_unit_{timestamp}"
+integration_db = "${ODOO_DB_NAME}_integration"
+tour_db = "${ODOO_DB_NAME}_staging"
 
 [tool.odoo-test.timeouts]
 unit = 180          # 3 minutes

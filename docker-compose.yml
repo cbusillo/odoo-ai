@@ -7,7 +7,7 @@ x-build-base: &build-base
     GITHUB_TOKEN: ${GITHUB_TOKEN:-}
   target: ${COMPOSE_BUILD_TARGET:-production}
 
-name: odoo-opw
+name: ${ODOO_CONTAINER_PREFIX:-odoo}
 services:
   web: &odoo-base
     build:

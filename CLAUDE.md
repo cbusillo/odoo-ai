@@ -217,7 +217,7 @@ Use `uv run` from project root for all commands:
 
 ## Project Context
 
-Odoo 18 Enterprise for OPW. Custom addons in `./addons`. Database: `opw`.
+Odoo 18 Enterprise development framework. Custom addons in `./addons`.
 **DO NOT MODIFY**: `services/shopify/gql/*`, `graphql/schema/*`
 
 ## Git History

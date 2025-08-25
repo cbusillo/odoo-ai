@@ -122,18 +122,20 @@ Always use script-runner with `--stop-after-init`
 ```python
 # ← Program Manager or other agents delegate to Dock
 
-# Standard container operations (default Haiku)
+# ← Dock agent delegating after container operations
+
+# When encountering errors in logs, delegate to Debugger
 Task(
-    description="Check container status",
-    prompt="@docs/agents/dock.md\n\nCheck if all Odoo containers are running and restart if needed",
-    subagent_type="dock"
+    description="Analyze container errors",
+    prompt="@docs/agents/debugger.md\n\nAnalyze these error logs from the web container",
+    subagent_type="debugger"
 )
 
-# Complex orchestration (upgrade to Sonnet)
+# For performance issues, delegate to Flash
 Task(
-    description="Complex deployment",
-    prompt="@docs/agents/dock.md\n\nModel: sonnet\n\nCoordinate rolling update deployment",
-    subagent_type="dock"
+    description="Optimize database performance",
+    prompt="@docs/agents/flash.md\n\nAnalyze slow database queries in container",
+    subagent_type="flash"
 )
 ```
 

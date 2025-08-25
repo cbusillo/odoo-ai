@@ -106,20 +106,20 @@ uv run python tools/test_runner.py --tour-only                          # Tour t
 - **Bulk test generation** → `Model: haiku` (repetitive patterns)
 
 ```python
-# ← Program Manager delegates to Scout agent
+# ← Scout agent delegating test-related tasks
 
-# Standard test writing (default Sonnet)
+# Delegate UI testing to Playwright
 Task(
-    description="Write unit tests",
-    prompt="@docs/agents/scout.md\n\nWrite tests for motor model CRUD operations",
-    subagent_type="scout"
+    description="Debug tour test",
+    prompt="@docs/agents/playwright.md\n\nDebug why the motor workflow tour is failing",
+    subagent_type="playwright"
 )
 
-# Complex test architecture (upgrade to Opus)
+# Delegate frontend component tests to Owl
 Task(
-    description="Complex test suite",
-    prompt="@docs/agents/scout.md\n\nModel: opus\n\nDesign test suite for Shopify integration",
-    subagent_type="scout"
+    description="Write component tests",
+    prompt="@docs/agents/owl.md\n\nWrite Hoot tests for the multigraph component",
+    subagent_type="owl"
 )
 ```
 

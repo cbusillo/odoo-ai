@@ -112,20 +112,20 @@ Focus on:
 - **Performance error analysis** → `Model: sonnet` (default, good balance)
 
 ```python
-# ← Program Manager delegates to Debugger agent
+# ← Debugger agent delegating after error analysis
 
-# Standard error analysis (default Sonnet)
+# After analyzing error, check container logs
 Task(
-    description="Debug error",
-    prompt="@docs/agents/debugger.md\n\nAnalyze this AttributeError in motor.py",
-    subagent_type="debugger"
+    description="Check container logs",
+    prompt="@docs/agents/dock.md\n\nGet recent logs from web container for this error context",
+    subagent_type="dock"
 )
 
-# Complex system debugging (upgrade to Opus)
+# For performance errors, delegate to Flash
 Task(
-    description="Complex integration issue",
-    prompt="@docs/agents/debugger.md\n\nModel: opus\n\nDebug Shopify sync failure cascade",
-    subagent_type="debugger"
+    description="Analyze performance issue",
+    prompt="@docs/agents/flash.md\n\nProfile this timeout error - possible N+1 query issue",
+    subagent_type="flash"
 )
 ```
 

@@ -107,18 +107,20 @@ MultiEdit(
 ```python
 # ← Program Manager delegates to Refactor agent
 
-# Standard refactoring (default Sonnet)
+# ← Refactor agent delegating during refactoring
+
+# Research patterns before refactoring
 Task(
-    description="Code modernization",
-    prompt="@docs/agents/refactor.md\n\nUpdate type hints to Python 3.10+ syntax",
-    subagent_type="refactor"
+    description="Find patterns",
+    prompt="@docs/agents/archer.md\n\nFind modern type hint patterns in Odoo 18",
+    subagent_type="archer"
 )
 
-# Complex architectural refactoring (upgrade to Opus)
+# After refactoring, validate quality
 Task(
-    description="Architectural refactoring",
-    prompt="@docs/agents/refactor.md\n\nModel: opus\n\nRefactor inheritance hierarchy",
-    subagent_type="refactor"
+    description="Validate refactoring",
+    prompt="@docs/agents/inspector.md\n\nCheck refactored code for issues",
+    subagent_type="inspector"
 )
 ```
 

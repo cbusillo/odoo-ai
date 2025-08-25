@@ -138,11 +138,20 @@ Load style guides for quality analysis:
 **Override**: `Model: haiku` (basic linting) | `Model: opus` (deep analysis)
 
 ```python
-# ← Program Manager delegates to Inspector agent
+# ← Inspector agent delegating after finding issues
+
+# After finding issues, delegate fixes to Refactor
 Task(
-    description="Code quality check",
-    prompt="@docs/agents/inspector.md\n\nAnalyze product_connect module for issues",
-    subagent_type="inspector"  # Default: Sonnet | Override: haiku / opus
+    description="Fix code issues",
+    prompt="@docs/agents/refactor.md\n\nFix the naming conventions and type hints I found",
+    subagent_type="refactor"
+)
+
+# For comprehensive review, coordinate with QC
+Task(
+    description="Full quality audit",
+    prompt="@docs/agents/qc.md\n\nCoordinate full review of product_connect module",
+    subagent_type="qc"
 )
 ```
 

@@ -136,18 +136,20 @@ I analyzed the error and determined it was caused by...
 ```python
 # ← Program Manager delegates to Anthropic Engineer agent
 
-# Standard best practices (downgrade to Sonnet)
+# ← Anthropic-engineer demonstrating best practices
+
+# Example: Optimal delegation pattern
 Task(
-    description="Tool optimization",
-    prompt="@docs/agents/anthropic-engineer.md\n\nModel: sonnet\n\nOptimize MCP tool usage",
-    subagent_type="anthropic-engineer"
+    description="Research patterns",
+    prompt="@docs/agents/archer.md\n\nFind best practices in codebase",
+    subagent_type="archer"
 )
 
-# Complex AI system design (default Opus)
+# Example: Implementation verification
 Task(
-    description="AI workflow optimization",
-    prompt="@docs/agents/anthropic-engineer.md\n\nDesign multi-agent collaboration patterns",
-    subagent_type="anthropic-engineer"
+    description="Verify implementation",
+    prompt="@docs/agents/gpt.md\n\nImplement and verify the optimization patterns",
+    subagent_type="gpt"
 )
 ```
 

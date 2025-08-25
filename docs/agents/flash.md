@@ -147,18 +147,20 @@ recent = orders.filtered(lambda o: o.state == 'sale')[:100]
 ```python
 # ← Program Manager delegates to Flash agent
 
-# Standard performance analysis (default Sonnet)
+# ← Flash agent delegating after finding performance issues
+
+# After profiling, delegate fixes to Refactor
 Task(
-    description="Performance check",
-    prompt="@docs/agents/flash.md\n\nAnalyze product.template model for performance issues",
-    subagent_type="flash"
+    description="Implement optimizations",
+    prompt="@docs/agents/refactor.md\n\nOptimize the N+1 queries found in product.template",
+    subagent_type="refactor"
 )
 
-# Complex optimization (upgrade to Opus)
+# Check code quality issues affecting performance
 Task(
-    description="Complex optimization",
-    prompt="@docs/agents/flash.md\n\nModel: opus\n\nOptimize entire Shopify sync pipeline",
-    subagent_type="flash"
+    description="Quality analysis",
+    prompt="@docs/agents/inspector.md\n\nFind inefficient patterns causing performance issues",
+    subagent_type="inspector"
 )
 ```
 

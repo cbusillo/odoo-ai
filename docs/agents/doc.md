@@ -129,18 +129,20 @@ Grep(pattern="TODO|FIXME|XXX", path="docs/", output_mode="content")
 ```python
 # ← Program Manager delegates to Doc agent
 
-# Standard documentation maintenance (default Sonnet)
+# ← Doc agent delegating documentation tasks
+
+# Research code for accurate documentation
 Task(
-    description="Update agent documentation",
-    prompt="@docs/agents/doc.md\n\nUpdate docs/agents/README.md to reflect new agent capabilities",
-    subagent_type="doc"
+    description="Research code patterns",
+    prompt="@docs/agents/archer.md\n\nFind actual implementations to document",
+    subagent_type="archer"
 )
 
-# Complex architectural documentation (upgrade to Opus)
+# Verify test documentation accuracy
 Task(
-    description="Architecture documentation rewrite", 
-    prompt="@docs/agents/doc.md\n\nModel: opus\n\nRewrite ARCHITECTURE.md based on current codebase",
-    subagent_type="doc"
+    description="Verify test docs", 
+    prompt="@docs/agents/scout.md\n\nValidate test documentation against actual tests",
+    subagent_type="scout"
 )
 ```
 

@@ -39,6 +39,26 @@
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/pre-tool-use.sh"
           }
         ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/prevent-task-recursion.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/cleanup-task-stack.py"
+          }
+        ]
       }
     ],
     "SessionStart": [

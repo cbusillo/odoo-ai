@@ -2,9 +2,20 @@
 
 This document contains tools and patterns that ALL agents should be aware of. Include this in agent prompts when needed.
 
+## File Creation Guidelines
+
+**Before creating any files**, read `tmp/README.md` for the proper temporary file structure:
+
+- `tmp/scripts/` - One-off analysis and utility scripts
+- `tmp/tests/` - Test files and output
+- `tmp/data/` - Export files and analysis results
+
+This keeps the project clean and ensures files are in the right location.
+
 ## Universal MCP Tools
 
 ### Quick Python Execution
+
 ```python
 # Run Python code directly in Odoo environment
 mcp__odoo-intelligence__execute_code(
@@ -17,6 +28,7 @@ mcp__odoo-intelligence__execute_code(
 ```
 
 ### Permission Debugging
+
 ```python
 # Debug why a user can't access records
 mcp__odoo-intelligence__permission_checker(
@@ -28,6 +40,7 @@ mcp__odoo-intelligence__permission_checker(
 ```
 
 ### Workflow Analysis
+
 ```python
 # Analyze state machines and transitions
 mcp__odoo-intelligence__workflow_states(
@@ -37,6 +50,7 @@ mcp__odoo-intelligence__workflow_states(
 ```
 
 ### Field Value Analysis
+
 ```python
 # Analyze actual data in the database
 mcp__odoo-intelligence__field_value_analyzer(
@@ -49,6 +63,7 @@ mcp__odoo-intelligence__field_value_analyzer(
 ```
 
 ### Dynamic Field Resolution
+
 ```python
 # Understand computed and related field chains
 mcp__odoo-intelligence__resolve_dynamic_fields(
@@ -60,6 +75,7 @@ mcp__odoo-intelligence__resolve_dynamic_fields(
 ## Quick Odoo Operations
 
 ### Container Management
+
 ```python
 # Check health
 mcp__odoo-intelligence__odoo_status(verbose=True)
@@ -82,6 +98,7 @@ mcp__odoo-intelligence__odoo_shell(
 ## Universal Search Patterns
 
 ### Find by Decorator
+
 ```python
 # Find all methods with specific decorators
 mcp__odoo-intelligence__search_decorators(
@@ -90,6 +107,7 @@ mcp__odoo-intelligence__search_decorators(
 ```
 
 ### Find by Field Type
+
 ```python
 # Find all models with specific field types
 mcp__odoo-intelligence__search_field_type(
@@ -98,6 +116,7 @@ mcp__odoo-intelligence__search_field_type(
 ```
 
 ### Find by Field Properties
+
 ```python
 # Find fields with specific properties
 mcp__odoo-intelligence__search_field_properties(

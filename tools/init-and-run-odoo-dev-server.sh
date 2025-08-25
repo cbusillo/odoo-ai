@@ -24,7 +24,7 @@ if [ -z "$CURRENT_BRANCH" ]; then
     exit 1
 fi
 
-ssh opw-dev "bash -s" -- "$CURRENT_BRANCH" "$FLAG" << 'EOF'
+ssh "${ODOO_DEV_SERVER:-dev-server}" "bash -s" -- "$CURRENT_BRANCH" "$FLAG" << 'EOF'
 FLAG=$2
 CURRENT_BRANCH=$1
 
@@ -45,7 +45,7 @@ fi
 EOF
 
 echo "Starting Odoo..."
-ssh opw-dev "service odoo start"
+ssh "${ODOO_DEV_SERVER:-dev-server}" "service odoo start"
 
 if [ "$INITIAL_STATE" -ne 0 ]; then
     echo "Stopping Tailscale..."

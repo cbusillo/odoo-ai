@@ -45,7 +45,7 @@ wheels = [
 ]
 
 [[package]]
-name = "odoo-opw"
+name = "odoo-ai"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

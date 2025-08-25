@@ -576,7 +576,7 @@ def main() -> None:
     parser.add_argument(
         "--url", default=os.environ.get("ODOO_URL", "http://localhost:8069"), help="Odoo URL (default: http://localhost:8069)"
     )
-    parser.add_argument("--db", default=os.environ.get("ODOO_DB", "opw"), help="Odoo database name (default: opw)")
+    parser.add_argument("--db", default=os.environ.get("ODOO_DB_NAME", "odoo_dev"), help="Odoo database name (default: from ODOO_DB_NAME env var)")
     parser.add_argument("--api-key", default=os.environ.get("ODOO_KEY"), help="Odoo API key")
     parser.add_argument("--manufacturers", help="Comma-separated list of manufacturers to import (default: all)")
     parser.add_argument("--test", action="store_true", help="Run in test mode (limited data)")

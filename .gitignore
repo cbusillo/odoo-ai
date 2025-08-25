@@ -200,3 +200,4 @@ odoo.*.conf
 
 /docs/todo
 /.claude/.compacted
+!.env.example

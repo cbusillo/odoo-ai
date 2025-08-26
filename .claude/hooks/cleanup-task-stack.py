@@ -9,17 +9,23 @@ import sys
 from pathlib import Path
 import os
 import hashlib
+from datetime import datetime
 
 def _stack_file() -> Path:
     """
-    Use a per-project stack file so different projects don't share state.
-    Falls back to a global file if project dir isn't provided.
+    Use a per-project stack file in the project's tmp/data/ directory.
+    This keeps temp files within the project and they get cleaned automatically.
     """
-    proj = os.environ.get("CLAUDE_PROJECT_DIR")
-    if proj:
-        h = hashlib.sha256(proj.encode("utf-8")).hexdigest()[:12]
-        return Path(f"/tmp/claude_agent_stack_{h}.json")
-    return Path("/tmp/claude_agent_stack.json")
+    proj = os.environ.get("CLAUDE_PROJECT_DIR") or os.environ.get("PWD") or os.getcwd()
+    
+    # Use project's tmp/data/ directory for temporary files
+    stack_dir = Path(proj) / "tmp" / "data"
+    stack_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Create unique stack file for this session/project
+    session_id = os.environ.get("CLAUDE_SESSION_ID", "default")
+    h = hashlib.sha256(f"{proj}_{session_id}".encode("utf-8")).hexdigest()[:12]
+    return stack_dir / f"agent_stack_{h}.json"
 
 
 def get_current_stack():
@@ -43,20 +49,40 @@ def save_stack(stack):
     stack_path = _stack_file()
     with open(stack_path, "w") as f:
         json.dump(stack, f)
+    try:
+        dbg = Path(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()) / ".claude" / "hook-debug.log"
+        dbg.parent.mkdir(parents=True, exist_ok=True)
+        with open(dbg, "a") as lf:
+            lf.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] cleanup: saved stack -> {stack} (path={stack_path})\n")
+    except Exception:
+        pass
 
 
 def main():
     try:
         # Read the hook input from stdin
         hook_input = json.load(sys.stdin)
+        dbg_path = None
+        try:
+            dbg_path = Path(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()) / ".claude" / "hook-debug.log"
+            dbg_path.parent.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            dbg_path = None
 
         # Only process Task tool completions
-        if hook_input.get("tool_name") != "Task":
+        tool_name = hook_input.get("tool_name")
+        if tool_name != "Task":
+            try:
+                if dbg_path:
+                    with open(dbg_path, "a") as lf:
+                        lf.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] cleanup: skip non-Task tool={tool_name}\n")
+            except Exception:
+                pass
             sys.exit(0)
 
         # Get the subagent that just completed
-        tool_input = hook_input.get("tool_input", {})
-        completed_agent = tool_input.get("subagent_type", "")
+        tool_input = hook_input.get("tool_input", {}) or {}
+        completed_agent = tool_input.get("subagent_type") or tool_input.get("subagent") or ""
 
         # Get current stack
         stack = get_current_stack()
@@ -75,12 +101,25 @@ def main():
         
         # Save updated stack (even if empty)
         save_stack(stack)
+        try:
+            if dbg_path:
+                with open(dbg_path, "a") as lf:
+                    lf.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] cleanup: post-tool stack -> {stack} (completed_agent={completed_agent})\n")
+        except Exception:
+            pass
 
         # Always allow PostToolUse to continue
         sys.exit(0)
 
     except Exception as e:
         # On error, just continue
+        try:
+            dbg = Path(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()) / ".claude" / "hook-debug.log"
+            dbg.parent.mkdir(parents=True, exist_ok=True)
+            with open(dbg, "a") as lf:
+                lf.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] cleanup: error -> {e}\n")
+        except Exception:
+            pass
         print(json.dumps({"error": str(e), "message": "Cleanup hook error - continuing"}), file=sys.stderr)
         sys.exit(0)
 

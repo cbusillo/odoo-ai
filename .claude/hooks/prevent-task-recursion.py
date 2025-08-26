@@ -150,7 +150,7 @@ def main():
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",
                     "permissionDecision": "deny",
-                    "permissionDecisionReason": f"Preventing excessive recursion of {target_agent} agent (appears {agent_count} times in stack). Agent should continue locally. Call stack: {' → '.join(stack)} → {target_agent} (blocked)",
+                    "permissionDecisionReason": f"Preventing excessive recursion of {target_agent} agent (appears {agent_count} times in stack). Agent should continue locally. Call stack: {' → '.join(stack)} → {target_agent} (blocked)\n\nRECOMMENDED ACTION: Recall the same agent with anti-recursion instructions:\nTask(\n    description=\"[original task]\",\n    prompt=\"[original request]\n\nIMPORTANT: Do NOT call Task() with subagent_type='{target_agent}'. You can delegate to other agents and use all other tools. For tasks in your domain, use direct tools (Edit, Write, MultiEdit). See docs/agent-patterns/anti-recursion-guidelines.md\",\n    subagent_type=\"{target_agent}\"\n)",
                 },
             }
             print(json.dumps(output))

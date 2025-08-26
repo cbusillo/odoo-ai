@@ -1,12 +1,135 @@
 #!/usr/bin/env python3
 
+import json
 import os
+import re
 import secrets
+import select
 import string
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
+
+
+def normalize_line_for_pattern_detection(line: str) -> str:
+    """Normalize a log line for pattern detection by removing timestamps and variable parts."""
+
+    # Remove timestamps like "2025-08-26 02:10:28,708"
+    line = re.sub(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}", "[TIMESTAMP]", line)
+
+    # Remove IP addresses like "127.0.0.1"
+    line = re.sub(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", "[IP]", line)
+
+    # Remove process IDs and other numbers that might vary
+    line = re.sub(r"\b\d+\b", "[NUM]", line)
+
+    # Remove version strings like "18.0-5"
+    line = re.sub(r"\d+\.\d+(-\d+)?", "[VERSION]", line)
+
+    # Normalize whitespace
+    line = " ".join(line.split())
+
+    return line.strip()
+
+
+def detect_repetitive_pattern(recent_lines: list, pattern_occurrences: dict, min_occurrences: int = 5) -> tuple[bool, str]:
+    """
+    Detect if we're seeing repetitive patterns in the log output.
+    Returns (is_repetitive, pattern_description).
+    """
+    if len(recent_lines) < min_occurrences:
+        return False, ""
+
+    # Update pattern occurrences count for all recent lines
+    for line in recent_lines:
+        normalized = normalize_line_for_pattern_detection(line)
+        if normalized and len(normalized) > 20:  # Ignore very short lines
+            pattern_occurrences[normalized] = pattern_occurrences.get(normalized, 0) + 1
+
+    # Find the most common pattern
+    if pattern_occurrences:
+        most_common_pattern = max(pattern_occurrences.items(), key=lambda x: x[1])
+        pattern, count = most_common_pattern
+
+        if count >= min_occurrences:
+            # Check if this pattern dominates recent output (>70% of recent lines)
+            recent_normalized = [normalize_line_for_pattern_detection(line) for line in recent_lines]
+            matching_lines = [norm for norm in recent_normalized if norm == pattern]
+            pattern_ratio = len(matching_lines) / len(recent_normalized) if recent_normalized else 0
+
+            if pattern_ratio > 0.7:  # More than 70% of recent lines are the same pattern
+                # Extract a readable part of the original pattern
+                original_sample = ""
+                for line in recent_lines:
+                    if normalize_line_for_pattern_detection(line) == pattern:
+                        original_sample = line[:100] + "..." if len(line) > 100 else line
+                        break
+
+                return True, f"Repetitive pattern detected ({count} times, {pattern_ratio:.1%} of recent output): {original_sample}"
+
+    return False, ""
+
+
+def kill_browser_processes(container_prefix: str = None) -> None:
+    """Aggressively kill browser processes to prevent websocket cleanup hangs."""
+    if container_prefix is None:
+        container_prefix = get_container_prefix()
+
+    browser_patterns = ["chromium.*headless", "chrome.*headless", "chromium", "chrome", "WebDriver", "geckodriver", "chromedriver"]
+
+    for pattern in browser_patterns:
+        try:
+            # Use SIGKILL (-9) for immediate termination
+            subprocess.run(
+                ["docker", "exec", f"{container_prefix}-script-runner-1", "pkill", "-9", "-f", pattern],
+                capture_output=True,
+                timeout=5,
+            )
+        except:
+            pass  # Ignore errors - process might not exist
+
+
+def safe_terminate_process(process: subprocess.Popen, container_prefix: str = None) -> None:
+    """Safely terminate a process with proper cleanup."""
+    if container_prefix is None:
+        container_prefix = get_container_prefix()
+
+    try:
+        # First attempt: gentle termination
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                # Force kill if it doesn't terminate gracefully
+                if process.poll() is None:
+                    process.kill()
+                    try:
+                        process.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        print("WARNING: Process failed to terminate cleanly")
+
+        # Kill any test processes in container
+        patterns = [
+            "odoo-bin.*test-enable",
+            "python.*odoo-bin",
+            "timeout.*odoo-bin",
+            "chromium",
+            "chrome",
+        ]
+
+        for pattern in patterns:
+            try:
+                subprocess.run(
+                    ["docker", "exec", f"{container_prefix}-script-runner-1", "pkill", "-f", pattern], capture_output=True, timeout=5
+                )
+            except:
+                pass  # Ignore cleanup failures
+
+    except Exception as e:
+        print(f"Error during process termination: {e}")
 
 
 def get_container_prefix() -> str:
@@ -24,12 +147,12 @@ def get_production_db_name() -> str:
             if "web" in service_name.lower():
                 env = service.get("environment", {})
                 if isinstance(env, dict):
-                    return env.get("ODOO_DB", "odoo_dev")
+                    return env.get("ODOO_DB_NAME", "odoo")
                 elif isinstance(env, list):
                     for env_var in env:
-                        if env_var.startswith("ODOO_DB="):
+                        if env_var.startswith("ODOO_DB_NAME="):
                             return env_var.split("=", 1)[1]
-    return "odoo_dev"
+    return "odoo"
 
 
 def get_script_runner_service() -> str:
@@ -54,15 +177,16 @@ def get_our_modules() -> list[str]:
 def run_unit_tests() -> int:
     modules = get_our_modules()
     test_db_name = f"{get_production_db_name()}_test_unit"
-    test_tags = ",".join([f"/{module}" for module in modules])
-    return run_docker_test_command(test_tags, test_db_name, modules, use_production_clone=False, use_module_prefix=False)
+    # Use unit_test tag - Odoo will find all tests with this tag
+    return run_docker_test_command("unit_test", test_db_name, modules, timeout=600, use_module_prefix=False)
 
 
 def run_integration_tests() -> int:
     modules = get_our_modules()
     test_db_name = f"{get_production_db_name()}_test_integration"
-    test_tags = ",".join([f"/{module}" for module in modules])
-    return run_docker_test_command(test_tags, test_db_name, modules, timeout=600, use_production_clone=True, use_module_prefix=False)
+    return run_docker_test_command(
+        "integration_test", test_db_name, modules, timeout=600, use_production_clone=True, use_module_prefix=False
+    )
 
 
 def run_tour_tests() -> int:
@@ -71,9 +195,8 @@ def run_tour_tests() -> int:
     test_db_name = f"{get_production_db_name()}_test_tour"
     print(f"   Database: {test_db_name}")
     print(f"   Modules: {', '.join(modules)}")
-    test_tags = ",".join([f"/{module}" for module in modules])
     return run_docker_test_command(
-        test_tags, test_db_name, modules, timeout=1800, use_production_clone=True, is_tour_test=True, use_module_prefix=False
+        "tour_test", test_db_name, modules, timeout=1800, use_production_clone=True, is_tour_test=True, use_module_prefix=False
     )
 
 
@@ -92,17 +215,17 @@ def run_all_tests() -> int:
     # 1) Unit tests on clean DB
     print("\n▶️  Phase 1: Unit tests")
     rc_unit = run_unit_tests()
-    rc |= (rc_unit != 0)
+    rc |= rc_unit != 0
 
     # 2) Integration tests on cloned DB
     print("\n▶️  Phase 2: Integration tests")
     rc_integration = run_integration_tests() if rc_unit == 0 else rc_unit
-    rc |= (rc_integration != 0)
+    rc |= rc_integration != 0
 
     # 3) Tour tests (browser) on cloned DB
     print("\n▶️  Phase 3: Tour tests")
     rc_tour = run_tour_tests() if rc_integration == 0 else rc_integration
-    rc |= (rc_tour != 0)
+    rc |= rc_tour != 0
 
     if rc == 0:
         print("\n✅ All categories passed")
@@ -111,12 +234,6 @@ def run_all_tests() -> int:
         print("\n❌ Some categories failed")
         # Return first non-zero code for conventional CI semantics
         return rc_unit or rc_integration or rc_tour or 1
-
-
-def run_quick_tests() -> int:
-    modules = get_our_modules()
-    test_db_name = f"{get_production_db_name()}_test_unit"
-    return run_docker_test_command("unit_test", test_db_name, modules, use_production_clone=False)
 
 
 def show_test_stats() -> int:
@@ -186,6 +303,34 @@ def show_test_stats() -> int:
     print("  uv run test-all         # All tests")
     print("  uv run test-quick       # Subset of unit tests")
     print("  uv run test-clean       # Clean up test artifacts")
+
+    # Show recent test logs for agents to easily find
+    print("\n" + "=" * 50)
+    print("RECENT TEST LOGS:")
+    log_dir = Path("tmp/test-logs")
+    if log_dir.exists():
+        # Get last 5 test runs
+        test_dirs = sorted([d for d in log_dir.iterdir() if d.is_dir()], reverse=True)[:5]
+        if test_dirs:
+            for test_dir in test_dirs:
+                summary_file = test_dir / "summary.json"
+                if summary_file.exists():
+                    try:
+                        with open(summary_file) as f:
+                            summary = json.load(f)
+                            status = "✅ PASSED" if summary.get("success") else "❌ FAILED"
+                            if summary.get("timeout"):
+                                status = "⏱️ TIMEOUT"
+                            test_type = summary.get("test_type", "unknown")
+                            elapsed = summary.get("elapsed_seconds", 0)
+                            print(f"  {test_dir.name}: {status} ({test_type}, {elapsed:.1f}s)")
+                            print(f"    📁 Logs: {test_dir}")
+                    except:
+                        print(f"  {test_dir.name}: [Could not read summary]")
+        else:
+            print("  No recent test runs found")
+    else:
+        print("  No test logs directory found yet")
 
     return 0
 
@@ -381,10 +526,16 @@ def cleanup_chrome_processes() -> None:
     script_runner_service = get_script_runner_service()
     # Try to kill Chrome processes gracefully first
     subprocess.run(["docker", "exec", f"{get_container_prefix()}-{script_runner_service}-1", "pkill", "chrome"], capture_output=True)
-    subprocess.run(["docker", "exec", f"{get_container_prefix()}-{script_runner_service}-1", "pkill", "chromium"], capture_output=True)
+    subprocess.run(
+        ["docker", "exec", f"{get_container_prefix()}-{script_runner_service}-1", "pkill", "chromium"], capture_output=True
+    )
     # Force kill if still running
-    subprocess.run(["docker", "exec", f"{get_container_prefix()}-{script_runner_service}-1", "pkill", "-9", "chrome"], capture_output=True)
-    subprocess.run(["docker", "exec", f"{get_container_prefix()}-{script_runner_service}-1", "pkill", "-9", "chromium"], capture_output=True)
+    subprocess.run(
+        ["docker", "exec", f"{get_container_prefix()}-{script_runner_service}-1", "pkill", "-9", "chrome"], capture_output=True
+    )
+    subprocess.run(
+        ["docker", "exec", f"{get_container_prefix()}-{script_runner_service}-1", "pkill", "-9", "chromium"], capture_output=True
+    )
     # Clean up zombie processes
     subprocess.run(
         [
@@ -780,25 +931,31 @@ def run_docker_test_command(
             print(f"   Cleaning up Chrome processes...")
             cleanup_chrome_processes()
 
-            # Mark modules as uninstalled to force test module loading
-            print(f"   Marking modules as uninstalled to force test discovery...")
-            for module in modules_to_install:
-                cmd_uninstall = [
-                    "docker",
-                    "compose",
-                    "exec",
-                    "-T",
-                    "database",
-                    "psql",
-                    "-U",
-                    "odoo",
-                    "-d",
-                    db_name,
-                    "-c",
-                    f"UPDATE ir_module_module SET state = 'uninstalled' WHERE name = '{module}';",
-                ]
-                subprocess.run(cmd_uninstall, capture_output=True)
-            print(f"   ✅ Modules marked for reinstallation")
+            # DO NOT mark modules as uninstalled for tour tests!
+            # This would cause -i to reinstall them and wipe production data
+            # Tours need the actual production data to navigate
+            if not is_tour_test:
+                # Only for unit/integration tests, mark modules for reinstall
+                print(f"   Marking modules as uninstalled to force test discovery...")
+                for module in modules_to_install:
+                    cmd_uninstall = [
+                        "docker",
+                        "compose",
+                        "exec",
+                        "-T",
+                        "database",
+                        "psql",
+                        "-U",
+                        "odoo",
+                        "-d",
+                        db_name,
+                        "-c",
+                        f"UPDATE ir_module_module SET state = 'uninstalled' WHERE name = '{module}';",
+                    ]
+                    subprocess.run(cmd_uninstall, capture_output=True)
+                print(f"   ✅ Modules marked for reinstallation")
+            else:
+                print(f"   ✅ Keeping modules installed to preserve production data for tours")
     else:
         drop_and_create_test_database(db_name)
 
@@ -809,6 +966,7 @@ def run_docker_test_command(
         test_tags_final = ",".join(modules_to_install)
     elif not use_module_prefix:
         # Use tags as-is without module prefix (for tour tests)
+        # With -u flag, we don't trigger base tests
         test_tags_final = test_tags
     elif "," in test_tags:
         # Complex tags with multiple components - apply module prefix to last tag
@@ -825,10 +983,14 @@ def run_docker_test_command(
 
     print(f"🏷️  Final test tags: {test_tags_final}")
 
-    # For tests, always use -i (install) to force test module loading
-    # Even with production clones, we need -i to trigger test discovery
-    # Odoo doesn't load test modules during update (-u), only during install
-    module_flag = "-i"
+    # Use different module flags based on test type
+    if is_tour_test:
+        # For tour tests, don't reinstall modules to avoid database locks
+        # Modules are already installed in the cloned production database
+        module_flag = "-u"  # Update instead of install
+    else:
+        # For unit/integration tests, use install to ensure clean test loading
+        module_flag = "-i"
 
     cmd = [
         "docker",
@@ -841,37 +1003,276 @@ def run_docker_test_command(
     if test_password:
         cmd.extend(["-e", f"ODOO_TEST_PASSWORD={test_password}"])
 
-    cmd.extend(
-        [
-            script_runner_service,
-            "/odoo/odoo-bin",
-            "-d",
-            db_name,
-            module_flag,
-            modules_str,
-            "--test-tags",
-            test_tags_final,
-            "--test-enable",
-            "--stop-after-init",
-            "--max-cron-threads=0",
-            "--workers=0",
-            f"--db-filter=^{db_name}$",
-            "--log-level=test",
-            "--without-demo=all",
-        ]
-    )
+    # Tour tests need workers for websocket support, others can use single-threaded mode
+    if is_tour_test:
+        cmd.extend(
+            [
+                script_runner_service,
+                "/odoo/odoo-bin",
+                "-d",
+                db_name,
+                module_flag,
+                modules_str,
+                "--test-tags",
+                test_tags_final,
+                "--test-enable",
+                "--stop-after-init",
+                "--max-cron-threads=0",
+                "--workers=0",  # Use single worker until multi-worker issue is resolved
+                f"--db-filter=^{db_name}$",
+                "--log-level=test",
+                "--without-demo=all",
+            ]
+        )
+    else:
+        cmd.extend(
+            [
+                script_runner_service,
+                "/odoo/odoo-bin",
+                "-d",
+                db_name,
+                module_flag,
+                modules_str,
+                "--test-tags",
+                test_tags_final,
+                "--test-enable",
+                "--stop-after-init",
+                "--max-cron-threads=0",
+                "--workers=0",  # Single-threaded for unit/integration tests
+                f"--db-filter=^{db_name}$",
+                "--log-level=test",
+                "--without-demo=all",
+            ]
+        )
+
+    # Create log directory for this test run
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_dir = Path("tmp/test-logs") / f"test-{timestamp}"
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    log_file = log_dir / "output.log"
+    summary_file = log_dir / "summary.json"
 
     print(f"🚀 Command: {' '.join(cmd)}")
+    print(f"📁 Logs: {log_dir}")
     print()
 
     start_time = time.time()
 
+    # Prepare summary data
+    summary = {
+        "timestamp": timestamp,
+        "command": cmd,
+        "test_type": "tour" if is_tour_test else "unit/integration",
+        "database": db_name,
+        "modules": modules_to_install,
+        "test_tags": test_tags_final,
+        "timeout": timeout,
+        "start_time": start_time,
+    }
+
     try:
-        # Don't capture output, let it stream to console
-        result = subprocess.run(cmd, timeout=timeout, text=True)
+        # Run command with output going to both console and log file
+        with open(log_file, "w") as f:
+            # Write command info to log
+            f.write(f"Command: {' '.join(cmd)}\n")
+            f.write(f"Started: {datetime.now()}\n")
+            f.write("=" * 80 + "\n\n")
+            f.flush()
+
+            # Use Popen to stream output to both console and file
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+
+            # Track timing for timeout and stall detection
+            last_output_time = time.time()
+            stall_warnings = 0
+            max_stall_warnings = 10
+            stall_threshold = 60  # seconds
+
+            # Enhanced stall detection - track repetitive patterns
+            recent_lines = []  # Store last 20 lines for pattern detection
+            pattern_occurrences = {}  # Count occurrences of similar lines
+            last_pattern_check = time.time()
+            pattern_check_interval = 60  # Check for patterns every 1 minute
+
+            # Simple progress tracking
+            test_count = 0
+            current_test = ""
+            last_test = ""
+
+            # Adaptive thresholds based on test type (derive from test_tags)
+            test_type_lower = test_tags.lower()
+            if "tour" in test_type_lower or is_tour_test:
+                stall_threshold = 120  # Tours can take longer
+                max_stall_warnings = 15
+            elif "integration" in test_type_lower:
+                stall_threshold = 90
+                max_stall_warnings = 12
+
+            result_code = 0
+
+            # Stream output with timeout and stall detection
+            while True:
+                current_time = time.time()
+
+                # Check for overall timeout
+                if current_time - start_time > timeout:
+                    print(f"\n⏱️ TIMEOUT: Test execution exceeded {timeout} seconds")
+                    f.write(f"\n⏱️ TIMEOUT: Test execution exceeded {timeout} seconds\n")
+                    safe_terminate_process(process)
+                    result_code = -1
+                    break
+
+                # Use select to check if data is available (non-blocking)
+                try:
+                    ready, _, _ = select.select([process.stdout], [], [], 3.0)
+
+                    if ready:
+                        line = process.stdout.readline()
+                        if not line:  # EOF - process ended
+                            break
+                        print(line, end="")  # To console
+                        f.write(line)  # To file
+                        f.flush()
+                        last_output_time = current_time
+                        stall_warnings = 0  # Reset on new output
+
+                        # Add line to pattern detection buffer
+                        recent_lines.append(line.strip())
+                        if len(recent_lines) > 20:  # Keep only last 20 lines
+                            recent_lines.pop(0)
+
+                        # Check for repetitive patterns periodically
+                        if current_time - last_pattern_check > pattern_check_interval:
+                            is_repetitive, pattern_desc = detect_repetitive_pattern(recent_lines, pattern_occurrences)
+                            if is_repetitive:
+                                print(f"\n🔄 REPETITIVE PATTERN DETECTED: {pattern_desc}")
+                                print(f"❌ STALLED: Process stuck in repetitive output. Terminating...")
+                                f.write(f"\n🔄 REPETITIVE PATTERN DETECTED: {pattern_desc}\n")
+                                f.write(f"❌ STALLED: Process stuck in repetitive output. Terminating...\n")
+                                safe_terminate_process(process)
+                                result_code = -3  # New code for pattern-based stall
+                                break
+                            last_pattern_check = current_time
+
+                        # Enhanced test completion detection
+                        test_completion_indicators = [
+                            "Test completed successfully",
+                            "tests started in",
+                            "post-tests in",
+                            "failed, 0 error(s) of",
+                            "Initiating shutdown",
+                        ]
+
+                        if any(indicator in line for indicator in test_completion_indicators):
+                            # Test framework signaled completion - start cleanup timer
+                            if not hasattr(locals(), "cleanup_start_time"):
+                                cleanup_start_time = current_time
+                                print(f"\n🧹 Test completion detected. Starting cleanup timer...")
+                                f.write(f"\n🧹 Test completion detected. Starting cleanup timer...\n")
+
+                                # For tour tests, immediately kill browsers to prevent websocket hang
+                                if is_tour_test:
+                                    print(f"🔫 Preemptively killing browser processes...")
+                                    f.write(f"🔫 Preemptively killing browser processes...\n")
+                                    kill_browser_processes()
+
+                        # Check cleanup timeout (much shorter than overall timeout)
+                        if hasattr(locals(), "cleanup_start_time"):
+                            cleanup_elapsed = current_time - cleanup_start_time
+                            if cleanup_elapsed > 30:  # 30 seconds max for cleanup
+                                print(f"\n❌ CLEANUP HUNG: Process stuck in cleanup for {cleanup_elapsed:.1f}s. Terminating...")
+                                f.write(f"\n❌ CLEANUP HUNG: Process stuck in cleanup for {cleanup_elapsed:.1f}s. Terminating...\n")
+                                safe_terminate_process(process)
+                                result_code = -4  # New code for cleanup hang
+                                break
+
+                        # Simple test progress tracking
+                        if "test_" in line and ("(" in line or ":" in line):
+                            # Looks like a test name
+                            parts = line.split()
+                            for part in parts:
+                                if part.startswith("test_") and part != last_test:
+                                    test_count += 1
+                                    last_test = part
+                                    current_test = part.strip("():")
+                                    if test_count % 10 == 0:
+                                        print(f"\nℹ️  Progress: {test_count} tests started...\n")
+                                        f.write(f"\nℹ️  Progress: {test_count} tests started...\n")
+                                    break
+                    else:
+                        # No output available - check for stall
+                        if current_time - last_output_time > stall_threshold:
+                            stall_warnings += 1
+                            test_info = f" (last test: {current_test})" if current_test else ""
+                            print(
+                                f"\n⚠️  WARNING: No output for {current_time - last_output_time:.1f}s [{stall_warnings}/{max_stall_warnings}]{test_info}"
+                            )
+                            f.write(
+                                f"\n⚠️  WARNING: No output for {current_time - last_output_time:.1f}s [{stall_warnings}/{max_stall_warnings}]{test_info}\n"
+                            )
+
+                            if stall_warnings >= max_stall_warnings:
+                                print(f"\n❌ STALLED: Process appears stuck. Terminating...")
+                                f.write(f"\n❌ STALLED: Process appears stuck. Terminating...\n")
+                                safe_terminate_process(process)
+                                result_code = -2
+                                break
+
+                    # Check if process ended
+                    poll_result = process.poll()
+                    if poll_result is not None:
+                        result_code = poll_result
+                        break
+
+                except Exception as e:
+                    print(f"\n⚠️  Error reading output: {e}")
+                    f.write(f"\n⚠️  Error reading output: {e}\n")
+                    time.sleep(0.1)
+                    continue
+
+            # Get any remaining output
+            try:
+                for _ in range(100):  # Limit iterations
+                    line = process.stdout.readline()
+                    if not line:
+                        break
+                    print(line, end="")
+                    f.write(line)
+                    f.flush()
+            except:
+                pass
+
+            # Ensure process is terminated
+            if process.poll() is None:
+                try:
+                    result_code = process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    print("\n⚠️  Process didn't exit cleanly, forcing termination")
+                    f.write("\n⚠️  Process didn't exit cleanly, forcing termination\n")
+                    safe_terminate_process(process)
+                    result_code = -1
+
         elapsed = time.time() - start_time
 
         print(f"\n⏱️  Completed in {elapsed:.2f}s")
+
+        # Update summary
+        summary.update(
+            {
+                "end_time": time.time(),
+                "elapsed_seconds": elapsed,
+                "returncode": result_code,
+                "success": result_code == 0,
+                "timeout": result_code == -1,
+                "stalled": result_code == -2,
+                "repetitive_pattern": result_code == -3,
+                "cleanup_hang": result_code == -4,
+                "tests_started": test_count,
+                "last_test": current_test if current_test else None,
+                "error": None,
+            }
+        )
 
         # Cleanup after tests (default behavior)
         if cleanup_after:
@@ -880,15 +1281,43 @@ def run_docker_test_command(
             cleanup_test_databases(production_db)
             cleanup_test_filestores(production_db)
 
-        if result.returncode == 0:
+        if result_code == 0:
             print("✅ Tests passed!")
+            print(f"📄 Logs saved to: {log_file}")
         else:
             print("❌ Tests failed!")
+            print(f"📄 Check logs at: {log_file}")
 
-        return result.returncode
+        # Save summary for AI agents to parse
+        with open(summary_file, "w") as f:
+            json.dump(summary, f, indent=2, default=str)
+
+        return result_code
 
     except subprocess.TimeoutExpired:
+        # This should rarely happen now as we handle timeout inline
+        elapsed = time.time() - start_time
         print(f"\n❌ Tests timed out after {timeout} seconds")
+
+        # Update summary for timeout
+        summary.update(
+            {
+                "end_time": time.time(),
+                "elapsed_seconds": elapsed,
+                "returncode": -1,
+                "success": False,
+                "timeout": True,
+                "stalled": False,
+                "error": f"Timeout after {timeout} seconds",
+            }
+        )
+
+        # Save summary even on timeout
+        with open(summary_file, "w") as f:
+            json.dump(summary, f, indent=2, default=str)
+
+        print(f"📄 Partial logs saved to: {log_file}")
+
         # Cleanup on timeout if enabled
         if cleanup_after:
             print("🧹 Cleanup after timeout...")
@@ -926,8 +1355,6 @@ if __name__ == "__main__":
             sys.exit(run_tour_tests())
         elif command == "all":
             sys.exit(run_all_tests())
-        elif command == "quick":
-            sys.exit(run_quick_tests())
         elif command == "stats":
             sys.exit(show_test_stats())
         elif command == "clean" or command == "cleanup":

@@ -2,6 +2,7 @@
 
 This file contains detailed documentation maintenance patterns and workflows extracted from the Doc agent documentation.
 
+
 ## Documentation Structure Reference
 
 ### Core Documentation Files

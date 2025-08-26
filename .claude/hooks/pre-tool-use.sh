@@ -19,7 +19,11 @@ fi
  
 # Never interrupt Task (agent delegation) to avoid recursion
 if [[ "$TOOL_NAME" == "Task" ]]; then
-  echo '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow"}}'
+  # Log environment context for debugging recursion issues
+  {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] PreToolUse(Task): env(PWD=${PWD}, CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR})"
+  } >> "$DEBUG_LOG" 2>/dev/null
+  # Intentionally emit no decision JSON for Task; let the recursion hook decide.
   exit 0
 fi
  

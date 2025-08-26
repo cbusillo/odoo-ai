@@ -17,6 +17,13 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="/docs/odoo18/SECURITY_PATTERNS.md">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
       </map>
     </option>
   </component>

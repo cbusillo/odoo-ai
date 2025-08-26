@@ -68,17 +68,39 @@ uv run test-integration # Integration tests (< 10 min)
 uv run test-tour       # Browser UI tests (< 15 min)
 uv run test-all        # Complete test suite (< 30 min)
 
-# Advanced test runner (for specific filtering)
-uv run python tools/test_runner.py product_connect                        # Run tests for specific module
-uv run python tools/test_runner.py TestProductTemplate                    # Run specific test class
-uv run python tools/test_runner.py TestProductTemplate.test_sku_validation # Run specific test method
-uv run python tools/test_runner.py --python                              # Python tests only (legacy)
-uv run python tools/test_runner.py --tour-only                          # Tour tests only
+# Test management commands
+uv run test-stats      # Show test statistics and discovered tests
+uv run test-clean      # Clean up test artifacts and databases
 ```
+
+## Tour Test Best Practices
+
+**Avoid Hanging Browser Tests**: Prefer model validation over browser automation when possible.
+
+```python
+# ❌ Problematic - can hang indefinitely
+def test_action_browser(self):
+    self.browser_js("/web#action=123", "/* complex JS */")
+
+
+# ✅ Preferred - fast and reliable  
+def test_action_validation(self):
+    action = self.env.ref("module.action_name")
+    self.assertTrue(action, "Action should exist")
+    self.assertEqual(action.res_model, "expected.model")
+
+    # Test model accessibility
+    model = self.env[action.res_model]
+    records = model.search([], limit=1)
+    self.assertTrue(hasattr(model, 'search'), "Model should be accessible")
+```
+
+**Pattern Detection**: The test system automatically detects repetitive output patterns that indicate hanging tests.
 
 ## Routing
 
 **Who I delegate TO (CAN call):**
+
 - **Owl agent** → Hoot tests (JS component testing)
 - **Playwright agent** → Browser debugging and tour troubleshooting
 - **Flash agent** → Performance issues in tests

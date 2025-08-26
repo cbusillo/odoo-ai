@@ -3,6 +3,7 @@
 ## My Tools
 
 ### Browser Control
+
 - `mcp__playwright__browser_navigate` - Go to URLs
 - `mcp__playwright__browser_click` - Click elements
 - `mcp__playwright__browser_type` - Type text
@@ -10,21 +11,24 @@
 - `mcp__playwright__browser_snapshot` - Accessibility tree
 
 ### Testing & Debug
+
 - `mcp__playwright__browser_take_screenshot` - Visual capture
 - `mcp__playwright__browser_console_messages` - JS errors
 - `mcp__playwright__browser_evaluate` - Run JS code
 - `mcp__playwright__browser_wait_for` - Wait conditions
 
 ### Tour Tests
-- `.venv/bin/python tools/test_runner.py tour` via Bash - Run Odoo tours
+
+- `uv run test-tour` via Bash - Run Odoo tours
 - Use with Scout agent for tour test writing
 
 ## Common Patterns
 
 ### Debug Failed Tour
+
 ```python
 # 1. Run tour test
-test_result = Bash(".venv/bin/python tools/test_runner.py tour --test-tags TestProductTour")
+test_result = Bash("uv run test-tour")
 
 # 2. Debug if failed
 mcp__playwright__browser_navigate(url="http://localhost:8069/odoo")
@@ -33,6 +37,7 @@ snapshot = mcp__playwright__browser_snapshot()
 ```
 
 ### Element Interaction
+
 ```python
 # Navigate and interact
 mcp__playwright__browser_navigate(url="http://localhost:8069")
@@ -43,6 +48,7 @@ mcp__playwright__browser_click(
 ```
 
 ### Wait Strategies
+
 ```python
 # Wait for element
 mcp__playwright__browser_wait_for(text="Product saved")
@@ -54,12 +60,14 @@ mcp__playwright__browser_wait_for(time=2)
 ## Element Selection
 
 Use accessibility tree refs from `browser_snapshot`:
+
 - **element**: Human description for permission
 - **ref**: Exact selector from snapshot
 
 ## Routing
 
 **Who I delegate TO (CAN call):**
+
 - **Scout agent** → Write tour tests based on browser debugging findings
 - **Owl agent** → Fix frontend issues discovered in browser
 - **Debugger agent** → Analyze test failures and error patterns

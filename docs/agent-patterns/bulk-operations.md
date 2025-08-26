@@ -181,7 +181,7 @@ def test_refactoring():
     result = Bash("python -m py_compile models/*.py")
     
     # Run unit tests
-    test_result = Bash("./tools/test_runner.py python")
+    test_result = Bash("uv run test-unit")
     
     # Check for import errors
     import_check = mcp__odoo-intelligence__odoo_update_module(

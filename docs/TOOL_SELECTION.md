@@ -42,7 +42,7 @@
 
 ✅ **Use Bash when:**
 
-- Running custom scripts (`tools/test_runner.py`)
+- Running custom scripts (use `uv run test-*` commands)
 - MCP doesn't support specific flags you need
 - Complex piping operations
 - One-off system administration

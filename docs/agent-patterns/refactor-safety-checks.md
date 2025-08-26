@@ -40,10 +40,10 @@ chain = mcp__odoo-intelligence__inheritance_chain(
 
 ```bash
 # Run tests before changes
-./tools/test_runner.py all -v
+uv run test-all
 
 # Save test results
-./tools/test_runner.py all -j > pre-refactor-tests.json
+uv run test-stats > pre-refactor-tests.txt
 ```
 
 ## Safe Refactoring Patterns
@@ -61,7 +61,7 @@ MultiEdit(
 )
 
 # Step 2: Test that file
-test_result = Bash("./tools/test_runner.py --test-tags TestProduct")
+test_result = Bash("uv run test-unit")
 
 # Step 3: Only continue if tests pass
 if test_result.success:
@@ -247,10 +247,10 @@ docker exec ${ODOO_CONTAINER_PREFIX}-script-runner-1 /odoo/odoo-bin \
   -u product_connect --stop-after-init
 
 # 3. Unit tests
-./tools/test_runner.py all
+uv run test-all
 
 # 4. UI tests
-./tools/test_runner.py tour
+uv run test-tour
 ```
 
 ### Performance Validation

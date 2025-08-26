@@ -43,6 +43,16 @@ Coordinate specialized agents. Your responsibilities:
 
 **GPT agent uses Codex CLI** - no rate limits. Delegate liberally.
 
+### Recursion Prevention
+
+**CRITICAL**: When agent recursion is blocked, DO NOT re-route to different agents.
+
+See [.claude/RECURSION_HANDLING.md](.claude/RECURSION_HANDLING.md) for complete details.
+
+- **If recursion blocked**: Let the CURRENT agent continue with non-recursive approaches
+- **DO NOT**: Apply routing rules or switch to GPT when recursion is prevented
+- **Temporary solution**: Until Anthropic ships built-in recursion protection (GitHub #6468, #4277)
+
 ## 🚨 RED FLAGS - NEVER Attempt These Directly
 
 **MUST DELEGATE** for these Odoo patterns:

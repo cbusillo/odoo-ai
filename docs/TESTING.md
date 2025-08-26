@@ -76,9 +76,10 @@ uv run test-report        # Generate HTML report
 ### Tour Tests (`tour_test` tag)
 
 - **Purpose**: End-to-end browser workflow testing
-- **Runtime**: < 15 minutes
-- **Database**: Staging database with full demo data
+- **Runtime**: < 15 minutes (with automatic hang detection)
+- **Database**: Production database clone for realistic testing
 - **Examples**: UI interactions, complete user workflows
+- **Features**: Pattern detection prevents hanging, Chrome process cleanup
 
 ## Writing Tests
 
@@ -233,10 +234,11 @@ class TestShopifySync(IntegrationTestCase):
 
 **Features**:
 
-- Full staging environment
-- Complete demo data
-- Browser automation support
-- End-to-end workflow testing
+- Production database clone (preserves realistic data)
+- Chrome process management and cleanup
+- Automatic hang detection with pattern recognition
+- Multi-worker HttpCase compatibility
+- Environment validation for Chrome/browser setup
 
 **Example**:
 
@@ -252,6 +254,13 @@ class TestProductWorkflow(TourTestCase):
         
     def test_product_creation_flow(self):
         self.start_tour("/odoo", "product_creation_tour")
+        
+    def test_action_validation(self):
+        # Alternative pattern: model validation instead of browser automation
+        action = self.env.ref("module.action_name")
+        self.assertTrue(action, "Action should exist")
+        model = self.env[action.res_model]
+        self.assertTrue(hasattr(model, 'search'), "Model should be accessible")
 ```
 
 ## Factory Pattern Usage
@@ -521,10 +530,11 @@ graph TD
 
 #### Tour Tests
 
-- **Staging database** (`${ODOO_DB_NAME}_staging`)
-- **Full demo data** loaded
-- **No reset during runs** for stability
-- **Periodic refresh** as needed
+- **Production clone database** (`${ODOO_DB_NAME}_test_tour`)
+- **Real production data** for realistic testing
+- **Database cloning** from production before each run
+- **Filestore symlinks** for image/attachment access
+- **Pattern detection** to prevent hanging tests
 
 ## Common Test Patterns
 
@@ -654,6 +664,9 @@ uv run test-setup          # Reinitialize databases
 3. **Wait conditions**: Use proper timeouts for async operations
 4. **Error monitoring**: Check for JavaScript errors in tours
 5. **Test data**: Use unique identifiers to avoid conflicts
+6. **Hang prevention**: System automatically detects repetitive output patterns
+7. **Chrome issues**: Environment validation handles SIGTRAP and process cleanup
+8. **Model validation**: Consider model/action validation as alternative to browser automation for reliability
 
 ### Performance
 

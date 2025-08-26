@@ -12,7 +12,7 @@ def debug_failed_tour_comprehensive(tour_name):
     initial_state = capture_initial_browser_state()
     
     # Start tour execution
-    tour_result = Bash(f".venv/bin/python tools/test_runner.py tour --test-tags {tour_name}")
+    tour_result = Bash(f"uv run test-tour")
     
     # Phase 2: Capture failure context if tour failed
     if tour_result.returncode != 0:

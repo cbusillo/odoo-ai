@@ -2,6 +2,31 @@
 
 This file contains detailed patterns and examples extracted from the Anthropic Engineer agent documentation.
 
+## Claude Code Post-Training Resources
+
+**IMPORTANT**: Claude Code was released after Claude's knowledge cutoff. For current information:
+
+- **Official Documentation**: https://docs.anthropic.com/en/docs/claude-code/overview
+- **GitHub Repository**: https://github.com/anthropics/claude-code
+- **Latest Features**: Check GitHub releases and issues for post-training updates
+- **Community Patterns**: GitHub discussions for real-world usage patterns
+
+### Staying Current with Post-Training Updates
+
+```python
+# Check for latest Claude Code capabilities
+WebFetch(
+    url="https://docs.anthropic.com/en/docs/claude-code",
+    prompt="What new features or patterns were added recently?"
+)
+
+# Verify against GitHub for community patterns
+WebFetch(
+    url="https://github.com/anthropics/claude-code",
+    prompt="What are the latest issues, discussions, or examples?"
+)
+```
+
 ## Claude Code CLI Deep Dive
 
 ### MCP (Model Context Protocol) Management
@@ -55,10 +80,11 @@ claude mcp add -s user docker uvx mcp-server-docker
 claude --version
 
 # When updates happen:
-# 1. Check release notes/changelog
+# 1. Check GitHub releases: https://github.com/anthropics/claude-code/releases
 # 2. Use WebFetch for latest documentation
 # 3. Update agent docs with new features
 # 4. Test MCP configurations still work
+# 5. Check official docs for API changes
 ```
 
 ### Version-Aware Documentation Updates
@@ -66,14 +92,20 @@ claude --version
 ```python
 # Check for new features before updating docs
 WebFetch(
-    url="https://docs.anthropic.com/en/docs/claude-code",
+    url="https://docs.anthropic.com/en/docs/claude-code/overview",
     prompt="What new features were added in the latest version?"
+)
+
+# Check GitHub for community patterns and issues
+WebFetch(
+    url="https://github.com/anthropics/claude-code/issues",
+    prompt="What common issues or new patterns are being discussed?"
 )
 
 # Update agent docs when capabilities change
 Task(
     description="Update agent capabilities",
-    prompt="@docs/agents/scout.md\n\nAdd new test runner features from v1.0.65",
+    prompt="@docs/agents/scout.md\n\nAdd new test runner features from latest release",
     subagent_type="scout"
 )
 ```
@@ -200,7 +232,7 @@ grep - r
 "pattern"
 
 # GOOD: Purpose-built tools
-mcp__odoo-intelligence__search_code(pattern="pattern")
+mcp__odoo - intelligence__search_code(pattern="pattern")
 ```
 
 ### 3. Verbose Outputs
@@ -251,10 +283,12 @@ claude mcp add -s user my-server python ./script.py
 ### When Claude Code Updates
 
 1. **Check version**: `claude --version`
-2. **Review changes**: Check changelog/release notes
-3. **Update practices**: Use WebFetch on docs.anthropic.com
+2. **Review changes**: Check GitHub releases and changelog
+3. **Update practices**: Use WebFetch on docs.anthropic.com and GitHub
 4. **Test MCPs**: Verify existing configurations work
 5. **Update agents**: Add new capabilities to agent docs
+6. **Check community**: Review GitHub issues for new patterns or breaking changes
+7. **Verify examples**: Test that documented patterns still work
 
 ## The Anthropic Way
 

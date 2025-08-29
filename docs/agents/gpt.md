@@ -2,35 +2,46 @@
 
 **Audience**: This agent is called by Program Managers using Task(). PMs should NOT call MCP tools directly.
 
+**⚠️ CRITICAL MODEL RULE**: DO NOT specify model parameter unless using gpt-4.1 for extended context (400K+ tokens). The
+default config uses gpt-5.
+
 ## My Tools
 
 ```python
-# Start conversation (session_id comes via 'codex/event' notification)
-mcp__gpt_codex__codex(
+# Start conversation (session_id delivered via codex/event notification)
+mcp__gpt - codex__codex(
     prompt="Your request",
     sandbox="danger-full-access",  # or "workspace-write", "read-only"
-    model="gpt-5",  # Default, or "gpt-4.1" for 1M+ token context
-    approval_policy = "never",  # or "untrusted", "on-failure", "on-request"
+    # model parameter: OMIT to use default (gpt-5), only specify "gpt-4.1" for 1M+ token context
+    approval_policy="never",  # or "untrusted", "on-failure", "on-request"
     # Optional parameters:
-profile = "deep-reasoning",  # Available: deep-reasoning, dev-standard, test-runner, safe-production, quick
-cwd = "/path/to/dir",  # Working directory
-base_instructions = "custom",  # Replace default instructions
-include_plan_tool = true,  # Include plan tool
+    profile="deep-reasoning",  # Available: deep-reasoning, dev-standard, test-runner, safe-production, quick
+    cwd="/path/to/dir",  # Working directory
+    base_instructions="custom",  # Replace default instructions
+    include_plan_tool=True,  # Include plan tool
     # Advanced config overrides:
-config = {
-    "model_reasoning_effort": "high",  # For complex tasks
-    "model_reasoning_summary": "detailed",  # Verbose output
-    "sandbox_workspace_write.network_access": true,  # Network access
-    "hide_agent_reasoning": false  # Show thinking process
-}
+    config={
+        "model_reasoning_effort": "high",  # For complex tasks
+        "model_reasoning_summary": "detailed",  # Verbose output
+        "sandbox_workspace_write.network_access": True,  # Network access
+        "hide_agent_reasoning": False  # Show thinking process
+    }
 )
 
-# Continue session (use session_id from notification)
-mcp__gpt_codex__codex_reply(
+# Continue session (extract session_id from initial response)
+mcp__gpt - codex__codex_reply(
     prompt="Follow-up request",
-    sessionId="uuid-from-notification"
+    sessionId="uuid-from-initial-response"
 )
 ```
+
+## CRITICAL: Model Selection
+
+**DO NOT specify the model parameter unless you need extended context!**
+
+- **Default (OMIT model parameter)** → Uses gpt-5 from config
+- **Only specify `model="gpt-4.1"`** → When context exceeds 400K tokens
+- **NEVER use gpt-4o** → Outdated model, not supported
 
 ## Sandbox Mode Decision Guide
 
@@ -85,58 +96,63 @@ See: [CODEX_MCP_REFERENCE.md#sandbox-selection-for-odoo-tasks](../system/CODEX_M
 ## Quick Patterns
 
 ```python
-# Complex Odoo task with high reasoning
-mcp__gpt_codex__codex(
+# Complex Odoo task with high reasoning (uses default gpt-5)
+mcp__gpt - codex__codex(
     prompt="Optimize ORM queries in product_connect module",
     profile="deep-reasoning",
     sandbox="workspace-write"
+    # NOTE: No model parameter - uses default gpt-5
 )
 
 # Production safety check
-mcp__gpt_codex__codex(
+mcp__gpt - codex__codex(
     prompt="Analyze production database performance",
     profile="safe-production",
     sandbox="read-only"
 )
 
-# Fact-check with web search
-mcp__gpt_codex__codex(
+# Fact-check with web search (uses default gpt-5)
+mcp__gpt - codex__codex(
     prompt="Verify: [claim]. Search web if needed.",
-    sandbox="danger-full-access",
-    model="gpt-5"  # Default, or "gpt-4.1" for 1M+ context
+    sandbox="danger-full-access"
+    # No model parameter - uses default gpt-5
 )
 
 # Implement across codebase
-mcp__gpt_codex__codex(
+mcp__gpt - codex__codex(
     prompt="Refactor @addons/product_connect/ to async pattern",
     profile="dev-standard",
     sandbox="workspace-write"
 )
 
 # Quick fix with fast profile
-mcp__gpt_codex__codex(
+mcp__gpt - codex__codex(
     prompt="Fix syntax error in views",
     profile="quick",
     sandbox="workspace-write"
 )
 
 # Test execution with test runner
-mcp__gpt_codex__codex(
+mcp__gpt - codex__codex(
     prompt="Run unit tests and fix failures",
     profile="test-runner",
     sandbox="danger-full-access"
 )
 
-# Multi-step with session
-response = mcp__gpt_codex__codex(prompt="Analyze architecture", sandbox="read-only",
-                                   model="gpt-5")  # Or "gpt-4.1" for huge contexts
-# Get session_id from notification, then:
-mcp__gpt_codex__codex_reply(prompt="Now optimize it", sessionId="uuid")
+# Multi-step with session (uses default gpt-5)
+response = mcp__gpt - codex__codex(
+    prompt="Analyze architecture",
+    sandbox="read-only"
+    # No model parameter - uses default gpt-5
+)
+# Extract session_id from codex/event notification, then:
+# session_id = "urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # From notification
+mcp__gpt - codex__codex_reply(prompt="Now optimize it", sessionId=session_id)
 
-# Deep thinking with HIGH reasoning
-mcp__gpt_codex__codex(
+# Deep thinking with HIGH reasoning (uses default gpt-5)
+mcp__gpt - codex__codex(
     prompt="Think step by step: [complex problem]",
-    model="gpt-5",  # Default, or "gpt-4.1" for 1M+ contexts
+    # No model parameter - uses default gpt-5
     config={
         "model_reasoning_effort": "high",  # Maximum reasoning depth
         "model_reasoning_summary": "detailed"  # Show all thinking
@@ -146,24 +162,34 @@ mcp__gpt_codex__codex(
 
 ## Session Management
 
+**IMPORTANT**: The Codex MCP tools work asynchronously:
+
+- The `codex` tool initiates a session but returns no direct output
+- Session IDs and responses are delivered via `codex/event` notifications
+- The tool appears to complete without visible output (this is normal)
+
+**Note**: Direct testing of these tools outside of the GPT agent context may not show visible results due to the
+event-based architecture.
+
 **Session Creation:**
 
 ```python
-# Initial call creates session
-response = mcp__gpt_codex__codex(
+# Initial call creates session - session_id comes via codex/event notification
+response = mcp__gpt - codex__codex(
     prompt="Analyze this codebase structure",
     sandbox="read-only"
 )
-# Session ID comes via 'codex/event' notification automatically
+# Session ID will be delivered via codex/event notification (not in response)
+# Look for: {"type": "codex/event", "sessionId": "urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"}
 ```
 
 **Session Continuation:**
 
 ```python
-# Use session_id from notification for follow-ups
-mcp__gpt_codex__codex_reply(
+# Use UUID session_id from codex/event notification for follow-ups
+mcp__gpt - codex__codex_reply(
     prompt="Now implement the changes we discussed",
-    sessionId="uuid-captured-from-notification"
+    sessionId="urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # From codex/event notification
 )
 ```
 
@@ -173,6 +199,13 @@ mcp__gpt_codex__codex_reply(
 - Avoids re-explaining project structure
 - Enables iterative development workflows
 - Reduces token usage in subsequent calls
+
+**Session ID Format Requirements:**
+
+- Must be valid UUID format: `urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+- Never use arbitrary strings like "gpt-5" or custom IDs
+- Always extract from `codex/event` notification stream
+- Session IDs are automatically generated by Codex CLI
 
 **Best Practice:** Use sessions for multi-step tasks like:
 
@@ -217,18 +250,155 @@ See: [CODEX_MCP_REFERENCE.md#model-priority-same-as-global](../system/CODEX_MCP_
 **Quick reminder**: Use `gpt-5` as primary choice. Use `gpt-4.1` as alternative for 1M+ token contexts or when `gpt-5`
 is unavailable.
 
-## Need More?
+## Troubleshooting
 
-### Core References (Canonical)
+### Session ID Parsing Errors
 
-- **Complete MCP reference**: [CODEX_MCP_REFERENCE.md](../system/CODEX_MCP_REFERENCE.md)
-- **Basic usage examples**: [usage.md](../codex/usage.md)
-- **Advanced configuration**: [advanced.md](../codex/advanced.md)
-- **Odoo profiles & config**: [CODEX_CONFIG.md](../CODEX_CONFIG.md)
+**Error**:
+`"Failed to parse session_id: invalid character: expected an optional prefix of 'urn:uuid:' followed by [0-9a-fA-F-], found 'g' at 1"`
 
-### Project-Specific Patterns
+**Cause**: Using invalid session ID format (e.g., "gpt-5" instead of proper UUID)
 
-- **Session patterns**: [gpt-session-patterns.md](../agent-patterns/gpt-session-patterns.md)
-- **Performance tips**: [gpt-performance-patterns.md](../agent-patterns/gpt-performance-patterns.md)
-- **Model selection**: [MODEL_SELECTION.md](../system/MODEL_SELECTION.md)
+**Solution**:
+
+1. Never manually create session IDs
+2. Always extract from `codex/event` notification
+3. Ensure format: `urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+
+```python
+# ❌ WRONG - Manual session ID
+mcp__gpt - codex__codex_reply(
+    prompt="Continue task",
+    sessionId="gpt-5"  # This will fail
+)
+
+# ✅ CORRECT - UUID from notification
+mcp__gpt - codex__codex_reply(
+    prompt="Continue task",
+    sessionId="urn:uuid:12345678-1234-1234-1234-123456789abc"  # From codex/event
+)
+```
+
+### Session Continuation Issues
+
+**Common Problems**:
+
+1. **Session Not Found**: Session may have expired or been cleaned up
+    - **Solution**: Start new session, provide context in prompt
+
+2. **Context Lost**: Session doesn't remember previous conversation
+    - **Solution**: Include key context in continuation prompt
+
+3. **Permission Errors**: Session sandbox mode conflicts with new task
+    - **Solution**: Start new session with appropriate sandbox mode
+
+### Sandbox Mode Requirements
+
+**Error**: Permission denied or insufficient access
+
+**Solutions by Operation Type**:
+
+```python
+# File analysis only - read-only sufficient
+mcp__gpt - codex__codex(
+    prompt="Analyze code patterns in this file",
+    sandbox="read-only"
+)
+
+# Code implementation - workspace-write required
+mcp__gpt - codex__codex(
+    prompt="Implement new feature in existing files",
+    sandbox="workspace-write"  # Default for most tasks
+)
+
+# Web research or package installation - danger-full-access required
+mcp__gpt - codex__codex(
+    prompt="Research latest Odoo best practices online",
+    sandbox="danger-full-access"  # Required for internet access
+)
+
+# System operations (Docker, psutil) - danger-full-access required
+mcp__gpt - codex__codex(
+    prompt="Run system diagnostics and Docker container health checks",
+    sandbox="danger-full-access"  # Required for system access
+)
+```
+
+### Model Availability Issues
+
+**Error**: Model not available or rate limited
+
+**Solution**: Model selection strategy
+
+```python
+# Primary: Use default (no model parameter)
+mcp__gpt - codex__codex(
+    prompt="Your task"
+    # No model parameter - uses default gpt-5 from config
+)
+
+# Extended context: ONLY when needed for 400K+ tokens
+mcp__gpt - codex__codex(
+    prompt="Your task",
+    model="gpt-4.1"  # ONLY specify for huge contexts (1M+ tokens)
+)
+
+# Note: gpt-4.5 exists but rarely needed - let config handle fallbacks
+```
+
+### Context Size Issues
+
+**Error**: Context too large or token limit exceeded
+
+**Solutions**:
+
+1. **Use gpt-4.1**: 1M+ token context window
+2. **Break into smaller tasks**: Decompose large requests
+3. **Use sessions**: Maintain context across multiple calls
+4. **Focus scope**: Be specific about files/areas to analyze
+
+### Performance Issues
+
+**Symptoms**: Slow responses, timeouts
+
+**Optimizations**:
+
+```python
+# Quick tasks - use quick profile (uses default gpt-5)
+mcp__gpt - codex__codex(
+    prompt="Fix simple syntax error",
+    profile="quick"  # Low reasoning effort, faster
+    # No model parameter - uses default gpt-5
+)
+
+# Complex tasks - optimize reasoning
+mcp__gpt - codex__codex(
+    prompt="Complex architectural refactoring",
+    profile="deep-reasoning",  # High reasoning effort
+    config={
+        "model_reasoning_effort": "high",
+        "model_reasoning_summary": "detailed"
+    }
+)
+```
+
+## Related Documentation
+
+### Codex MCP References
+
+- **Complete MCP Reference**: [CODEX_MCP_REFERENCE.md](../system/CODEX_MCP_REFERENCE.md) - Full Codex tool documentation
+- **Odoo Profiles & Config**: [CODEX_CONFIG.md](../CODEX_CONFIG.md) - Pre-configured profiles for Odoo tasks
+- **Model Selection**: [MODEL_SELECTION.md](../system/MODEL_SELECTION.md) - When to use different models
+
+### Pattern Documentation
+
+- **Session Patterns**: [gpt-session-patterns.md](../agent-patterns/gpt-session-patterns.md) - Multi-turn conversation
+  patterns
+- **Performance Patterns**: [gpt-performance-patterns.md](../agent-patterns/gpt-performance-patterns.md) - Optimization
+  strategies
+
+### External Resources
+
+- **Codex CLI**: Check latest features via MCP tools (post-training)
+- **Model Updates**: New models may be available beyond gpt-5
 

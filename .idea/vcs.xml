@@ -12,6 +12,7 @@
   </component>
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/addons/cm_custom" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/addons/disable_odoo_online" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/addons/product_connect" vcs="Git" />
   </component>

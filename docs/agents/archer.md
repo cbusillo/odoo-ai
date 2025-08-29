@@ -22,7 +22,7 @@ MCP search tools are 100x faster than grep/find. See [Tool Selection Guide](../T
 
 ```bash
 # ✅ CORRECT - Docker exec with absolute paths
-docker exec ${ODOO_CONTAINER_PREFIX}-web-1 cat /odoo/addons/web/static/src/views/graph/graph_controller.js
+docker exec ${ODOO_PROJECT_NAME}-web-1 cat /odoo/addons/web/static/src/views/graph/graph_controller.js
 
 # ❌ WRONG - These won't work!
 Read("../../../../odoo/addons/web/...")  # No relative paths!
@@ -39,7 +39,7 @@ Read("../../../../odoo/addons/web/...")  # No relative paths!
 ### Path Rules
 
 - ✅ Custom: `Read("addons/product_connect/models/motor.py")`
-- ✅ Core: `docker exec ${ODOO_CONTAINER_PREFIX}-web-1 cat /odoo/addons/base/models/res_partner.py`
+- ✅ Core: `docker exec ${ODOO_PROJECT_NAME}-web-1 cat /odoo/addons/base/models/res_partner.py`
 - ❌ NEVER: `Read("../../../../odoo/...")` - Doesn't exist on host!
 
 ## Research Patterns

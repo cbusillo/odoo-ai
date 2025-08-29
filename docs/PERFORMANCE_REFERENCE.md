@@ -77,14 +77,14 @@ specialization.
 # ❌ SLOW: Bash approach (30+ seconds)
 docker
 exec
-${ODOO_CONTAINER_PREFIX}-web-1
+${ODOO_PROJECT_NAME} - web - 1
 find / odoo - name
 "*.py" | xargs
 grep - l
 "class.*Product"
 
 # ✅ FAST: MCP tool (<1 second)
-mcp__odoo-intelligence__search_models(pattern="product")
+mcp__odoo - intelligence__search_models(pattern="product")
 ```
 
 ### Example 2: Analyzing Performance Issues
@@ -94,7 +94,7 @@ mcp__odoo-intelligence__search_models(pattern="product")
 # Manually checking each file for loops with searches
 
 # ✅ COMPLETE: MCP analysis (seconds, finds all issues)
-mcp__odoo-intelligence__performance_analysis(model_name="sale.order")
+mcp__odoo - intelligence__performance_analysis(model_name="sale.order")
 ```
 
 ### Example 3: Code Quality Check
@@ -104,7 +104,7 @@ mcp__odoo-intelligence__performance_analysis(model_name="sale.order")
 # Only checks currently open file
 
 # ✅ COMPREHENSIVE: Project-wide analysis
-mcp__odoo-intelligence__pattern_analysis(pattern_type="all")
+mcp__odoo - intelligence__pattern_analysis(pattern_type="all")
 # Analyzes entire codebase instantly
 ```
 

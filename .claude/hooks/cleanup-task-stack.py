@@ -97,7 +97,11 @@ def main():
         elif stack:
             # Fallback: if no subagent_type but stack exists, pop the most recent
             # This prevents stack from growing indefinitely due to missing metadata
-            stack.pop()
+            # Also handle error cases where Task was blocked
+            if hook_input.get("tool_result", {}).get("error"):
+                # Task was blocked or errored, pop from stack anyway
+                if stack:
+                    stack.pop()
         
         # Save updated stack (even if empty)
         save_stack(stack)

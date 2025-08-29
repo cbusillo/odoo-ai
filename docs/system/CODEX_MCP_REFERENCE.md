@@ -17,7 +17,7 @@ This document provides quick reference for Codex MCP usage in the Odoo project c
 
 - **Basic Usage**: [usage.md](../codex/usage.md)
 - **Advanced Features**: [advanced.md](../codex/advanced.md)
-- **Agent Integration**: [gpt-codex.md](../agents/gpt-codex.md)
+- **Agent Integration**: [gpt.md](../agents/gpt.md)
 
 ## Project-Specific Configuration
 
@@ -26,7 +26,7 @@ This document provides quick reference for Codex MCP usage in the Odoo project c
 When using Codex MCP for Odoo development, use these configurations:
 
 ```python
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Your Odoo task",
     model="gpt-5",  # Default, or "gpt-4.1" for 1M+ context
     sandbox="workspace-write",  # For code modifications
@@ -47,6 +47,15 @@ mcp__gpt-codex__codex(
 2. **Python Execution**: Never run Python directly, use Odoo's environment
 3. **Database Context**: Include `--database ${ODOO_DB_NAME}` in Odoo commands
 4. **Test Commands**: Use `uv run` commands defined in pyproject.toml
+
+## Important Notes
+
+### Session Management
+
+- Codex MCP tools work **asynchronously** via event notifications
+- Session IDs and responses are delivered through `codex/event` notifications
+- Direct tool calls return no visible output (this is normal)
+- The GPT agent handles these events internally when called via Task()
 
 ## Quick Reference
 

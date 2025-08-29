@@ -10,30 +10,43 @@ MCP server.
 ### Starting a Conversation
 
 ```python
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Your request here",
     sandbox="workspace-write",  # or "danger-full-access", "read-only"
     model="gpt-5",  # Default, or "gpt-4.1" (1M+ token context), "gpt-4.5"
-    approval-policy="never",  # or "untrusted", "on-failure", "on-request"
+    approval - policy = "never",  # or "untrusted", "on-failure", "on-request"
     # Additional optional parameters:
-    profile="profile-name",  # Config profile from ~/.codex/config.toml
-    cwd="/path/to/dir",  # Working directory
-    config={"key": "value"},  # Config overrides (as TOML)
-    base-instructions="custom",  # Replace default instructions
-    include-plan-tool=true  # Include plan tool
+profile = "profile-name",  # Config profile from ~/.codex/config.toml
+cwd = "/path/to/dir",  # Working directory
+config = {"key": "value"},  # Config overrides (as TOML)
+base - instructions = "custom",  # Replace default instructions
+include - plan - tool = true  # Include plan tool
 )
 ```
 
 ### Continuing a Session
 
-The session ID is returned via a `codex/event` notification (not in the direct response).
+**IMPORTANT**: The session ID is delivered via `codex/event` notification (NOT in the direct response).
 
 ```python
-mcp__gpt-codex__codex-reply(
+# After initial codex call, look for notification like:
+# {"type": "codex/event", "sessionId": "urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"}
+
+mcp__gpt - codex__codex - reply(
     prompt="Follow-up request",
-    sessionId="uuid-from-notification"  # Must be valid UUID format
+    sessionId="urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # From codex/event notification
 )
 ```
+
+**Session ID Requirements**:
+
+- Must be exact UUID from `codex/event` notification
+- Format: `urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+- Never use arbitrary strings like "gpt-5" or "session-1"
+
+Tip for Claude users: set the environment variable `CODEX_MCP_IMMEDIATE_RESULT=1` when launching the Codex MCP server to
+receive an immediate `tools/call` result that contains `{ type: "session_started", sessionId }`. Event notifications
+will continue to stream via `codex/event` until `task_complete`.
 
 ## Sandbox Modes
 
@@ -71,7 +84,7 @@ See: [reference.md#common-issues](./reference.md#common-issues)
 ### Web Research
 
 ```python
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Research the best practices for [topic]. Search the web for current information.",
     sandbox="danger-full-access",
     model="gpt-5"  # Default - use this for most tasks
@@ -81,7 +94,7 @@ mcp__gpt-codex__codex(
 ### Large Refactoring
 
 ```python
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Refactor all files in @/path/to/directory to use async patterns",
     sandbox="workspace-write",
     model="gpt-5"  # Or "gpt-4.1" for very large contexts (1M+ tokens)
@@ -91,7 +104,7 @@ mcp__gpt-codex__codex(
 ### Debug and Fix
 
 ```python
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Debug and fix the failing tests in @/tests/. Run the tests and fix any issues.",
     sandbox="workspace-write"
 )

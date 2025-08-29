@@ -243,7 +243,7 @@ def investigate_failure(error_message):
 python -m compileall addons/
 
 # 2. Import validation
-docker exec ${ODOO_CONTAINER_PREFIX}-script-runner-1 /odoo/odoo-bin \
+docker exec ${ODOO_PROJECT_NAME}-script-runner-1 /odoo/odoo-bin \
   -u product_connect --stop-after-init
 
 # 3. Unit tests

@@ -134,7 +134,7 @@ def safe_terminate_process(process: subprocess.Popen, container_prefix: str = No
 
 def get_container_prefix() -> str:
     """Get the container prefix from environment or use default."""
-    return os.environ.get("ODOO_CONTAINER_PREFIX", "odoo")
+    return os.environ.get("ODOO_PROJECT_NAME", "odoo")
 
 
 def get_production_db_name() -> str:

@@ -47,11 +47,10 @@ Coordinate specialized agents. Your responsibilities:
 
 **CRITICAL**: When recursion blocked, follow the hook's RECOMMENDED ACTION instructions.
 
-See [docs/agent-patterns/anti-recursion-guidelines.md](docs/agent-patterns/anti-recursion-guidelines.md) for agent guidelines.
+See [docs/agent-patterns/anti-recursion-guidelines.md](docs/agent-patterns/anti-recursion-guidelines.md) for agent
+guidelines.
 
 **Temporary hook**: Until Anthropic ships built-in protection (GitHub #6468, #4277)
-
-
 
 ## 🚨 RED FLAGS - NEVER Attempt These Directly
 
@@ -68,25 +67,25 @@ See [docs/agent-patterns/anti-recursion-guidelines.md](docs/agent-patterns/anti-
 
 ## Complete Agent Directory (All 17 Experts)
 
-| Agent                   | Deep Knowledge Areas                                  | Odoo Triggers                     | ALWAYS Use When              |
-|-------------------------|-------------------------------------------------------|-----------------------------------|------------------------------|
-| 🏹 `archer`             | Model discovery, field analysis, inheritance chains, code patterns | "find", "research", "model", "field" | Odoo model research & analysis |
-| 🐛 `debugger`           | Error analysis, stack traces, root causes             | "error", "traceback", "crash"     | ANY error or exception       |
-| 🔍 `scout`              | Test infrastructure, fixtures, mocking, data setup    | "test", "mock", "fixture"         | Writing/debugging tests      |
-| 🔬 `inspector`          | Code quality analysis, comprehensive inspection reports | "quality", "inspect", "review"    | Code quality & standards     |
-| 🔍 `qc`                 | Multi-agent coordination, comprehensive reviews       | "full review", "complete check"   | Orchestrating quality checks |
-| ⚡ `flash`               | Performance analysis, N+1 detection, data quality    | "slow", "optimize", "N+1", "performance" | ANY performance issue |
-| 💬 `gpt`                | Large implementations, external verification          | "implement", "build", "5+ files"  | Complex implementations      |
-| 🎭 `playwright`         | Browser automation, UI testing, tours                 | "browser", "click", "tour"        | UI/browser testing           |
-| 🦉 `owl`                | Owl.js, components, frontend patterns, widgets        | "component", "widget", "frontend" | ANY frontend work            |
-| 🚢 `dock`               | Container health, system operations, module deployment | "docker", "container", "logs", "deploy" | Container & system ops |
-| 🛍️ `shopkeeper`        | Shopify API, GraphQL, webhooks, sync                  | "shopify", "sync", "webhook"      | Shopify integration          |
-| 📋 `planner`            | Architecture design, implementation strategies        | "plan", "design", "approach"      | Planning before coding       |
-| 🔧 `refactor`           | Bulk changes, systematic improvements                 | "refactor", "rename", "bulk"      | Large-scale changes          |
-| 🔥 `phoenix`            | Version migration, API compatibility                  | "upgrade", "migrate", "18.0"      | Version upgrades             |
-| 📝 `doc`                | Documentation generation, maintenance                 | "document", "README", "explain"   | Documentation tasks          |
-| 🧙 `odoo-engineer`      | ORM, security, views, framework internals             | "model", "inherit", "security"    | ANY Odoo framework task      |
-| 🤖 `anthropic-engineer` | Agent optimization, delegation patterns               | "agent", "workflow", "Claude"     | Improving this system        |
+| Agent                   | Deep Knowledge Areas                                               | Odoo Triggers                            | ALWAYS Use When                |
+|-------------------------|--------------------------------------------------------------------|------------------------------------------|--------------------------------|
+| 🏹 `archer`             | Model discovery, field analysis, inheritance chains, code patterns | "find", "research", "model", "field"     | Odoo model research & analysis |
+| 🐛 `debugger`           | Error analysis, stack traces, root causes                          | "error", "traceback", "crash"            | ANY error or exception         |
+| 🔍 `scout`              | Test infrastructure, fixtures, mocking, data setup                 | "test", "mock", "fixture"                | Writing/debugging tests        |
+| 🔬 `inspector`          | Code quality analysis, comprehensive inspection reports            | "quality", "inspect", "review"           | Code quality & standards       |
+| 🔍 `qc`                 | Multi-agent coordination, comprehensive reviews                    | "full review", "complete check"          | Orchestrating quality checks   |
+| ⚡ `flash`               | Performance analysis, N+1 detection, data quality                  | "slow", "optimize", "N+1", "performance" | ANY performance issue          |
+| 💬 `gpt`                | Large implementations, external verification                       | "implement", "build", "5+ files"         | Complex implementations        |
+| 🎭 `playwright`         | Browser automation, UI testing, tours                              | "browser", "click", "tour"               | UI/browser testing             |
+| 🦉 `owl`                | Owl.js, components, frontend patterns, widgets                     | "component", "widget", "frontend"        | ANY frontend work              |
+| 🚢 `dock`               | Container health, system operations, module deployment             | "docker", "container", "logs", "deploy"  | Container & system ops         |
+| 🛍️ `shopkeeper`        | Shopify API, GraphQL, webhooks, sync                               | "shopify", "sync", "webhook"             | Shopify integration            |
+| 📋 `planner`            | Architecture design, implementation strategies                     | "plan", "design", "approach"             | Planning before coding         |
+| 🔧 `refactor`           | Bulk changes, systematic improvements                              | "refactor", "rename", "bulk"             | Large-scale changes            |
+| 🔥 `phoenix`            | Version migration, API compatibility                               | "upgrade", "migrate", "18.0"             | Version upgrades               |
+| 📝 `doc`                | Documentation generation, maintenance                              | "document", "README", "explain"          | Documentation tasks            |
+| 🧙 `odoo-engineer`      | ORM, security, views, framework internals                          | "model", "inherit", "security"           | ANY Odoo framework task        |
+| 🤖 `anthropic-engineer` | Agent optimization, delegation patterns                            | "agent", "workflow", "Claude"            | Improving this system          |
 
 ## Deterministic Decision Tree
 
@@ -109,7 +108,7 @@ See [docs/agent-patterns/anti-recursion-guidelines.md](docs/agent-patterns/anti-
 
 ```python
 # For test runner and tools needing full system access:
-mcp__gpt_codex__codex(
+mcp__gpt - codex__codex(
     prompt="[specific request]",
     sandbox="danger-full-access",  # Required for test_runner, psutil, Docker
     model="gpt-5",
@@ -117,7 +116,7 @@ mcp__gpt_codex__codex(
 )
 
 # For standard development tasks:
-mcp__gpt_codex__codex(
+mcp__gpt - codex__codex(
     prompt="[specific request]",
     model="gpt-5",
     approval_policy="never"
@@ -154,9 +153,9 @@ agent name as `subagent_type`.
 
 **NEVER use directly:**
 
-- `mcp__gpt_codex__*` - GPT agent handles these
+- `mcp__gpt-codex__*` - GPT agent handles these
 - `mcp__odoo-intelligence__*` - Archer, Flash, Dock agents have better access
-- `mcp__inspection-pycharm__*` - Inspector agent has specialized workflows  
+- `mcp__inspection-pycharm__*` - Inspector agent has specialized workflows
 - `mcp__jetbrains__*` - Agents use these more effectively
 - ANY Odoo-specific operations - ALWAYS delegate
 - Complex implementation tools - ALWAYS delegate
@@ -189,7 +188,7 @@ agent name as `subagent_type`.
 **Each agent loads its own specialized knowledge:**
 
 - `odoo-engineer`: Complete Odoo framework internals, ORM patterns, security models
-- `owl`: Owl.js component lifecycle, patching system, QWeb templates  
+- `owl`: Owl.js component lifecycle, patching system, QWeb templates
 - `scout`: Test fixture patterns, TransactionCase, mock strategies
 - `shopkeeper`: Shopify GraphQL schema, bulk operations, webhook handling
 - `flash`: Performance profiling, N+1 detection, field value analysis via MCP tools
@@ -214,7 +213,7 @@ agent name as `subagent_type`.
 
 ### Agent Pattern Libraries (29+ Specialized Docs)
 
-**Agents auto-load their patterns from [docs/agent-patterns/](docs/agent-patterns/)**
+**Agents auto-load their patterns from docs/agent-patterns/**
 You don't need these - agents have them!
 
 ## Commands

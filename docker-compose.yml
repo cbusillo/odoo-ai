@@ -1,19 +1,25 @@
-x-build-base: &build-base
-  dockerfile: docker/Dockerfile
-  args:
-    PYTHON_VERSION: ${PYTHON_VERSION:?error}
-    ODOO_VERSION: ${ODOO_VERSION:?error}
-    ODOO_ENTERPRISE_REPOSITORY: ${ODOO_ENTERPRISE_REPOSITORY:-}
-    GITHUB_TOKEN: ${GITHUB_TOKEN:-}
-  target: ${COMPOSE_BUILD_TARGET:-production}
+x-odoo-base: &odoo-base
+  # TODO: SECURITY WARNING - Never push this image to a registry!
+  # 1. GitHub token is embedded in Docker layer history
+  # 2. Contains proprietary Odoo Enterprise source code
+  # 3. To prevent accidental push: keep image name local (no registry prefix)
+  # If registry push ever needed: refactor Dockerfile to use BuildKit secrets
+  image: ${DOCKER_IMAGE:-odoo-ai}:latest
+  build:
+    dockerfile: docker/Dockerfile
+    args:
+      PYTHON_VERSION: ${PYTHON_VERSION:?error}
+      ODOO_VERSION: ${ODOO_VERSION:?error}
+      ODOO_ENTERPRISE_REPOSITORY: ${ODOO_ENTERPRISE_REPOSITORY:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    target: ${COMPOSE_BUILD_TARGET:-production}
+  env_file:
+    - .env
 
-name: ${ODOO_CONTAINER_PREFIX:-odoo}
+name: ${ODOO_PROJECT_NAME:-odoo}
 services:
-  web: &odoo-base
-    build:
-      <<: *build-base
-    env_file:
-      - .env
+  web:
+    <<: *odoo-base
     ports:
       - "8069:8069"
     volumes:

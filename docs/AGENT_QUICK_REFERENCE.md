@@ -73,7 +73,7 @@ Task(
 )
 
 # GPT agent (special case - direct MCP)
-mcp__gpt_codex__codex(
+mcp__gpt - codex__codex(
     prompt="[request]",
     sandbox="workspace-write",
     model="gpt-5",

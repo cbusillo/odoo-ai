@@ -51,7 +51,7 @@
 
 ```bash
 # Using Bash because MCP doesn't support --dev=all flag
-docker exec ${ODOO_CONTAINER_PREFIX}-web-1 /odoo/odoo-bin --dev=all --stop-after-init
+docker exec ${ODOO_PROJECT_NAME}-web-1 /odoo/odoo-bin --dev=all --stop-after-init
 ```
 
 ## Tool Categories
@@ -120,7 +120,7 @@ docker exec ${ODOO_CONTAINER_PREFIX}-web-1 /odoo/odoo-bin --dev=all --stop-after
 
 ```python
 # Takes 30+ seconds, requires parsing
-bash("docker exec ${ODOO_CONTAINER_PREFIX}-web-1 grep -r 'class.*Controller' /odoo/addons/")
+bash("docker exec ${ODOO_PROJECT_NAME}-web-1 grep -r 'class.*Controller' /odoo/addons/")
 ```
 
 **Problems**:
@@ -171,7 +171,7 @@ for container in container_list.split('\n'):
 ```python
 # Single call, complete structured data
 containers = mcp__docker__list_containers()
-# Returns: [{"name": "${ODOO_CONTAINER_PREFIX}-web-1", "status": "running", "ports": {...}, ...}]
+# Returns: [{"name": "${ODOO_PROJECT_NAME}-web-1", "status": "running", "ports": {...}, ...}]
 ```
 
 **Benefits**:
@@ -264,9 +264,9 @@ mcp__odoo-intelligence__odoo_logs(lines=100)
 
 # ❌ WRONG: Manual process
 # 1. Wrong container (interferes with web)
-bash("docker exec ${ODOO_CONTAINER_PREFIX}-web-1 /odoo/odoo-bin -u product_connect")
+bash("docker exec ${ODOO_PROJECT_NAME}-web-1 /odoo/odoo-bin -u product_connect")
 # 2. Full log dump
-bash("docker logs ${ODOO_CONTAINER_PREFIX}-web-1")
+bash("docker logs ${ODOO_PROJECT_NAME}-web-1")
 # Total time: 45+ seconds, potential issues
 ```
 
@@ -289,8 +289,8 @@ mcp__odoo-intelligence__search_code(
 
 ```python
 # ❌ DON'T: Multiple subprocess overhead
-bash("docker exec ${ODOO_CONTAINER_PREFIX}-web-1 ls /odoo/addons")
-bash("docker exec ${ODOO_CONTAINER_PREFIX}-web-1 cat /odoo/addons/base/__manifest__.py")
+bash("docker exec ${ODOO_PROJECT_NAME}-web-1 ls /odoo/addons")
+bash("docker exec ${ODOO_PROJECT_NAME}-web-1 cat /odoo/addons/base/__manifest__.py")
 
 # ✅ DO: Use appropriate tools
 mcp__odoo-intelligence__module_structure(module_name="base")

@@ -71,11 +71,11 @@ addons/product_connect/
 ## 🐳 Container Architecture
 
 ### Container Purposes
-	
-- **${ODOO_CONTAINER_PREFIX}-web-1**: Main web server (user requests)
-- **${ODOO_CONTAINER_PREFIX}-shell-1**: Interactive shell operations
-- **${ODOO_CONTAINER_PREFIX}-script-runner-1**: Module updates, tests, one-off scripts
-- **${ODOO_CONTAINER_PREFIX}-database-1**: PostgreSQL database
+
+- **${ODOO_PROJECT_NAME}-web-1**: Main web server (user requests)
+- **${ODOO_PROJECT_NAME}-shell-1**: Interactive shell operations
+- **${ODOO_PROJECT_NAME}-script-runner-1**: Module updates, tests, one-off scripts
+- **${ODOO_PROJECT_NAME}-database-1**: PostgreSQL database
 
 ### Container Paths (READ-ONLY)
 
@@ -87,9 +87,9 @@ addons/product_connect/
 - `/volumes/data/*` - Filestore data
 
 ### Path Access Rules
-	
+
 - ✅ **Custom addons**: Use `Read("addons/product_connect/...")`
-- ✅ **Odoo core**: Use `docker exec ${ODOO_CONTAINER_PREFIX}-web-1 cat /odoo/addons/...`
+- ✅ **Odoo core**: Use `docker exec ${ODOO_PROJECT_NAME}-web-1 cat /odoo/addons/...`
 - ❌ **NEVER**: Use `Read("/odoo/...")` - path doesn't exist on host!
 
 ## 🧩 Component Architecture
@@ -106,7 +106,7 @@ addons/product_connect/
 # Example: Product Template Extension
 class ProductTemplate(models.Model):
     _inherit = 'product.template'
-    
+
     motor_year = fields.Integer()
     motor_make = fields.Char()
     motor_model = fields.Char()
@@ -405,6 +405,7 @@ carrier_map = env['delivery.carrier.service.map']
 ### Future Migration Path
 
 When Odoo becomes source of truth:
+
 1. Enable order confirmation workflow
 2. Implement bi-directional fulfillment sync
 3. Activate inventory movements

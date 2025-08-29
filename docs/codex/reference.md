@@ -40,8 +40,9 @@ See also:
 ## Session Management
 
 - Initial `codex` call creates a session automatically.
-- Session ID is delivered via `codex/event` notification (not in the direct response).
-- Session IDs must be valid UUIDs.
+- **CRITICAL**: Session ID is delivered via `codex/event` notification (NOT in the direct response).
+- Session IDs must be valid UUIDs in format: `urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+- Never manually create session IDs - always extract from notification stream
 - Use the session ID with `mcp__gpt-codex__codex-reply` to maintain context across turns.
 - For the code snippet to continue a session, see: [usage.md#continuing-a-session](./usage.md#continuing-a-session)
 
@@ -56,6 +57,25 @@ See also:
 
 ### Session ID Problems
 
-- Error: "Failed to parse session_id"
-- Ensure you use the UUID from the `codex/event` notification
-- Do not manually construct session IDs
+**Error**:
+`"Failed to parse session_id: invalid character: expected an optional prefix of 'urn:uuid:' followed by [0-9a-fA-F-], found 'g' at 1"`
+
+**Root Cause**: Using invalid session ID format (e.g., "gpt-5", "session-1", etc.)
+
+**Solutions**:
+
+1. **Never manually create session IDs** - they must come from Codex CLI
+2. **Extract from `codex/event` notification** - not from direct response
+3. **Use proper UUID format**: `urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+4. **Example of correct extraction**:
+   ```python
+   # Look for this in notification stream:
+   # {"type": "codex/event", "sessionId": "urn:uuid:12345678-1234-1234-1234-123456789abc"}
+   ```
+
+**Common mistakes**:
+
+- ❌ `sessionId="gpt-5"` (arbitrary string)
+- ❌ `sessionId="session-1"` (custom format)
+- ❌ `sessionId=response.get('sessionId')` (not in direct response)
+- ✅ `sessionId="urn:uuid:12345678-1234-1234-1234-123456789abc"` (from notification)

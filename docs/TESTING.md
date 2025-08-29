@@ -782,7 +782,7 @@ Each UV command is implemented in `tools/test_commands.py`:
 def run_unit_tests():
     """Run fast unit tests using script-runner container."""
     cmd = [
-        "docker", "exec", "${ODOO_CONTAINER_PREFIX}-script-runner-1",
+        "docker", "exec", "${ODOO_PROJECT_NAME}-script-runner-1",
         "/odoo/odoo-bin",
         "--test-tags", "product_connect,unit_test",
         "--stop-after-init",
@@ -805,7 +805,7 @@ test-all = "tools.test_commands:run_all_tests"
 
 [tool.odoo-test]
 # Container settings
-container = "${ODOO_CONTAINER_PREFIX}-script-runner-1"
+container = "${ODOO_PROJECT_NAME}-script-runner-1"
 addons_path = "/volumes/addons,/odoo/addons,/volumes/enterprise"
 
 # Database configuration

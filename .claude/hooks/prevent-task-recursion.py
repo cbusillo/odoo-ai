@@ -43,8 +43,9 @@ def get_current_stack():
     stack_path = _stack_file()
     if stack_path.exists():
         try:
-            # Reset stale stacks older than 2 hours to avoid permanent lockouts
-            if time.time() - stack_path.stat().st_mtime > 2 * 60 * 60:
+            # Reset stale stacks older than 10 minutes to avoid persistent lockouts
+            # This handles cases where cleanup hooks don't run (e.g., blocked tasks)
+            if time.time() - stack_path.stat().st_mtime > 10 * 60:
                 return []
             with open(stack_path, "r") as f:
                 data = json.load(f)
@@ -123,6 +124,8 @@ def main():
         MAX_SELF_CALLS = 1  # Allow agent to call itself once, block on second attempt
         agent_count = stack.count(target_agent)
         
+        # IMPORTANT: Don't add to stack if we're going to block
+        # This prevents stuck stacks when cleanup hooks don't run
         if agent_count >= MAX_SELF_CALLS:
             # EXCESSIVE RECURSION DETECTED! Signal to continue with current agent instead of re-routing
             decision_note = f"deny: recursion (depth {agent_count})"
@@ -188,6 +191,7 @@ def main():
 
         # No recursion detected, add to stack for tracking
         # Note: We'll need a PostToolUse hook to remove from stack
+        # IMPORTANT: Only add if we're allowing the call
         stack.append(str(target_agent))
         save_stack(stack)
         try:

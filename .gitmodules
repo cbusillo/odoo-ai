@@ -6,3 +6,6 @@
 	path = addons/disable_odoo_online
 	url = git@github.com:cbusillo/disable_odoo_online
 	ignore = dirty
+[submodule "addons/cm_custom"]
+	path = addons/cm_custom
+	url = https://github.com/cellmechanic/cm_custom.git

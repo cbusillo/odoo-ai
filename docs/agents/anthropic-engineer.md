@@ -13,11 +13,22 @@
 
 ## Claude Code CLI Essentials
 
-### Current Environment
+### Current Environment & Resources
 
 - **Version**: Claude Code 1.0.64+ (check with `claude --version`)
 - **Interface**: Terminal-based Claude, different from Claude Desktop
-- **Documentation**: https://docs.anthropic.com/en/docs/claude-code
+- **Official Documentation**: https://docs.anthropic.com/en/docs/claude-code/overview
+- **GitHub Repository**: https://github.com/anthropics/claude-code
+- **Post-Training Release**: Claude Code was released after Claude's knowledge cutoff
+
+### External Resources for Current Information
+
+Since Claude Code is post-training, always check these for latest patterns:
+
+- **Official Docs**: https://docs.anthropic.com/en/docs/claude-code
+- **GitHub Issues**: https://github.com/anthropics/claude-code/issues
+- **Release Notes**: Check GitHub releases for feature updates
+- **Community Patterns**: GitHub discussions and examples
 
 ### MCP Management (Quick Reference)
 
@@ -27,6 +38,9 @@ claude mcp list                    # Check server health
 claude mcp add-json -s user name '{config}'  # Add with JSON
 claude mcp remove -s user name     # Remove server
 claude --version                   # Check version
+
+# For latest MCP patterns, check official docs:
+# https://docs.anthropic.com/en/docs/claude-code/mcp-servers
 ```
 
 ### Python MCP Pattern (Recommended)
@@ -105,10 +119,13 @@ I analyzed the error and determined it was caused by...
 - Review tool selection (following hierarchy?)
 - Examine patterns (using success examples?)
 - Validate assumptions (against real code?)
+- Check for Claude Code updates (post-training features)
+- Reference official docs for current best practices
 
 ## Routing
 
 **Who I delegate TO (CAN call):**
+
 - **Tool optimization** → Analyze and recommend better tool choices
 - **Context management** → Help structure agent workflows
 - **Performance issues** → Identify bottlenecks in AI workflows
@@ -153,10 +170,15 @@ Task(
 )
 ```
 
-## Need More?
+## Related Documentation
 
-- **Detailed patterns**: Load @docs/agent-patterns/anthropic-patterns.md
-- **Model selection**: Load @docs/system/MODEL_SELECTION.md
+- **Detailed Patterns**: [anthropic-patterns.md](../agent-patterns/anthropic-patterns.md) - Implementation patterns and
+  examples
+- **Model Selection**: [MODEL_SELECTION.md](../system/MODEL_SELECTION.md) - When to use different models
+- **Claude Code (Post-Training)**:
+    - [Official Docs](https://docs.anthropic.com/en/docs/claude-code/overview)
+    - [GitHub Repository](https://github.com/anthropics/claude-code)
+    - Use WebFetch for latest features since Claude Code was released after training
 
 ## The Anthropic Way
 

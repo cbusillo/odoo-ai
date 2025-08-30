@@ -2,7 +2,15 @@
 # PreToolUse hook: Check if compaction occurred and inject CLAUDE.md reminder
 # IMPORTANT: Never interrupt Task (agent delegation) with an approval prompt to avoid recursion.
 
-CLAUDE_DIR=".claude"
+# Find the project root - use CLAUDE_PROJECT_DIR if set, otherwise find it
+if [[ -n "$CLAUDE_PROJECT_DIR" ]]; then
+    PROJECT_DIR="$CLAUDE_PROJECT_DIR"
+else
+    # Get the directory where this script is located and go up 2 levels
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+fi
+CLAUDE_DIR="$PROJECT_DIR/.claude"
 COMPACT_FLAG="$CLAUDE_DIR/.compacted"
 DEBUG_LOG="$CLAUDE_DIR/hook-debug.log"
 JQ_BIN="${JQ_BIN:-jq}"

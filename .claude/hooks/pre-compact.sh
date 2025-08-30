@@ -1,7 +1,15 @@
 #!/bin/bash
 # Pre-compact hook: Mark that compaction is occurring
 
-CLAUDE_DIR=".claude"
+# Find the project root - use CLAUDE_PROJECT_DIR if set, otherwise find it
+if [[ -n "$CLAUDE_PROJECT_DIR" ]]; then
+    PROJECT_DIR="$CLAUDE_PROJECT_DIR"
+else
+    # Get the directory where this script is located and go up 2 levels
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+fi
+CLAUDE_DIR="$PROJECT_DIR/.claude"
 COMPACT_FLAG="$CLAUDE_DIR/.compacted" 
 LOG_FILE="$CLAUDE_DIR/compact.log"
 DEBUG_LOG="$CLAUDE_DIR/hook-debug.log"

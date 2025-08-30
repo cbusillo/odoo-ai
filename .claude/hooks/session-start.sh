@@ -1,5 +1,6 @@
 #!/bin/sh
 # SessionStart hook: Check if compaction occurred and inject CLAUDE.md reminder
+# Also clears any stale agent stack files to prevent recursion issues
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -9,6 +10,13 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CLAUDE_DIR="$PROJECT_DIR/.claude"
 COMPACT_FLAG="$CLAUDE_DIR/.compacted"
 DEBUG_LOG="$CLAUDE_DIR/hook-debug.log"
+STACK_DIR="$PROJECT_DIR/tmp/data"
+
+# Clear any stale agent stack files on session start (safety measure)
+if [ -d "$STACK_DIR" ]; then
+    find "$STACK_DIR" -name "agent_stack_*.json" -type f -delete 2>/dev/null
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] SessionStart: Cleared agent stack files" >> "$DEBUG_LOG"
+fi
 
 # Check if compaction flag exists
 if [ -f "$COMPACT_FLAG" ]; then

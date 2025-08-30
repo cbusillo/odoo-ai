@@ -1,19 +1,25 @@
-# Recursion Prevention - Agent Guidelines
+# 🚨 Recursion Prevention - Agent Guidelines
+
+## CRITICAL: Never Call Yourself
+
+**Agents MUST NOT delegate to themselves** - This crashes Claude Code!
 
 ## Core Principle: Own Your Domain
 
-Handle tasks within your expertise directly. Don't delegate back to yourself.
+Handle tasks within your expertise directly. Use your tools, not Task() to yourself.
 
-## When You See "Preventing excessive recursion"
+## When You See "Preventing recursion"
 
-The hook caught you trying to self-delegate. Continue with direct tools instead.
+The hook blocked a self-call that would crash the system. You MUST:
 
 ### DO:
+
 - Use Edit/Write/MultiEdit for file changes
-- Use Read/Grep/Bash for analysis  
+- Use Read/Grep/Bash for analysis
 - Complete the work with your available tools
 
 ### DON'T:
+
 - Call Task() with your own agent type
 - Switch to a different agent
 - Abandon the current task
@@ -29,10 +35,21 @@ The hook caught you trying to self-delegate. Continue with direct tools instead.
 ## Exception: Cross-Agent Delegation
 
 These patterns are healthy:
+
 - `archer → odoo-engineer` (Research → Implementation)
-- `debugger → dock` (Error analysis → Container fixes)  
+- `debugger → dock` (Error analysis → Container fixes)
 - `planner → specialists` (Planning → Execution)
+
+## Enhanced Protection (Aug 2025)
+
+**New safeguards to prevent crashes:**
+
+- ✅ Blocks ALL self-calls (not just immediate)
+- ✅ Stack depth limited to 2 levels (was 3)
+- ✅ Auto-clears stale stacks after 5 minutes
+- ✅ Session start resets all stacks
+- ✅ Better cleanup on blocked tasks
 
 ## Hook Status
 
-This is a temporary solution until Anthropic ships built-in recursion protection.
+Temporary solution until Anthropic ships built-in recursion protection (Issues #6468, #4277)

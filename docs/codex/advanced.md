@@ -12,12 +12,39 @@ See also:
 
 ## Key Advanced Features
 
-### 1. Reasoning Configuration
+### 1. MCP Server Compatibility Mode
+
+The Codex MCP server runs in compatibility mode by default, which provides synchronous responses required by most MCP
+clients:
+
+```python
+# Compatibility mode is enabled by default in the MCP server
+# This ensures session IDs are returned immediately in the response
+
+response = mcp__gpt - codex__codex(
+    prompt="Your task here",
+    sandbox="workspace-write"
+)
+
+# Session ID is immediately available
+session_id = response['structuredContent']['sessionId']
+
+# Continue the conversation
+mcp__gpt - codex__codex - reply(
+    prompt="Follow-up question",
+    sessionId=session_id
+)
+```
+
+**Note**: The MCP server must be started with `--compatibility-mode` flag or have `mcp.compatibility_mode = true` in
+config.toml.
+
+### 2. Reasoning Configuration
 
 Control how deeply the model thinks about problems:
 
 ```python
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Complex architectural decision needed",
     model="gpt-5",
     config={
@@ -36,12 +63,12 @@ mcp__gpt-codex__codex(
 - Security vulnerability analysis
 - Algorithm design and optimization
 
-### 2. Network Access in Sandbox
+### 3. Network Access in Sandbox
 
 Enable network access while maintaining workspace write restrictions:
 
 ```python
-config={
+config = {
     "sandbox_workspace_write.network_access": true,
     "sandbox_workspace_write.exclude_tmpdir_env_var": false,
     "sandbox_workspace_write.exclude_slash_tmp": false
@@ -55,12 +82,12 @@ config={
 - Downloading dependencies
 - Fetching documentation
 
-### 3. Environment Variable Control
+### 4. Environment Variable Control
 
 Fine-tune which environment variables are passed to subprocesses:
 
 ```python
-config={
+config = {
     "shell_environment_policy.inherit": "all",  # "all", "core", or "none"
     "shell_environment_policy.ignore_default_excludes": false,
     "shell_environment_policy.exclude": ["AWS_*", "AZURE_*", "GITHUB_*"],
@@ -73,17 +100,17 @@ config={
 }
 ```
 
-### 4. Performance Tuning
+### 5. Performance Tuning
 
 Optimize for large contexts and network reliability:
 
 ```python
-config={
+config = {
     # Context management
     "model_context_window": 400000,  # Override default context size
     "model_max_output_tokens": 16384,  # Maximum output length
     "project_doc_max_bytes": 32768,  # Max bytes from AGENTS.md
-    
+
     # Network tuning (per-provider basis)
     "request_max_retries": 4,  # HTTP request retries
     "stream_max_retries": 10,  # SSE stream reconnect attempts
@@ -91,12 +118,12 @@ config={
 }
 ```
 
-### 5. Zero Data Retention (ZDR)
+### 6. Zero Data Retention (ZDR)
 
 For enterprise accounts with ZDR requirements:
 
 ```python
-config={
+config = {
     "disable_response_storage": true  # Required for ZDR accounts
 }
 ```
@@ -106,9 +133,9 @@ config={
 Override default system prompts:
 
 ```python
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Your task",
-    base-instructions="""You are an expert Python developer.
+    base - instructions = """You are an expert Python developer.
     Follow PEP 8 strictly.
     Always include type hints.
     Write comprehensive docstrings."""
@@ -126,7 +153,6 @@ model = "gpt-5"
 model_reasoning_effort = "high"
 model_reasoning_summary = "detailed"
 approval_policy = "never"
-# Note: sandbox_mode cannot be set in profiles - use CLI flags
 
 [profiles.deep-reasoning.sandbox_workspace_write]
 network_access = true
@@ -135,27 +161,23 @@ network_access = true
 model = "gpt-5"
 model_reasoning_effort = "medium"
 approval_policy = "never"
-# Note: sandbox_mode cannot be set in profiles - use CLI flags
 
 [profiles.test-runner]
 model = "gpt-5"
 model_reasoning_effort = "medium"
 approval_policy = "never"
-# Note: requires --sandbox danger-full-access CLI flag
 
 [profiles.safe-production]
 model = "gpt-5"
 model_reasoning_effort = "medium"
 approval_policy = "on-request"
 disable_response_storage = true
-# Note: sandbox_mode cannot be set in profiles - use CLI flags
 
 [profiles.quick]
 model = "gpt-5"
 model_reasoning_effort = "low"
 model_reasoning_summary = "none"
 approval_policy = "never"
-# Note: sandbox_mode cannot be set in profiles - use CLI flags
 ```
 
 Then use:
@@ -168,11 +190,10 @@ mcp__gpt_codex__codex(
     sandbox="workspace-write"  # Must specify sandbox explicitly
 )
 
-# Test runner profile requires danger-full-access
 mcp__gpt_codex__codex(
     prompt="Run tests",
     profile="test-runner",
-    sandbox="danger-full-access"  # Required for test execution
+    sandbox="workspace-write"  # Must specify sandbox explicitly
 )
 ```
 
@@ -183,7 +204,7 @@ mcp__gpt_codex__codex(
 For the most complex problems:
 
 ```python
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Solve [complex problem]",
     model="gpt-5",  # Or "gpt-4.1" for 1M+ token contexts
     config={
@@ -201,15 +222,15 @@ mcp__gpt-codex__codex(
 For quick development cycles:
 
 ```python
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Quick implementation",
     model="gpt-5",
-    approval-policy="never",
-    config={
-        "model_reasoning_effort": "low",
-        "hide_agent_reasoning": true,
-        "sandbox_workspace_write.network_access": true
-    }
+    approval - policy = "never",
+config = {
+    "model_reasoning_effort": "low",
+    "hide_agent_reasoning": true,
+    "sandbox_workspace_write.network_access": true
+}
 )
 ```
 
@@ -256,12 +277,6 @@ mcp__gpt_codex__codex(
 **CRITICAL**: Sandbox mode must be specified via CLI flags or config overrides, never in profiles:
 
 ```bash
-# Correct: CLI flag
-codex exec "Task" --profile deep-reasoning --sandbox danger-full-access
-
-# Correct: Config override
-codex exec "Task" --profile dev-standard -c 'sandbox_mode="workspace-write"'
-
 # Via MCP (always specify sandbox explicitly)
 mcp__gpt_codex__codex(
     prompt="Task",
@@ -274,7 +289,6 @@ mcp__gpt_codex__codex(
 
 - Profiles define reasoning, approval, and environment settings
 - Sandbox mode is a security boundary that must be explicit
-- Test runner profile requires `danger-full-access` for full test execution
 
 ## Best Practices
 

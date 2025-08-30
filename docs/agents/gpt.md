@@ -2,56 +2,35 @@
 
 **Audience**: This agent is called by Program Managers using Task(). PMs should NOT call MCP tools directly.
 
-**⚠️ CRITICAL MODEL RULE**: DO NOT specify model parameter unless using gpt-4.1 for extended context (400K+ tokens). The
-default config uses gpt-5.
-
 ## My Tools
 
 ```python
-# Start conversation (session_id delivered via codex/event notification)
+# Start conversation (session_id returned in response)
 mcp__gpt - codex__codex(
     prompt="Your request",
-    sandbox="danger-full-access",  # or "workspace-write", "read-only"
-    # model parameter: OMIT to use default (gpt-5), only specify "gpt-4.1" for 1M+ token context
-    approval_policy="never",  # or "untrusted", "on-failure", "on-request"
+    sandbox="workspace-write",  # Choose: read-only, workspace-write
+    profile="dev-standard",  # Choose profile based on task complexity
     # Optional parameters:
-    profile="deep-reasoning",  # Available: deep-reasoning, dev-standard, test-runner, safe-production, quick
     cwd="/path/to/dir",  # Working directory
     base_instructions="custom",  # Replace default instructions
     include_plan_tool=True,  # Include plan tool
-    # Advanced config overrides:
-    config={
-        "model_reasoning_effort": "high",  # For complex tasks
-        "model_reasoning_summary": "detailed",  # Verbose output
-        "sandbox_workspace_write.network_access": True,  # Network access
-        "hide_agent_reasoning": False  # Show thinking process
-    }
 )
 
 # Continue session (extract session_id from initial response)
 mcp__gpt - codex__codex_reply(
     prompt="Follow-up request",
-    sessionId="uuid-from-initial-response"
+    sessionId="12345678-1234-1234-1234-123456789abc"  # From response['structuredContent']['sessionId']
 )
 ```
 
-## CRITICAL: Model Selection
+## Sandbox Mode Selection
 
-**DO NOT specify the model parameter unless you need extended context!**
+Choose the appropriate sandbox mode for your task:
 
-- **Default (OMIT model parameter)** → Uses gpt-5 from config
-- **Only specify `model="gpt-4.1"`** → When context exceeds 400K tokens
-- **NEVER use gpt-4o** → Outdated model, not supported
+- **`read-only`** - Code analysis, pattern searches, auditing
+- **`workspace-write`** - Implementation, refactoring, file modifications (default)
 
-## Sandbox Mode Decision Guide
-
-See: [CODEX_MCP_REFERENCE.md#sandbox-selection-for-odoo-tasks](../system/CODEX_MCP_REFERENCE.md#sandbox-selection-for-odoo-tasks)
-
-**Quick guide**:
-
-- `workspace-write` (default) - Implementation and refactoring
-- `danger-full-access` - Web research or package installation
-- `read-only` - Analysis only
+Note: Package installation and system operations should be done directly in Claude Code, not through Codex.
 
 ## Primary Use Cases
 
@@ -59,137 +38,112 @@ See: [CODEX_MCP_REFERENCE.md#sandbox-selection-for-odoo-tasks](../system/CODEX_M
 2. **Large tasks**:
     - 5+ files → ALWAYS delegate to GPT agent
     - 20+ files → MUST use GPT agent (preserves PM context)
-3. **Web research**: Current information with `danger-full-access`
+3. **Web research**: Current information (web search enabled in config)
 4. **Debug & fix**: Actually fix code, not just analyze
 5. **Code execution**: Run tests, profile, optimize
 
-## Codex Profiles
+## Profile Selection
 
-**Available profiles in ~/.codex/config.toml:**
+Choose the appropriate profile based on task complexity and requirements:
 
-- **`deep-reasoning`**: Complex multi-step tasks with gpt-5, high reasoning effort, detailed summaries
-    - High reasoning effort for architectural decisions
-    - Network access enabled for package installation
-    - Best for: Complex refactoring, performance optimization, debugging
-
-- **`dev-standard`**: Standard development with gpt-5, medium reasoning, auto-approval
-    - Medium reasoning effort for typical development tasks
-    - Workspace write access with auto-approval
-    - Best for: Standard implementation, bug fixes, routine development
-
-- **`test-runner`**: Test execution and debugging with medium reasoning
-    - Medium reasoning effort for test analysis
-    - Requires --sandbox danger-full-access CLI flag
-    - Best for: Running tests, test debugging, CI/CD tasks
-
-- **`safe-production`**: Production/analysis tasks with approval required
-    - Medium reasoning effort for production tasks
-    - Approval required for actions (on-request)
-    - No response storage for security
-    - Best for: Production analysis, audits, reports
-
-- **`quick`**: Lightweight profile for simple, fast tasks
-    - Low reasoning effort for speed
-    - No reasoning summary for faster responses
+- **`quick`** - Simple, fast tasks (low reasoning effort)
     - Best for: Simple bug fixes, quick implementations
 
-## Quick Patterns
+- **`dev-standard`** - Standard development tasks (medium reasoning, auto-approval)
+    - Best for: Standard implementation, bug fixes, routine development
+
+- **`deep-reasoning`** - Complex multi-step tasks (high reasoning effort)
+    - Best for: Complex refactoring, performance optimization, debugging
+
+- **`test-runner`** - Test execution and debugging (medium reasoning)
+    - Best for: Running tests, test debugging, CI/CD tasks
+
+- **`safe-production`** - Production analysis (approval required, no storage)
+    - Best for: Production analysis, audits, reports
+
+## Common Usage Patterns
 
 ```python
-# Complex Odoo task with high reasoning (uses default gpt-5)
-mcp__gpt - codex__codex(
-    prompt="Optimize ORM queries in product_connect module",
-    profile="deep-reasoning",
-    sandbox="workspace-write"
-    # NOTE: No model parameter - uses default gpt-5
-)
-
-# Production safety check
-mcp__gpt - codex__codex(
-    prompt="Analyze production database performance",
-    profile="safe-production",
-    sandbox="read-only"
-)
-
-# Fact-check with web search (uses default gpt-5)
-mcp__gpt - codex__codex(
-    prompt="Verify: [claim]. Search web if needed.",
-    sandbox="danger-full-access"
-    # No model parameter - uses default gpt-5
-)
-
-# Implement across codebase
-mcp__gpt - codex__codex(
-    prompt="Refactor @addons/product_connect/ to async pattern",
-    profile="dev-standard",
-    sandbox="workspace-write"
-)
-
-# Quick fix with fast profile
+# Quick fix - simple tasks
 mcp__gpt - codex__codex(
     prompt="Fix syntax error in views",
     profile="quick",
     sandbox="workspace-write"
 )
 
-# Test execution with test runner
+# Standard development - typical implementation
+mcp__gpt - codex__codex(
+    prompt="Refactor @addons/product_connect/ to async pattern",
+    profile="dev-standard",
+    sandbox="workspace-write"
+)
+
+# Complex task - architectural changes  
+mcp__gpt - codex__codex(
+    prompt="Optimize ORM queries in product_connect module",
+    profile="deep-reasoning",
+    sandbox="workspace-write"
+)
+
+# Web research - fact checking
+mcp__gpt - codex__codex(
+    prompt="Verify: [claim]. Search web if needed.",
+    profile="dev-standard",
+    sandbox="workspace-write"  # Web search enabled in config
+)
+
+# Test execution 
 mcp__gpt - codex__codex(
     prompt="Run unit tests and fix failures",
     profile="test-runner",
-    sandbox="danger-full-access"
+    sandbox="workspace-write"
 )
 
-# Multi-step with session (uses default gpt-5)
+# Production analysis - read-only safety
+mcp__gpt - codex__codex(
+    prompt="Analyze production database performance",
+    profile="safe-production",
+    sandbox="read-only"
+)
+
+# Multi-step with session
 response = mcp__gpt - codex__codex(
     prompt="Analyze architecture",
+    profile="dev-standard",
     sandbox="read-only"
-    # No model parameter - uses default gpt-5
 )
-# Extract session_id from codex/event notification, then:
-# session_id = "urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # From notification
+session_id = response['structuredContent']['sessionId']
 mcp__gpt - codex__codex_reply(prompt="Now optimize it", sessionId=session_id)
-
-# Deep thinking with HIGH reasoning (uses default gpt-5)
-mcp__gpt - codex__codex(
-    prompt="Think step by step: [complex problem]",
-    # No model parameter - uses default gpt-5
-    config={
-        "model_reasoning_effort": "high",  # Maximum reasoning depth
-        "model_reasoning_summary": "detailed"  # Show all thinking
-    }
-)
 ```
 
 ## Session Management
 
-**IMPORTANT**: The Codex MCP tools work asynchronously:
+**IMPORTANT**: The Codex MCP server runs in compatibility mode for synchronous responses:
 
-- The `codex` tool initiates a session but returns no direct output
-- Session IDs and responses are delivered via `codex/event` notifications
-- The tool appears to complete without visible output (this is normal)
-
-**Note**: Direct testing of these tools outside of the GPT agent context may not show visible results due to the
-event-based architecture.
+- The `codex` tool returns an immediate response with session ID
+- Session IDs are included in the response's `structuredContent.sessionId` field
+- No async notifications or event handling required
 
 **Session Creation:**
 
 ```python
-# Initial call creates session - session_id comes via codex/event notification
+# Initial call creates session and returns session ID directly
 response = mcp__gpt - codex__codex(
     prompt="Analyze this codebase structure",
     sandbox="read-only"
 )
-# Session ID will be delivered via codex/event notification (not in response)
-# Look for: {"type": "codex/event", "sessionId": "urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"}
+# Extract session ID from response
+session_id = response['structuredContent']['sessionId']
+# Example: "12345678-1234-1234-1234-123456789abc"
 ```
 
 **Session Continuation:**
 
 ```python
-# Use UUID session_id from codex/event notification for follow-ups
+# Use UUID session_id from initial response for follow-ups
 mcp__gpt - codex__codex_reply(
     prompt="Now implement the changes we discussed",
-    sessionId="urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # From codex/event notification
+    sessionId=session_id  # From response['structuredContent']['sessionId']
 )
 ```
 
@@ -202,10 +156,11 @@ mcp__gpt - codex__codex_reply(
 
 **Session ID Format Requirements:**
 
-- Must be valid UUID format: `urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+- Must be valid UUID format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
 - Never use arbitrary strings like "gpt-5" or custom IDs
-- Always extract from `codex/event` notification stream
+- Always extract from response's `structuredContent.sessionId` field
 - Session IDs are automatically generated by Codex CLI
+- Do NOT add "urn:uuid:" prefix
 
 **Best Practice:** Use sessions for multi-step tasks like:
 
@@ -243,27 +198,20 @@ mcp__gpt - codex__codex_reply(
 ✅ **Can do**: Execute code, modify files, run tests, web search, save results  
 ❌ **Can't do**: Deep Research mode, persist across separate `codex` calls without session_id
 
-## Model Selection
-
-See: [CODEX_MCP_REFERENCE.md#model-priority-same-as-global](../system/CODEX_MCP_REFERENCE.md#model-priority-same-as-global)
-
-**Quick reminder**: Use `gpt-5` as primary choice. Use `gpt-4.1` as alternative for 1M+ token contexts or when `gpt-5`
-is unavailable.
-
 ## Troubleshooting
 
 ### Session ID Parsing Errors
 
 **Error**:
-`"Failed to parse session_id: invalid character: expected an optional prefix of 'urn:uuid:' followed by [0-9a-fA-F-], found 'g' at 1"`
+`"Failed to parse session_id: invalid UUID format"`
 
 **Cause**: Using invalid session ID format (e.g., "gpt-5" instead of proper UUID)
 
 **Solution**:
 
 1. Never manually create session IDs
-2. Always extract from `codex/event` notification
-3. Ensure format: `urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+2. Always extract from response's `structuredContent.sessionId`
+3. Ensure format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (no urn:uuid: prefix)
 
 ```python
 # ❌ WRONG - Manual session ID
@@ -272,10 +220,10 @@ mcp__gpt - codex__codex_reply(
     sessionId="gpt-5"  # This will fail
 )
 
-# ✅ CORRECT - UUID from notification
+# ✅ CORRECT - UUID from response
 mcp__gpt - codex__codex_reply(
     prompt="Continue task",
-    sessionId="urn:uuid:12345678-1234-1234-1234-123456789abc"  # From codex/event
+    sessionId="12345678-1234-1234-1234-123456789abc"  # From response['structuredContent']['sessionId']
 )
 ```
 
@@ -311,17 +259,7 @@ mcp__gpt - codex__codex(
     sandbox="workspace-write"  # Default for most tasks
 )
 
-# Web research or package installation - danger-full-access required
-mcp__gpt - codex__codex(
-    prompt="Research latest Odoo best practices online",
-    sandbox="danger-full-access"  # Required for internet access
-)
-
-# System operations (Docker, psutil) - danger-full-access required
-mcp__gpt - codex__codex(
-    prompt="Run system diagnostics and Docker container health checks",
-    sandbox="danger-full-access"  # Required for system access
-)
+# Note: For package installation or system operations, use Claude Code directly instead of Codex
 ```
 
 ### Model Availability Issues

@@ -26,13 +26,12 @@ This document provides quick reference for Codex MCP usage in the Odoo project c
 When using Codex MCP for Odoo development, use these configurations:
 
 ```python
-mcp__gpt - codex__codex(
+mcp__gpt-codex__codex(
     prompt="Your Odoo task",
-    model="gpt-5",  # Default, or "gpt-4.1" for 1M+ context
+    profile="deep-reasoning",  # For complex Odoo patterns
     sandbox="workspace-write",  # For code modifications
     cwd="/volumes/",  # Container path for Odoo
     config={
-        "model_reasoning_effort": "high",  # For complex Odoo patterns
         "shell_environment_policy.set": {
             "ODOO_RC": "/volumes/odoo.local.conf",
             "PYTHONPATH": "/volumes/addons"
@@ -52,24 +51,27 @@ mcp__gpt - codex__codex(
 
 ### Session Management
 
-- Codex MCP tools work **asynchronously** via event notifications
-- Session IDs and responses are delivered through `codex/event` notifications
-- Direct tool calls return no visible output (this is normal)
-- The GPT agent handles these events internally when called via Task()
+- Codex MCP server runs in **compatibility mode** for synchronous responses
+- Session IDs are returned directly in the response's `structuredContent.sessionId` field
+- Direct tool calls return immediate responses with session information
+- The GPT agent can extract session IDs from the response for multi-turn conversations
 
 ## Quick Reference
 
-### Model Priority (Same as Global)
+### Profile Selection for Odoo Tasks
 
-1. **gpt-5** - Primary choice for most tasks
-2. **gpt-4.1** - Alternative with 1M+ token context (use when gpt-5 unavailable or context exceeds 400K)
-3. **gpt-4.5** - Additional fallback option when needed
+- **quick**: Simple fixes, syntax errors
+- **dev-standard**: Standard implementation, refactoring
+- **deep-reasoning**: Complex architectural changes, optimization
+- **test-runner**: Test execution and debugging
+- **safe-production**: Production analysis and audits
 
 ### Sandbox Selection for Odoo Tasks
 
 - **read-only**: Code analysis, pattern searches
 - **workspace-write**: Implementation, refactoring (default)
-- **danger-full-access**: Package installation, API testing
+
+Note: Package installation and system operations should be done directly in Claude Code.
 
 ## See Also
 

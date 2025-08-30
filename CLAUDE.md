@@ -43,14 +43,26 @@ Coordinate specialized agents. Your responsibilities:
 
 **GPT agent uses Codex CLI** - no rate limits. Delegate liberally.
 
-### Recursion Prevention
+### 🚨 Recursion Prevention (CRITICAL)
 
-**CRITICAL**: When recursion blocked, follow the hook's RECOMMENDED ACTION instructions.
+**NEVER DELEGATE TO THE SAME AGENT TYPE** - This causes crashes!
 
-See [docs/agent-patterns/anti-recursion-guidelines.md](docs/agent-patterns/anti-recursion-guidelines.md) for agent
-guidelines.
+**When you see "Preventing recursion":**
 
-**Temporary hook**: Until Anthropic ships built-in protection (GitHub #6468, #4277)
+1. STOP attempting delegation
+2. Use direct tools instead (Edit, Write, Read, Grep, etc.)
+3. Complete the task yourself
+
+**Prevention Rules:**
+
+- Agents CANNOT call themselves (enforced by hooks)
+- Stack depth limited to 2 levels
+- Stale stacks auto-clear after 5 minutes
+- Session start clears all stacks
+
+See [docs/agent-patterns/anti-recursion-guidelines.md](docs/agent-patterns/anti-recursion-guidelines.md)
+
+**Note**: Enhanced hooks now block ALL self-calls to prevent crashes
 
 ## 🚨 RED FLAGS - NEVER Attempt These Directly
 

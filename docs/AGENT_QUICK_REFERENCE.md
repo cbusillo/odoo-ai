@@ -76,7 +76,6 @@ Task(
 mcp__gpt - codex__codex(
     prompt="[request]",
     sandbox="workspace-write",
-    model="gpt-5",
     profile="deep-reasoning"  # Available: deep-reasoning, dev-standard, test-runner, safe-production, quick
 )
 ```

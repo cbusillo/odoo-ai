@@ -16,7 +16,12 @@ def _stack_file() -> Path:
     Use a per-project stack file in the project's tmp/data/ directory.
     This keeps temp files within the project and they get cleaned automatically.
     """
-    proj = os.environ.get("CLAUDE_PROJECT_DIR") or os.environ.get("PWD") or os.getcwd()
+    # ALWAYS use CLAUDE_PROJECT_DIR if available
+    proj = os.environ.get("CLAUDE_PROJECT_DIR")
+    if not proj:
+        # Find project root by looking for .claude directory upwards
+        current = Path(__file__).parent.parent.parent  # hooks -> .claude -> project
+        proj = str(current.resolve())
     
     # Use project's tmp/data/ directory for temporary files
     stack_dir = Path(proj) / "tmp" / "data"
@@ -33,6 +38,11 @@ def get_current_stack():
     stack_path = _stack_file()
     if stack_path.exists():
         try:
+            import time
+            # Auto-clear stale stacks (5 minutes)
+            if time.time() - stack_path.stat().st_mtime > 5 * 60:
+                stack_path.unlink()
+                return []
             with open(stack_path, "r") as f:
                 data = json.load(f)
                 # ensure list of strings
@@ -50,7 +60,11 @@ def save_stack(stack):
     with open(stack_path, "w") as f:
         json.dump(stack, f)
     try:
-        dbg = Path(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()) / ".claude" / "hook-debug.log"
+        # Find project root safely
+        proj_dir = os.environ.get("CLAUDE_PROJECT_DIR")
+        if not proj_dir:
+            proj_dir = str(Path(__file__).parent.parent.parent.resolve())
+        dbg = Path(proj_dir) / ".claude" / "hook-debug.log"
         dbg.parent.mkdir(parents=True, exist_ok=True)
         with open(dbg, "a") as lf:
             lf.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] cleanup: saved stack -> {stack} (path={stack_path})\n")
@@ -64,7 +78,7 @@ def main():
         hook_input = json.load(sys.stdin)
         dbg_path = None
         try:
-            dbg_path = Path(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()) / ".claude" / "hook-debug.log"
+            dbg_path = Path(os.environ.get("CLAUDE_PROJECT_DIR", "/Users/cbusillo/Developer/odoo-ai")) / ".claude" / "hook-debug.log"
             dbg_path.parent.mkdir(parents=True, exist_ok=True)
         except Exception:
             dbg_path = None
@@ -87,21 +101,22 @@ def main():
         # Get current stack
         stack = get_current_stack()
 
+        # Always try to clean up the agent from the stack
         if completed_agent and completed_agent in stack:
-            # Remove the last occurrence of this agent from the stack
-            # Remove from the end (most recent)
-            for i in range(len(stack) - 1, -1, -1):
-                if stack[i] == completed_agent:
-                    stack.pop(i)
-                    break
+            # Remove ALL occurrences of this agent (in case of duplicates)
+            stack = [a for a in stack if a != completed_agent]
         elif stack:
-            # Fallback: if no subagent_type but stack exists, pop the most recent
-            # This prevents stack from growing indefinitely due to missing metadata
-            # Also handle error cases where Task was blocked
-            if hook_input.get("tool_result", {}).get("error"):
-                # Task was blocked or errored, pop from stack anyway
+            # Fallback: if we have a stack but no clear agent, pop the last one
+            # This handles blocked tasks, errors, or missing metadata
+            if hook_input.get("tool_result", {}).get("error") or \
+               hook_input.get("tool_result", {}).get("hookSpecificOutput"):
+                # Task was blocked, errored, or modified by hook
                 if stack:
                     stack.pop()
+        
+        # Additional safety: if stack is too deep, trim it
+        if len(stack) > 2:
+            stack = stack[-2:]  # Keep only last 2 entries
         
         # Save updated stack (even if empty)
         save_stack(stack)
@@ -118,7 +133,11 @@ def main():
     except Exception as e:
         # On error, just continue
         try:
-            dbg = Path(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()) / ".claude" / "hook-debug.log"
+            # Find project root safely
+            proj_dir = os.environ.get("CLAUDE_PROJECT_DIR")
+            if not proj_dir:
+                proj_dir = str(Path(__file__).parent.parent.parent.resolve())
+            dbg = Path(proj_dir) / ".claude" / "hook-debug.log"
             dbg.parent.mkdir(parents=True, exist_ok=True)
             with open(dbg, "a") as lf:
                 lf.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] cleanup: error -> {e}\n")

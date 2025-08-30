@@ -17,17 +17,22 @@ def _stack_file() -> Path:
     Use a per-project stack file in the project's tmp/data/ directory.
     This keeps temp files within the project and they get cleaned automatically.
     """
-    proj = os.environ.get("CLAUDE_PROJECT_DIR") or os.environ.get("PWD") or os.getcwd()
+    # ALWAYS use CLAUDE_PROJECT_DIR if available
+    proj = os.environ.get("CLAUDE_PROJECT_DIR")
+    if not proj:
+        # Find project root by looking for .claude directory upwards
+        current = Path(__file__).parent.parent.parent  # hooks -> .claude -> project
+        proj = str(current.resolve())
     
     # Use project's tmp/data/ directory for temporary files
     stack_dir = Path(proj) / "tmp" / "data"
     stack_dir.mkdir(parents=True, exist_ok=True)
     
-    # Clean up old stack files (older than 1 hour)
+    # Clean up old stack files (older than 5 minutes for better recovery)
     try:
         now = time.time()
         for old_file in stack_dir.glob("agent_stack_*.json"):
-            if now - old_file.stat().st_mtime > 3600:  # 1 hour
+            if now - old_file.stat().st_mtime > 300:  # 5 minutes (was 1 hour)
                 old_file.unlink()
     except Exception:
         pass  # Continue even if cleanup fails
@@ -43,9 +48,9 @@ def get_current_stack():
     stack_path = _stack_file()
     if stack_path.exists():
         try:
-            # Reset stale stacks older than 10 minutes to avoid persistent lockouts
+            # Reset stale stacks older than 5 minutes to avoid persistent lockouts
             # This handles cases where cleanup hooks don't run (e.g., blocked tasks)
-            if time.time() - stack_path.stat().st_mtime > 10 * 60:
+            if time.time() - stack_path.stat().st_mtime > 5 * 60:  # 5 minutes (was 10)
                 return []
             with open(stack_path, "r") as f:
                 data = json.load(f)
@@ -70,7 +75,11 @@ def save_stack(stack):
         pass
     # Best-effort debug log
     try:
-        dbg = Path(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()) / ".claude" / "hook-debug.log"
+        # Find project root safely
+        proj_dir = os.environ.get("CLAUDE_PROJECT_DIR")
+        if not proj_dir:
+            proj_dir = str(Path(__file__).parent.parent.parent.resolve())
+        dbg = Path(proj_dir) / ".claude" / "hook-debug.log"
         dbg.parent.mkdir(parents=True, exist_ok=True)
         with open(dbg, "a") as lf:
             lf.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] prevent: saved stack -> {stack} (path={stack_path})\n")
@@ -85,7 +94,11 @@ def main():
         # Prepare debug log
         dbg_path = None
         try:
-            dbg_path = Path(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()) / ".claude" / "hook-debug.log"
+            # Find project root safely
+            proj_dir = os.environ.get("CLAUDE_PROJECT_DIR")
+            if not proj_dir:
+                proj_dir = str(Path(__file__).parent.parent.parent.resolve())
+            dbg_path = Path(proj_dir) / ".claude" / "hook-debug.log"
             dbg_path.parent.mkdir(parents=True, exist_ok=True)
         except Exception:
             dbg_path = None
@@ -119,16 +132,17 @@ def main():
         # Get current call stack
         stack = get_current_stack()
 
-        # Check if this agent is already in the stack too many times
+        # Check if this agent is trying to call itself (ANY self-call, not just immediate)
         decision_note = ""
-        MAX_SELF_CALLS = 1  # Allow agent to call itself once, block on second attempt
-        agent_count = stack.count(target_agent)
+        # Block ANY self-call to prevent loops - agent should never call itself
+        is_self_call = target_agent in stack
         
         # IMPORTANT: Don't add to stack if we're going to block
         # This prevents stuck stacks when cleanup hooks don't run
-        if agent_count >= MAX_SELF_CALLS:
-            # EXCESSIVE RECURSION DETECTED! Signal to continue with current agent instead of re-routing
-            decision_note = f"deny: recursion (depth {agent_count})"
+        if is_self_call:
+            # RECURSION DETECTED! Block any attempt at self-delegation
+            agent_count = stack.count(target_agent) + 1  # Count including this attempt
+            decision_note = f"deny: self-call"
             
             # Create event signal file for orchestrator to detect
             try:
@@ -140,7 +154,9 @@ def main():
                     "time": datetime.now().isoformat(),
                     "action": "continue_current_agent"
                 }
-                proj_dir = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+                proj_dir = os.environ.get("CLAUDE_PROJECT_DIR")
+                if not proj_dir:
+                    proj_dir = str(Path(__file__).parent.parent.parent.resolve())
                 event_dir = Path(proj_dir) / "tmp" / "data"
                 event_dir.mkdir(parents=True, exist_ok=True)
                 event_file = event_dir / "recursion_event.json"
@@ -153,7 +169,7 @@ def main():
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",
                     "permissionDecision": "deny",
-                    "permissionDecisionReason": f"Preventing excessive recursion of {target_agent} agent (appears {agent_count} times in stack). Agent should continue locally. Call stack: {' → '.join(stack)} → {target_agent} (blocked)\n\nRECOMMENDED ACTION: Recall the same agent with anti-recursion instructions:\nTask(\n    description=\"[original task]\",\n    prompt=\"[original request]\n\nIMPORTANT: Do NOT call Task() with subagent_type='{target_agent}'. You can delegate to other agents and use all other tools. For tasks in your domain, use direct tools (Edit, Write, MultiEdit). See docs/agent-patterns/anti-recursion-guidelines.md\",\n    subagent_type=\"{target_agent}\"\n)",
+                    "permissionDecisionReason": f"Preventing recursion: {target_agent} cannot call itself (appears {agent_count} times in stack). Current stack: {' → '.join(stack)}\n\nRECOMMENDED ACTION: The current {target_agent} agent should continue with direct tools instead of self-delegation. For tasks in your domain, use Edit, Write, MultiEdit, Read, Grep, etc. See docs/agent-patterns/anti-recursion-guidelines.md",
                 },
             }
             print(json.dumps(output))
@@ -170,7 +186,7 @@ def main():
 
         # Check stack depth to prevent deep chains
         # Keep chains shallow to prevent ping-pong loops from growing
-        MAX_DEPTH = 3
+        MAX_DEPTH = 2  # Reduced from 3 to be more conservative
         if len(stack) >= MAX_DEPTH:
             decision_note = "deny: max-depth"
             output = {
@@ -196,25 +212,8 @@ def main():
         save_stack(stack)
         try:
             if dbg_path:
-                # Get basic process info for correlation with crashes
-                try:
-                    # Simple approach: check if we can get basic OS info
-                    pid = os.getpid()
-                    memory_info = f"pid: {pid}"
-                except:
-                    memory_info = "pid: unknown"
-                
-                # Calculate what the stack will look like after we add this agent
-                new_stack = stack + [target_agent]
-                new_agent_count = new_stack.count(target_agent)
-                
                 with open(dbg_path, "a") as lf:
-                    lf.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] prevent: allow; push {target_agent} -> {new_stack} (self-call depth: {new_agent_count}, total depth: {len(new_stack)}, {memory_info})\n")
-                    # Log tool input details for self-calls
-                    if agent_count > 0:
-                        tool_prompt = tool_input.get("prompt", "")[:200] + "..." if len(tool_input.get("prompt", "")) > 200 else tool_input.get("prompt", "")
-                        lf.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] prevent: SELF-CALL DETECTED: {target_agent} calling itself ({memory_info})\n")
-                        lf.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] prevent: SELF-CALL PROMPT: {tool_prompt}\n")
+                    lf.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] prevent: allow; push {target_agent} -> {stack} (depth: {len(stack)})\n")
         except Exception:
             pass
 
@@ -224,7 +223,11 @@ def main():
     except Exception as e:
         # On error, allow the call but log the issue
         try:
-            dbg = Path(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()) / ".claude" / "hook-debug.log"
+            # Find project root safely
+            proj_dir = os.environ.get("CLAUDE_PROJECT_DIR")
+            if not proj_dir:
+                proj_dir = str(Path(__file__).parent.parent.parent.resolve())
+            dbg = Path(proj_dir) / ".claude" / "hook-debug.log"
             dbg.parent.mkdir(parents=True, exist_ok=True)
             with open(dbg, "a") as lf:
                 lf.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] prevent: error -> {e}\n")

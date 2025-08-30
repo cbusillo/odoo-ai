@@ -9,3 +9,8 @@
 [submodule "addons/cm_custom"]
 	path = addons/cm_custom
 	url = https://github.com/cellmechanic/cm_custom.git
+	ignore = dirty
+[submodule "addons/external_ids"]
+	path = addons/external_ids
+	url = https://github.com/cbusillo/external_ids.git
+	ignore = dirty

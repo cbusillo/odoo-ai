@@ -11,6 +11,7 @@ import os
 import time
 import hashlib
 from datetime import datetime
+import fcntl
 
 def _stack_file() -> Path:
     """
@@ -44,7 +45,7 @@ def _stack_file() -> Path:
 
 
 def get_current_stack():
-    """Get the current agent call stack."""
+    """Get the current agent call stack with file locking."""
     stack_path = _stack_file()
     if stack_path.exists():
         try:
@@ -53,6 +54,8 @@ def get_current_stack():
             if time.time() - stack_path.stat().st_mtime > 5 * 60:  # 5 minutes (was 10)
                 return []
             with open(stack_path, "r") as f:
+                # Use file locking to prevent concurrent access issues
+                fcntl.flock(f.fileno(), fcntl.LOCK_SH)  # Shared lock for reading
                 data = json.load(f)
                 # ensure list of strings
                 if isinstance(data, list):
@@ -64,9 +67,11 @@ def get_current_stack():
 
 
 def save_stack(stack):
-    """Save the agent call stack."""
+    """Save the agent call stack with file locking."""
     stack_path = _stack_file()
     with open(stack_path, "w") as f:
+        # Use exclusive lock for writing to prevent race conditions
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
         json.dump(stack, f)
     # Touch file mtime for staleness checks
     try:
@@ -135,11 +140,20 @@ def main():
         # Check if this agent is trying to call itself (ANY self-call, not just immediate)
         decision_note = ""
         # Block ANY self-call to prevent loops - agent should never call itself
+        # CRITICAL: Check BEFORE adding to stack to prevent race condition
         is_self_call = target_agent in stack
+        
+        # ADDITIONAL PROTECTION: Also check if agent would appear more than once
+        # This catches cases where concurrent calls might bypass the first check
+        would_duplicate = stack.count(target_agent) > 0
+        
+        # ULTRA-STRICT: Block if we would have ANY duplicate at all
+        # This prevents even the first self-call from succeeding
+        immediate_self_call = len(stack) > 0 and stack[-1] == target_agent
         
         # IMPORTANT: Don't add to stack if we're going to block
         # This prevents stuck stacks when cleanup hooks don't run
-        if is_self_call:
+        if is_self_call or would_duplicate or immediate_self_call:
             # RECURSION DETECTED! Block any attempt at self-delegation
             agent_count = stack.count(target_agent) + 1  # Count including this attempt
             decision_note = f"deny: self-call"

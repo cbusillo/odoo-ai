@@ -10,6 +10,7 @@ from pathlib import Path
 import os
 import hashlib
 from datetime import datetime
+import fcntl
 
 def _stack_file() -> Path:
     """

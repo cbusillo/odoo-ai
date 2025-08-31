@@ -12,10 +12,15 @@ COMPACT_FLAG="$CLAUDE_DIR/.compacted"
 DEBUG_LOG="$CLAUDE_DIR/hook-debug.log"
 STACK_DIR="$PROJECT_DIR/tmp/data"
 
-# Clear any stale agent stack files on session start (safety measure)
+# Initialize recursion correlation environment variables
+export CLAUDE_CURRENT_AGENT="PM"
+export CLAUDE_DELEGATION_CHAIN="PM"
+export CLAUDE_SESSION_ID="${CLAUDE_SESSION_ID:-$(date +%s)}"
+
+# Clear any old stack files (legacy cleanup)
 if [ -d "$STACK_DIR" ]; then
     find "$STACK_DIR" -name "agent_stack_*.json" -type f -delete 2>/dev/null
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] SessionStart: Cleared agent stack files" >> "$DEBUG_LOG"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] SessionStart: Initialized correlation vars, cleared old stack files" >> "$DEBUG_LOG"
 fi
 
 # Check if compaction flag exists

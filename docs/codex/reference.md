@@ -28,14 +28,17 @@ See also:
 
 ## Sandbox Modes
 
-| Mode                 | Use Case                      | Permissions                     |
-|----------------------|-------------------------------|---------------------------------|
-| `read-only`          | Analysis, exploration         | Read files only                 |
-| `workspace-write`    | Implementation, file changes  | Read/write files within project |
-| `danger-full-access` | Web research, external access | Full system + network access    |
+| Mode                 | Use Case                     | Permissions                     |
+|----------------------|------------------------------|---------------------------------|
+| `read-only`          | Analysis, exploration        | Read files only                 |
+| `workspace-write`    | Implementation, file changes | Read/write files within project |
+| `danger-full-access` | ⚠️ **AVOID** - Security risk | Full system + network access    |
 
-- Default: Start with `workspace-write`. Switch to `danger-full-access` only when internet or system-wide access is
-  required.
+**🚨 SECURITY WARNING**: `danger-full-access` grants unrestricted system access and should be **avoided**.
+
+- Default: Use `workspace-write` for all tasks (includes network access, Docker, files, tests)
+- `danger-full-access` provides no additional capabilities needed for normal development
+- Never use in automated workflows or when handling untrusted code
 
 ## Session Management
 

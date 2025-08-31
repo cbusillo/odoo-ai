@@ -32,20 +32,20 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "any",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/pre-tool-use.sh"
-          }
-        ]
-      },
-      {
         "matcher": "Task",
         "hooks": [
           {
             "type": "command",
             "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/prevent-task-recursion.py"
+          }
+        ]
+      },
+      {
+        "matcher": "any",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/pre-tool-use.sh"
           }
         ]
       }

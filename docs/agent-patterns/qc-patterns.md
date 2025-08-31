@@ -30,7 +30,8 @@ def comprehensive_quality_review(module_name):
     )
     
     # Phase 4: Security Review
-    security_check = mcp__odoo-intelligence__pattern_analysis(
+    security_check = mcp__odoo-intelligence__analysis_query(
+        analysis_type="patterns",
         pattern_type="api_decorators"  # Check access controls
     )
     
@@ -54,7 +55,8 @@ def pre_commit_quality_gate(changed_files):
         
         # Odoo-specific checks
         if "models/" in file:
-            field_check = mcp__odoo-intelligence__field_usages(
+            field_check = mcp__odoo-intelligence__field_query(
+                operation="usages",
                 model_name=extract_model(file),
                 field_name="*"  # Check all fields
             )

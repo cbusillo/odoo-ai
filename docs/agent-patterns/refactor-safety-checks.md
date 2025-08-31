@@ -19,19 +19,22 @@ git checkout -b refactoring-safety
 
 ```python
 # Check dependencies
-dependencies = mcp__odoo-intelligence__field_dependencies(
+dependencies = mcp__odoo-intelligence__field_query(
+    operation="dependencies",
     model_name="product.template",
     field_name="name"
 )
 
 # Find all usages
-usages = mcp__odoo-intelligence__field_usages(
+usages = mcp__odoo-intelligence__field_query(
+    operation="usages",
     model_name="product.template",
     field_name="name"
 )
 
 # Check inheritance chain
-chain = mcp__odoo-intelligence__inheritance_chain(
+chain = mcp__odoo-intelligence__model_query(
+    operation="inheritance",
     model_name="product.template"
 )
 ```
@@ -258,7 +261,8 @@ uv run test-tour
 ```python
 # Ensure refactoring didn't hurt performance
 before_metrics = Read("pre-refactor-metrics.json")
-after_metrics = mcp__odoo-intelligence__performance_analysis(
+after_metrics = mcp__odoo-intelligence__analysis_query(
+    analysis_type="performance",
     model_name="product.template"
 )
 

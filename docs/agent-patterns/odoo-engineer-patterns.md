@@ -26,16 +26,16 @@ def research_odoo_patterns(feature_type):
 # Step 2: Deep Structure Analysis
 def analyze_odoo_structure(model_name):
     # Understand the complete model
-    model_info = mcp__odoo-intelligence__model_info(model_name=model_name)
+    model_info = mcp__odoo-intelligence__model_query(operation="info", model_name=model_name)
     
     # See how it's used in views
     view_usage = mcp__odoo-intelligence__view_model_usage(model_name=model_name)
     
     # Trace complete inheritance
-    inheritance = mcp__odoo-intelligence__inheritance_chain(model_name=model_name)
+    inheritance = mcp__odoo-intelligence__model_query(operation="inheritance", model_name=model_name)
     
     # Find performance considerations
-    performance = mcp__odoo-intelligence__performance_analysis(model_name=model_name)
+    performance = mcp__odoo-intelligence__analysis_query(analysis_type="performance", model_name=model_name)
     
     return {
         'model': model_info,

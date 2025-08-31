@@ -28,7 +28,8 @@ def investigate_error(error_traceback):
     
     # Phase 4: Trace inheritance chain if model-related
     if error_info['model']:
-        inheritance = mcp__odoo-intelligence__inheritance_chain(
+        inheritance = mcp__odoo-intelligence__model_query(
+            operation="inheritance",
             model_name=error_info['model']
         )
     
@@ -68,7 +69,8 @@ def debug_missing_method(traceback, method_name):
     # Check inheritance chain
     if "object has no attribute" in traceback:
         model_name = extract_model_from_traceback(traceback)
-        inheritance = mcp__odoo-intelligence__inheritance_chain(
+        inheritance = mcp__odoo-intelligence__model_query(
+            operation="inheritance",
             model_name=model_name
         )
         
@@ -165,7 +167,8 @@ def debug_access_error(user_id, model_name, operation):
 # Pattern: Memory/Timeout errors
 def debug_performance_error(error_type):
     # Get performance analysis
-    perf_issues = mcp__odoo-intelligence__performance_analysis(
+    perf_issues = mcp__odoo-intelligence__analysis_query(
+        analysis_type="performance",
         model_name=extract_model_from_context()
     )
     

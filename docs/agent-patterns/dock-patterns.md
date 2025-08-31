@@ -14,7 +14,7 @@ def comprehensive_container_health_check():
     containers = mcp__docker__list_containers(all=True)
 
     # Phase 2: Check Odoo-specific status
-    odoo_status = mcp__odoo - intelligence__odoo_status(verbose=True)
+    odoo_status = mcp__odoo-intelligence__odoo_status(verbose=True)
 
     # Phase 3: Get logs for problematic containers
     problematic_containers = [c for c in containers if c['State'] != 'running']
@@ -45,16 +45,16 @@ def graceful_odoo_restart():
     """Restart Odoo services with proper sequence."""
 
     # Step 1: Stop web service first (stop accepting requests)
-    mcp__odoo - intelligence__odoo_restart(services="web-1")
+    mcp__odoo-intelligence__odoo_restart(services="web-1")
 
     # Step 2: Wait for current requests to finish
     time.sleep(5)
 
     # Step 3: Restart shell and script-runner
-    mcp__odoo - intelligence__odoo_restart(services="shell-1,script-runner-1")
+    mcp__odoo-intelligence__odoo_restart(services="shell-1,script-runner-1")
 
     # Step 4: Verify all services are healthy
-    return mcp__odoo - intelligence__odoo_status()
+    return mcp__odoo-intelligence__odoo_status()
 
 
 # Emergency restart pattern
@@ -84,7 +84,7 @@ def emergency_restart():
         mcp__docker__start_container(container_id=container['Id'])
         time.sleep(5)
 
-    return mcp__odoo - intelligence__odoo_status()
+    return mcp__odoo-intelligence__odoo_status()
 ```
 
 ## Module Management Patterns
@@ -96,7 +96,7 @@ def safe_module_update(module_names, test_after=True):
     """Update modules with rollback capability."""
 
     # Pre-update checks
-    initial_status = mcp__odoo - intelligence__odoo_status()
+    initial_status = mcp__odoo-intelligence__odoo_status()
     if not initial_status.get('healthy', False):
         raise Exception("System not healthy before update")
 
@@ -105,7 +105,7 @@ def safe_module_update(module_names, test_after=True):
 
     try:
         # Update modules using script-runner
-        update_result = mcp__odoo - intelligence__odoo_update_module(
+        update_result = mcp__odoo-intelligence__odoo_update_module(
             modules=module_names,
             force_install=False
         )
@@ -143,14 +143,14 @@ def update_with_dependencies(primary_module):
     """Update module and its dependencies in correct order."""
 
     # Get dependency tree
-    deps = mcp__odoo - intelligence__addon_dependencies(addon_name=primary_module)
+    deps = mcp__odoo-intelligence__addon_dependencies(addon_name=primary_module)
 
     # Calculate update order (dependencies first)
     update_order = calculate_dependency_order(deps)
 
     # Update in sequence
     for module in update_order:
-        result = mcp__odoo - intelligence__odoo_update_module(modules=module)
+        result = mcp__odoo-intelligence__odoo_update_module(modules=module)
         if "ERROR" in result:
             return {'success': False, 'failed_module': module, 'error': result}
 
@@ -191,7 +191,7 @@ def analyze_system_logs():
         }
 
     # Get Odoo-specific logs with more detail
-    odoo_logs = mcp__odoo - intelligence__odoo_logs(lines=1000)
+    odoo_logs = mcp__odoo-intelligence__odoo_logs(lines=1000)
     log_analysis['odoo_detailed'] = analyze_odoo_logs(odoo_logs)
 
     return log_analysis
@@ -261,19 +261,19 @@ def setup_development_environment():
                 mcp__docker__start_container(container_id=container['Id'])
 
     # Update modules to latest
-    mcp__odoo - intelligence__odoo_update_module(modules="product_connect")
+    mcp__odoo-intelligence__odoo_update_module(modules="product_connect")
 
     # Clear any stale data
     clear_development_cache()
 
-    return mcp__odoo - intelligence__odoo_status()
+    return mcp__odoo-intelligence__odoo_status()
 
 
 def development_module_cycle(module_name):
     """Complete development cycle: update -> test -> restart if needed."""
 
     # Update module
-    update_result = mcp__odoo - intelligence__odoo_update_module(modules=module_name)
+    update_result = mcp__odoo-intelligence__odoo_update_module(modules=module_name)
 
     # Check for errors that require restart
     needs_restart = any(keyword in update_result for keyword in [
@@ -285,15 +285,15 @@ def development_module_cycle(module_name):
 
     if needs_restart:
         # Restart only necessary services
-        mcp__odoo - intelligence__odoo_restart(services="web-1,shell-1")
+        mcp__odoo-intelligence__odoo_restart(services="web-1,shell-1")
 
         # Re-update after restart
-        update_result = mcp__odoo - intelligence__odoo_update_module(modules=module_name)
+        update_result = mcp__odoo-intelligence__odoo_update_module(modules=module_name)
 
     return {
         'update_result': update_result,
         'restart_performed': needs_restart,
-        'final_status': mcp__odoo - intelligence__odoo_status()
+        'final_status': mcp__odoo-intelligence__odoo_status()
     }
 ```
 
@@ -357,7 +357,7 @@ def optimize_container_performance():
     # Execute optimization actions
     for action in optimization_actions:
         if action['action'] == 'restart':
-            mcp__odoo - intelligence__odoo_restart(
+            mcp__odoo-intelligence__odoo_restart(
                 services=action['container'].replace('${ODOO_PROJECT_NAME}-', '').replace('-1', '')
             )
 
@@ -407,7 +407,7 @@ def check_external_apis():
     """Check connectivity to external APIs."""
 
     # Look for API connection issues in logs
-    odoo_logs = mcp__odoo - intelligence__odoo_logs(lines=200)
+    odoo_logs = mcp__odoo-intelligence__odoo_logs(lines=200)
 
     api_status = {
         'shopify': {
@@ -460,7 +460,7 @@ def disaster_recovery_procedure():
 
     # Step 1: Assess damage
     try:
-        status = mcp__odoo - intelligence__odoo_status()
+        status = mcp__odoo-intelligence__odoo_status()
         recovery_steps.append("Status check: Partial failure")
     except:
         recovery_steps.append("Status check: Complete failure")
@@ -498,7 +498,7 @@ def disaster_recovery_procedure():
         recovery_steps.append(f"Recovery failed: {e}")
 
     # Step 4: Verify recovery
-    final_status = mcp__odoo - intelligence__odoo_status()
+    final_status = mcp__odoo-intelligence__odoo_status()
     recovery_steps.append(f"Final status: {final_status}")
 
     return {
@@ -518,13 +518,13 @@ def restart_for_frontend_changes():
     """Restart containers to apply frontend changes."""
 
     # Only restart web container for frontend changes
-    result = mcp__odoo - intelligence__odoo_restart(services="web-1")
+    result = mcp__odoo-intelligence__odoo_restart(services="web-1")
 
     # Wait for restart to complete
     time.sleep(10)
 
     # Verify restart was successful
-    status = mcp__odoo - intelligence__odoo_status()
+    status = mcp__odoo-intelligence__odoo_status()
 
     return {
         'restart_result': result,
@@ -569,7 +569,7 @@ def prepare_test_environment():
         time.sleep(5)
 
     # Verify test database connectivity
-    test_db_check = mcp__odoo - intelligence__odoo_status()
+    test_db_check = mcp__odoo-intelligence__odoo_status()
 
     return {
         'script_runner_ready': bool(script_runner),

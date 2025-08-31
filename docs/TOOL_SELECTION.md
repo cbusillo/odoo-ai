@@ -108,7 +108,7 @@ docker exec ${ODOO_PROJECT_NAME}-web-1 /odoo/odoo-bin --dev=all --stop-after-ini
 |----------------------|----------------------------------------------|---------------|--------------------|--------------------|
 | Search code patterns | `mcp__odoo-intelligence__search_code`        | `bash grep`   | **100x faster**    | <1s vs 30s+        |
 | Container status     | `mcp__docker__list_containers`               | `docker ps`   | **10x faster**     | Structured data    |
-| Code quality check   | `mcp__odoo-intelligence__pattern_analysis`   | Manual review | **1000x coverage** | Entire project     |
+| Code quality check   | `mcp__odoo-intelligence__analysis_query`     | Manual review | **1000x coverage** | Entire project     |
 | Module update        | `mcp__odoo-intelligence__odoo_update_module` | `docker exec` | **5x safer**       | Proper environment |
 | File search          | `Glob`                                       | `bash find`   | **50x faster**     | Optimized patterns |
 
@@ -187,9 +187,9 @@ containers = mcp__docker__list_containers()
 
 ```python
 # Only analyzes currently open file
-mcp__inspection_pycharm__inspection_trigger()
+mcp__inspection-pycharm__inspection_trigger()
 # Wait...
-mcp__inspection_pycharm__inspection_get_problems()
+mcp__inspection-pycharm__inspection_get_problems()
 ```
 
 **Problems**:
@@ -203,8 +203,8 @@ mcp__inspection_pycharm__inspection_get_problems()
 
 ```python
 # Analyzes entire codebase systematically
-mcp__odoo-intelligence__pattern_analysis(pattern_type="all")
-mcp__odoo-intelligence__performance_analysis(model_name="product.template")
+mcp__odoo-intelligence__analysis_query(analysis_type="patterns", pattern_type="all")
+mcp__odoo-intelligence__analysis_query(analysis_type="performance", model_name="product.template")
 ```
 
 **Benefits**:
@@ -314,7 +314,7 @@ running = [c for c in containers if c["status"] == "running"]
 Need to search code?
 ├─ YES → Use mcp__odoo-intelligence__search_* tools
 │   ├─ Search by pattern → search_code()
-│   ├─ Find models → search_models()
+│   ├─ Find models → model_query(operation="search")
 │   ├─ Find methods → find_method()
 │   └─ Search by decorator → search_decorators()
 └─ NO → Continue...

@@ -6,11 +6,11 @@ MCP search tools are 100x faster than grep/find. See [Tool Selection Guide](../T
 
 ### 1. MCP Tools FIRST
 
-- `mcp__odoo-intelligence__search_models` - Find models by pattern
-- `mcp__odoo-intelligence__model_info` - Get model details
+- `mcp__odoo-intelligence__model_query` - Find models and get details (operations: search, info, relationships,
+  inheritance, view_usage)
 - `mcp__odoo-intelligence__find_method` - Find method implementations
 - `mcp__odoo-intelligence__search_code` - Regex search Python/XML/JS
-- `mcp__odoo-intelligence__inheritance_chain` - Trace inheritance
+- `mcp__odoo-intelligence__model_query` - Trace inheritance (operation="inheritance")
 
 ### 2. File Tools (if needed)
 
@@ -47,8 +47,8 @@ Read("../../../../odoo/addons/web/...")  # No relative paths!
 ### Find Models
 
 ```python
-mcp__odoo-intelligence__search_models(pattern="product")
-mcp__odoo-intelligence__model_info(model_name="product.template")
+mcp__odoo-intelligence__model_query(operation="search", pattern="product")
+mcp__odoo-intelligence__model_query(operation="info", model_name="product.template")
 ```
 
 ### Find Patterns
@@ -63,13 +63,13 @@ mcp__odoo-intelligence__search_code(
 ### Trace Inheritance
 
 ```python
-mcp__odoo-intelligence__inheritance_chain(model_name="sale.order")
+mcp__odoo-intelligence__model_query(operation="inheritance", model_name="sale.order")
 ```
 
 ## Research Workflow
 
 1. Start broad with search
-2. Get details with model_info
+2. Get details with model_query(operation="info")
 3. Find examples in code
 4. Read specific files
 

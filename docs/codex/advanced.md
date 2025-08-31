@@ -21,7 +21,7 @@ clients:
 # Compatibility mode is enabled by default in the MCP server
 # This ensures session IDs are returned immediately in the response
 
-response = mcp__gpt - codex__codex(
+response = mcp__gpt-codex__codex(
     prompt="Your task here",
     sandbox="workspace-write"
 )
@@ -30,7 +30,7 @@ response = mcp__gpt - codex__codex(
 session_id = response['structuredContent']['sessionId']
 
 # Continue the conversation
-mcp__gpt - codex__codex - reply(
+mcp__gpt-codex__codex_reply(
     prompt="Follow-up question",
     sessionId=session_id
 )
@@ -44,7 +44,7 @@ config.toml.
 Control how deeply the model thinks about problems:
 
 ```python
-mcp__gpt - codex__codex(
+mcp__gpt-codex__codex(
     prompt="Complex architectural decision needed",
     model="gpt-5",
     config={
@@ -68,7 +68,7 @@ mcp__gpt - codex__codex(
 Enable network access while maintaining workspace write restrictions:
 
 ```python
-config = {
+    config={
     "sandbox_workspace_write.network_access": true,
     "sandbox_workspace_write.exclude_tmpdir_env_var": false,
     "sandbox_workspace_write.exclude_slash_tmp": false
@@ -87,7 +87,7 @@ config = {
 Fine-tune which environment variables are passed to subprocesses:
 
 ```python
-config = {
+    config={
     "shell_environment_policy.inherit": "all",  # "all", "core", or "none"
     "shell_environment_policy.ignore_default_excludes": false,
     "shell_environment_policy.exclude": ["AWS_*", "AZURE_*", "GITHUB_*"],
@@ -105,7 +105,7 @@ config = {
 Optimize for large contexts and network reliability:
 
 ```python
-config = {
+    config={
     # Context management
     "model_context_window": 400000,  # Override default context size
     "model_max_output_tokens": 16384,  # Maximum output length
@@ -123,7 +123,7 @@ config = {
 For enterprise accounts with ZDR requirements:
 
 ```python
-config = {
+    config={
     "disable_response_storage": true  # Required for ZDR accounts
 }
 ```
@@ -133,9 +133,9 @@ config = {
 Override default system prompts:
 
 ```python
-mcp__gpt - codex__codex(
+mcp__gpt-codex__codex(
     prompt="Your task",
-    base - instructions = """You are an expert Python developer.
+    base_instructions="""You are an expert Python developer.
     Follow PEP 8 strictly.
     Always include type hints.
     Write comprehensive docstrings."""
@@ -184,13 +184,13 @@ Then use:
 
 ```python
 # Use profiles with appropriate sandbox flags
-mcp__gpt_codex__codex(
+mcp__gpt-codex__codex(
     prompt="Your task",
     profile="deep-reasoning",
     sandbox="workspace-write"  # Must specify sandbox explicitly
 )
 
-mcp__gpt_codex__codex(
+mcp__gpt-codex__codex(
     prompt="Run tests",
     profile="test-runner",
     sandbox="workspace-write"  # Must specify sandbox explicitly
@@ -204,7 +204,7 @@ mcp__gpt_codex__codex(
 For the most complex problems:
 
 ```python
-mcp__gpt - codex__codex(
+mcp__gpt-codex__codex(
     prompt="Solve [complex problem]",
     model="gpt-5",  # Or "gpt-4.1" for 1M+ token contexts
     config={
@@ -222,11 +222,11 @@ mcp__gpt - codex__codex(
 For quick development cycles:
 
 ```python
-mcp__gpt - codex__codex(
+mcp__gpt-codex__codex(
     prompt="Quick implementation",
     model="gpt-5",
-    approval - policy = "never",
-config = {
+    approval_policy="never",
+    config={
     "model_reasoning_effort": "low",
     "hide_agent_reasoning": true,
     "sandbox_workspace_write.network_access": true
@@ -239,7 +239,7 @@ config = {
 For production environments:
 
 ```python
-mcp__gpt_codex__codex(
+mcp__gpt-codex__codex(
     prompt="Production task",
     profile="safe-production",  # Use safe-production profile
     sandbox="read-only",
@@ -278,7 +278,7 @@ mcp__gpt_codex__codex(
 
 ```bash
 # Via MCP (always specify sandbox explicitly)
-mcp__gpt_codex__codex(
+mcp__gpt-codex__codex(
     prompt="Task",
     profile="deep-reasoning",
     sandbox="workspace-write"  # Required - profiles cannot set this

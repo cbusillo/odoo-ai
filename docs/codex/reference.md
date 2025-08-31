@@ -43,7 +43,7 @@ See also:
 - Session ID is returned in the direct response's `structuredContent.sessionId` field
 - Session IDs are standard UUIDs: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
 - Never manually create session IDs - always extract from the response
-- Use the session ID with `mcp__gpt-codex__codex-reply` to maintain context across turns.
+- Use the session ID with `mcp__gpt-codex__codex_reply` to maintain context across turns.
 - For the code snippet to continue a session, see: [usage.md#continuing-a-session](./usage.md#continuing-a-session)
 
 ## Common Issues

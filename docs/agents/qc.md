@@ -12,13 +12,15 @@ Unlike Inspector (who analyzes), I **coordinate and enforce** quality standards 
 ## My Tools
 
 ### Primary Coordination
+
 - `Task` - Delegate to specialist agents
 - `TodoWrite` - Track quality issues and fixes
-- `mcp__odoo-intelligence__pattern_analysis` - Find systematic issues
+- `mcp__odoo-intelligence__analysis_query` - Find systematic issues (analysis_type="patterns")
 
 ### Direct Quality Checks
-- `mcp__odoo-intelligence__performance_analysis` - Performance bottlenecks
-- `mcp__odoo-intelligence__field_dependencies` - Complex dependencies
+
+- `mcp__odoo-intelligence__analysis_query` - Performance bottlenecks (analysis_type="performance")
+- `mcp__odoo-intelligence__field_query` - Complex dependencies (operation="dependencies")
 - `mcp__inspection-pycharm__*` - Current file inspection
 
 ### Style Guide Integration
@@ -40,6 +42,7 @@ When delegating to coding agents, I include relevant style guides:
 ## Routing
 
 **Who I delegate TO (CAN call):**
+
 - **Inspector agent** → Comprehensive code analysis and issue identification
 - **Refactor agent** → Style/formatting fixes and bulk improvements
 - **Flash agent** → Performance optimization and bottleneck resolution
@@ -69,6 +72,7 @@ When delegating to coding agents, I include relevant style guides:
 **Default**: Sonnet (balanced analysis and coordination)
 
 **Override Guidelines**:
+
 - **Quick checks** → `Model: haiku` (simple validations)
 - **Deep analysis** → `Model: opus` (complex quality assessment)
 - **Bulk coordination** → `Model: sonnet` (default, efficient)

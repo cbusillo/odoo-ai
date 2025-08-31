@@ -14,8 +14,8 @@ mcp__odoo-intelligence__search_code(
 )
 
 # Step 2: Understand structure  
-mcp__odoo-intelligence__model_info(model_name="product.template")
-mcp__odoo-intelligence__inheritance_chain(model_name="product.template")
+mcp__odoo-intelligence__model_query(operation="info", model_name="product.template")
+mcp__odoo-intelligence__model_query(operation="inheritance", model_name="product.template")
 
 # Step 3: Test theories
 mcp__odoo-intelligence__execute_code(
@@ -34,11 +34,11 @@ mcp__odoo-intelligence__read_odoo_file(
 
 - `mcp__odoo-intelligence__search_code` - Find patterns
 - `mcp__odoo-intelligence__read_odoo_file` - Read ANY Odoo file (core/enterprise/custom)
-- `mcp__odoo-intelligence__model_info` - Model structure
+- `mcp__odoo-intelligence__model_query` - Model structure (operation="info")
 - `mcp__odoo-intelligence__view_model_usage` - UI patterns
-- `mcp__odoo-intelligence__pattern_analysis` - Common patterns
-- `mcp__odoo-intelligence__inheritance_chain` - Trace inheritance
-- `mcp__odoo-intelligence__performance_analysis` - Find issues
+- `mcp__odoo-intelligence__analysis_query` - Common patterns and performance issues (analysis_type: "patterns", "
+  performance")
+- `mcp__odoo-intelligence__model_query` - Trace inheritance (operation="inheritance")
 - `mcp__odoo-intelligence__execute_code` - Test in shell
 
 ## Anti-Recursion Rules
@@ -59,13 +59,13 @@ mcp__odoo-intelligence__read_odoo_file(
 
 ## Decision Tree
 
-| Request Type          | My Action                                             |
-|-----------------------|-------------------------------------------------------|
-| Architecture question | Research patterns → Provide evidence-based advice     |
-| Code review           | Find similar implementations → Critique with examples |
-| Performance issue     | Use performance_analysis → Recommend optimizations    |
-| Implementation task   | Research patterns → Delegate to specialist            |
-| Complex/large task    | Research → Route to GPT with context                  |
+| Request Type          | My Action                                                                 |
+|-----------------------|---------------------------------------------------------------------------|
+| Architecture question | Research patterns → Provide evidence-based advice                         |
+| Code review           | Find similar implementations → Critique with examples                     |
+| Performance issue     | Use analysis_query(analysis_type="performance") → Recommend optimizations |
+| Implementation task   | Research patterns → Delegate to specialist                                |
+| Complex/large task    | Research → Route to GPT with context                                      |
 
 ## How I Think
 

@@ -9,7 +9,7 @@
 
 ### Code Analysis
 - `mcp__odoo-intelligence__find_method` - Trace methods
-- `mcp__odoo-intelligence__inheritance_chain` - Follow inheritance
+- `mcp__odoo-intelligence__model_query` - Follow inheritance (operation="inheritance")
 - `mcp__odoo-intelligence__permission_checker` - Debug access rights (load system/SHARED_TOOLS.md)
 
 ## Common Error Patterns

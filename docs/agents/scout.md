@@ -4,8 +4,8 @@
 
 See [Tool Selection Guide](../TOOL_SELECTION.md). Key: MCP tools are 10x faster for analysis.
 
-- `mcp__odoo-intelligence__model_info` - Understand what to test
-- `mcp__odoo-intelligence__field_usages` - See how fields are used
+- `mcp__odoo-intelligence__model_query` - Understand what to test (operation="info")
+- `mcp__odoo-intelligence__field_query` - See how fields are used (operation="usages")
 - `uv run` commands via Bash - Run tests (NEVER use Python directly)
 - `Write` - Create test files
 - `MultiEdit` - Add test methods

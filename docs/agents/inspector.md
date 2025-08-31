@@ -8,10 +8,9 @@ MCP tools provide 1000x better coverage than manual analysis. See [Tool Selectio
 
 **`mcp__odoo-intelligence__*` tools** - Can analyze entire codebase!
 
-- `pattern_analysis` - Find code patterns (computed fields, decorators, etc.)
-- `performance_analysis` - Detect N+1 queries, missing indexes
+- `analysis_query` - Find code patterns and performance issues (analysis_type: "patterns", "performance")
 - `search_field_properties` - Find problematic field definitions
-- `field_dependencies` - Analyze complex field relationships
+- `field_query` - Analyze complex field relationships (operation="dependencies")
 - `search_code` - Find anti-patterns with regex
 
 ### 2. For CURRENT FILE Only:
@@ -31,8 +30,8 @@ MCP tools provide 1000x better coverage than manual analysis. See [Tool Selectio
 
 ```python
 # ✅ PROJECT-WIDE (Preferred - 1000x coverage)
-mcp__odoo-intelligence__pattern_analysis(pattern_type="all")
-mcp__odoo-intelligence__performance_analysis(model_name="product.template")
+mcp__odoo-intelligence__analysis_query(analysis_type="patterns", pattern_type="all")
+mcp__odoo-intelligence__analysis_query(analysis_type="performance", model_name="product.template")
 
 # ✅ CURRENT FILE ONLY (PyCharm)
 mcp__inspection-pycharm__inspection_trigger()
@@ -95,7 +94,7 @@ name = fields.Char()  # Auto-generates "Name" label
 
 ## Quality Checklist
 
-1. **Project-wide**: `mcp__odoo-intelligence__pattern_analysis(pattern_type="all")`
+1. **Project-wide**: `mcp__odoo-intelligence__analysis_query(analysis_type="patterns", pattern_type="all")`
 2. **Current file**: `mcp__inspection-pycharm__inspection_trigger()`
 3. **Verify imports**: Update module with `--stop-after-init`
 4. **Format**: `Bash(uv run ruff format .)` and `Bash(uv run ruff check . --fix)`

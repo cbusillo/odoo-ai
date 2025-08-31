@@ -59,20 +59,23 @@ total = fields.Float(compute='_compute_total', store=True)
 
 ```python
 # Find performance bottlenecks
-mcp__odoo-intelligence__performance_analysis(
+mcp__odoo-intelligence__analysis_query(
+    analysis_type="performance",
     model_name="product.template"
 )
 
 # Check field dependency chains
-mcp__odoo-intelligence__field_dependencies(
+mcp__odoo-intelligence__field_query(
+    operation="dependencies",
     model_name="sale.order",
     field_name="amount_total"
 )
 
 # Analyze data distribution patterns
-mcp__odoo-intelligence__field_value_analyzer(
-    model="sale.order",
-    field="state",
+mcp__odoo-intelligence__field_query(
+    operation="analyze_values",
+    model_name="sale.order",
+    field_name="state",
     sample_size=10000
 )
 ```
@@ -93,7 +96,8 @@ mcp__odoo-intelligence__search_code(
 )
 
 # Detect pattern inefficiencies
-mcp__odoo-intelligence__pattern_analysis(
+mcp__odoo-intelligence__analysis_query(
+    analysis_type="patterns",
     pattern_type="computed_fields"
 )
 ```

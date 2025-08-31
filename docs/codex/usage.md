@@ -10,17 +10,17 @@ MCP server.
 ### Starting a Conversation
 
 ```python
-response = mcp__gpt - codex__codex(
+response = mcp__gpt-codex__codex(
     prompt="Your request here",
     sandbox="workspace-write",  # or "danger-full-access", "read-only"
     model="gpt-5",  # Default, or "gpt-4.1" (1M+ token context), "gpt-4.5"
-    approval - policy = "never",  # or "untrusted", "on-failure", "on-request"
+    approval_policy="never",  # or "untrusted", "on-failure", "on-request"
     # Additional optional parameters:
-profile = "profile-name",  # Config profile from ~/.codex/config.toml
-cwd = "/path/to/dir",  # Working directory
-config = {"key": "value"},  # Config overrides (as TOML)
-base - instructions = "custom",  # Replace default instructions
-include - plan - tool = true  # Include plan tool
+    profile="profile-name",  # Config profile from ~/.codex/config.toml
+    cwd="/path/to/dir",  # Working directory
+    config={"key": "value"},  # Config overrides (as TOML)
+    base_instructions="custom",  # Replace default instructions
+    include_plan_tool=true  # Include plan tool
 )
 
 # Extract session ID from response
@@ -33,7 +33,7 @@ session_id = response['structuredContent']['sessionId']
 
 ```python
 # Use the session ID from the initial codex call response
-mcp__gpt - codex__codex - reply(
+mcp__gpt-codex__codex_reply(
     prompt="Follow-up request",
     sessionId=session_id  # From response['structuredContent']['sessionId']
 )
@@ -82,7 +82,7 @@ See: [reference.md#common-issues](./reference.md#common-issues)
 ### Web Research
 
 ```python
-response = mcp__gpt - codex__codex(
+response = mcp__gpt-codex__codex(
     prompt="Research the best practices for [topic]. Search the web for current information.",
     sandbox="danger-full-access",
     model="gpt-5"  # Default - use this for most tasks
@@ -93,7 +93,7 @@ session_id = response['structuredContent']['sessionId']
 ### Large Refactoring
 
 ```python
-response = mcp__gpt - codex__codex(
+response = mcp__gpt-codex__codex(
     prompt="Refactor all files in @/path/to/directory to use async patterns",
     sandbox="workspace-write",
     model="gpt-5"  # Or "gpt-4.1" for very large contexts (1M+ tokens)
@@ -104,14 +104,14 @@ session_id = response['structuredContent']['sessionId']
 ### Debug and Fix
 
 ```python
-response = mcp__gpt - codex__codex(
+response = mcp__gpt-codex__codex(
     prompt="Debug and fix the failing tests in @/tests/. Run the tests and fix any issues.",
     sandbox="workspace-write"
 )
 session_id = response['structuredContent']['sessionId']
 
 # Continue with follow-up if needed
-mcp__gpt - codex__codex - reply(
+mcp__gpt-codex__codex_reply(
     prompt="Now add test coverage for the edge cases",
     sessionId=session_id
 )

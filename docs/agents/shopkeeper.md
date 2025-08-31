@@ -3,11 +3,13 @@
 ## My Tools
 
 ### Model Analysis
-- `mcp__odoo-intelligence__model_info` - Check Shopify fields
-- `mcp__odoo-intelligence__field_usages` - See sync usage
+
+- `mcp__odoo-intelligence__model_query` - Check Shopify fields (operation="info")
+- `mcp__odoo-intelligence__field_query` - See sync usage (operation="usages")
 - `mcp__odoo-intelligence__search_code` - Find sync patterns
 
 ### GraphQL Schema
+
 - `Grep` - Search the 61k+ line schema efficiently
 - `Read` - Read schema sections
 - **Location**: `addons/product_connect/graphql/schema/shopify_schema_2025-04.sdl`
@@ -15,24 +17,28 @@
 ## Critical Rules
 
 ### Skip Sync Context (ALWAYS USE!)
+
 ```python
 # Prevent sync loops when importing from Shopify
 self.with_context(skip_shopify_sync=True).write(vals)
 ```
 
 Use when:
+
 - Importing from Shopify
 - Bulk updates
 - Test data
 - Data corrections
 
 ### Generated Code Warning
+
 **DO NOT MODIFY**: `services/shopify/gql/*` is auto-generated!
 Run `generate_shopify_models.py` when schema changes.
 
 ### Key Shopify Fields
+
 - `shopify_product_id` - Product ID
-- `shopify_variant_id` - Variant ID  
+- `shopify_variant_id` - Variant ID
 - `shopify_order_id` - Order ID
 - `shopify_customer_id` - Customer ID
 - `shopify_sync_status` - last_success/failed/pending
@@ -40,6 +46,7 @@ Run `generate_shopify_models.py` when schema changes.
 ## Common Patterns
 
 ### Product Import
+
 ```python
 product = self.env['product.template'].with_context(
     skip_shopify_sync=True,
@@ -51,6 +58,7 @@ product = self.env['product.template'].with_context(
 ```
 
 ### GraphQL Query
+
 ```python
 from ..services.shopify.client import ShopifyClient
 
@@ -61,6 +69,7 @@ result = client.execute(query, variables)
 ## Routing
 
 **Who I delegate TO (CAN call):**
+
 - **Debugger agent** → Error handling and sync failure analysis
 - **Flash agent** → Performance issues in sync operations
 - **Archer agent** → Research Shopify patterns in core/enterprise

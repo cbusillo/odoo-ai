@@ -3,17 +3,20 @@
 ## My Tools
 
 ### Find Old Patterns
+
 - `mcp__odoo-intelligence__search_code` - Find deprecated patterns
-- `mcp__odoo-intelligence__pattern_analysis` - Analyze current patterns
+- `mcp__odoo-intelligence__analysis_query` - Analyze current patterns (analysis_type="patterns")
 - `Read` - Examine specific files
 
 ### Find Modern Examples
-- `mcp__odoo-intelligence__search_models` - Find Odoo 18 examples
+
+- `mcp__odoo-intelligence__model_query` - Find Odoo 18 examples (operation="search")
 - `docker exec` to read core Odoo 18 implementations
 
 ## Key Migration Patterns
 
 ### Field Naming (Odoo 18)
+
 ```python
 # OLD: Always _id suffix
 carrier_id = fields.Many2one('delivery.carrier')
@@ -26,6 +29,7 @@ carrier_id = fields.Integer()
 ```
 
 ### String Attributes
+
 ```python
 # OLD: Explicit strings
 name = fields.Char(string="Product Name")
@@ -36,6 +40,7 @@ qty = fields.Integer(string="Quantity")  # Only when different
 ```
 
 ### Type Hints (Python 3.10+)
+
 ```python
 # OLD: typing imports
 from typing import Optional, List, Dict
@@ -47,6 +52,7 @@ def method(self, vals: dict | None) -> list[str]:
 ```
 
 ### JavaScript/Frontend
+
 ```javascript
 // OLD: odoo.define
 odoo.define('module.widget', function (require) {
@@ -62,6 +68,7 @@ export class MyWidget extends Component {
 ```
 
 ### API Decorators
+
 ```python
 # OLD: Deprecated decorators
 @api.multi
@@ -78,6 +85,7 @@ def method(self):
 ## Migration Commands
 
 ### Find Patterns to Update
+
 ```python
 # Find old type hints
 mcp__odoo-intelligence__search_code(
@@ -114,6 +122,7 @@ mcp__odoo-intelligence__search_code(
 ## Routing
 
 **Who I delegate TO (CAN call):**
+
 - **GPT agent** → Complex migrations requiring extensive codebase changes
 - **Scout agent** → Testing migration results and compatibility verification
 - **Refactor agent** → Bulk code changes and systematic pattern updates

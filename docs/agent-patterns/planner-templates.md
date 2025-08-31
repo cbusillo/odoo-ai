@@ -40,8 +40,8 @@ Model Planning:
 
 ```python
 # 1. Analyze existing structure
-product_info = mcp__odoo-intelligence__model_info(model_name="product.template")
-bundle_examples = mcp__odoo-intelligence__search_models(pattern="bundle|kit")
+product_info = mcp__odoo-intelligence__model_query(operation="info", model_name="product.template")
+bundle_examples = mcp__odoo-intelligence__model_query(operation="search", pattern="bundle|kit")
 
 # 2. Create implementation tasks
 TodoWrite([
@@ -58,8 +58,8 @@ TodoWrite([
 
 ```python
 # 1. Current structure analysis
-motor_info = mcp__odoo-intelligence__model_info(model_name="motor.product")
-relationships = mcp__odoo-intelligence__model_relationships(model_name="motor.product")
+motor_info = mcp__odoo-intelligence__model_query(operation="info", model_name="motor.product")
+relationships = mcp__odoo-intelligence__model_query(operation="relationships", model_name="motor.product")
 
 # 2. Design decisions
 """
@@ -75,7 +75,7 @@ Schema Design:
 
 ```python
 # 1. Research existing patterns
-shipping_models = mcp__odoo-intelligence__search_models(pattern="shipping|delivery")
+shipping_models = mcp__odoo-intelligence__model_query(operation="search", pattern="shipping|delivery")
 integration_patterns = mcp__odoo-intelligence__search_code(
     pattern="class.*Integration|service.*api",
     file_type="py"

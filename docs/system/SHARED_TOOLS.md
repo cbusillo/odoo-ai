@@ -43,7 +43,8 @@ mcp__odoo-intelligence__permission_checker(
 
 ```python
 # Analyze state machines and transitions
-mcp__odoo-intelligence__workflow_states(
+mcp__odoo-intelligence__analysis_query(
+    analysis_type="workflow",
     model_name="sale.order"
 )
 # Returns: state fields, transitions, button actions
@@ -53,9 +54,10 @@ mcp__odoo-intelligence__workflow_states(
 
 ```python
 # Analyze actual data in the database
-mcp__odoo-intelligence__field_value_analyzer(
-    model="product.template",
-    field="list_price",
+mcp__odoo-intelligence__field_query(
+    operation="analyze_values",
+    model_name="product.template",
+    field_name="list_price",
     domain=[('active', '=', True)],
     sample_size=1000
 )
@@ -66,7 +68,8 @@ mcp__odoo-intelligence__field_value_analyzer(
 
 ```python
 # Understand computed and related field chains
-mcp__odoo-intelligence__resolve_dynamic_fields(
+mcp__odoo-intelligence__field_query(
+    operation="resolve_dynamic",
     model_name="sale.order.line"
 )
 # Shows: compute dependencies, related paths, triggers
@@ -110,7 +113,8 @@ mcp__odoo-intelligence__search_decorators(
 
 ```python
 # Find all models with specific field types
-mcp__odoo-intelligence__search_field_type(
+mcp__odoo-intelligence__field_query(
+    operation="search_type",
     field_type="many2one"  # or "char", "float", "json", etc.
 )
 ```
@@ -119,7 +123,8 @@ mcp__odoo-intelligence__search_field_type(
 
 ```python
 # Find fields with specific properties
-mcp__odoo-intelligence__search_field_properties(
+mcp__odoo-intelligence__field_query(
+    operation="search_properties",
     property="computed"  # or "related", "stored", "required", "readonly"
 )
 ```
@@ -128,13 +133,13 @@ mcp__odoo-intelligence__search_field_properties(
 
 1. **execute_code**: Quick data checks, one-off scripts, testing snippets
 2. **permission_checker**: User can't see records, access rights errors
-3. **workflow_states**: Understanding approval flows, state machines
-4. **field_value_analyzer**: Data quality checks, finding outliers
-5. **resolve_dynamic_fields**: Debugging compute errors, understanding dependencies
+3. **analysis_query(analysis_type="workflow")**: Understanding approval flows, state machines
+4. **field_query(operation="analyze_values")**: Data quality checks, finding outliers
+5. **field_query(operation="resolve_dynamic")**: Debugging compute errors, understanding dependencies
 
 ## Performance Tips
 
 - Use `execute_code` for quick checks instead of creating temporary files
 - `permission_checker` is faster than manually checking ir.model.access and ir.rule
-- `field_value_analyzer` can prevent performance issues by showing data patterns
+- `field_query(operation="analyze_values")` can prevent performance issues by showing data patterns
 - These tools run in the actual Odoo environment with full context

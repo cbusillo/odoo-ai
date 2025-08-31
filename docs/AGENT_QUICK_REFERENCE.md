@@ -73,7 +73,7 @@ Task(
 )
 
 # GPT agent (special case - direct MCP)
-mcp__gpt - codex__codex(
+mcp__gpt-codex__codex(
     prompt="[request]",
     sandbox="workspace-write",
     profile="deep-reasoning"  # Available: deep-reasoning, dev-standard, test-runner, safe-production, quick

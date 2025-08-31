@@ -7,19 +7,19 @@ specialization.
 
 ### Search Operations
 
-| Operation               | MCP Tool                                | Alternative        | Performance Gain | Real-World Impact           |
-|-------------------------|-----------------------------------------|--------------------|------------------|-----------------------------|
-| **Search 10k+ files**   | `mcp__odoo-intelligence__search_code`   | `bash grep -r`     | **100x faster**  | <1 second vs 30+ seconds    |
-| **Find model patterns** | `mcp__odoo-intelligence__search_models` | Manual file search | **50x faster**   | Instant vs minutes          |
-| **Locate methods**      | `mcp__odoo-intelligence__find_method`   | grep through files | **100x faster**  | Project-wide instant search |
+| Operation               | MCP Tool                              | Alternative        | Performance Gain | Real-World Impact           |
+|-------------------------|---------------------------------------|--------------------|------------------|-----------------------------|
+| **Search 10k+ files**   | `mcp__odoo-intelligence__search_code` | `bash grep -r`     | **100x faster**  | <1 second vs 30+ seconds    |
+| **Find model patterns** | `mcp__odoo-intelligence__model_query` | Manual file search | **50x faster**   | Instant vs minutes          |
+| **Locate methods**      | `mcp__odoo-intelligence__find_method` | grep through files | **100x faster**  | Project-wide instant search |
 
 ### Analysis Operations
 
-| Operation                 | MCP Tool                                       | Alternative       | Performance Gain      | Coverage Impact                |
-|---------------------------|------------------------------------------------|-------------------|-----------------------|--------------------------------|
-| **Code quality analysis** | `mcp__odoo-intelligence__pattern_analysis`     | Manual review     | **1000x coverage**    | Entire codebase vs single file |
-| **Performance analysis**  | `mcp__odoo-intelligence__performance_analysis` | Manual inspection | **Complete coverage** | Finds all N+1 queries          |
-| **Field dependencies**    | `mcp__odoo-intelligence__field_dependencies`   | Manual tracing    | **100x faster**       | Complete dependency graph      |
+| Operation                 | MCP Tool                                 | Alternative       | Performance Gain      | Coverage Impact                |
+|---------------------------|------------------------------------------|-------------------|-----------------------|--------------------------------|
+| **Code quality analysis** | `mcp__odoo-intelligence__analysis_query` | Manual review     | **1000x coverage**    | Entire codebase vs single file |
+| **Performance analysis**  | `mcp__odoo-intelligence__analysis_query` | Manual inspection | **Complete coverage** | Finds all N+1 queries          |
+| **Field dependencies**    | `mcp__odoo-intelligence__field_query`    | Manual tracing    | **100x faster**       | Complete dependency graph      |
 
 ### Container Operations
 
@@ -84,7 +84,7 @@ grep - l
 "class.*Product"
 
 # ✅ FAST: MCP tool (<1 second)
-mcp__odoo - intelligence__search_models(pattern="product")
+mcp__odoo-intelligence__model_query(operation="search", pattern="product")
 ```
 
 ### Example 2: Analyzing Performance Issues
@@ -94,7 +94,7 @@ mcp__odoo - intelligence__search_models(pattern="product")
 # Manually checking each file for loops with searches
 
 # ✅ COMPLETE: MCP analysis (seconds, finds all issues)
-mcp__odoo - intelligence__performance_analysis(model_name="sale.order")
+mcp__odoo-intelligence__analysis_query(analysis_type="performance", model_name="sale.order")
 ```
 
 ### Example 3: Code Quality Check
@@ -104,7 +104,7 @@ mcp__odoo - intelligence__performance_analysis(model_name="sale.order")
 # Only checks currently open file
 
 # ✅ COMPREHENSIVE: Project-wide analysis
-mcp__odoo - intelligence__pattern_analysis(pattern_type="all")
+mcp__odoo-intelligence__analysis_query(analysis_type="patterns", pattern_type="all")
 # Analyzes entire codebase instantly
 ```
 

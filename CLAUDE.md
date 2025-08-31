@@ -120,7 +120,7 @@ See [docs/agent-patterns/anti-recursion-guidelines.md](docs/agent-patterns/anti-
 
 ```python
 # For test runner and tools needing full system access:
-mcp__gpt - codex__codex(
+mcp__gpt-codex__codex(
     prompt="[specific request]",
     sandbox="danger-full-access",  # Required for test_runner, psutil, Docker
     model="gpt-5",
@@ -128,7 +128,7 @@ mcp__gpt - codex__codex(
 )
 
 # For standard development tasks:
-mcp__gpt - codex__codex(
+mcp__gpt-codex__codex(
     prompt="[specific request]",
     model="gpt-5",
     approval_policy="never"

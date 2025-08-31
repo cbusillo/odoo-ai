@@ -7,7 +7,7 @@ Always use the fastest tools for documentation verification. See [Tool Selection
 ### Documentation Analysis Tools
 
 - `mcp__odoo-intelligence__search_code` - Find code patterns to document
-- `mcp__odoo-intelligence__model_info` - Verify model documentation accuracy
+- `mcp__odoo-intelligence__model_query` - Verify model documentation accuracy (operation="info")
 - `mcp__odoo-intelligence__module_structure` - Document module organization
 - `Read` - Examine existing documentation files
 - `Grep` - Find documentation inconsistencies
@@ -43,7 +43,7 @@ Grep(pattern="Odoo \d+|Python \d\.\d+", path="docs/", output_mode="content")
 
 ```python
 # Find undocumented models
-mcp__odoo-intelligence__search_models(pattern=".*")
+mcp__odoo-intelligence__model_query(operation="search", pattern=".*")
 
 # Check if new agent files match README.md table
 Glob(pattern="docs/agents/*.md")
@@ -88,7 +88,7 @@ mcp__odoo-intelligence__module_structure(module_name="product_connect")
 Read("docs/DOCUMENTATION.md")
 
 # Verification
-mcp__odoo-intelligence__model_info(model_name="product.template")
+mcp__odoo-intelligence__model_query(operation="info", model_name="product.template")
 WebSearch(query="verify Shopify GraphQL API 2025-04 status")
 
 # Update

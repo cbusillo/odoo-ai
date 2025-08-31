@@ -5,7 +5,7 @@
 - `mcp__odoo-intelligence__search_code` with `file_type="js"` - Find JS patterns
 - `Write` - Create components and tests
 - `MultiEdit` - Update multiple frontend files
-- `mcp__pycharm__find_files_by_name_substring` - Find specific JS files
+- `mcp__jetbrains__find_files_by_name_substring` - Find specific JS files
 
 ## Critical Rules
 

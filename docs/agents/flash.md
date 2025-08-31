@@ -4,13 +4,13 @@
 
 ### Performance Analysis Tools
 
-- `mcp__odoo-intelligence__performance_analysis` - Find N+1 queries, missing indexes
-- `mcp__odoo-intelligence__field_dependencies` - Analyze compute chains
-- `mcp__odoo-intelligence__field_value_analyzer` - Check data patterns
+- `mcp__odoo-intelligence__analysis_query` - Find N+1 queries, missing indexes (analysis_type="performance")
+- `mcp__odoo-intelligence__field_query` - Analyze compute chains and data patterns (operations: dependencies,
+  analyze_values)
 
 ### Pattern Detection
 
-- `mcp__odoo-intelligence__pattern_analysis` - Find inefficient patterns
+- `mcp__odoo-intelligence__analysis_query` - Find inefficient patterns (analysis_type="patterns")
 - `mcp__odoo-intelligence__search_code` - Find specific anti-patterns
 
 ## Quick Analysis Commands
@@ -19,12 +19,14 @@
 
 ```python
 # Comprehensive analysis
-mcp__odoo-intelligence__performance_analysis(
+mcp__odoo-intelligence__analysis_query(
+    analysis_type="performance",
     model_name="product.template"
 )
 
 # Check field dependencies
-mcp__odoo-intelligence__field_dependencies(
+mcp__odoo-intelligence__field_query(
+    operation="dependencies",
     model_name="sale.order",
     field_name="amount_total"
 )

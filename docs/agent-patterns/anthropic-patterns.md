@@ -232,7 +232,7 @@ grep - r
 "pattern"
 
 # GOOD: Purpose-built tools
-mcp__odoo - intelligence__search_code(pattern="pattern")
+mcp__odoo-intelligence__search_code(pattern="pattern")
 ```
 
 ### 3. Verbose Outputs

@@ -4,15 +4,15 @@
 
 **These are the ONLY delegation thresholds. All documentation should reference this section.**
 
-| Context/Scope           | Action                      | Rationale                                      |
-|-------------------------|-----------------------------|------------------------------------------------|
-| **1-2 files**           | Handle directly             | Small scope, quick edits                       |
-| **3-5 files**           | Consider specialists        | Medium complexity benefits from expertise      |
-| **5+ files**            | ALWAYS delegate to GPT      | Preserves context, GPT has efficient execution |
-| **20+ files**           | MUST use GPT agent          | Only GPT can handle this scale effectively     |
-| **Context >30%**        | Offload everything          | Critical context preservation needed           |
-| **Any uncertainty**     | GPT for verification        | External validation prevents errors            |
-| **Web research needed** | GPT with danger-full-access | Only GPT has web access capability             |
+| Context/Scope           | Action                   | Rationale                                      |
+|-------------------------|--------------------------|------------------------------------------------|
+| **1-2 files**           | Handle directly          | Small scope, quick edits                       |
+| **3-5 files**           | Consider specialists     | Medium complexity benefits from expertise      |
+| **5+ files**            | ALWAYS delegate to GPT   | Preserves context, GPT has efficient execution |
+| **20+ files**           | MUST use GPT agent       | Only GPT can handle this scale effectively     |
+| **Context >30%**        | Offload everything       | Critical context preservation needed           |
+| **Any uncertainty**     | GPT for verification     | External validation prevents errors            |
+| **Web research needed** | GPT with workspace-write | GPT has network access for research            |
 
 ## Critical Issue: Recursive Agent Calls
 

@@ -119,10 +119,10 @@ See [docs/agent-patterns/anti-recursion-guidelines.md](docs/agent-patterns/anti-
 **For GPT Agent (SPECIAL CASE - uses MCP directly):**
 
 ```python
-# For test runner and tools needing full system access:
+# For test runner and tools needing container access:
 mcp__gpt-codex__codex(
     prompt="[specific request]",
-    sandbox="danger-full-access",  # Required for test_runner, psutil, Docker
+    sandbox="workspace-write",  # Sufficient for most tasks including Docker
     model="gpt-5",
     approval_policy="never"
 )

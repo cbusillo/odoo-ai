@@ -60,13 +60,13 @@ Task(
 Specialized profile for test execution:
 
 - Medium reasoning effort for test analysis
-- Requires --sandbox danger-full-access CLI flag
+- Requires --sandbox workspace-write CLI flag
 - Suitable for running and debugging tests
 - Network access may be needed for external dependencies
 
 ```bash
 # CLI usage (requires sandbox flag)
-codex exec "Run tests" --profile test-runner --sandbox danger-full-access
+codex exec "Run tests" --profile test-runner --sandbox workspace-write
 
 # Via GPT agent
 Task(
@@ -146,7 +146,7 @@ codex exec "Task" --profile deep-reasoning
 codex exec "Task" -c 'model_reasoning_effort="high"'
 
 # Sandbox mode via CLI flag (cannot be set in profiles)
-codex exec "Task" --sandbox danger-full-access
+codex exec "Task" --sandbox workspace-write
 
 # Multiple config overrides
 codex exec "Task" \
@@ -167,9 +167,9 @@ The GPT agent automatically selects appropriate profiles based on task:
 ## Troubleshooting
 
 1. **Profile not found**: Ensure profile is in `~/.codex/config.toml`, not project config
-2. **Sandbox mode ignored**: Profiles cannot set sandbox mode - use CLI flags like `--sandbox danger-full-access`
+2. **Sandbox mode ignored**: Profiles cannot set sandbox mode - use CLI flags like `--sandbox workspace-write`
 3. **Environment variables missing**: Use config overrides or set in profile
-4. **Network access denied**: Enable in profile or use `danger-full-access` sandbox
+4. **Network access denied**: Enable in profile or use `workspace-write` sandbox
 5. **Authentication errors**: Run `codex login` to refresh credentials
 
 ## Important Notes
@@ -180,12 +180,12 @@ The GPT agent automatically selects appropriate profiles based on task:
 
 ```bash
 # Correct: CLI flag
-codex exec "Task" --profile deep-reasoning --sandbox danger-full-access
+codex exec "Task" --profile deep-reasoning --sandbox workspace-write
 
 # Correct: Config override
-codex exec "Task" -c 'sandbox_mode="danger-full-access"'
+codex exec "Task" -c 'sandbox_mode="workspace-write"'
 
 # Incorrect: Cannot be set in profile
 [profiles.my-profile]
-sandbox_mode = "danger-full-access"  # THIS DOESN'T WORK
+sandbox_mode = "workspace-write"  # THIS DOESN'T WORK
 ```

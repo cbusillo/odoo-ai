@@ -12,7 +12,7 @@ MCP server.
 ```python
 response = mcp__gpt-codex__codex(
     prompt="Your request here",
-    sandbox="workspace-write",  # or "danger-full-access", "read-only"
+    sandbox="workspace-write",  # or "read-only" for analysis only
     model="gpt-5",  # Default, or "gpt-4.1" (1M+ token context), "gpt-4.5"
     approval_policy="never",  # or "untrusted", "on-failure", "on-request"
     # Additional optional parameters:
@@ -84,7 +84,7 @@ See: [reference.md#common-issues](./reference.md#common-issues)
 ```python
 response = mcp__gpt-codex__codex(
     prompt="Research the best practices for [topic]. Search the web for current information.",
-    sandbox="danger-full-access",
+    sandbox="workspace-write",  # Sufficient for network access
     model="gpt-5"  # Default - use this for most tasks
 )
 session_id = response['structuredContent']['sessionId']

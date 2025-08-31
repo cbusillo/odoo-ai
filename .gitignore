@@ -202,3 +202,6 @@ odoo.*.conf
 /docs/todo
 /.claude/.compacted
 !.env.example
+
+# Claude Code agent stack files (recursion prevention)
+.claude/agent-stack/

@@ -25,13 +25,14 @@ else
   TOOL_NAME="$(printf '%s' "$HOOK_INPUT" | sed -n 's/.*\"tool_name\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p' | head -n1)"
 fi
  
-# Never interrupt Task (agent delegation) to avoid recursion
+# Allow Task (agent delegation) to proceed normally
 if [[ "$TOOL_NAME" == "Task" ]]; then
-  # Log environment context for debugging recursion issues
+  # Log environment context for debugging
   {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] PreToolUse(Task): env(PWD=${PWD}, CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR})"
   } >> "$DEBUG_LOG" 2>/dev/null
-  # Intentionally emit no decision JSON for Task; let the recursion hook decide.
+  # Return proper JSON response to maintain hook chain
+  echo '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow"}}'
   exit 0
 fi
  

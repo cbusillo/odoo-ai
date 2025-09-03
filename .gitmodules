@@ -14,3 +14,7 @@
 	path = addons/external_ids
 	url = https://github.com/cbusillo/external_ids.git
 	ignore = dirty
+[submodule "addons/hr_employee_name_extended"]
+	path = addons/hr_employee_name_extended
+	url = git@github.com:cbusillo/hr_employee_name_extended.git
+	branch = main

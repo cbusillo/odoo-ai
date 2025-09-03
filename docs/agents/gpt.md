@@ -6,7 +6,7 @@
 
 ```python
 # Start conversation (session_id returned in response)
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Your request",
     sandbox="workspace-write",  # Choose: read-only, workspace-write
     profile="dev-standard",  # Choose profile based on task complexity
@@ -16,8 +16,24 @@ mcp__gpt-codex__codex(
     include_plan_tool=True,  # Include plan tool
 )
 
+# CRITICAL: Always include documentation paths in prompts
+# Example with documentation context:
+mcp__gpt - codex__codex(
+    prompt="""Review code quality in @addons/product_connect
+    
+    Key documentation:
+    - Project instructions: @CLAUDE.md
+    - Odoo patterns: @docs/agent-patterns/odoo-patterns.md
+    - Style guides: @docs/style/ODOO.md @docs/style/PYTHON.md
+    - Testing patterns: @docs/agent-patterns/testing.md
+    
+    Focus on Odoo framework compliance and performance.""",
+    sandbox="workspace-write",
+    profile="dev-standard"
+)
+
 # Continue session (extract session_id from initial response)
-mcp__gpt-codex__codex_reply(
+mcp__gpt - codex__codex_reply(
     prompt="Follow-up request",
     sessionId="12345678-1234-1234-1234-123456789abc"  # From response['structuredContent']['sessionId']
 )
@@ -65,55 +81,55 @@ Choose the appropriate profile based on task complexity and requirements:
 
 ```python
 # Quick fix - simple tasks
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Fix syntax error in views",
     profile="quick",
     sandbox="workspace-write"
 )
 
 # Standard development - typical implementation
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Refactor @addons/product_connect/ to async pattern",
     profile="dev-standard",
     sandbox="workspace-write"
 )
 
 # Complex task - architectural changes  
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Optimize ORM queries in product_connect module",
     profile="deep-reasoning",
     sandbox="workspace-write"
 )
 
 # Web research - fact checking
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Verify: [claim]. Search web if needed.",
     profile="dev-standard",
     sandbox="workspace-write"  # Web search enabled in config
 )
 
 # Test execution 
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Run unit tests and fix failures",
     profile="test-runner",
     sandbox="workspace-write"
 )
 
 # Production analysis - read-only safety
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Analyze production database performance",
     profile="safe-production",
     sandbox="read-only"
 )
 
 # Multi-step with session
-response = mcp__gpt-codex__codex(
+response = mcp__gpt - codex__codex(
     prompt="Analyze architecture",
     profile="dev-standard",
     sandbox="read-only"
 )
 session_id = response['structuredContent']['sessionId']
-mcp__gpt-codex__codex_reply(prompt="Now optimize it", sessionId=session_id)
+mcp__gpt - codex__codex_reply(prompt="Now optimize it", sessionId=session_id)
 ```
 
 ## Session Management
@@ -128,7 +144,7 @@ mcp__gpt-codex__codex_reply(prompt="Now optimize it", sessionId=session_id)
 
 ```python
 # Initial call creates session and returns session ID directly
-response = mcp__gpt-codex__codex(
+response = mcp__gpt - codex__codex(
     prompt="Analyze this codebase structure",
     sandbox="read-only"
 )
@@ -141,7 +157,7 @@ session_id = response['structuredContent']['sessionId']
 
 ```python
 # Use UUID session_id from initial response for follow-ups
-mcp__gpt-codex__codex_reply(
+mcp__gpt - codex__codex_reply(
     prompt="Now implement the changes we discussed",
     sessionId=session_id  # From response['structuredContent']['sessionId']
 )
@@ -215,13 +231,13 @@ mcp__gpt-codex__codex_reply(
 
 ```python
 # ❌ WRONG - Manual session ID
-mcp__gpt-codex__codex_reply(
+mcp__gpt - codex__codex_reply(
     prompt="Continue task",
     sessionId="gpt-5"  # This will fail
 )
 
 # ✅ CORRECT - UUID from response
-mcp__gpt-codex__codex_reply(
+mcp__gpt - codex__codex_reply(
     prompt="Continue task",
     sessionId="12345678-1234-1234-1234-123456789abc"  # From response['structuredContent']['sessionId']
 )
@@ -248,13 +264,13 @@ mcp__gpt-codex__codex_reply(
 
 ```python
 # File analysis only - read-only sufficient
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Analyze code patterns in this file",
     sandbox="read-only"
 )
 
 # Code implementation - workspace-write required
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Implement new feature in existing files",
     sandbox="workspace-write"  # Default for most tasks
 )
@@ -270,13 +286,13 @@ mcp__gpt-codex__codex(
 
 ```python
 # Primary: Use default (no model parameter)
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Your task"
     # No model parameter - uses default gpt-5 from config
 )
 
 # Extended context: ONLY when needed for 400K+ tokens
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Your task",
     model="gpt-4.1"  # ONLY specify for huge contexts (1M+ tokens)
 )
@@ -303,14 +319,14 @@ mcp__gpt-codex__codex(
 
 ```python
 # Quick tasks - use quick profile (uses default gpt-5)
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Fix simple syntax error",
     profile="quick"  # Low reasoning effort, faster
     # No model parameter - uses default gpt-5
 )
 
 # Complex tasks - optimize reasoning
-mcp__gpt-codex__codex(
+mcp__gpt - codex__codex(
     prompt="Complex architectural refactoring",
     profile="deep-reasoning",  # High reasoning effort
     config={

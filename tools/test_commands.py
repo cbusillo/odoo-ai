@@ -169,16 +169,42 @@ def get_our_modules() -> list[str]:
     addons_path = Path("addons")
     if addons_path.exists():
         for module_dir in addons_path.iterdir():
-            if module_dir.is_dir() and (module_dir / "__manifest__.py").exists():
-                modules.append(module_dir.name)
+            if not module_dir.is_dir():
+                continue
+            if (module_dir / "__manifest__.py").exists():
+                name = module_dir.name
+                # Skip backup/temp/experimental folders
+                lowered = name.lower()
+                if any(term in lowered for term in ("backup", "codex", "_bak", "~")):
+                    continue
+                modules.append(name)
     return modules
 
 
-def run_unit_tests() -> int:
-    modules = get_our_modules()
+def run_unit_tests(modules: list[str] | None = None) -> int:
+    """Run unit tests.
+
+    If ``modules`` is provided, restrict installation and test tags to that
+    subset. This enables focused runs like:
+
+        python -m tools.test_commands unit user_name_extended
+
+    Default behavior (``modules is None``) runs against all custom addons.
+    """
+    if modules:
+        # Keep only valid modules present in our addons directory
+        available = set(get_our_modules())
+        modules = [m for m in modules if m in available]
+        if not modules:
+            print("❌ No matching modules found under ./addons for requested unit test run")
+            return 1
+    else:
+        modules = get_our_modules()
+
     test_db_name = f"{get_production_db_name()}_test_unit"
-    # Use unit_test tag - Odoo will find all tests with this tag
-    return run_docker_test_command("unit_test", test_db_name, modules, timeout=600, use_module_prefix=False)
+    # When scoping to specific modules, prefix test tags so only their tests run
+    use_prefix = True if modules else False
+    return run_docker_test_command("unit_test", test_db_name, modules, timeout=600, use_module_prefix=use_prefix)
 
 
 def run_integration_tests() -> int:
@@ -814,7 +840,7 @@ def clone_production_database(db_name: str) -> str:
     result = subprocess.run(drop_cmd, capture_output=True, text=True)
     if result.returncode != 0:
         print(f"   ❌ Failed to drop database: {result.stderr}")
-        return
+        return ""
 
     # Step 3: Terminate connections to production database before cloning
     print(f"   Terminating connections to production database {production_db}...")
@@ -856,7 +882,7 @@ def clone_production_database(db_name: str) -> str:
     result = subprocess.run(clone_cmd, capture_output=True, text=True)
     if result.returncode != 0:
         print(f"   ❌ Failed to clone database: {result.stderr}")
-        return
+        return ""
 
     # Step 4: Verify creation succeeded
     verify_create_cmd = [
@@ -959,27 +985,31 @@ def run_docker_test_command(
     else:
         drop_and_create_test_database(db_name)
 
-    # Build test tags - optionally with module prefix to only run our module tests
-    # Format: module_name:test_tag for each module (when use_module_prefix=True)
+    # Build test tags - optionally scope tags to specific modules using proper Odoo syntax
+    # Syntax: [-][tag][/module][:class][.method]
+    # For example, restricting tag 'unit_test' to module 'user_name_extended' -> 'unit_test/user_name_extended'
     if not test_tags:
-        # No tags specified, just use module names
-        test_tags_final = ",".join(modules_to_install)
+        # No tags specified, just limit by modules
+        # Use '/module' form so only those modules' tests run
+        test_tags_final = ",".join([f"/{module}" for module in modules_to_install])
     elif not use_module_prefix:
-        # Use tags as-is without module prefix (for tour tests)
-        # With -u flag, we don't trigger base tests
-        test_tags_final = test_tags
-    elif "," in test_tags:
-        # Complex tags with multiple components - apply module prefix to last tag
-        # e.g., "post_install,-at_install,unit_test" -> "module:unit_test"
-        tags = test_tags.split(",")
-        last_tag = tags[-1].strip()
-        test_tags_final = ",".join([f"{module}:{last_tag}" for module in modules_to_install])
-    elif test_tags.startswith("-"):
-        # Negative tags - use as-is
+        # Use tags as-is without scoping to module(s)
         test_tags_final = test_tags
     else:
-        # Simple tags - use module prefixes
-        test_tags_final = ",".join([f"{module}:{test_tags}" for module in modules_to_install])
+        # Scope provided tag expression to modules.
+        # We only support the common case where the expression is a single positive tag
+        # or a simple comma-separated list where the last item is the primary tag to scope.
+        parts = [p.strip() for p in test_tags.split(",") if p.strip()]
+        if len(parts) == 1 and not parts[0].startswith("-"):
+            tag = parts[0]
+            test_tags_final = ",".join([f"{tag}/{module}" for module in modules_to_install])
+        else:
+            # Fallback: attach module scoping to the last positive tag
+            primary = next((p for p in reversed(parts) if not p.startswith("-")), parts[-1])
+            scoped = [f"{primary}/{module}" for module in modules_to_install]
+            # Keep the other parts (excluding the primary we scoped) and add scoped specs
+            keep = [p for p in parts if p != primary]
+            test_tags_final = ",".join(keep + scoped)
 
     print(f"🏷️  Final test tags: {test_tags_final}")
 
@@ -1348,7 +1378,9 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         command = sys.argv[1]
         if command == "unit":
-            sys.exit(run_unit_tests())
+            # Allow optional module list after "unit" to restrict scope
+            modules = sys.argv[2:] if len(sys.argv) > 2 else None
+            sys.exit(run_unit_tests(modules))
         elif command == "integration":
             sys.exit(run_integration_tests())
         elif command == "tour":

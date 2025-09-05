@@ -280,6 +280,14 @@ def run_unit_tests(modules: list[str] | None = None, *, session_dir: Path | None
     print("Unit matrix results:")
     for module, rc, logdir in results:
         print(f"  {module:28} {'OK' if rc == 0 else 'FAIL'}  → {logdir}")
+    # When running within a session (run_all_tests), write an aggregate per-phase
+    # summary so counters reflect all split runs rather than only the last one.
+    if session_dir is not None:
+        try:
+            _write_phase_aggregate_summary(session_dir, "unit")
+        except Exception:
+            # Non-fatal: logs still exist per-module
+            pass
 
     return 0 if overall_rc == 0 else 1
 
@@ -469,7 +477,7 @@ def run_all_tests() -> int:
             "integration": summaries.get("integration"),
             "tour": summaries.get("tour"),
         },
-        "returncodes": {
+        "return_codes": {
             "unit": rc_unit,
             "js": rc_js,
             "integration": rc_integration,
@@ -490,6 +498,7 @@ def run_all_tests() -> int:
             except Exception:
                 pass
         return total
+
     aggregate["counters_total"] = {
         "tests_run": _sum_counter("tests_run"),
         "failures": _sum_counter("failures"),
@@ -522,6 +531,7 @@ def run_all_tests() -> int:
     else:
         print("\n❌ Some categories failed")
         print("Results:")
+
         def _fmt(cat: str, code: int | None) -> str:
             log = session_dir
             summ = summaries.get(cat) or {}
@@ -591,10 +601,9 @@ def _update_latest_symlink(session_dir: Path) -> None:
         latest.symlink_to(rel)
     except Exception:
         # On systems without symlink support, write a pointer file
-        latest.with_suffix(".json").write_text(json.dumps({
-            "schema_version": SUMMARY_SCHEMA_VERSION,
-            "latest": str(session_dir)
-        }, indent=2))
+        latest.with_suffix(".json").write_text(
+            json.dumps({"schema_version": SUMMARY_SCHEMA_VERSION, "latest": str(session_dir)}, indent=2)
+        )
 
 
 def _write_latest_json(session_dir: Path) -> None:
@@ -651,14 +660,99 @@ def _write_digest(session_dir: Path, aggregate: dict) -> None:
     (session_dir / "digest.json").write_text(json.dumps(digest, indent=2))
 
 
-_RE_RAN = re.compile(r"^Ran\s+(?P<tests>\d+)\s+tests?\s+in\s+(?P<seconds>[0-9.]+)s", re.IGNORECASE)
-_RE_FAILED = re.compile(r"^FAILED\s*\((?P<parts>[^)]*)\)")
+def _write_phase_aggregate_summary(session_dir: Path, category: str) -> Path | None:
+    """Aggregate multiple per-phase *.summary.json files into a single summary.
+
+    Intended for split runs (e.g., unit tests per-module). Sums counters across
+    all component summaries and writes an `all.summary.json` file in the phase
+    directory so downstream readers (_get_latest_log_summary, run_all_tests)
+    see accurate totals.
+    """
+    phase_dir = session_dir / category
+    if not phase_dir.exists():
+        return None
+
+    parts: list[tuple[Path, dict]] = []
+    for sfile in sorted(phase_dir.glob("*.summary.json")):
+        # Skip any prior aggregate to avoid double counting on re-runs
+        if sfile.name == "all.summary.json":
+            continue
+        try:
+            with open(sfile) as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    parts.append((sfile, data))
+        except Exception:
+            pass
+
+    if not parts:
+        return None
+
+    def _get_counter(d: dict, key: str) -> int:
+        c = d.get("counters") or {}
+        try:
+            return int(c.get(key, 0))
+        except Exception:
+            return 0
+
+    total = {
+        "tests_run": 0,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+    }
+    all_rc_zero = True
+    component_files: list[str] = []
+    for p, d in parts:
+        component_files.append(p.name)
+        total["tests_run"] += _get_counter(d, "tests_run")
+        total["failures"] += _get_counter(d, "failures")
+        total["errors"] += _get_counter(d, "errors")
+        total["skips"] += _get_counter(d, "skips")
+        rc = d.get("returncode")
+        try:
+            if rc is None or int(rc) != 0:
+                all_rc_zero = False
+        except Exception:
+            all_rc_zero = False
+
+    aggregate = {
+        "schema_version": SUMMARY_SCHEMA_VERSION,
+        "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
+        "category": category,
+        "counters": total,
+        "success": bool(all_rc_zero and total["failures"] == 0 and total["errors"] == 0),
+        "returncode": 0 if all_rc_zero else 1,
+        "components": component_files,
+        "summary_file": str((phase_dir / "all.summary.json").resolve()),
+    }
+
+    out_path = phase_dir / "all.summary.json"
+    try:
+        with open(out_path, "w") as f:
+            json.dump(aggregate, f, indent=2)
+    except Exception:
+        return None
+    return out_path
+
+
+_RE_RAN = re.compile(r"\bRan\s+(?P<tests>\d+)\s+tests?\s+in\s+(?P<seconds>[0-9.]+)s\b", re.IGNORECASE)
+_RE_FAILED = re.compile(r"FAILED\s*\((?P<parts>[^)]*)\)")
 _RE_PART = re.compile(r"\b(?P<key>failures|errors|skipped|expected failures|unexpected successes)\s*=\s*(?P<val>\d+)")
 
 
 def _maybe_update_summary_counters_from_line(line: str, summary: dict) -> None:
     try:
-        m = _RE_RAN.search(line.strip())
+        # Strip ANSI color codes that may prefix lines in some environments
+        ansi_free = re.sub(r"\x1b\[[0-9;]*m", "", line)
+
+        # Heuristic for Odoo logs: count per-test start lines
+        # Example: "... odoo.addons...: Starting TestFoo.test_bar ..."
+        if ": Starting " in ansi_free and re.search(r"\bTest\w*\.test_", ansi_free):
+            summary.setdefault("counters", {}).setdefault("tests_run", 0)
+            summary["counters"]["tests_run"] += 1
+
+        m = _RE_RAN.search(ansi_free)
         if m:
             tests = int(m.group("tests"))
             summary.setdefault("counters", {}).setdefault("tests_run", 0)
@@ -667,7 +761,7 @@ def _maybe_update_summary_counters_from_line(line: str, summary: dict) -> None:
             return
 
         # FAILED (failures=1, errors=0, skipped=2)
-        m = _RE_FAILED.search(line.strip())
+        m = _RE_FAILED.search(ansi_free)
         if m:
             parts = m.group("parts")
             for pm in _RE_PART.finditer(parts):
@@ -682,8 +776,8 @@ def _maybe_update_summary_counters_from_line(line: str, summary: dict) -> None:
             return
 
         # OK (skipped=3) — uncommon but handle
-        if line.strip().startswith("OK") and "skipped=" in line:
-            for pm in _RE_PART.finditer(line):
+        if "OK (" in ansi_free and "skipped=" in ansi_free:
+            for pm in _RE_PART.finditer(ansi_free):
                 if pm.group("key").lower() == "skipped":
                     summary["counters"]["skips"] = int(pm.group("val"))
                     break
@@ -1719,10 +1813,10 @@ def run_docker_test_command(
                         if "unable to get image 'postgres" in lower:
                             diagnostics.append(line.strip())
                             reason = reason or "docker-image-access"
-                        if "fatal:  database \"" in lower and "does not exist" in lower:
+                        if 'fatal:  database "' in lower and "does not exist" in lower:
                             diagnostics.append(line.strip())
                             reason = reason or "db-missing"
-                        if "could not translate host name \"database\"" in lower:
+                        if 'could not translate host name "database"' in lower:
                             diagnostics.append(line.strip())
                             reason = reason or "db-host-unavailable"
 
@@ -1943,6 +2037,7 @@ def run_docker_test_command(
 
 def _hash_text(text: str) -> str:
     import hashlib
+
     return hashlib.sha256(text.encode("utf-8", errors="ignore")).hexdigest()[:16]
 
 

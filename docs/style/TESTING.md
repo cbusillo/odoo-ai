@@ -124,3 +124,20 @@ def test_constraint_violation(self):
 - ❌ Use jQuery patterns in tours (`:visible`, `:contains`)
 - ❌ Create test users without secure passwords
 - ❌ Commit in tests (Odoo handles transactions)
+
+## Runner & Logs
+
+Use our Docker‑aware runner to execute tests and collect structured artifacts.
+
+- Phases: Unit → JS → Integration → Tour (in that order)
+- Commands:
+    - `uv run test-all` — run all phases and aggregate results
+    - `uv run test-unit` | `uv run test-js` | `uv run test-integration` | `uv run test-tour`
+    - `uv run test-clean` — drop test DBs and filestores
+- Timeouts: configured in `pyproject.toml` under `[tool.odoo-test.timeouts]`
+- Logs: `tmp/test-logs/test-YYYYMMDD_HHMMSS/` with per‑phase `all.log`, `all.summary.json`, `all.failures.json` and a
+  session `summary.json`/`digest.json` at the root. `tmp/test-logs/latest` points to the latest session.
+- DB strategy: unit split uses `opw_ut_<module>`; clone‑based phases use `opw_test_<phase>`. Cleanup removes both
+  patterns.
+- Tips: If your shell sandbox blocks Docker, use the PyCharm “All Tests” run config. For JS/Tour timeouts, warm the
+  instance or raise the phase timeout in `pyproject.toml`.

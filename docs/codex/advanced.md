@@ -46,7 +46,7 @@ Control how deeply the model thinks about problems:
 ```python
 mcp__gpt-codex__codex(
     prompt="Complex architectural decision needed",
-    model="gpt-5",
+    model=env("OPENAI_PRIMARY_MODEL"),
     config={
         "model_reasoning_effort": "high",  # Options: "low", "medium", "high"
         "model_reasoning_summary": "detailed",  # Options: "auto", "concise", "detailed"
@@ -149,7 +149,7 @@ Use predefined profiles from ~/.codex/config.toml:
 ```toml
 # In ~/.codex/config.toml
 [profiles.deep-reasoning]
-model = "gpt-5"
+model = env("OPENAI_PRIMARY_MODEL")
 model_reasoning_effort = "high"
 model_reasoning_summary = "detailed"
 approval_policy = "never"
@@ -158,23 +158,23 @@ approval_policy = "never"
 network_access = true
 
 [profiles.dev-standard]
-model = "gpt-5"
+model = env("OPENAI_PRIMARY_MODEL")
 model_reasoning_effort = "medium"
 approval_policy = "never"
 
 [profiles.test-runner]
-model = "gpt-5"
+model = env("OPENAI_PRIMARY_MODEL")
 model_reasoning_effort = "medium"
 approval_policy = "never"
 
 [profiles.safe-production]
-model = "gpt-5"
+model = env("OPENAI_PRIMARY_MODEL")
 model_reasoning_effort = "medium"
 approval_policy = "on-request"
 disable_response_storage = true
 
 [profiles.quick]
-model = "gpt-5"
+model = env("OPENAI_PRIMARY_MODEL")
 model_reasoning_effort = "low"
 model_reasoning_summary = "none"
 approval_policy = "never"
@@ -206,7 +206,7 @@ For the most complex problems:
 ```python
 mcp__gpt-codex__codex(
     prompt="Solve [complex problem]",
-    model="gpt-5",  # Or "gpt-4.1" for 1M+ token contexts
+    model=env("OPENAI_PRIMARY_MODEL"),
     config={
         "model_reasoning_effort": "high",
         "model_reasoning_summary": "detailed",
@@ -224,7 +224,7 @@ For quick development cycles:
 ```python
 mcp__gpt-codex__codex(
     prompt="Quick implementation",
-    model="gpt-5",
+    model=env("OPENAI_PRIMARY_MODEL"),
     approval_policy="never",
     config={
     "model_reasoning_effort": "low",

@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+Claude Code 1.0.102 (Max plan). Default models: `sonnet` for subagents, `opus` for PM/planning, `haiku` for fast scans.
+Long‑context variants are not used. Single source for model details: docs/system/MODEL_SELECTION.md. Include kits:
+docs/system/INCLUDE_KITS.md.
+
 ## Role: Program Manager
 
 Coordinate specialized agents. Your responsibilities:
@@ -41,7 +45,12 @@ Coordinate specialized agents. Your responsibilities:
 - **Uncertain/research**: Delegate immediately
 - **Context >30%**: Delegate everything
 
-**GPT agent uses Codex CLI** - no rate limits. Delegate liberally.
+**GPT agent uses Codex CLI (via MCP)** - large/bulk work and web research go through Codex to preserve Claude’s
+five‑hour Max window.
+
+## Addon Golden Path
+
+- See: docs/ODOO_ADDON_GOLDEN_PATH.md (plan → scaffold → implement → test → inspect → ship)
 
 ### 🚨 Recursion Prevention (CRITICAL)
 
@@ -123,14 +132,14 @@ See [docs/agent-patterns/anti-recursion-guidelines.md](docs/agent-patterns/anti-
 mcp__gpt-codex__codex(
     prompt="[specific request]",
     sandbox="workspace-write",  # Sufficient for most tasks including Docker
-    model="gpt-5",
+    # model is configured via OPENAI_PRIMARY_MODEL
     approval_policy="never"
 )
 
 # For standard development tasks:
 mcp__gpt-codex__codex(
     prompt="[specific request]",
-    model="gpt-5",
+    # model is configured via OPENAI_PRIMARY_MODEL
     approval_policy="never"
     # Uses default sandbox_mode="workspace-write" from config
 )

@@ -15,7 +15,7 @@
 
 ### Current Environment & Resources
 
-- **Version**: Claude Code 1.0.64+ (check with `claude --version`)
+- **Version**: Claude Code 1.0.102 (verify with `claude --version`)
 - **Interface**: Terminal-based Claude, different from Claude Desktop
 - **Official Documentation**: https://docs.anthropic.com/en/docs/claude-code/overview
 - **GitHub Repository**: https://github.com/anthropics/claude-code

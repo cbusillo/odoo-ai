@@ -24,20 +24,15 @@ exclude = ["addons*", "tmp*", "docker*", "patches*"]
 test-unit = "tools.test_commands:run_unit_tests"
 test-integration = "tools.test_commands:run_integration_tests"
 test-tour = "tools.test_commands:run_tour_tests"
+test-js = "tools.test_commands:run_js_tests"
 test-all = "tools.test_commands:run_all_tests"
 test-stats = "tools.test_commands:show_test_stats"
 test-clean = "tools.test_commands:cleanup_all_test_artifacts"
 
 [tool.odoo-test.timeouts]
-unit = 180          # 3 minutes
-integration = 600   # 10 minutes  
-tour = 1800        # 30 minutes
-default = 300      # 5 minutes
-
-[tool.odoo-test.parallel]
-enabled = true
-workers = 4
-scope = "class"    # Run test classes in parallel
+unit = 300
+integration = 600
+tour = 180
 
 [tool.ruff]
 line-length = 133

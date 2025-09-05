@@ -5,17 +5,18 @@
 Claude Code agents can request specific AI models based on task complexity, enabling rate limit preservation and
 performance optimization.
 
-## Canonical Model Matrix
+## Canonical Model Matrix (Anthropic)
 
 | Model Family | Model Name | Speed | Tokens    | Rate Limit | Best For                       |
 |--------------|------------|-------|-----------|------------|--------------------------------|
 | **Claude**   | Haiku      | <1s   | 1K-5K     | LOW        | Simple queries, status checks  |
 | **Claude**   | Sonnet     | ~5s   | 15K-50K   | MEDIUM     | Standard development (default) |
-| **Claude**   | Opus       | ~15s  | 100K-300K | HIGH       | Complex analysis               |
-| **OpenAI**   | gpt-5      | ~10s  | 0 Claude  | NONE       | Primary GPT choice             |
-| **OpenAI**   | gpt-4.1    | ~15s  | 0 Claude  | NONE       | 1M+ context alternative        |
+| **Claude**   | Opus 4.1   | ~15s  | 100K-300K | HIGH       | Complex analysis               |
 
-**Note**: Model availability changes over time. The GPT agent supports multiple OpenAI models via Codex CLI.
+We do not use long‑context Sonnet variants in this project.
+
+**OpenAI via Codex**: The GPT agent uses OpenAI models through Codex CLI. We configure OpenAI models via environment
+variables rather than hardcoding names.
 
 ## Syntax
 
@@ -33,21 +34,21 @@ Task details...""",
 
 ## Default Models by Agent
 
-| Agent          | Default | Reasoning                   |
-|----------------|---------|-----------------------------|
-| 🚢 Dock        | Haiku   | Simple container operations |
-| 🏹 Archer      | Haiku   | Fast pattern searches       |
-| 🔍 Scout       | Sonnet  | Test writing complexity     |
-| 🦉 Owl         | Sonnet  | Frontend development        |
-| 🔬 Inspector   | Sonnet  | Code analysis               |
-| 🛍️ Shopkeeper | Sonnet  | Business logic              |
-| 🎭 Playwright  | Sonnet  | Browser automation          |
-| 🔧 Refactor    | Opus    | Systematic changes          |
-| ⚡ Flash        | Opus    | Performance analysis        |
-| 🐛 Debugger    | Opus    | Complex reasoning           |
-| 📋 Planner     | Opus    | Architecture design         |
-| 💬 GPT         | gpt-5   | External model capability   |
-| 🔥 Phoenix     | Opus    | Migration complexity        |
+| Agent          | Default              | Reasoning                   |
+|----------------|----------------------|-----------------------------|
+| 🚢 Dock        | Haiku                | Simple container operations |
+| 🏹 Archer      | Haiku                | Fast pattern searches       |
+| 🔍 Scout       | Sonnet               | Test writing complexity     |
+| 🦉 Owl         | Sonnet               | Frontend development        |
+| 🔬 Inspector   | Sonnet               | Code analysis               |
+| 🛍️ Shopkeeper | Sonnet               | Business logic              |
+| 🎭 Playwright  | Sonnet               | Browser automation          |
+| 🔧 Refactor    | Opus                 | Systematic changes          |
+| ⚡ Flash        | Opus                 | Performance analysis        |
+| 🐛 Debugger    | Opus                 | Complex reasoning           |
+| 📋 Planner     | Opus                 | Architecture design         |
+| 💬 GPT         | OPENAI_PRIMARY_MODEL | External model via Codex    |
+| 🔥 Phoenix     | Opus                 | Migration complexity        |
 
 ## Override Examples
 
@@ -81,29 +82,23 @@ Design comprehensive test suite for multi-tenant system""",
 )
 ```
 
-### Offload to External Models
+### OpenAI Model Selection (env‑based)
 
-```python
-# Preserve Claude tokens for large tasks
-Task(
-    description="Large refactoring via external model",
-    prompt="""@docs/agents/gpt.md
+- `OPENAI_PRIMARY_MODEL`: default OpenAI model for Codex (e.g., `gpt-4.1`, `o4`, `o4-mini`).
+- `OPENAI_LARGE_CONTEXT_MODEL` (optional): set only if you explicitly need a larger context alternative.
 
-Use gpt-5 for this 50+ file refactoring""",
-    subagent_type="gpt"
-)
-```
+Codex MCP calls should not hardcode OpenAI model names; use the environment values above.
 
 ## Performance Benchmarks
 
 ### Response Times
 
-| Task Type             | Model  | Response Time | Success Rate |
-|-----------------------|--------|---------------|--------------|
-| Container status      | Haiku  | <1s           | 98%          |
-| Write unit test       | Sonnet | ~5s           | 85%          |
-| Architecture analysis | Opus   | ~15s          | 94%          |
-| 50-file refactor      | gpt-5  | ~30s          | 92%          |
+| Task Type             | Model                | Response Time | Success Rate |
+|-----------------------|----------------------|---------------|--------------|
+| Container status      | Haiku                | <1s           | 98%          |
+| Write unit test       | Sonnet               | ~5s           | 85%          |
+| Architecture analysis | Opus                 | ~15s          | 94%          |
+| 50-file refactor      | OPENAI_PRIMARY_MODEL | ~30s          | 92%          |
 
 ### Task Success Rates
 
@@ -125,14 +120,14 @@ Use gpt-5 for this 50+ file refactoring""",
 1. **High-volume operations** → Use Haiku
 2. **Standard development** → Use Sonnet (default)
 3. **Complex analysis** → Use Opus sparingly
-4. **Large implementations** → Offload to gpt-5 (preserves 100% Claude tokens)
+4. **Large implementations** → Offload to Codex (preserves Claude tokens)
 
 ### Token Usage
 
 - **Haiku**: 1K-5K tokens → Minimal impact
 - **Sonnet**: 15K-50K tokens → Moderate usage
 - **Opus**: 100K-300K tokens → Heavy usage
-- **gpt-5/gpt-4.1**: 0 Claude tokens → Zero impact (via Codex CLI)
+- **OpenAI (via Codex)**: 0 Claude tokens → Zero impact
 
 ## Best Practices
 
@@ -182,7 +177,7 @@ analysis = manager.analyze_task("Check container status")
 and features described in this guide reflect the current state as of documentation writing.
 
 - **Claude models** (Haiku, Sonnet, Opus) are subject to Anthropic's release schedule
-- **OpenAI models** (gpt-5, gpt-4.1) availability depends on OpenAI's API access
+- **OpenAI models** availability depends on OpenAI's API access
 - **Version numbers** are deliberately simplified to focus on capability tiers rather than specific versions
 - **New models** may be added to any tier as they become available
 

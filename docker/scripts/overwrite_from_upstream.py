@@ -79,6 +79,7 @@ class ShopifySettings(BaseSettings):
     def validate_safe_environment(self) -> None:
         # Get production indicators from environment or use defaults
         import os
+
         indicators_str = os.environ.get("PRODUCTION_INDICATORS", "production,live,prod-")
         production_indicators = [ind.strip() for ind in indicators_str.split(",")]
 
@@ -105,6 +106,63 @@ class OdooUpstreamRestorer:
             subprocess.run(cmd, shell=True, env=self.os_env, check=True)
         except subprocess.CalledProcessError as command_error:
             raise OdooRestorerError(f"Command failed: {cmd}\nError: {command_error}") from command_error
+
+    # --- Docker lifecycle helpers (best-effort; non-fatal if unavailable) ---
+    def _sdk_container_by_labels(self, service: str):
+        """Locate a Compose-managed container by project and service labels via Docker SDK."""
+        try:
+            import docker  # type: ignore
+
+            client = docker.from_env()
+            project = os.environ.get("ODOO_PROJECT_NAME", "odoo")
+            filters = {
+                "label": [
+                    f"com.docker.compose.project={project}",
+                    f"com.docker.compose.service={service}",
+                ]
+            }
+            matches = client.containers.list(all=True, filters=filters)
+            return matches[0] if matches else None
+        except Exception as e:
+            _logger.warning(f"Docker SDK unavailable: {e}")
+            return None
+
+    def stop_web_service(self) -> None:
+        if os.environ.get("ODOO_SKIP_WEB_CONTROL", "0") == "1":
+            _logger.info("Skipping web stop (ODOO_SKIP_WEB_CONTROL=1)")
+            return
+        c = self._sdk_container_by_labels("web")
+        if c is not None:
+            try:
+                _logger.info(f"Stopping container {c.name} via Docker SDK")
+                if c.status == "running":
+                    c.stop(timeout=30)
+                return
+            except Exception as e:
+                _logger.warning(f"SDK stop failed: {e}")
+        # Fallback to docker compose if SDK failed/unavailable
+        try:
+            self.run_command("docker compose stop web")
+        except OdooRestorerError as e:
+            _logger.warning(f"Could not stop web via docker compose: {e}")
+
+    def start_web_service(self) -> None:
+        if os.environ.get("ODOO_SKIP_WEB_CONTROL", "0") == "1":
+            _logger.info("Skipping web start (ODOO_SKIP_WEB_CONTROL=1)")
+            return
+        c = self._sdk_container_by_labels("web")
+        if c is not None:
+            try:
+                _logger.info(f"Starting container {c.name} via Docker SDK")
+                c.start()
+                return
+            except Exception as e:
+                _logger.warning(f"SDK start failed: {e}")
+        # Fallback to docker compose if SDK failed/unavailable
+        try:
+            self.run_command("docker compose up -d web")
+        except OdooRestorerError as e:
+            _logger.warning(f"Could not start web via docker compose: {e}")
 
     def overwrite_filestore(self) -> subprocess.Popen:
         _logger.info("Overwriting filestore...")
@@ -246,6 +304,7 @@ class OdooUpstreamRestorer:
 
         # Safety check: prevent setting production values, allow replacing production with development
         import os
+
         indicators_str = os.environ.get("PRODUCTION_INDICATORS", "production,live,prod-")
         production_indicators = [ind.strip() for ind in indicators_str.split(",")]
 
@@ -335,30 +394,137 @@ class OdooUpstreamRestorer:
         drop_cmd = f"dropdb --if-exists -h {self.local.host} -U {self.local.db_user} {self.local.db_name}"
         self.run_command(drop_cmd)
 
-    def update_addons(self) -> None:
-        try:
-            addons_folder = Path("/volumes/addons")
-            if not addons_folder.exists():
-                addons_folder = Path("/opt/project/addons")
-            if not addons_folder.exists():
-                addons_folder = Path("/opt/odoo/odoo-addons")
+    # --- Sanity checks ---
+    def assert_core_schema_healthy(self) -> None:
+        """Ensure core tables and records exist before handing control back to web."""
+        self.connect_to_db()
+        with self.local.db_conn.cursor() as cur:
+            # ir_module_module must exist and have rows
+            try:
+                cur.execute("SELECT COUNT(*) FROM ir_module_module")
+                mod_count = cur.fetchone()[0]
+            except psycopg2.Error as e:
+                raise OdooDatabaseUpdateError(f"Schema check failed: ir_module_module missing ({e})") from e
+            if mod_count == 0:
+                raise OdooDatabaseUpdateError("Schema check failed: ir_module_module is empty")
 
-            addon_list = ",".join(d.name for d in addons_folder.iterdir() if d.is_dir())
-            if not addon_list:
-                _logger.info("No addons found to update.")
-                return
-            odoo_bin = Path("/odoo/odoo-bin")
-            if not odoo_bin.exists():
-                odoo_bin = f"{Path('/opt/odoo/venv/bin/python')} {odoo_bin}"
-            command = f"{odoo_bin} --stop-after-init -d {self.local.db_name} --no-http -u {addon_list}"
-            conf = Path("/etc/odoo.conf")
-            if conf.exists():
-                command += f" --config {conf}"
+            # Languages must exist
+            try:
+                cur.execute("SELECT COUNT(*) FROM res_lang")
+                lang_count = cur.fetchone()[0]
+            except psycopg2.Error as e:
+                raise OdooDatabaseUpdateError(f"Schema check failed: res_lang missing ({e})") from e
+            if lang_count == 0:
+                raise OdooDatabaseUpdateError("Schema check failed: no languages in res_lang")
+
+            # base.public_user should resolve
+            cur.execute("SELECT 1 FROM ir_model_data WHERE module='base' AND name='public_user' LIMIT 1")
+            if cur.fetchone() is None:
+                raise OdooDatabaseUpdateError("Schema check failed: base.public_user xmlid not found")
+
+    def update_addons(self) -> None:
+        """Install/update modules listed in ODOO_UPDATE.
+
+        - Reads comma-separated list from env ODOO_UPDATE
+        - Installs missing ones (-i) and updates all listed (-u)
+        - Validates module dirs exist under known addons paths
+        """
+        mods_env = os.environ.get("ODOO_UPDATE", "").strip()
+        if not mods_env:
+            _logger.info("ODOO_UPDATE not set; skipping addon install/update.")
+            return
+
+        desired = [m.strip() for m in mods_env.split(",") if m.strip()]
+        if not desired:
+            _logger.info("ODOO_UPDATE is empty after parsing; skipping.")
+            return
+
+        # Resolve module presence using configured addons paths.
+        # Prefer ODOO_ADDONS_PATH from the environment/.env; fallback to common defaults.
+        addons_env = os.environ.get("ODOO_ADDONS_PATH", "").strip()
+        addons_paths: list[Path] = []
+        if addons_env:
+            # Support both comma and colon separators
+            sep = "," if "," in addons_env else ":"
+            for raw in [p.strip() for p in addons_env.split(sep) if p.strip()]:
+                addons_paths.append(Path(raw))
+        else:
+            addons_paths = [
+                Path("/volumes/addons"),
+                Path("/opt/project/addons"),
+                Path("/odoo/addons"),
+                Path("/volumes/enterprise"),
+            ]
+        _logger.info(
+            "Using addons search paths: %s",
+            ", ".join(str(p) for p in addons_paths),
+        )
+        found: set[str] = set()
+        missing_fs: list[str] = []
+        for name in desired:
+            present = False
+            for base in addons_paths:
+                if (base / name).is_dir():
+                    found.add(name)
+                    present = True
+                    break
+            if not present:
+                missing_fs.append(name)
+
+        if missing_fs:
+            _logger.warning(f"Modules listed in ODOO_UPDATE not found on disk and will be skipped: {', '.join(missing_fs)}")
+
+        if not found:
+            _logger.info("No valid modules from ODOO_UPDATE found on disk; skipping.")
+            return
+
+        # Determine install vs update from DB state
+        self.connect_to_db()
+        rows: dict[str, str] = {}
+        with self.local.db_conn.cursor() as cur:
+            cur.execute(
+                "SELECT name, state FROM ir_module_module WHERE name = ANY(%s)",
+                (list(found),),
+            )
+            for name, state in cur.fetchall():
+                rows[name] = state
+
+        to_install = [name for name in found if name not in rows or rows.get(name) in ("uninstalled", "to remove")]
+        to_update = list(found)
+
+        odoo_bin = "/odoo/odoo-bin"
+        if not Path(odoo_bin).exists():
+            odoo_bin = f"{Path('/opt/odoo/venv/bin/python')} /odoo/odoo-bin"
+
+        cmd_parts = [
+            odoo_bin,
+            "--stop-after-init",
+            "-d",
+            self.local.db_name,
+            "--no-http",
+        ]
+        if to_install:
+            cmd_parts += ["-i", ",".join(to_install)]
+        if to_update:
+            cmd_parts += ["-u", ",".join(to_update)]
+
+        # Prefer generated config if present for consistency
+        gen_conf = "/volumes/config/_generated.conf"
+        if Path(gen_conf).exists():
+            cmd_parts += ["--config", gen_conf]
+
+        command = " ".join(cmd_parts)
+        _logger.info(f"Installing: {to_install if to_install else 'none'}; Updating: {to_update if to_update else 'none'}")
+        try:
             self.run_command(command)
         except subprocess.CalledProcessError as update_error:
-            raise OdooRestorerError(f"Failed to update addons: {update_error}") from update_error
+            raise OdooRestorerError(f"Failed to install/update addons: {update_error}") from update_error
 
     def run(self, do_sanitize: bool = True) -> None:
+        # Note: We intentionally do not try to stop/start the web service here.
+        # In containerized runs, the Docker CLI/socket are typically unavailable,
+        # and best-effort control caused noisy, non-fatal failures. The restore
+        # process itself is safe without pausing web in this environment.
         filestore_proc = self.overwrite_filestore()
         self.overwrite_database()
         filestore_proc.wait()
@@ -383,6 +549,9 @@ class OdooUpstreamRestorer:
             except OdooDatabaseUpdateError:
                 self.drop_database()
                 raise
+
+        # Final core sanity before handing back control
+        self.assert_core_schema_healthy()
 
         _logger.info("Upstream overwrite completed successfully.")
 

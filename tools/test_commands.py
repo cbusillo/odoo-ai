@@ -11,6 +11,10 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+import shutil
+
+# Summary schema version for all JSON outputs produced by test runner
+SUMMARY_SCHEMA_VERSION = "1.0"
 
 
 def normalize_line_for_pattern_detection(line: str) -> str:
@@ -72,23 +76,16 @@ def detect_repetitive_pattern(recent_lines: list, pattern_occurrences: dict, min
     return False, ""
 
 
-def kill_browser_processes(container_prefix: str = None) -> None:
+def kill_browser_processes() -> None:
     """Aggressively kill browser processes to prevent websocket cleanup hangs."""
-    if container_prefix is None:
-        container_prefix = get_container_prefix()
-
+    sr = get_script_runner_service()
+    ensure_services_up([sr])
     browser_patterns = ["chromium.*headless", "chrome.*headless", "chromium", "chrome", "WebDriver", "geckodriver", "chromedriver"]
-
     for pattern in browser_patterns:
         try:
-            # Use SIGKILL (-9) for immediate termination
-            subprocess.run(
-                ["docker", "exec", f"{container_prefix}-script-runner-1", "pkill", "-9", "-f", pattern],
-                capture_output=True,
-                timeout=5,
-            )
-        except:
-            pass  # Ignore errors - process might not exist
+            _compose_exec(sr, ["pkill", "-9", "-f", pattern])
+        except Exception:
+            pass
 
 
 def safe_terminate_process(process: subprocess.Popen, container_prefix: str = None) -> None:
@@ -120,12 +117,11 @@ def safe_terminate_process(process: subprocess.Popen, container_prefix: str = No
             "chrome",
         ]
 
+        sr = get_script_runner_service()
         for pattern in patterns:
             try:
-                subprocess.run(
-                    ["docker", "exec", f"{container_prefix}-script-runner-1", "pkill", "-f", pattern], capture_output=True, timeout=5
-                )
-            except:
+                _compose_exec(sr, ["pkill", "-f", pattern])
+            except Exception:
                 pass  # Ignore cleanup failures
 
     except Exception as e:
@@ -133,8 +129,12 @@ def safe_terminate_process(process: subprocess.Popen, container_prefix: str = No
 
 
 def get_container_prefix() -> str:
-    """Get the container prefix from environment or use default."""
+    """Get the Compose project name (container prefix)."""
     return os.environ.get("ODOO_PROJECT_NAME", "odoo")
+
+
+def get_database_service() -> str:
+    return "database"
 
 
 def get_production_db_name() -> str:
@@ -164,6 +164,39 @@ def get_script_runner_service() -> str:
     return "script-runner"
 
 
+def _compose_exec(service: str, args: list[str], capture_output: bool = True) -> subprocess.CompletedProcess:
+    """Run `docker compose exec -T <service> ...` consistently."""
+    cmd = ["docker", "compose", "exec", "-T", service] + args
+    return subprocess.run(cmd, capture_output=capture_output, text=True)
+
+
+def _compose_run(service: str, args: list[str], env: dict | None = None) -> subprocess.Popen:
+    """Run `docker compose run --rm <service> ...` and stream output later."""
+    cmd = ["docker", "compose", "run", "--rm", service] + args
+    if env:
+        env_pairs = sum((["-e", f"{k}={v}"] for k, v in env.items()), [])
+        cmd = ["docker", "compose", "run", "--rm"] + env_pairs + [service] + args
+    return subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+
+
+def ensure_services_up(services: list[str]) -> None:
+    """Ensure listed services are started (idempotent)."""
+    for s in services:
+        subprocess.run(["docker", "compose", "up", "-d", s], capture_output=True)
+
+
+def load_timeouts() -> dict:
+    """Load timeouts from pyproject.toml [tool.odoo-test.timeouts]."""
+    try:
+        import tomli  # type: ignore
+
+        with open("pyproject.toml", "rb") as f:
+            data = tomli.load(f)
+        return data.get("tool", {}).get("odoo-test", {}).get("timeouts", {}) or {}
+    except Exception:
+        return {}
+
+
 def get_our_modules() -> list[str]:
     modules = []
     addons_path = Path("addons")
@@ -181,7 +214,7 @@ def get_our_modules() -> list[str]:
     return modules
 
 
-def run_unit_tests(modules: list[str] | None = None) -> int:
+def run_unit_tests(modules: list[str] | None = None, *, session_dir: Path | None = None) -> int:
     """Run unit tests.
 
     If ``modules`` is provided, restrict installation and test tags to that
@@ -191,7 +224,8 @@ def run_unit_tests(modules: list[str] | None = None) -> int:
 
     Default behavior (``modules is None``) runs against all custom addons.
     """
-    if modules:
+    user_scoped = modules is not None and len(modules) > 0
+    if user_scoped:
         # Keep only valid modules present in our addons directory
         available = set(get_our_modules())
         modules = [m for m in modules if m in available]
@@ -201,29 +235,160 @@ def run_unit_tests(modules: list[str] | None = None) -> int:
     else:
         modules = get_our_modules()
 
-    test_db_name = f"{get_production_db_name()}_test_unit"
-    # When scoping to specific modules, prefix test tags so only their tests run
-    use_prefix = True if modules else False
-    return run_docker_test_command("unit_test", test_db_name, modules, timeout=600, use_module_prefix=use_prefix)
+    timeout_cfg = load_timeouts().get("unit", 300)
+
+    # Split-by-module mode to avoid aborting on first failing module
+    split = os.environ.get("TEST_UNIT_SPLIT", "1") != "0"
+    if not split or (user_scoped and len(modules) == 1):
+        test_db_name = f"{get_production_db_name()}_test_unit"
+        use_prefix = True if user_scoped else False
+        return run_docker_test_command(
+            "unit_test",
+            test_db_name,
+            modules,
+            timeout=timeout_cfg,
+            use_module_prefix=use_prefix,
+            category="unit",
+            session_dir=session_dir,
+        )
+
+    print("🔀 Unit test matrix: per-module runs to collect all failures")
+    overall_rc = 0
+    results: list[tuple[str, int, Path]] = []
+    for module in modules:
+        db = f"{get_production_db_name()}_ut_{module}"
+        print("-" * 60)
+        print(f"▶️  {module}")
+        rc = run_docker_test_command(
+            "unit_test",
+            db,
+            [module],
+            timeout=timeout_cfg,
+            use_module_prefix=True,
+            category="unit",
+            session_dir=session_dir,
+        )
+        # Find the most recent log dir to report back (best-effort)
+        try:
+            latest_dir = max((d for d in (Path("tmp/test-logs")).iterdir() if d.is_dir()), key=lambda p: p.name)
+        except Exception:
+            latest_dir = Path("tmp/test-logs")
+        results.append((module, rc, latest_dir))
+        overall_rc |= rc != 0
+
+    print("=" * 60)
+    print("Unit matrix results:")
+    for module, rc, logdir in results:
+        print(f"  {module:28} {'OK' if rc == 0 else 'FAIL'}  → {logdir}")
+
+    return 0 if overall_rc == 0 else 1
 
 
-def run_integration_tests() -> int:
+def run_integration_tests(*, session_dir: Path | None = None) -> int:
     modules = get_our_modules()
     test_db_name = f"{get_production_db_name()}_test_integration"
+    timeout_cfg = load_timeouts().get("integration", 600)
     return run_docker_test_command(
-        "integration_test", test_db_name, modules, timeout=600, use_production_clone=True, use_module_prefix=False
+        "integration_test",
+        test_db_name,
+        modules,
+        timeout=timeout_cfg,
+        use_production_clone=True,
+        use_module_prefix=False,
+        category="integration",
+        session_dir=session_dir,
     )
 
 
-def run_tour_tests() -> int:
+def run_tour_tests(*, session_dir: Path | None = None) -> int:
     print("🧪 Starting tour tests...")
     modules = get_our_modules()
     test_db_name = f"{get_production_db_name()}_test_tour"
     print(f"   Database: {test_db_name}")
     print(f"   Modules: {', '.join(modules)}")
+    timeout_cfg = load_timeouts().get("tour", 1800)
     return run_docker_test_command(
-        "tour_test", test_db_name, modules, timeout=1800, use_production_clone=True, is_tour_test=True, use_module_prefix=False
+        "tour_test",
+        test_db_name,
+        modules,
+        timeout=timeout_cfg,
+        use_production_clone=True,
+        is_tour_test=True,
+        use_module_prefix=False,
+        category="tour",
+        session_dir=session_dir,
     )
+
+
+def run_js_tests(modules: list[str] | None = None, *, session_dir: Path | None = None) -> int:
+    """Run JS/hoot tests in a browser with dev assets and workers.
+
+    These are HttpCase-based and should not run with workers=0.
+    """
+    if modules:
+        available = set(get_our_modules())
+        modules = [m for m in modules if m in available]
+        if not modules:
+            print("❌ No matching modules found under ./addons for requested JS test run")
+            return 1
+    else:
+        modules = get_our_modules()
+
+    test_db_name = f"{get_production_db_name()}_test_js"
+    timeout_cfg = load_timeouts().get("js", 1200)
+    return run_docker_test_command(
+        "js_test",
+        test_db_name,
+        modules,
+        timeout=timeout_cfg,
+        use_production_clone=False,
+        is_js_test=True,
+        use_module_prefix=False,
+        category="js",
+        session_dir=session_dir,
+    )
+
+
+def _get_latest_log_summary() -> tuple[Path | None, dict | None]:
+    """Return most recent test session directory and its summary.
+
+    Prefers aggregate summary.json at the session root. If absent, falls back
+    to the newest per-phase *.summary.json file in that session.
+    If TEST_LOG_SESSION is set, uses that directory explicitly.
+    """
+    log_root = Path("tmp/test-logs")
+    if not log_root.exists():
+        return None, None
+
+    forced = os.environ.get("TEST_LOG_SESSION")
+    latest: Path | None = None
+    if forced:
+        cand = log_root / forced
+        latest = cand if cand.exists() else None
+    if latest is None:
+        sessions = [d for d in log_root.iterdir() if d.is_dir() and d.name.startswith("test-")]
+        if not sessions:
+            return None, None
+        latest = max(sessions, key=lambda p: p.name)
+
+    # Prefer aggregate summary.json
+    root_summary = latest / "summary.json"
+    if root_summary.exists():
+        try:
+            with open(root_summary) as f:
+                return latest, json.load(f)
+        except Exception:
+            pass
+
+    # Fallback to latest per-phase summary (search recursively)
+    candidates = sorted(latest.rglob("*.summary.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if candidates:
+        try:
+            with open(candidates[0]) as f:
+                return latest, json.load(f)
+        except Exception:
+            return latest, None
+    return latest, None
 
 
 def run_all_tests() -> int:
@@ -236,30 +401,313 @@ def run_all_tests() -> int:
     print("🧪 Running ALL tests (unit → integration → tour)")
     print("=" * 60)
 
-    rc = 0
+    keep_going = os.environ.get("TEST_KEEP_GOING", "1") != "0"
+    # Create a single session directory to aggregate logs/summaries
+    session_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    session_name = f"test-{session_ts}"
+    session_dir = Path("tmp/test-logs") / session_name
+    session_dir.mkdir(parents=True, exist_ok=True)
+    os.environ["TEST_LOG_SESSION"] = session_name
+    session_started = time.time()
+
+    # Prune older sessions (keep last N)
+    try:
+        _prune_old_log_sessions()
+    except Exception:
+        pass
+    # Track per-phase return codes and logs for accurate summary
+    rc_unit: int | None = None
+    rc_js: int | None = None
+    rc_integration: int | None = None
+    rc_tour: int | None = None
+    logs: dict[str, Path | None] = {"unit": None, "js": None, "integration": None, "tour": None}
+    summaries: dict[str, dict | None] = {"unit": None, "js": None, "integration": None, "tour": None}
 
     # 1) Unit tests on clean DB
     print("\n▶️  Phase 1: Unit tests")
-    rc_unit = run_unit_tests()
-    rc |= rc_unit != 0
+    rc_unit = run_unit_tests(session_dir=session_dir)
+    logs["unit"], summaries["unit"] = _get_latest_log_summary()
 
-    # 2) Integration tests on cloned DB
-    print("\n▶️  Phase 2: Integration tests")
-    rc_integration = run_integration_tests() if rc_unit == 0 else rc_unit
-    rc |= rc_integration != 0
+    # 2) JS unit tests (browser) on clean DB with dev assets
+    print("\n▶️  Phase 2: JS tests")
+    if keep_going or rc_unit == 0:
+        rc_js = run_js_tests(session_dir=session_dir)
+        logs["js"], summaries["js"] = _get_latest_log_summary()
+    else:
+        print("   Skipping JS tests due to unit failures (set TEST_KEEP_GOING=1 to force)")
+        rc_js = None
 
-    # 3) Tour tests (browser) on cloned DB
-    print("\n▶️  Phase 3: Tour tests")
-    rc_tour = run_tour_tests() if rc_integration == 0 else rc_integration
-    rc |= rc_tour != 0
+    # 3) Integration tests on cloned DB
+    print("\n▶️  Phase 3: Integration tests")
+    if keep_going or (rc_js == 0 if rc_js is not None else True):
+        rc_integration = run_integration_tests(session_dir=session_dir)
+        logs["integration"], summaries["integration"] = _get_latest_log_summary()
+    else:
+        print("   Skipping integration due to earlier failures (set TEST_KEEP_GOING=1 to force)")
+        rc_integration = None
 
-    if rc == 0:
+    # 4) Tour tests (browser) on cloned DB
+    print("\n▶️  Phase 4: Tour tests")
+    if keep_going or (rc_integration == 0 if rc_integration is not None else True):
+        rc_tour = run_tour_tests(session_dir=session_dir)
+        logs["tour"], summaries["tour"] = _get_latest_log_summary()
+    else:
+        print("   Skipping tours due to earlier failures (set TEST_KEEP_GOING=1 to force)")
+        rc_tour = None
+
+    any_fail = any(code is not None and code != 0 for code in (rc_unit, rc_js, rc_integration, rc_tour))
+    # Build aggregate summary for the whole session
+    aggregate = {
+        "schema_version": SUMMARY_SCHEMA_VERSION,
+        "session": session_name,
+        "start_time": session_started,
+        "end_time": time.time(),
+        "elapsed_seconds": time.time() - session_started,
+        "results": {
+            "unit": summaries.get("unit"),
+            "js": summaries.get("js"),
+            "integration": summaries.get("integration"),
+            "tour": summaries.get("tour"),
+        },
+        "returncodes": {
+            "unit": rc_unit,
+            "js": rc_js,
+            "integration": rc_integration,
+            "tour": rc_tour,
+        },
+    }
+    any_fail = any(code is not None and code != 0 for code in (rc_unit, rc_js, rc_integration, rc_tour))
+    aggregate["success"] = not any_fail
+
+    # Aggregate counters across phases when available
+    def _sum_counter(key: str) -> int:
+        total = 0
+        for k in ("unit", "js", "integration", "tour"):
+            s = aggregate["results"].get(k) or {}
+            c = (s.get("counters") or {}) if isinstance(s, dict) else {}
+            try:
+                total += int(c.get(key, 0))
+            except Exception:
+                pass
+        return total
+    aggregate["counters_total"] = {
+        "tests_run": _sum_counter("tests_run"),
+        "failures": _sum_counter("failures"),
+        "errors": _sum_counter("errors"),
+        "skips": _sum_counter("skips"),
+    }
+
+    # Write aggregate summary at session root
+    agg_path = session_dir / "summary.json"
+    try:
+        with open(agg_path, "w") as f:
+            json.dump(aggregate, f, indent=2, default=str)
+        _write_manifest(session_dir)
+        _write_latest_json(session_dir)
+        _write_digest(session_dir, aggregate)
+    except Exception:
+        pass
+
+    # Write a simple index.md for quick navigation and update latest symlink
+    try:
+        _write_session_index(session_dir, aggregate)
+        _update_latest_symlink(session_dir)
+    except Exception:
+        pass
+
+    if not any_fail:
         print("\n✅ All categories passed")
+        print(f"📁 Logs: {session_dir}")
         return 0
     else:
         print("\n❌ Some categories failed")
+        print("Results:")
+        def _fmt(cat: str, code: int | None) -> str:
+            log = session_dir
+            summ = summaries.get(cat) or {}
+            if code is None:
+                status = "SKIPPED"
+            else:
+                if code == 0:
+                    status = "OK"
+                else:
+                    if summ.get("timeout"):
+                        status = "TIMEOUT"
+                    elif summ.get("repetitive_pattern"):
+                        status = "STALLED"
+                    elif summ.get("cleanup_hang"):
+                        status = "CLEANUP-HANG"
+                    else:
+                        status = "FAIL"
+            extra = f"  → {log}" if log else ""
+            return f"  {cat:<11} {status}{extra}"
+
+        print(_fmt("unit", rc_unit))
+        print(_fmt("js", rc_js))
+        print(_fmt("integration", rc_integration))
+        print(_fmt("tour", rc_tour))
+        print(f"📁 Logs: {session_dir}")
         # Return first non-zero code for conventional CI semantics
-        return rc_unit or rc_integration or rc_tour or 1
+        for code in (rc_unit, rc_js, rc_integration, rc_tour):
+            if code and code != 0:
+                return code
+        return 1
+
+
+def _write_session_index(session_dir: Path, aggregate: dict) -> None:
+    lines: list[str] = []
+    lines.append(f"# Test Session {aggregate.get('session', session_dir.name)}")
+    ok = aggregate.get("success", False)
+    overall = "PASSED" if ok else "FAILED"
+    lines.append("")
+    lines.append(f"Overall: {overall}")
+    lines.append("")
+    lines.append("## Phases")
+    for cat in ("unit", "js", "integration", "tour"):
+        cat_dir = session_dir / cat
+        if not cat_dir.exists():
+            continue
+        entries = []
+        for sfile in sorted(cat_dir.glob("*.summary.json")):
+            base = sfile.stem.replace(".summary", "")
+            log = sfile.with_suffix("").with_suffix(".log")
+            entries.append(f"- {cat}: {base} → {sfile.name} / {log.name}")
+        if entries:
+            lines.append(f"### {cat.title()}")
+            lines.extend(entries)
+            lines.append("")
+    (session_dir / "index.md").write_text("\n".join(lines))
+
+
+def _update_latest_symlink(session_dir: Path) -> None:
+    latest = Path("tmp/test-logs") / "latest"
+    try:
+        if latest.exists() or latest.is_symlink():
+            latest.unlink()
+    except Exception:
+        pass
+    rel = os.path.relpath(session_dir, latest.parent)
+    try:
+        latest.symlink_to(rel)
+    except Exception:
+        # On systems without symlink support, write a pointer file
+        latest.with_suffix(".json").write_text(json.dumps({
+            "schema_version": SUMMARY_SCHEMA_VERSION,
+            "latest": str(session_dir)
+        }, indent=2))
+
+
+def _write_latest_json(session_dir: Path) -> None:
+    latest_json = Path("tmp/test-logs") / "latest.json"
+    data = {
+        "schema_version": SUMMARY_SCHEMA_VERSION,
+        "latest": str(session_dir),
+    }
+    latest_json.write_text(json.dumps(data, indent=2))
+
+
+def _write_manifest(session_dir: Path) -> None:
+    manifest = {"schema_version": SUMMARY_SCHEMA_VERSION, "files": []}
+    for p in session_dir.rglob("*"):
+        if p.is_file():
+            try:
+                stat = p.stat()
+                manifest["files"].append(
+                    {
+                        "path": str(p.relative_to(session_dir)),
+                        "bytes": stat.st_size,
+                        "mtime": int(stat.st_mtime),
+                    }
+                )
+            except Exception:
+                pass
+    (session_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
+
+
+def _write_digest(session_dir: Path, aggregate: dict) -> None:
+    """Write a compact, LLM-friendly digest.json at the session root."""
+    cats = {}
+    for cat in ("unit", "js", "integration", "tour"):
+        s = aggregate.get("results", {}).get(cat) or {}
+        if not isinstance(s, dict):
+            s = {}
+        cats[cat] = {
+            "success": bool(s.get("success")) if "success" in s else None,
+            "returncode": s.get("returncode"),
+            "counters": s.get("counters"),
+            "summary_file": s.get("summary_file"),
+            "log_file": s.get("log_file"),
+            "failures_file": s.get("failures_file"),
+            "reason": s.get("reason"),
+        }
+    digest = {
+        "schema_version": SUMMARY_SCHEMA_VERSION,
+        "session": aggregate.get("session"),
+        "success": aggregate.get("success"),
+        "elapsed_seconds": aggregate.get("elapsed_seconds"),
+        "counters_total": aggregate.get("counters_total"),
+        "categories": cats,
+    }
+    (session_dir / "digest.json").write_text(json.dumps(digest, indent=2))
+
+
+_RE_RAN = re.compile(r"^Ran\s+(?P<tests>\d+)\s+tests?\s+in\s+(?P<seconds>[0-9.]+)s", re.IGNORECASE)
+_RE_FAILED = re.compile(r"^FAILED\s*\((?P<parts>[^)]*)\)")
+_RE_PART = re.compile(r"\b(?P<key>failures|errors|skipped|expected failures|unexpected successes)\s*=\s*(?P<val>\d+)")
+
+
+def _maybe_update_summary_counters_from_line(line: str, summary: dict) -> None:
+    try:
+        m = _RE_RAN.search(line.strip())
+        if m:
+            tests = int(m.group("tests"))
+            summary.setdefault("counters", {}).setdefault("tests_run", 0)
+            # Keep the max seen to avoid regressions from noisy lines
+            summary["counters"]["tests_run"] = max(summary["counters"]["tests_run"], tests)
+            return
+
+        # FAILED (failures=1, errors=0, skipped=2)
+        m = _RE_FAILED.search(line.strip())
+        if m:
+            parts = m.group("parts")
+            for pm in _RE_PART.finditer(parts):
+                key = pm.group("key").lower()
+                val = int(pm.group("val"))
+                if key == "skipped":
+                    summary["counters"]["skips"] = val
+                elif key == "failures":
+                    summary["counters"]["failures"] = val
+                elif key == "errors":
+                    summary["counters"]["errors"] = val
+            return
+
+        # OK (skipped=3) — uncommon but handle
+        if line.strip().startswith("OK") and "skipped=" in line:
+            for pm in _RE_PART.finditer(line):
+                if pm.group("key").lower() == "skipped":
+                    summary["counters"]["skips"] = int(pm.group("val"))
+                    break
+    except Exception:
+        pass
+
+
+def _prune_old_log_sessions(keep: int | None = None) -> None:
+    log_root = Path("tmp/test-logs")
+    if not log_root.exists():
+        return
+    try:
+        keep = keep or int(os.environ.get("TEST_LOG_KEEP", "12"))
+    except ValueError:
+        keep = 12
+    sessions = sorted([d for d in log_root.iterdir() if d.is_dir() and d.name.startswith("test-")])
+    if len(sessions) <= keep:
+        return
+    to_remove = sessions[:-keep]
+    for d in to_remove:
+        try:
+            shutil.rmtree(d, ignore_errors=True)
+        except Exception:
+            pass
 
 
 def show_test_stats() -> int:
@@ -327,7 +775,6 @@ def show_test_stats() -> int:
     print("  uv run test-integration # Integration tests")
     print("  uv run test-tour        # Browser tours")
     print("  uv run test-all         # All tests")
-    print("  uv run test-quick       # Subset of unit tests")
     print("  uv run test-clean       # Clean up test artifacts")
 
     # Show recent test logs for agents to easily find
@@ -369,21 +816,21 @@ def cleanup_test_databases(production_db: str = None) -> None:
     print(f"🧹 Cleaning up test databases for {production_db}...")
 
     # Get list of test databases
-    list_cmd = [
-        "docker",
-        "exec",
-        f"{get_container_prefix()}-database-1",
-        "psql",
-        "-U",
-        "odoo",
-        "-d",
-        "postgres",
-        "-t",
-        "-c",
-        f"SELECT datname FROM pg_database WHERE datname LIKE '{production_db}_test_%';",
-    ]
-
-    result = subprocess.run(list_cmd, capture_output=True, text=True)
+    ensure_services_up([get_database_service()])
+    wait_for_database_ready()
+    result = _compose_exec(
+        get_database_service(),
+        [
+            "psql",
+            "-U",
+            "odoo",
+            "-d",
+            "postgres",
+            "-t",
+            "-c",
+            f"SELECT datname FROM pg_database WHERE datname LIKE '{production_db}_test_%';",
+        ],
+    )
     if result.returncode != 0:
         print(f"   ⚠️  Could not list databases: {result.stderr}")
         return
@@ -398,90 +845,81 @@ def cleanup_test_databases(production_db: str = None) -> None:
 
     for db in test_dbs:
         # Terminate connections
-        kill_cmd = [
-            "docker",
-            "exec",
-            f"{get_container_prefix()}-database-1",
+        _compose_exec(
+            get_database_service(),
+            [
+                "psql",
+                "-U",
+                "odoo",
+                "-d",
+                "postgres",
+                "-c",
+                f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db}' AND pid <> pg_backend_pid();",
+            ],
+        )
+
+        _force_drop_database(db)
+
+    # Verify all gone
+    result = _compose_exec(
+        get_database_service(),
+        [
             "psql",
             "-U",
             "odoo",
             "-d",
             "postgres",
+            "-t",
             "-c",
-            f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db}' AND pid <> pg_backend_pid();",
-        ]
-        subprocess.run(kill_cmd, capture_output=True)
-
-        # Drop database
-        drop_cmd = ["docker", "exec", f"{get_container_prefix()}-database-1", "dropdb", "-U", "odoo", "--if-exists", db]
-        result = subprocess.run(drop_cmd, capture_output=True, text=True)
-        if result.returncode == 0:
-            print(f"   ✅ Dropped {db}")
-        else:
-            print(f"   ⚠️  Failed to drop {db}: {result.stderr}")
+            f"SELECT datname FROM pg_database WHERE datname LIKE '{production_db}_test_%';",
+        ],
+    )
+    if result.returncode == 0 and not result.stdout.strip():
+        print("   ✅ All test databases dropped")
 
 
-def create_filestore_symlink(test_db_name: str, production_db: str) -> None:
+def create_filestore_snapshot(test_db_name: str, production_db: str) -> None:
+    """Create a fast read/write test filestore copied from production.
+
+    Strategy:
+    - Prefer hardlink copy (cp -al) for speed/space when supported
+    - Fallback to rsync -a
+    - Avoid symlink production to prevent data mutation during tests
+    """
     production_filestore = f"/volumes/data/filestore/{production_db}"
     test_filestore = f"/volumes/data/filestore/{test_db_name}"
+    sr = get_script_runner_service()
+    ensure_services_up([sr])
 
-    # Find the running script-runner container
-    script_runner_service = get_script_runner_service()
+    # Clean target first
+    _compose_exec(sr, ["sh", "-c", f"rm -rf '{test_filestore}' || true"])
 
-    # First try to use any running script-runner container
-    list_cmd = ["docker", "ps", "-q", "-f", f"name={get_container_prefix()}-{script_runner_service}", "-f", "status=running"]
-    result = subprocess.run(list_cmd, capture_output=True, text=True)
-
-    if result.returncode == 0 and result.stdout.strip():
-        # Use the first running container
-        container_id = result.stdout.strip().split()[0]
-        container_name = container_id[:12]  # Use short ID
-    else:
-        # Fallback to creating the symlink on the host via docker compose run
-        print(f"   Creating filestore symlink via docker compose run...")
-        symlink_cmd = [
-            "docker",
-            "compose",
-            "run",
-            "--rm",
-            script_runner_service,
+    # Try hardlink clone
+    result = _compose_exec(
+        sr,
+        [
             "sh",
             "-c",
-            f"if [ -e '{test_filestore}' ]; then rm -rf '{test_filestore}'; fi && ln -s '{production_filestore}' '{test_filestore}'",
-        ]
-        result = subprocess.run(symlink_cmd, capture_output=True, text=True)
-        if result.returncode == 0:
-            print(f"   ✅ Created filestore symlink: {test_filestore} → {production_filestore}")
-        else:
-            print(f"   ❌ Failed to create filestore symlink: {result.stderr}")
+            f"if [ -d '{production_filestore}' ]; then cp -al '{production_filestore}' '{test_filestore}' 2>/dev/null || false; else exit 1; fi",
+        ],
+    )
+    if result.returncode == 0:
+        print(f"   ✅ Filestore snapshot (hardlinks): {test_filestore}")
         return
 
-    cleanup_cmd = [
-        "docker",
-        "exec",
-        container_name,
-        "sh",
-        "-c",
-        f"if [ -e '{test_filestore}' ]; then rm -rf '{test_filestore}'; fi",
-    ]
-    result = subprocess.run(cleanup_cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"   ⚠️  Warning: Could not clean existing filestore: {result.stderr}")
-
-    symlink_cmd = [
-        "docker",
-        "exec",
-        container_name,
-        "ln",
-        "-s",
-        production_filestore,
-        test_filestore,
-    ]
-    result = subprocess.run(symlink_cmd, capture_output=True, text=True)
+    # Fallback to rsync copy
+    result = _compose_exec(
+        sr,
+        [
+            "sh",
+            "-c",
+            f"rsync -a --delete '{production_filestore}/' '{test_filestore}/' 2>/dev/null || false",
+        ],
+    )
     if result.returncode == 0:
-        print(f"   ✅ Created filestore symlink: {test_filestore} → {production_filestore}")
+        print(f"   ✅ Filestore snapshot (rsync): {test_filestore}")
     else:
-        print(f"   ❌ Failed to create filestore symlink: {result.stderr}")
+        print(f"   ❌ Failed to copy filestore: {result.stderr}")
 
 
 def cleanup_test_filestores(production_db: str = None) -> None:
@@ -490,16 +928,16 @@ def cleanup_test_filestores(production_db: str = None) -> None:
 
     print(f"🧹 Cleaning up test filestores for {production_db}...")
 
-    list_cmd = [
-        "docker",
-        "exec",
-        f"{get_container_prefix()}-script-runner-1",
-        "sh",
-        "-c",
-        f"ls -d /volumes/data/filestore/{production_db}_test_* 2>/dev/null || true",
-    ]
-
-    result = subprocess.run(list_cmd, capture_output=True, text=True)
+    sr = get_script_runner_service()
+    ensure_services_up([sr])
+    result = _compose_exec(
+        sr,
+        [
+            "sh",
+            "-c",
+            f"ls -d /volumes/data/filestore/{production_db}_test_* 2>/dev/null || true",
+        ],
+    )
     if not result.stdout.strip():
         print(f"   No test filestores found")
         return
@@ -509,23 +947,20 @@ def cleanup_test_filestores(production_db: str = None) -> None:
 
     for filestore in test_filestores:
         if filestore:
-            check_symlink_cmd = [
-                "docker",
-                "exec",
-                f"{get_container_prefix()}-script-runner-1",
-                "sh",
-                "-c",
-                f"if [ -L '{filestore}' ]; then echo 'symlink'; elif [ -d '{filestore}' ]; then echo 'directory'; else echo 'unknown'; fi",
-            ]
-            check_result = subprocess.run(check_symlink_cmd, capture_output=True, text=True)
+            check_result = _compose_exec(
+                sr,
+                [
+                    "sh",
+                    "-c",
+                    f"if [ -L '{filestore}' ]; then echo 'symlink'; elif [ -d '{filestore}' ]; then echo 'directory'; else echo 'unknown'; fi",
+                ],
+            )
             is_symlink = check_result.stdout.strip() == "symlink"
 
             if is_symlink:
-                rm_cmd = ["docker", "exec", f"{get_container_prefix()}-script-runner-1", "rm", filestore]
+                result = _compose_exec(sr, ["rm", filestore])
             else:
-                rm_cmd = ["docker", "exec", f"{get_container_prefix()}-script-runner-1", "rm", "-rf", filestore]
-
-            result = subprocess.run(rm_cmd, capture_output=True, text=True)
+                result = _compose_exec(sr, ["rm", "-rf", filestore])
             if result.returncode == 0:
                 filestore_name = filestore.split("/")[-1]
                 type_str = "symlink" if is_symlink else "directory"
@@ -549,37 +984,19 @@ def cleanup_all_test_artifacts() -> None:
 
 def cleanup_chrome_processes() -> None:
     """Kill any lingering Chrome/Chromium processes in script runner container"""
-    script_runner_service = get_script_runner_service()
-    # Try to kill Chrome processes gracefully first
-    subprocess.run(["docker", "exec", f"{get_container_prefix()}-{script_runner_service}-1", "pkill", "chrome"], capture_output=True)
-    subprocess.run(
-        ["docker", "exec", f"{get_container_prefix()}-{script_runner_service}-1", "pkill", "chromium"], capture_output=True
-    )
-    # Force kill if still running
-    subprocess.run(
-        ["docker", "exec", f"{get_container_prefix()}-{script_runner_service}-1", "pkill", "-9", "chrome"], capture_output=True
-    )
-    subprocess.run(
-        ["docker", "exec", f"{get_container_prefix()}-{script_runner_service}-1", "pkill", "-9", "chromium"], capture_output=True
-    )
-    # Clean up zombie processes
-    subprocess.run(
-        [
-            "docker",
-            "exec",
-            f"{get_container_prefix()}-{script_runner_service}-1",
-            "sh",
-            "-c",
-            "ps aux | grep defunct | awk '{print $2}' | xargs -r kill -9",
-        ],
-        capture_output=True,
-    )
+    sr = get_script_runner_service()
+    ensure_services_up([sr])
+    _compose_exec(sr, ["pkill", "chrome"])  # graceful
+    _compose_exec(sr, ["pkill", "chromium"])  # graceful
+    _compose_exec(sr, ["pkill", "-9", "chrome"])  # force
+    _compose_exec(sr, ["pkill", "-9", "chromium"])  # force
+    _compose_exec(sr, ["sh", "-c", "ps aux | grep defunct | awk '{print $2}' | xargs -r kill -9"])  # zombies
 
 
 def restart_script_runner_with_orphan_cleanup() -> None:
-    script_runner_service = get_script_runner_service()
-    subprocess.run(["docker", "compose", "stop", script_runner_service], capture_output=True)
-    subprocess.run(["docker", "compose", "run", "--rm", "--remove-orphans", script_runner_service, "true"], capture_output=True)
+    sr = get_script_runner_service()
+    # Start script-runner and clean orphans to reduce noisy warnings
+    subprocess.run(["docker", "compose", "up", "-d", "--remove-orphans", sr], capture_output=True)
 
 
 def drop_and_create_test_database(db_name: str) -> None:
@@ -589,88 +1006,79 @@ def drop_and_create_test_database(db_name: str) -> None:
     print(f"   Terminating connections to {db_name}...")
 
     # First, get the connection count
-    check_connections_cmd = [
-        "docker",
-        "exec",
-        f"{get_container_prefix()}-database-1",
-        "psql",
-        "-U",
-        "odoo",
-        "-d",
-        "postgres",
-        "-t",
-        "-c",
-        f"SELECT count(*) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();",
-    ]
-    result = subprocess.run(check_connections_cmd, capture_output=True, text=True)
+    result = _compose_exec(
+        get_database_service(),
+        [
+            "psql",
+            "-U",
+            "odoo",
+            "-d",
+            "postgres",
+            "-t",
+            "-c",
+            f"SELECT count(*) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();",
+        ],
+    )
     if result.returncode == 0:
         connection_count = result.stdout.strip()
         print(f"   Found {connection_count} active connections to {db_name}")
 
     # Kill the connections
-    kill_connections_cmd = [
-        "docker",
-        "exec",
-        f"{get_container_prefix()}-database-1",
-        "psql",
-        "-U",
-        "odoo",
-        "-d",
-        "postgres",
-        "-c",
-        f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();",
-    ]
-    result = subprocess.run(kill_connections_cmd, capture_output=True, text=True)
+    result = _compose_exec(
+        get_database_service(),
+        [
+            "psql",
+            "-U",
+            "odoo",
+            "-d",
+            "postgres",
+            "-c",
+            f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();",
+        ],
+    )
     if result.returncode != 0:
         print(f"   ⚠️  Warning: Could not kill connections: {result.stderr}")
     else:
         print(f"   Connection termination command executed")
 
     # Wait a moment for connections to close
-    import time
-
     time.sleep(2)
 
     # Check again
-    result = subprocess.run(check_connections_cmd, capture_output=True, text=True)
+    result = _compose_exec(
+        get_database_service(),
+        [
+            "psql",
+            "-U",
+            "odoo",
+            "-d",
+            "postgres",
+            "-t",
+            "-c",
+            f"SELECT count(*) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();",
+        ],
+    )
     if result.returncode == 0:
         remaining_count = result.stdout.strip()
         print(f"   {remaining_count} connections remaining after termination")
 
-    # Step 2: Drop database
-    print(f"   Dropping database {db_name}...")
-    drop_cmd = [
-        "docker",
-        "exec",
-        f"{get_container_prefix()}-database-1",
-        "psql",
-        "-U",
-        "odoo",
-        "-d",
-        "postgres",
-        "-c",
-        f"DROP DATABASE IF EXISTS {db_name};",
-    ]
-    result = subprocess.run(drop_cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"   ❌ Failed to drop database: {result.stderr}")
-        return
+    # Step 2: Drop database (aggressive)
+    _force_drop_database(db_name)
 
     # Step 3: Verify drop succeeded
-    verify_drop_cmd = [
-        "docker",
-        "exec",
-        f"{get_container_prefix()}-database-1",
-        "psql",
-        "-U",
-        "odoo",
-        "-d",
-        "postgres",
-        "-t",
-        "-c",
-        f"SELECT count(*) FROM pg_database WHERE datname = '{db_name}';",
-    ]
-    result = subprocess.run(verify_drop_cmd, capture_output=True, text=True)
+    result = _compose_exec(
+        get_database_service(),
+        [
+            "psql",
+            "-U",
+            "odoo",
+            "-d",
+            "postgres",
+            "-t",
+            "-c",
+            f"SELECT count(*) FROM pg_database WHERE datname = '{db_name}';",
+        ],
+    )
     if result.returncode == 0:
         count = result.stdout.strip()
         if count == "0":
@@ -680,38 +1088,36 @@ def drop_and_create_test_database(db_name: str) -> None:
 
     # Step 4: Create fresh database
     print(f"   Creating fresh database {db_name}...")
-    create_cmd = [
-        "docker",
-        "exec",
-        f"{get_container_prefix()}-database-1",
-        "psql",
-        "-U",
-        "odoo",
-        "-d",
-        "postgres",
-        "-c",
-        f"CREATE DATABASE {db_name};",
-    ]
-    result = subprocess.run(create_cmd, capture_output=True, text=True)
+    result = _compose_exec(
+        get_database_service(),
+        [
+            "psql",
+            "-U",
+            "odoo",
+            "-d",
+            "postgres",
+            "-c",
+            f"CREATE DATABASE {db_name};",
+        ],
+    )
     if result.returncode != 0:
         print(f"   ❌ Failed to create database: {result.stderr}")
         return
 
     # Step 5: Verify creation succeeded
-    verify_create_cmd = [
-        "docker",
-        "exec",
-        f"{get_container_prefix()}-database-1",
-        "psql",
-        "-U",
-        "odoo",
-        "-d",
-        "postgres",
-        "-t",
-        "-c",
-        f"SELECT count(*) FROM pg_database WHERE datname = '{db_name}';",
-    ]
-    result = subprocess.run(verify_create_cmd, capture_output=True, text=True)
+    result = _compose_exec(
+        get_database_service(),
+        [
+            "psql",
+            "-U",
+            "odoo",
+            "-d",
+            "postgres",
+            "-t",
+            "-c",
+            f"SELECT count(*) FROM pg_database WHERE datname = '{db_name}';",
+        ],
+    )
     if result.returncode == 0:
         count = result.stdout.strip()
         if count == "1":
@@ -720,6 +1126,108 @@ def drop_and_create_test_database(db_name: str) -> None:
             print(f"   ⚠️  Warning: Database creation may have failed (count: {count})")
 
     print(f"🗄️  Database cleanup completed")
+
+
+def wait_for_database_ready(retries: int = 30, delay: float = 1.0) -> bool:
+    """Wait until the Postgres service responds to pg_isready/psql.
+
+    Returns True if ready, False if timed out.
+    """
+    svc = get_database_service()
+    for _ in range(retries):
+        res = _compose_exec(svc, ["pg_isready", "-U", "odoo", "-d", "postgres"], capture_output=True)
+        if res.returncode == 0:
+            return True
+        time.sleep(delay)
+    # Last-chance simple query
+    res = _compose_exec(svc, ["psql", "-U", "odoo", "-d", "postgres", "-t", "-c", "SELECT 1"], capture_output=True)
+    return res.returncode == 0
+
+
+def _force_drop_database(db_name: str) -> None:
+    """Attempt to drop a database even with active connections.
+
+    Strategy:
+    - REVOKE CONNECT, ALTER DATABASE ... ALLOW_CONNECTIONS false
+    - Terminate backends
+    - DROP DATABASE ... WITH (FORCE)
+    - Fallback to dropdb --if-exists
+    - Verify count
+    """
+    svc = get_database_service()
+    print(f"   Dropping database {db_name} (aggressive)...")
+    # Prevent new connections
+    _compose_exec(
+        svc,
+        [
+            "psql",
+            "-U",
+            "odoo",
+            "-d",
+            "postgres",
+            "-c",
+            f"REVOKE CONNECT ON DATABASE {db_name} FROM PUBLIC;",
+        ],
+    )
+    _compose_exec(
+        svc,
+        [
+            "psql",
+            "-U",
+            "odoo",
+            "-d",
+            "postgres",
+            "-c",
+            f"ALTER DATABASE {db_name} WITH ALLOW_CONNECTIONS false;",
+        ],
+    )
+    # Terminate any remaining
+    _compose_exec(
+        svc,
+        [
+            "psql",
+            "-U",
+            "odoo",
+            "-d",
+            "postgres",
+            "-c",
+            f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();",
+        ],
+    )
+    # Try forced drop (Postgres 13+)
+    forced = _compose_exec(
+        svc,
+        [
+            "psql",
+            "-U",
+            "odoo",
+            "-d",
+            "postgres",
+            "-c",
+            f"DROP DATABASE IF EXISTS {db_name} WITH (FORCE);",
+        ],
+    )
+    if forced.returncode != 0:
+        # Fallback plain drop
+        _compose_exec(svc, ["dropdb", "-U", "odoo", "--if-exists", db_name])
+    # Verify
+    chk = _compose_exec(
+        svc,
+        [
+            "psql",
+            "-U",
+            "odoo",
+            "-d",
+            "postgres",
+            "-t",
+            "-c",
+            f"SELECT count(*) FROM pg_database WHERE datname = '{db_name}';",
+        ],
+    )
+    if chk.returncode == 0 and chk.stdout.strip() == "0":
+        print(f"   ✅ Dropped {db_name}")
+    else:
+        print(f"   ⚠️  Could not confirm drop of {db_name}")
 
 
 def setup_test_authentication(db_name: str) -> str:
@@ -734,30 +1242,34 @@ def setup_test_authentication(db_name: str) -> str:
 
     print(f"   Setting up test authentication...")
 
-    # Hash the password using Odoo's password hashing
-    # We'll use a simple approach - set the password directly via SQL
-    # Odoo will hash it on first authentication
-
-    # Update the admin user's password in the database
-    # Note: We're setting a plain password that Odoo will hash on first use
-    # This is simpler than trying to generate the correct hash format
-    update_password_cmd = [
-        "docker",
-        "exec",
-        f"{get_container_prefix()}-database-1",
-        "psql",
-        "-U",
-        "odoo",
-        "-d",
-        db_name,
+    # Compute a proper pbkdf2-sha512 hash using passlib inside the image
+    sr = get_script_runner_service()
+    ensure_services_up([sr])
+    hash_cmd = [
+        "python",
         "-c",
-        f"UPDATE res_users SET password = '{password}' WHERE login = 'admin';",
+        (f"from passlib.context import CryptContext; ctx=CryptContext(schemes=['pbkdf2_sha512']);print(ctx.hash('{password}'))"),
     ]
+    hash_res = _compose_exec(sr, hash_cmd)
+    if hash_res.returncode != 0:
+        print(f"   ⚠️  Warning: Could not hash password: {hash_res.stderr}")
+        hashed = None
+    else:
+        hashed = hash_res.stdout.strip().splitlines()[-1]
 
-    result = subprocess.run(update_password_cmd, capture_output=True, text=True)
+    if hashed:
+        # On some versions the hashed value is stored in `password` directly
+        sql = "UPDATE res_users SET password='{}' WHERE login='admin';".format(hashed.replace("'", "''"))
+    else:
+        # Fallback to setting plain text (old behavior) — may not work on new versions
+        sql = f"UPDATE res_users SET password = '{password}' WHERE login='admin';"
+
+    result = _compose_exec(
+        get_database_service(),
+        ["psql", "-U", "odoo", "-d", db_name, "-c", sql],
+    )
     if result.returncode != 0:
         print(f"   ⚠️  Warning: Failed to update admin password: {result.stderr}")
-        # Don't fail completely, tests might still work
     else:
         print(f"   ✅ Test authentication configured (admin user)")
 
@@ -770,43 +1282,42 @@ def setup_test_authentication(db_name: str) -> str:
 def clone_production_database(db_name: str) -> str:
     production_db = get_production_db_name()
     print(f"🗄️  Cloning production database: {production_db} → {db_name}")
+    wait_for_database_ready()
 
     # Step 1: Kill active connections to test database
     print(f"   Terminating connections to {db_name}...")
 
     # First, get the connection count
-    check_connections_cmd = [
-        "docker",
-        "exec",
-        f"{get_container_prefix()}-database-1",
-        "psql",
-        "-U",
-        "odoo",
-        "-d",
-        "postgres",
-        "-t",
-        "-c",
-        f"SELECT count(*) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();",
-    ]
-    result = subprocess.run(check_connections_cmd, capture_output=True, text=True)
+    result = _compose_exec(
+        get_database_service(),
+        [
+            "psql",
+            "-U",
+            "odoo",
+            "-d",
+            "postgres",
+            "-t",
+            "-c",
+            f"SELECT count(*) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();",
+        ],
+    )
     if result.returncode == 0:
         connection_count = result.stdout.strip()
         print(f"   Found {connection_count} active connections to {db_name}")
 
     # Kill the connections
-    kill_connections_cmd = [
-        "docker",
-        "exec",
-        f"{get_container_prefix()}-database-1",
-        "psql",
-        "-U",
-        "odoo",
-        "-d",
-        "postgres",
-        "-c",
-        f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();",
-    ]
-    result = subprocess.run(kill_connections_cmd, capture_output=True, text=True)
+    result = _compose_exec(
+        get_database_service(),
+        [
+            "psql",
+            "-U",
+            "odoo",
+            "-d",
+            "postgres",
+            "-c",
+            f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();",
+        ],
+    )
     if result.returncode != 0:
         print(f"   ⚠️  Warning: Could not kill connections: {result.stderr}")
     else:
@@ -818,45 +1329,40 @@ def clone_production_database(db_name: str) -> str:
     time.sleep(2)
 
     # Check again
-    result = subprocess.run(check_connections_cmd, capture_output=True, text=True)
+    result = _compose_exec(
+        get_database_service(),
+        [
+            "psql",
+            "-U",
+            "odoo",
+            "-d",
+            "postgres",
+            "-t",
+            "-c",
+            f"SELECT count(*) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();",
+        ],
+    )
     if result.returncode == 0:
         remaining_count = result.stdout.strip()
         print(f"   {remaining_count} connections remaining after termination")
 
-    # Step 2: Drop existing test database
-    print(f"   Dropping existing database {db_name}...")
-    drop_cmd = [
-        "docker",
-        "exec",
-        f"{get_container_prefix()}-database-1",
-        "psql",
-        "-U",
-        "odoo",
-        "-d",
-        "postgres",
-        "-c",
-        f"DROP DATABASE IF EXISTS {db_name};",
-    ]
-    result = subprocess.run(drop_cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"   ❌ Failed to drop database: {result.stderr}")
-        return ""
+    # Step 2: Drop existing test database (aggressive)
+    _force_drop_database(db_name)
 
     # Step 3: Terminate connections to production database before cloning
     print(f"   Terminating connections to production database {production_db}...")
-    kill_prod_connections_cmd = [
-        "docker",
-        "exec",
-        f"{get_container_prefix()}-database-1",
-        "psql",
-        "-U",
-        "odoo",
-        "-d",
-        "postgres",
-        "-c",
-        f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{production_db}' AND pid <> pg_backend_pid();",
-    ]
-    result = subprocess.run(kill_prod_connections_cmd, capture_output=True, text=True)
+    result = _compose_exec(
+        get_database_service(),
+        [
+            "psql",
+            "-U",
+            "odoo",
+            "-d",
+            "postgres",
+            "-c",
+            f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{production_db}' AND pid <> pg_backend_pid();",
+        ],
+    )
     if result.returncode != 0:
         print(f"   ⚠️  Warning: Could not kill production connections: {result.stderr}")
     else:
@@ -867,38 +1373,36 @@ def clone_production_database(db_name: str) -> str:
 
     # Step 4: Clone from production database
     print(f"   Cloning from production database {production_db}...")
-    clone_cmd = [
-        "docker",
-        "exec",
-        f"{get_container_prefix()}-database-1",
-        "psql",
-        "-U",
-        "odoo",
-        "-d",
-        "postgres",
-        "-c",
-        f"CREATE DATABASE {db_name} WITH TEMPLATE {production_db};",
-    ]
-    result = subprocess.run(clone_cmd, capture_output=True, text=True)
+    result = _compose_exec(
+        get_database_service(),
+        [
+            "psql",
+            "-U",
+            "odoo",
+            "-d",
+            "postgres",
+            "-c",
+            f"CREATE DATABASE {db_name} WITH TEMPLATE {production_db};",
+        ],
+    )
     if result.returncode != 0:
         print(f"   ❌ Failed to clone database: {result.stderr}")
         return ""
 
     # Step 4: Verify creation succeeded
-    verify_create_cmd = [
-        "docker",
-        "exec",
-        f"{get_container_prefix()}-database-1",
-        "psql",
-        "-U",
-        "odoo",
-        "-d",
-        "postgres",
-        "-t",
-        "-c",
-        f"SELECT count(*) FROM pg_database WHERE datname = '{db_name}';",
-    ]
-    result = subprocess.run(verify_create_cmd, capture_output=True, text=True)
+    result = _compose_exec(
+        get_database_service(),
+        [
+            "psql",
+            "-U",
+            "odoo",
+            "-d",
+            "postgres",
+            "-t",
+            "-c",
+            f"SELECT count(*) FROM pg_database WHERE datname = '{db_name}';",
+        ],
+    )
     if result.returncode == 0:
         count = result.stdout.strip()
         if count == "1":
@@ -921,7 +1425,10 @@ def run_docker_test_command(
     cleanup_before: bool = True,
     cleanup_after: bool = True,
     is_tour_test: bool = False,
+    is_js_test: bool = False,
     use_module_prefix: bool = True,
+    category: str | None = None,
+    session_dir: Path | None = None,
 ) -> int:
     if modules_to_install is None:
         modules_to_install = get_our_modules()
@@ -929,9 +1436,10 @@ def run_docker_test_command(
     modules_str = ",".join(modules_to_install)
     script_runner_service = get_script_runner_service()
     production_db = get_production_db_name()
+    ensure_services_up([get_database_service(), script_runner_service])
 
-    if is_tour_test:
-        print(f"🧪 Running TOUR tests (HttpCase-based tests)")
+    if is_tour_test or is_js_test:
+        print(f"🧪 Running {'JS' if is_js_test else 'TOUR'} tests (HttpCase-based)")
     else:
         print(f"🧪 Running tests: {test_tags}")
     print(f"📦 Modules: {modules_str}")
@@ -950,38 +1458,13 @@ def run_docker_test_command(
     test_password = None
     if use_production_clone:
         test_password = clone_production_database(db_name)
-        # Create symlink after container restart for tour tests
-        if is_tour_test or "tour" in test_tags:
-            print(f"   Creating filestore symlink for tour tests...")
-            create_filestore_symlink(db_name, production_db)
+        # Create a local snapshot of filestore for tour/integration tests
+        if is_tour_test or "tour" in test_tags or "integration" in test_tags:
+            print(f"   Preparing filestore snapshot for tests...")
+            create_filestore_snapshot(db_name, production_db)
             print(f"   Cleaning up Chrome processes...")
             cleanup_chrome_processes()
-
-            # DO NOT mark modules as uninstalled for tour tests!
-            # This would cause -i to reinstall them and wipe production data
-            # Tours need the actual production data to navigate
-            if not is_tour_test:
-                # Only for unit/integration tests, mark modules for reinstall
-                print(f"   Marking modules as uninstalled to force test discovery...")
-                for module in modules_to_install:
-                    cmd_uninstall = [
-                        "docker",
-                        "compose",
-                        "exec",
-                        "-T",
-                        "database",
-                        "psql",
-                        "-U",
-                        "odoo",
-                        "-d",
-                        db_name,
-                        "-c",
-                        f"UPDATE ir_module_module SET state = 'uninstalled' WHERE name = '{module}';",
-                    ]
-                    subprocess.run(cmd_uninstall, capture_output=True)
-                print(f"   ✅ Modules marked for reinstallation")
-            else:
-                print(f"   ✅ Keeping modules installed to preserve production data for tours")
+            print(f"   ✅ Keeping modules installed to preserve production data; will run with -u")
     else:
         drop_and_create_test_database(db_name)
 
@@ -1013,14 +1496,8 @@ def run_docker_test_command(
 
     print(f"🏷️  Final test tags: {test_tags_final}")
 
-    # Use different module flags based on test type
-    if is_tour_test:
-        # For tour tests, don't reinstall modules to avoid database locks
-        # Modules are already installed in the cloned production database
-        module_flag = "-u"  # Update instead of install
-    else:
-        # For unit/integration tests, use install to ensure clean test loading
-        module_flag = "-i"
+    # Use different module flags based on DB strategy
+    module_flag = "-u" if use_production_clone else "-i"
 
     cmd = [
         "docker",
@@ -1033,8 +1510,8 @@ def run_docker_test_command(
     if test_password:
         cmd.extend(["-e", f"ODOO_TEST_PASSWORD={test_password}"])
 
-    # Tour tests need workers for websocket support, others can use single-threaded mode
-    if is_tour_test:
+    # JS/Tour tests need workers and dev assets
+    if is_tour_test or is_js_test:
         cmd.extend(
             [
                 script_runner_service,
@@ -1048,12 +1525,14 @@ def run_docker_test_command(
                 "--test-enable",
                 "--stop-after-init",
                 "--max-cron-threads=0",
-                "--workers=0",  # Use single worker until multi-worker issue is resolved
+                f"--workers={int(os.environ.get('TOUR_WORKERS', '2'))}",
                 f"--db-filter=^{db_name}$",
                 "--log-level=test",
                 "--without-demo=all",
             ]
         )
+        if is_js_test:
+            cmd.append("--dev=all")
     else:
         cmd.extend(
             [
@@ -1075,37 +1554,85 @@ def run_docker_test_command(
             ]
         )
 
-    # Create log directory for this test run
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_dir = Path("tmp/test-logs") / f"test-{timestamp}"
+    # Determine category/labels for logging
+    derived_category = category or (
+        "tour" if is_tour_test else ("js" if is_js_test else ("integration" if "integration" in test_tags else "unit"))
+    )
+    # Create log directory for this session
+    if session_dir is None:
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_dir = Path("tmp/test-logs") / f"test-{ts}"
+        timestamp = ts
+    else:
+        log_dir = session_dir
+        # Derive timestamp from session dir name where possible
+        name = log_dir.name
+        timestamp = name.replace("test-", "") if name.startswith("test-") else datetime.now().strftime("%Y%m%d_%H%M%S")
     log_dir.mkdir(parents=True, exist_ok=True)
 
-    log_file = log_dir / "output.log"
-    summary_file = log_dir / "summary.json"
+    # Put logs inside a per-phase subdirectory for tidiness
+    phase_dir = log_dir / derived_category
+    phase_dir.mkdir(parents=True, exist_ok=True)
+    # Name files by module when running a split/matrix for units
+    if use_module_prefix and modules_to_install and len(modules_to_install) == 1:
+        base = modules_to_install[0]
+    else:
+        base = "all"
+    log_file = phase_dir / f"{base}.log"
+    summary_file = phase_dir / f"{base}.summary.json"
 
-    print(f"🚀 Command: {' '.join(cmd)}")
-    print(f"📁 Logs: {log_dir}")
+    # Build a redacted command for display/logging
+    redacted = []
+    i = 0
+    secret_prefixes = ("ODOO_TEST_PASSWORD=", "PASSWORD=", "TOKEN=", "KEY=")
+    while i < len(cmd):
+        part = cmd[i]
+        if part == "-e" and i + 1 < len(cmd):
+            env_pair = cmd[i + 1]
+            for pref in secret_prefixes:
+                if env_pair.startswith(pref):
+                    env_pair = pref + "***"
+                    break
+            redacted.extend([part, env_pair])
+            i += 2
+            continue
+        redacted.append(part)
+        i += 1
+
+    print(f"🚀 Command: {' '.join(redacted)}")
+    print(f"📁 Logs: {phase_dir}")
     print()
 
     start_time = time.time()
 
     # Prepare summary data
+
     summary = {
+        "schema_version": SUMMARY_SCHEMA_VERSION,
         "timestamp": timestamp,
         "command": cmd,
         "test_type": "tour" if is_tour_test else "unit/integration",
+        "category": derived_category,
         "database": db_name,
         "modules": modules_to_install,
         "test_tags": test_tags_final,
         "timeout": timeout,
         "start_time": start_time,
+        "log_file": str(log_file),
+        "summary_file": str(summary_file),
+        "counters": {  # Filled opportunistically from output; defaults safe for LLMs
+            "tests_run": 0,
+            "failures": 0,
+            "errors": 0,
+            "skips": 0,
+        },
     }
 
     try:
         # Run command with output going to both console and log file
         with open(log_file, "w") as f:
-            # Write command info to log
-            f.write(f"Command: {' '.join(cmd)}\n")
+            # Write command info to log (redacted)
+            f.write(f"Command: {' '.join(redacted)}\n")
             f.write(f"Started: {datetime.now()}\n")
             f.write("=" * 80 + "\n\n")
             f.flush()
@@ -1140,6 +1667,9 @@ def run_docker_test_command(
                 max_stall_warnings = 12
 
             result_code = 0
+            error_detected = False
+            diagnostics: list[str] = []
+            reason: str | None = None
 
             # Stream output with timeout and stall detection
             while True:
@@ -1171,6 +1701,30 @@ def run_docker_test_command(
                         recent_lines.append(line.strip())
                         if len(recent_lines) > 20:  # Keep only last 20 lines
                             recent_lines.pop(0)
+
+                        # Detect hard errors that should mark the run as failed
+                        lower = line.lower()
+                        if (
+                            "critical" in lower and "failed to initialize database" in lower
+                        ) or "traceback (most recent call last):" in lower:
+                            error_detected = True
+
+                        # Opportunistically parse unittest-style counters
+                        _maybe_update_summary_counters_from_line(line, summary)
+
+                        # Environment diagnostics
+                        if "permission denied" in lower and "docker daemon socket" in lower:
+                            diagnostics.append(line.strip())
+                            reason = reason or "docker-permission-denied"
+                        if "unable to get image 'postgres" in lower:
+                            diagnostics.append(line.strip())
+                            reason = reason or "docker-image-access"
+                        if "fatal:  database \"" in lower and "does not exist" in lower:
+                            diagnostics.append(line.strip())
+                            reason = reason or "db-missing"
+                        if "could not translate host name \"database\"" in lower:
+                            diagnostics.append(line.strip())
+                            reason = reason or "db-host-unavailable"
 
                         # Check for repetitive patterns periodically
                         if current_time - last_pattern_check > pattern_check_interval:
@@ -1287,7 +1841,11 @@ def run_docker_test_command(
 
         print(f"\n⏱️  Completed in {elapsed:.2f}s")
 
-        # Update summary
+        # Honor in-log fatal error detection even if exit code is 0
+        if result_code == 0 and summary.get("test_type") in ("unit/integration", "tour") and error_detected:
+            result_code = 1
+
+        # Update summary (store redacted command)
         summary.update(
             {
                 "end_time": time.time(),
@@ -1301,6 +1859,9 @@ def run_docker_test_command(
                 "tests_started": test_count,
                 "last_test": current_test if current_test else None,
                 "error": None,
+                "command": redacted,
+                "reason": reason,
+                "diagnostics": diagnostics,
             }
         )
 
@@ -1310,6 +1871,12 @@ def run_docker_test_command(
             print("🧹 Post-test cleanup...")
             cleanup_test_databases(production_db)
             cleanup_test_filestores(production_db)
+
+        # Build failures.json for machine parsing
+        try:
+            _build_failures_from_log(log_file, summary)
+        except Exception:
+            pass
 
         if result_code == 0:
             print("✅ Tests passed!")
@@ -1374,6 +1941,85 @@ def run_docker_test_command(
         return 1
 
 
+def _hash_text(text: str) -> str:
+    import hashlib
+    return hashlib.sha256(text.encode("utf-8", errors="ignore")).hexdigest()[:16]
+
+
+def _build_failures_from_log(log_path: Path, summary: dict) -> None:
+    """Parse a test log and emit failures.json next to the summary.
+
+    Extracts compact entries with type (fail/error), test id if seen, brief
+    message, and a traceback fingerprint.
+    """
+    out_path = Path(summary.get("summary_file", "")).with_name(
+        Path(summary.get("summary_file", "")).stem.replace(".summary", "") + ".failures.json"
+    )
+    if not log_path.exists():
+        return
+    entries: list[dict] = []
+    cur: dict | None = None
+    collecting_tb = False
+    tb_lines: list[str] = []
+    with open(log_path, "r", errors="ignore") as f:
+        for raw in f:
+            line = raw.rstrip("\n")
+            l = line.strip()
+            lw = l.lower()
+            # Start of Python traceback
+            if l.startswith("Traceback (most recent call last):"):
+                collecting_tb = True
+                tb_lines = [l]
+                if cur is None:
+                    cur = {"type": "error", "message": "", "test": None}
+                continue
+            if collecting_tb:
+                if l == "" and tb_lines:
+                    # end of traceback chunk
+                    cur = cur or {"type": "error", "message": "", "test": None}
+                    tb = "\n".join(tb_lines)
+                    cur["traceback"] = tb
+                    cur["fingerprint"] = _hash_text(tb)
+                    entries.append(cur)
+                    cur = None
+                    tb_lines = []
+                    collecting_tb = False
+                else:
+                    tb_lines.append(l)
+                continue
+            # Unittest headers
+            if lw.startswith(("fail:", "error:")):
+                parts = l.split(None, 1)
+                typ = parts[0].rstrip(":").lower()
+                test_id = parts[1] if len(parts) > 1 else None
+                cur = {"type": "fail" if typ == "fail" else "error", "test": test_id, "message": ""}
+                continue
+            # Short failure lines like AssertionError: ...
+            if cur and ("assert" in lw or lw.startswith(("valueerror:", "keyerror:", "typeerror:", "psycopg2"))):
+                cur["message"] = l
+                # Fallthrough: wait for traceback or finalize if standalone
+                continue
+            # Finalize on blank after a short error context without traceback
+            if cur and l == "":
+                entries.append(cur)
+                cur = None
+                continue
+    # Save
+    out = {
+        "schema_version": SUMMARY_SCHEMA_VERSION,
+        "count": len(entries),
+        "entries": entries,
+    }
+    try:
+        with open(out_path, "w") as f:
+            json.dump(out, f, indent=2)
+        # Link in summary
+        summary["failures_file"] = str(out_path)
+        summary["failures_count"] = len(entries)
+    except Exception:
+        pass
+
+
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         command = sys.argv[1]
@@ -1396,5 +2042,5 @@ if __name__ == "__main__":
             print(f"Unknown command: {command}")
             sys.exit(1)
     else:
-        print("Usage: python test_commands.py [unit|integration|tour|all|quick|stats|clean]")
+        print("Usage: python test_commands.py [unit|integration|tour|all|stats|clean]")
         sys.exit(1)

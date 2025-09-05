@@ -20,7 +20,7 @@ Best for complex multi-step tasks with deep reasoning:
 - Network access enabled
 - Workspace write permissions
 - Auto-approval of commands
-- Uses gpt-5 with detailed summaries
+- Uses OPENAI_PRIMARY_MODEL with detailed summaries
 
 ```bash
 # CLI usage
@@ -38,7 +38,7 @@ Task(
 
 Standard development profile for typical tasks:
 
-- Balanced performance with gpt-5
+- Balanced performance with OPENAI_PRIMARY_MODEL
 - Workspace write permissions
 - Auto-approval of commands
 - Suitable for most development work

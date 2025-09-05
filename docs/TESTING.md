@@ -12,6 +12,7 @@ layers with clean separation and reliable execution.
 ## Advanced Testing Documentation
 
 For comprehensive testing patterns including:
+
 - Computed fields with cache management
 - Security and access rights testing
 - Multi-company scenarios
@@ -48,6 +49,28 @@ uv run test-report        # Generate HTML report
 ```
 
 **That's it!** These commands handle all the complexity internally.
+
+### Logs & Summaries (Machine-Friendly)
+
+Every test run writes a single session folder under `tmp/test-logs/test-YYYYMMDD_HHMMSS/` with:
+
+- `summary.json`: Aggregate status across phases (schema_version, success, return codes, totals)
+- `digest.json`: Compact snapshot for tools/LLMs (per-phase success, counters, pointers)
+- `manifest.json`: List of all artifacts (relative path, bytes, mtime)
+- `index.md`: Human-readable index
+- `unit/`, `js/`, `integration/`, `tour/`: Per-phase subfolders with:
+    - `all.log` (or `<module>.log` for unit matrix)
+    - `all.summary.json` / `<module>.summary.json`
+    - `failures.json` (parsed failures/errors with short messages and fingerprints)
+
+Shortcuts:
+
+- `tmp/test-logs/latest` → symlink to latest session (if supported)
+- `tmp/test-logs/latest.json` → JSON pointer to latest session
+
+Counters in summaries are parsed from standard unittest output and include `tests_run`, `failures`, `errors`, `skips`.
+Environment/setup issues (e.g., Docker socket, DB clone) are captured under `reason` and `diagnostics` in per‑phase
+summaries.
 
 ### What Makes This Work
 

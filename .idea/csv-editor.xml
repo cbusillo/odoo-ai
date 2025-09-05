@@ -31,20 +31,6 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="/addons/user_name_extended/security/ir.model.access.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="/docs/odoo18/SECURITY_PATTERNS.md">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
       </map>
     </option>
   </component>

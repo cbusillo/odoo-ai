@@ -14,17 +14,15 @@ See also:
 
 ## Model Selection
 
-| Model             | Best For                   | Context Window | Notes                                                        |
-|-------------------|----------------------------|----------------|--------------------------------------------------------------|
-| `gpt-5` (default) | Most tasks, fast & capable | ~400K tokens   | Use for 99% of tasks                                         |
-| `gpt-4.1`         | Extremely large codebases  | 1M+ tokens     | Alternative when `gpt-5` context insufficient or unavailable |
-| `gpt-4.5`         | Alternative option         | ~400K tokens   | Additional fallback if others unavailable                    |
+| Model (env)                  | Best For                   | Context Window | Notes                                         |
+|------------------------------|----------------------------|----------------|-----------------------------------------------|
+| `OPENAI_PRIMARY_MODEL`       | Most tasks, fast & capable | provider-typed | Set in env (e.g., `gpt-4.1`, `o4`, `o4-mini`) |
+| `OPENAI_LARGE_CONTEXT_MODEL` | Extremely large contexts   | provider-typed | Optional; only if you need larger contexts    |
 
 ### Model Priority
 
-1. **gpt-5** - Primary choice for most tasks
-2. **gpt-4.1** - Alternative for massive contexts (1M+ tokens) or when gpt-5 unavailable
-3. **gpt-4.5** - Additional fallback option when needed
+1. **OPENAI_PRIMARY_MODEL** - Primary choice for most tasks
+2. **OPENAI_LARGE_CONTEXT_MODEL** - Alternative for massive contexts (if configured)
 
 ## Sandbox Modes
 
@@ -63,7 +61,7 @@ See also:
 **Error**:
 `"Failed to parse session_id: invalid UUID format"`
 
-**Root Cause**: Using invalid session ID format (e.g., "gpt-5", "session-1", etc.)
+**Root Cause**: Using invalid session ID format (e.g., a model name, "session-1", etc.)
 
 **Solutions**:
 
@@ -79,7 +77,7 @@ See also:
 
 **Common mistakes**:
 
-- ❌ `sessionId="gpt-5"` (arbitrary string)
+- ❌ `sessionId="model-name"` (arbitrary string)
 - ❌ `sessionId="session-1"` (custom format)
 - ❌ `sessionId="urn:uuid:" + uuid` (don't add urn:uuid: prefix)
 - ✅ `sessionId="12345678-1234-1234-1234-123456789abc"` (from response)

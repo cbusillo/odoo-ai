@@ -13,7 +13,7 @@ MCP server.
 response = mcp__gpt-codex__codex(
     prompt="Your request here",
     sandbox="workspace-write",  # or "read-only" for analysis only
-    model="gpt-5",  # Default, or "gpt-4.1" (1M+ token context), "gpt-4.5"
+    model=env("OPENAI_PRIMARY_MODEL"),
     approval_policy="never",  # or "untrusted", "on-failure", "on-request"
     # Additional optional parameters:
     profile="profile-name",  # Config profile from ~/.codex/config.toml
@@ -43,7 +43,7 @@ mcp__gpt-codex__codex_reply(
 
 - Must be the exact UUID from the initial response
 - Format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (standard UUID)
-- Never use arbitrary strings like "gpt-5" or "session-1"
+- Never use arbitrary strings like a model name or "session-1"
 - Do NOT add "urn:uuid:" prefix
 
 ## Sandbox Modes
@@ -85,7 +85,7 @@ See: [reference.md#common-issues](./reference.md#common-issues)
 response = mcp__gpt-codex__codex(
     prompt="Research the best practices for [topic]. Search the web for current information.",
     sandbox="workspace-write",  # Sufficient for network access
-    model="gpt-5"  # Default - use this for most tasks
+    model=env("OPENAI_PRIMARY_MODEL")
 )
 session_id = response['structuredContent']['sessionId']
 ```
@@ -96,7 +96,7 @@ session_id = response['structuredContent']['sessionId']
 response = mcp__gpt-codex__codex(
     prompt="Refactor all files in @/path/to/directory to use async patterns",
     sandbox="workspace-write",
-    model="gpt-5"  # Or "gpt-4.1" for very large contexts (1M+ tokens)
+    model=env("OPENAI_PRIMARY_MODEL")
 )
 session_id = response['structuredContent']['sessionId']
 ```

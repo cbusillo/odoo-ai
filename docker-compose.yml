@@ -15,6 +15,9 @@ x-odoo-base: &odoo-base
     target: ${COMPOSE_BUILD_TARGET:-production}
   env_file:
     - .env
+  volumes:
+    - ~/.ssh:/home/ubuntu/.ssh:ro
+    - data:/volumes/data
 
 name: ${ODOO_PROJECT_NAME:-odoo}
 services:
@@ -22,9 +25,6 @@ services:
     <<: *odoo-base
     ports:
       - "8069:8069"
-    volumes:
-      - ~/.ssh:/home/ubuntu/.ssh:ro
-      - data:/volumes/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

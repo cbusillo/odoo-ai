@@ -903,7 +903,12 @@ def show_test_stats() -> int:
 
 
 def cleanup_test_databases(production_db: str = None) -> None:
-    """Drop all test databases matching pattern ${PRODUCTION_DB}_test_*"""
+    """Drop test databases for this project.
+
+    Historically we created per-module unit DBs as "${PROD}_ut_<module>" and
+    other phases as "${PROD}_test_*". Clean up both patterns to avoid orphaned
+    databases accumulating between runs.
+    """
     if production_db is None:
         production_db = get_production_db_name()
 
@@ -912,6 +917,7 @@ def cleanup_test_databases(production_db: str = None) -> None:
     # Get list of test databases
     ensure_services_up([get_database_service()])
     wait_for_database_ready()
+    # Collect both legacy ("_ut_") and standard ("_test_") databases
     result = _compose_exec(
         get_database_service(),
         [
@@ -922,7 +928,11 @@ def cleanup_test_databases(production_db: str = None) -> None:
             "postgres",
             "-t",
             "-c",
-            f"SELECT datname FROM pg_database WHERE datname LIKE '{production_db}_test_%';",
+            (
+                "SELECT datname FROM pg_database "
+                f"WHERE datname LIKE '{production_db}_test_%' "
+                f"   OR datname LIKE '{production_db}_ut_%';"
+            ),
         ],
     )
     if result.returncode != 0:
@@ -965,7 +975,11 @@ def cleanup_test_databases(production_db: str = None) -> None:
             "postgres",
             "-t",
             "-c",
-            f"SELECT datname FROM pg_database WHERE datname LIKE '{production_db}_test_%';",
+            (
+                "SELECT datname FROM pg_database "
+                f"WHERE datname LIKE '{production_db}_test_%' "
+                f"   OR datname LIKE '{production_db}_ut_%';"
+            ),
         ],
     )
     if result.returncode == 0 and not result.stdout.strip():
@@ -1625,8 +1639,9 @@ def run_docker_test_command(
                 "--without-demo=all",
             ]
         )
-        if is_js_test:
-            cmd.append("--dev=all")
+        # Note: Do not enable dev assets for JS tests. `--dev=all` slows
+        # cold starts and triggers 20s websocket navigation timeouts in
+        # `browser_js`. Keep it off by default for test reliability.
     else:
         cmd.extend(
             [

@@ -9,6 +9,7 @@ MCP tools, keep plans tight, and validate with our test commands.
 - Language/style: docs/style/PYTHON.md, docs/style/JAVASCRIPT.md
 - Odoo patterns: docs/style/ODOO.md, docs/ODOO_WORKFLOW.md
 - Testing: docs/style/TESTING.md, docs/odoo18/TESTING_ADVANCED.md
+    - See “Runner & Logs” section in docs/style/TESTING.md
 - Odoo 18 canon: docs/odoo18/API_PATTERNS.md, docs/odoo18/SECURITY_PATTERNS.md, docs/odoo18/PERFORMANCE_ORM.md
 - Tooling strategy: docs/TOOL_SELECTION.md, docs/system/AGENT_SAFEGUARDS.md, docs/system/ERROR_RECOVERY.md,
   docs/system/MODEL_SELECTION.md
@@ -43,7 +44,9 @@ doc before writing or updating tests.
 uv run test-unit          # Unit tests
 uv run test-integration   # Integration tests
 uv run test-tour          # Browser/UI tests
+uv run test-js            # JS/hoot and browser_js tests
 uv run test-all           # Full test suite
+uv run test-clean         # Drop test DBs/filestores and artifacts
 
 # Code Quality
 uv run ruff format .      # Format Python

@@ -192,7 +192,6 @@ cython_debug/
 odoo.*.cfg
 odoo.*.conf
 
-.tmp*
 /docker/config/_generated.conf
 
 # Temporary files directory

@@ -315,8 +315,11 @@ def run_tour_tests(*, session_dir: Path | None = None) -> int:
     print(f"   Database: {test_db_name}")
     print(f"   Modules: {', '.join(modules)}")
     timeout_cfg = load_timeouts().get("tour", 1800)
+    # Exclude JS unit tests explicitly from tour runs to avoid double-running
+    # browser_js suites here. JS tests have their own phase and settings.
+    tour_tags = "tour_test,-js_test"
     return run_docker_test_command(
-        "tour_test",
+        tour_tags,
         test_db_name,
         modules,
         timeout=timeout_cfg,
@@ -340,7 +343,16 @@ def run_js_tests(modules: list[str] | None = None, *, session_dir: Path | None =
             print("❌ No matching modules found under ./addons for requested JS test run")
             return 1
     else:
-        modules = get_our_modules()
+        # Default: restrict to addons that actually contain JS tests to reduce install surface
+        all_modules = get_our_modules()
+        modules = []
+        for m in all_modules:
+            js_dir = Path(f"addons/{m}/static/tests")
+            if js_dir.exists() and any(js_dir.rglob("*.test.js")):
+                modules.append(m)
+        # Fallback: if none detected, use all custom modules (preserves legacy behavior)
+        if not modules:
+            modules = all_modules
 
     test_db_name = f"{get_production_db_name()}_test_js"
     timeout_cfg = load_timeouts().get("js", 1200)
@@ -578,10 +590,10 @@ def _write_session_index(session_dir: Path, aggregate: dict) -> None:
         if not cat_dir.exists():
             continue
         entries = []
-        for sfile in sorted(cat_dir.glob("*.summary.json")):
-            base = sfile.stem.replace(".summary", "")
-            log = sfile.with_suffix("").with_suffix(".log")
-            entries.append(f"- {cat}: {base} → {sfile.name} / {log.name}")
+        for session_file in sorted(cat_dir.glob("*.summary.json")):
+            base = session_file.stem.replace(".summary", "")
+            log = session_file.with_suffix("").with_suffix(".log")
+            entries.append(f"- {cat}: {base} → {session_file.name} / {log.name}")
         if entries:
             lines.append(f"### {cat.title()}")
             lines.extend(entries)
@@ -673,15 +685,15 @@ def _write_phase_aggregate_summary(session_dir: Path, category: str) -> Path | N
         return None
 
     parts: list[tuple[Path, dict]] = []
-    for sfile in sorted(phase_dir.glob("*.summary.json")):
+    for session_file in sorted(phase_dir.glob("*.summary.json")):
         # Skip any prior aggregate to avoid double counting on re-runs
-        if sfile.name == "all.summary.json":
+        if session_file.name == "all.summary.json":
             continue
         try:
-            with open(sfile) as f:
+            with open(session_file) as f:
                 data = json.load(f)
                 if isinstance(data, dict):
-                    parts.append((sfile, data))
+                    parts.append((session_file, data))
         except Exception:
             pass
 
@@ -1077,6 +1089,18 @@ def cleanup_test_filestores(production_db: str = None) -> None:
                 print(f"   ⚠️  Failed to remove {filestore}: {result.stderr}")
 
 
+def cleanup_single_test_filestore(db_name: str) -> None:
+    """Remove a specific test filestore directory if it exists."""
+    sr = get_script_runner_service()
+    ensure_services_up([sr])
+    target = f"/volumes/data/filestore/{db_name}"
+    result = _compose_exec(sr, ["sh", "-c", f"[ -e '{target}' ] && rm -rf '{target}' || true"])
+    if result.returncode == 0:
+        print(f"   ✅ Removed filestore (scoped): {db_name}")
+    else:
+        print(f"   ⚠️  Failed to remove filestore {db_name}: {result.stderr}")
+
+
 def cleanup_all_test_artifacts() -> None:
     """Complete cleanup of all test artifacts"""
     production_db = get_production_db_name()
@@ -1233,6 +1257,9 @@ def drop_and_create_test_database(db_name: str) -> None:
         else:
             print(f"   ⚠️  Warning: Database creation may have failed (count: {count})")
 
+    # Ensure Postgres is ready to accept connections for the new DB before we
+    # launch Odoo; avoids transient "not currently accepting connections" errors
+    wait_for_database_ready()
     print(f"🗄️  Database cleanup completed")
 
 
@@ -1554,11 +1581,21 @@ def run_docker_test_command(
     print(f"📊 Database: {db_name}")
     print("-" * 60)
 
-    # Cleanup before tests (default behavior)
+    # Cleanup before tests (scoped by default to avoid cross-run interference)
     if cleanup_before:
-        print("🧹 Pre-test cleanup...")
-        cleanup_test_databases(production_db)
-        cleanup_test_filestores(production_db)
+        scoped = os.environ.get("TEST_SCOPED_CLEANUP", "1") != "0"
+        if scoped:
+            print("🧹 Scoped pre-test cleanup...")
+            # Drop only the target DB/filestore for this run
+            try:
+                _force_drop_database(db_name)
+            except Exception:
+                pass
+            cleanup_single_test_filestore(db_name)
+        else:
+            print("🧹 Pre-test cleanup (global)...")
+            cleanup_test_databases(production_db)
+            cleanup_test_filestores(production_db)
         print("-" * 60)
 
     restart_script_runner_with_orphan_cleanup()
@@ -1620,6 +1657,15 @@ def run_docker_test_command(
 
     # JS/Tour tests need workers and dev assets
     if is_tour_test or is_js_test:
+        # For tours, default to workers=0 to improve stability of HttpCase-based flows.
+        # For JS (browser_js/hoot) tests, keep a small number of workers (default 2) unless overridden.
+        tour_workers_default = int(os.environ.get("TOUR_WORKERS", "0"))
+        js_workers_default = int(os.environ.get("JS_WORKERS", "2"))
+
+        # Respect optional warmup toggle; default to disabled (0) to avoid 30s pre-hit stalls
+        if is_tour_test:
+            cmd.extend(["-e", f"TOUR_WARMUP={os.environ.get('TOUR_WARMUP', '0')}"])
+
         cmd.extend(
             [
                 script_runner_service,
@@ -1633,12 +1679,18 @@ def run_docker_test_command(
                 "--test-enable",
                 "--stop-after-init",
                 "--max-cron-threads=0",
-                f"--workers={int(os.environ.get('TOUR_WORKERS', '2'))}",
+                f"--workers={js_workers_default if is_js_test else tour_workers_default}",
                 f"--db-filter=^{db_name}$",
                 "--log-level=test",
                 "--without-demo=all",
             ]
         )
+        # Optionally disable enterprise addons for JS to avoid auto-installing enterprise stack (faster and avoids mismatches)
+        if is_js_test and os.environ.get("JS_COMMUNITY_ONLY", "1") != "0":
+            community_paths = (
+                "/odoo/odoo/addons,/opt/odoo-cleanup/odoo/addons,/volumes/data/addons/18.0,/opt/project/addons,/odoo/addons"
+            )
+            cmd.extend(["--addons-path", community_paths])
         # Note: Do not enable dev assets for JS tests. `--dev=all` slows
         # cold starts and triggers 20s websocket navigation timeouts in
         # `browser_js`. Keep it off by default for test reliability.
@@ -1977,9 +2029,18 @@ def run_docker_test_command(
         # Cleanup after tests (default behavior)
         if cleanup_after:
             print("-" * 60)
-            print("🧹 Post-test cleanup...")
-            cleanup_test_databases(production_db)
-            cleanup_test_filestores(production_db)
+            scoped = os.environ.get("TEST_SCOPED_CLEANUP", "1") != "0"
+            if scoped:
+                print("🧹 Post-test cleanup (scoped)...")
+                try:
+                    _force_drop_database(db_name)
+                except Exception:
+                    pass
+                cleanup_single_test_filestore(db_name)
+            else:
+                print("🧹 Post-test cleanup (global)...")
+                cleanup_test_databases(production_db)
+                cleanup_test_filestores(production_db)
 
         # Build failures.json for machine parsing
         try:
@@ -2097,11 +2158,18 @@ def _build_failures_from_log(log_path: Path, summary: dict) -> None:
                 else:
                     tb_lines.append(l)
                 continue
-            # Unittest headers
+            # Unittest-style headers (avoid logging noise like DB "ERROR:" lines)
             if lw.startswith(("fail:", "error:")):
                 parts = l.split(None, 1)
                 typ = parts[0].rstrip(":").lower()
-                test_id = parts[1] if len(parts) > 1 else None
+                rest = parts[1] if len(parts) > 1 else ""
+                # Heuristic: only treat as a unit test header if the rest mentions a test id
+                # (contains 'test' token or looks like Class.test or module.Class)
+                rest_l = rest.lower()
+                if "test" not in rest_l:
+                    # Likely an infra log line (e.g., odoo.sql_db ERROR: ...). Ignore.
+                    continue
+                test_id = rest
                 cur = {"type": "fail" if typ == "fail" else "error", "test": test_id, "message": ""}
                 continue
             # Short failure lines like AssertionError: ...

@@ -539,6 +539,8 @@ def run_all_tests() -> int:
     if not any_fail:
         print("\n✅ All categories passed")
         print(f"📁 Logs: {session_dir}")
+        # Final footer line for quick scanning in terminals/IDE consoles
+        print("🟢 Everything is green")
         return 0
     else:
         print("\n❌ Some categories failed")
@@ -569,6 +571,8 @@ def run_all_tests() -> int:
         print(_fmt("integration", rc_integration))
         print(_fmt("tour", rc_tour))
         print(f"📁 Logs: {session_dir}")
+        # Final footer line for quick scanning in terminals/IDE consoles
+        print("🔴 Overall: NOT GREEN")
         # Return first non-zero code for conventional CI semantics
         for code in (rc_unit, rc_js, rc_integration, rc_tour):
             if code and code != 0:
@@ -2051,9 +2055,12 @@ def run_docker_test_command(
         if result_code == 0:
             print("✅ Tests passed!")
             print(f"📄 Logs saved to: {log_file}")
+            # Explicit final footer so the last console line always shows status
+            print("🟢 Everything is green")
         else:
             print("❌ Tests failed!")
             print(f"📄 Check logs at: {log_file}")
+            print("🔴 Overall: NOT GREEN")
 
         # Save summary for AI agents to parse
         with open(summary_file, "w") as f:

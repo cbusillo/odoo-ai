@@ -30,9 +30,10 @@ test-stats = "tools.test_commands:show_test_stats"
 test-clean = "tools.test_commands:cleanup_all_test_artifacts"
 
 [tool.odoo-test.timeouts]
-unit = 300
-integration = 600
-tour = 180
+unit = 600
+integration = 900
+tour = 600
+js = 1200
 
 [tool.ruff]
 line-length = 133

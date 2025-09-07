@@ -25,6 +25,7 @@ services:
     <<: *odoo-base
     ports:
       - "8069:8069"
+      - "8072:8072"
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

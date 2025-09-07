@@ -1,7 +1,7 @@
 # AGENTS.md — Codex CLI Operating Guide (Read Me First)
 
 This project is optimized for Codex CLI. Follow these rules to work fast, safely, and in the house style. Always prefer
-MCP tools, keep plans tight, and validate with our test commands.
+MCP tools when appropriate and validate with our test commands.
 
 ## Read Order (Before You Start)
 
@@ -31,7 +31,7 @@ doc before writing or updating tests.
 
 ## Critical Rules
 
-- Tools: ALWAYS favor MCP tools over Bash (10–100x faster); see docs/TOOL_SELECTION.md
+- Tools: ALWAYS favor MCP tools when appropriate; see docs/TOOL_SELECTION.md
 - Git: Use `git mv` to preserve history
 - Tests: Use only `uv run` commands below
 - Formatting: Use Ruff for Python; Owl.js patterns and no semicolons for JS
@@ -55,45 +55,26 @@ uv run ruff check --fix   # Fix Python issues
 
 ## Codex CLI Operating Rules
 
-- Planning: Use the plan tool to outline 3–6 concise steps; keep exactly one step in_progress; update as you proceed.
+- Planning: Use the plan tool; update as you proceed.
 - Preambles: Before grouped tool calls, send a one‑sentence preamble describing what you are about to do.
 - File edits: Use `apply_patch` with minimal, focused changes; prefer editing existing files over creating new ones.
 - Validation: Run targeted tests for what you changed; expand scope only after green.
 - Brevity: Default to concise, structured updates; avoid filler. Prefer bullets with bolded keywords.
-
-## Delegation & Safeguards (Must Know)
-
-- Thresholds: 3–5 files → consider specialists; 5+ files → delegate to a sub‑agent; 20+ files → must use a sub‑agent.
-- Never delegate to the same agent type (no self‑calls) to avoid recursion; see docs/system/AGENT_SAFEGUARDS.md.
-- Use GPT agent for verification when information is unstable, cross‑checking external docs; see
-  docs/system/MODEL_SELECTION.md.
+- Shell: Prefer the built‑in shell tool over the JetBrains terminal; avoid shell for basic file operations.
 
 ## Tooling Priority (Fast Path)
 
-- MCP first: Use specialized `mcp__odoo-intelligence__*`, `mcp__docker__*`, and other MCP tools where available.
-- Built‑ins next: Use file ops (Read/Write/Edit/Glob/Grep) when MCP doesn’t cover it.
-- Bash last: Only when neither MCP nor built‑ins suffice; document why. See docs/TOOL_SELECTION.md.
-
-## Agents Shortlist (When To Use Which)
-
-- Archer (docs/agents/archer.md): Codebase research, pattern finding across modules.
-- Scout (docs/agents/scout.md): Test scaffolding, fixtures, data factories, tour shells.
-- Inspector (docs/agents/inspector.md): Code quality, perf, security checks across repo.
-- Refactor (docs/agents/refactor.md): Systematic, multi‑file changes after Inspector findings.
-- Owl (docs/agents/owl.md): Frontend (Owl.js 2.0), components, tours.
-- Dock (docs/agents/dock.md): Container ops (restart, logs, env), module updates.
-- Debugger (docs/agents/debugger.md): Repro, logs, bisect, failure isolation.
-- Phoenix (docs/agents/phoenix.md): Version/migration flows, upgrade hooks.
-- QC (docs/agents/qc.md): End‑to‑end quality pipeline orchestration.
-
-Rule of thumb: If scope ≥ 5 files, or you need parallel specialized work, launch the appropriate agent instead of
-expanding main context.
+- odoo-intelligence first: Prefer `odoo-intelligence__*` for Odoo queries, code search/analysis, and module updates. Use
+  other MCP tools like `docker__*` when appropriate.
+- Inspections second: Use `inspection-pycharm__*` to surface code problems and navigate findings before any ad‑hoc
+  scans.
+- Built‑ins third: Use built‑in file ops and the built‑in shell for reads/edits and targeted commands. Do not use shell
+  for basic find/grep/cat/ls — use file ops or `rg` via built‑ins instead.
+- JetBrains last: Use `jetbrains__*` only when an IDE‑specific action is required (e.g., open editor view, IDE
+  refactors, run configurations).
 
 ## Web Search
 
-- Enable in `~/.codex/config.toml`:
-    - `[tools]` → `web_search = true`
-    - `[sandbox_workspace_write]` → `network_access = true`
 - Use web search when information could have changed (APIs, docs, prices, laws), when you need citations, or when you
   are unsure.
 
@@ -104,12 +85,10 @@ Add citations for any unstable facts or external claims. Prefer primary document
 - Paths: Use container paths inside tools (`/volumes/addons/*`, `/volumes/enterprise/*`); never reference `/odoo/*` on
   host.
 - Execution: Never run Python directly; use Odoo environment commands and `uv run` test tasks.
+- Use the odoo-intelligence MCP when possible
 - Context flags: Use `with_context(skip_shopify_sync=True)` to avoid sync loops when appropriate.
-- Field naming: Prefer `carrier` over `carrier_id` when the field returns a recordset (Odoo 18 pattern); follow existing
-  module conventions.
-- Don’t touch generated files: `services/shopify/gql/*`, `graphql/schema/*`.
 
-See docs/style/ODOO.md for details and container rules.
+See docs/style/ODOO.md for details and container rules. Its very important to respect the style rules.
 
 ## Odoo 18 Canon (Consult Before Coding)
 
@@ -140,11 +119,7 @@ Related patterns and templates:
 
 ## Large/Complex Workflows
 
-- Thresholds: 5+ files or multi‑phase work → break into clear plan steps; use sessions when delegating via Codex MCP;
-  consult docs/system/AGENT_SAFEGUARDS.md.
-- Error handling: Follow docs/system/ERROR_RECOVERY.md for retries, fallbacks, and rate‑limit handling.
-
-When delegating: follow docs/system/AGENT_SAFEGUARDS.md for safe handoffs; agents must not call themselves.
+- Thresholds: 5+ files or multi‑phase work → break into clear plan steps
 
 ## Typical Workflow
 
@@ -166,17 +141,17 @@ When delegating: follow docs/system/AGENT_SAFEGUARDS.md for safe handoffs; agent
 ## MCP Recipes (Copy/Paste Starters)
 
 - List models/fields quickly:
-    - `mcp__odoo-intelligence__model_query(operation="list", pattern="product.*")`
-    - `mcp__odoo-intelligence__field_query(model_name="product.template", operation="list")`
+    - `odoo-intelligence__model_query(operation="list", pattern="product.*")`
+    - `odoo-intelligence__field_query(model_name="product.template", operation="list")`
 - Find overrides/patterns:
-    - `mcp__odoo-intelligence__search_code(pattern="def create\(", file_type="py")`
-    - `mcp__odoo-intelligence__analysis_query(analysis_type="inheritance", model_name="product.template")`
+    - `odoo-intelligence__search_code(pattern="def create\(", file_type="py")`
+    - `odoo-intelligence__analysis_query(analysis_type="inheritance", model_name="product.template")`
 - Run targeted tests:
     - `uv run test-unit addons/<module>`
     - `uv run test-integration addons/<module>`
     - `uv run test-tour addons/<module>`
 - Update a module in proper env:
-    - `mcp__odoo-intelligence__odoo_update_module(modules="<module>")`
+    - `odoo-intelligence__odoo_update_module(modules="<module>")`
 
 Prefer MCP over Bash; only fall back to Bash if a needed flag isn’t supported (document why).
 
@@ -204,11 +179,6 @@ References: docs/style/TESTING.md, docs/agent-patterns/test-templates.md, addons
 - Service mocking patterns: docs/references/service-mocking.md.
 - Use `with_context(skip_shopify_sync=True)` for imports/bulk updates/test data.
 - Do not edit generated files: `services/shopify/gql/*`, `graphql/schema/*`.
-
-## Model Selection & Verification
-
-- Choose the right model/tool for the task; see docs/system/MODEL_SELECTION.md.
-- For unstable facts or external dependencies, verify with GPT or web search and cite sources.
 
 ## Project Health
 

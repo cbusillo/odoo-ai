@@ -56,7 +56,7 @@ class LocalServerSettings(BaseSettings):
     db_name: str = Field(..., alias="ODOO_DB_NAME")
     db_conn: connection | None = None
     filestore_path: Path = Field(..., alias="ODOO_FILESTORE_PATH")
-    base_url: str = Field(None, alias="ODOO_BASE_URL")
+    base_url: str | None = Field(None, alias="ODOO_BASE_URL")
     # Script/runtime toggles
     disable_cron: bool = Field(True, alias="SANITIZE_DISABLE_CRON")
     skip_web_control: bool = Field(False, alias="ODOO_SKIP_WEB_CONTROL")
@@ -115,18 +115,17 @@ class OdooUpstreamRestorer:
         self.os_env = os.environ.copy()
         self.os_env["PGPASSWORD"] = self.local.db_password.get_secret_value()
 
-    def run_command(self, cmd: str) -> None:
-        _logger.info(f"Running command: {cmd}")
+    def run_command(self, command: str) -> None:
+        _logger.info(f"Running command: {command}")
         try:
-            subprocess.run(cmd, shell=True, env=self.os_env, check=True)
+            subprocess.run(command, shell=True, env=self.os_env, check=True)
         except subprocess.CalledProcessError as command_error:
-            raise OdooRestorerError(f"Command failed: {cmd}\nError: {command_error}") from command_error
+            raise OdooRestorerError(f"Command failed: {command}\nError: {command_error}") from command_error
 
     def stop_web_service(self) -> None:
         if self.local.skip_web_control:
             _logger.info("Skipping web stop (ODOO_SKIP_WEB_CONTROL=1)")
             return
-        # Use Docker Compose CLI directly (preferred in this project)
         try:
             self.run_command("docker compose stop web")
         except OdooRestorerError as e:
@@ -136,7 +135,6 @@ class OdooUpstreamRestorer:
         if self.local.skip_web_control:
             _logger.info("Skipping web start (ODOO_SKIP_WEB_CONTROL=1)")
             return
-        # Use Docker Compose CLI directly (preferred in this project)
         try:
             self.run_command("docker compose up -d web")
         except OdooRestorerError as e:
@@ -144,8 +142,10 @@ class OdooUpstreamRestorer:
 
     def overwrite_filestore(self) -> subprocess.Popen:
         _logger.info("Overwriting filestore...")
-        cmd = f"rsync -az --delete {self.upstream.user}@{self.upstream.host}:{self.upstream.filestore_path} {self.local.filestore_path}"
-        return subprocess.Popen(cmd, shell=True, env=self.os_env)
+        rsync_command = (
+            f"rsync -az --delete {self.upstream.user}@{self.upstream.host}:{self.upstream.filestore_path} {self.local.filestore_path}"
+        )
+        return subprocess.Popen(rsync_command, shell=True, env=self.os_env)
 
     def overwrite_database(self) -> None:
         backup_path = "/tmp/upstream_db_backup.sql.gz"
@@ -252,13 +252,13 @@ class OdooUpstreamRestorer:
         disable_cron = self.local.disable_cron
 
         sql_calls: list[SqlCall] = [
-            SqlCall("ir.mail_server", KeyValuePair("active", "False")),
+            SqlCall("ir.mail_server", KeyValuePair("active", False)),
             SqlCall("ir.config_parameter", KeyValuePair("value", "False"), KeyValuePair("key", "mail.catchall.domain")),
             SqlCall("ir.config_parameter", KeyValuePair("value", "False"), KeyValuePair("key", "mail.catchall.alias")),
             SqlCall("ir.config_parameter", KeyValuePair("value", "False"), KeyValuePair("key", "mail.bounce.alias")),
         ]
         if disable_cron:
-            sql_calls.append(SqlCall("ir.cron", KeyValuePair("active", "False")))
+            sql_calls.append(SqlCall("ir.cron", KeyValuePair("active", False)))
         if self.local.base_url:
             sql_calls.append(
                 SqlCall(
@@ -275,7 +275,7 @@ class OdooUpstreamRestorer:
 
         # If we asked to disable crons, verify no active cron remains
         if disable_cron:
-            active_crons = self.call_odoo_sql(SqlCall("ir.cron", where=KeyValuePair("active", "True")), SqlCallType.SELECT)
+            active_crons = self.call_odoo_sql(SqlCall("ir.cron", where=KeyValuePair("active", True)), SqlCallType.SELECT)
             if active_crons:
                 errors = "\n".join(f"- {cron[7]} (id: {cron[0]})" for cron in active_crons)
                 raise OdooDatabaseUpdateError(f"Error: The following cron jobs are still active after sanitization:\n{errors}")
@@ -316,7 +316,7 @@ class OdooUpstreamRestorer:
             ),
             SqlCall(
                 "ir.config_parameter",
-                KeyValuePair("value", True),
+                KeyValuePair("value", "True"),
                 KeyValuePair("key", "shopify.test_store"),
             ),
         ]
@@ -364,13 +364,12 @@ class OdooUpstreamRestorer:
 
     # --- Sanity checks ---
     def assert_core_schema_healthy(self) -> None:
-        """Ensure core tables and records exist before handing control back to web."""
         self.connect_to_db()
-        with self.local.db_conn.cursor() as cur:
+        with self.local.db_conn.cursor() as cursor:
             # ir_module_module must exist and have rows
             try:
-                cur.execute("SELECT COUNT(*) FROM ir_module_module")
-                mod_count = cur.fetchone()[0]
+                cursor.execute("SELECT COUNT(*) FROM ir_module_module")
+                mod_count = cursor.fetchone()[0]
             except psycopg2.Error as e:
                 raise OdooDatabaseUpdateError(f"Schema check failed: ir_module_module missing ({e})") from e
             if mod_count == 0:
@@ -378,25 +377,19 @@ class OdooUpstreamRestorer:
 
             # Languages must exist
             try:
-                cur.execute("SELECT COUNT(*) FROM res_lang")
-                lang_count = cur.fetchone()[0]
+                cursor.execute("SELECT COUNT(*) FROM res_lang")
+                lang_count = cursor.fetchone()[0]
             except psycopg2.Error as e:
                 raise OdooDatabaseUpdateError(f"Schema check failed: res_lang missing ({e})") from e
             if lang_count == 0:
                 raise OdooDatabaseUpdateError("Schema check failed: no languages in res_lang")
 
             # base.public_user should resolve
-            cur.execute("SELECT 1 FROM ir_model_data WHERE module='base' AND name='public_user' LIMIT 1")
-            if cur.fetchone() is None:
+            cursor.execute("SELECT 1 FROM ir_model_data WHERE module='base' AND name='public_user' LIMIT 1")
+            if cursor.fetchone() is None:
                 raise OdooDatabaseUpdateError("Schema check failed: base.public_user xmlid not found")
 
     def update_addons(self) -> None:
-        """Install/update modules listed in ODOO_UPDATE.
-
-        - Reads comma-separated list from env ODOO_UPDATE
-        - Installs missing ones (-i) and updates all listed (-u)
-        - Validates module dirs exist under known addons paths
-        """
         mods_env = (self.local.update_modules or "").strip()
         if not mods_env:
             _logger.info("ODOO_UPDATE not set; skipping addon install/update.")
@@ -407,12 +400,9 @@ class OdooUpstreamRestorer:
             _logger.info("ODOO_UPDATE is empty after parsing; skipping.")
             return
 
-        # Resolve module presence using configured addons paths.
-        # Prefer ODOO_ADDONS_PATH from the environment/.env; fallback to common defaults.
         addons_env = (self.local.addons_path or "").strip()
         addons_paths: list[Path] = []
         if addons_env:
-            # Support both comma and colon separators
             sep = "," if "," in addons_env else ":"
             for raw in [p.strip() for p in addons_env.split(sep) if p.strip()]:
                 addons_paths.append(Path(raw))
@@ -446,7 +436,6 @@ class OdooUpstreamRestorer:
             _logger.info("No valid modules from ODOO_UPDATE found on disk; skipping.")
             return
 
-        # Determine install vs update from DB state
         self.connect_to_db()
         rows: dict[str, str] = {}
         with self.local.db_conn.cursor() as cur:
@@ -476,10 +465,9 @@ class OdooUpstreamRestorer:
         if to_update:
             cmd_parts += ["-u", ",".join(to_update)]
 
-        # Prefer generated config if present for consistency
-        gen_conf = "/volumes/config/_generated.conf"
-        if Path(gen_conf).exists():
-            cmd_parts += ["--config", gen_conf]
+        generated_config_path = "/volumes/config/_generated.conf"
+        if Path(generated_config_path).exists():
+            cmd_parts += ["--config", generated_config_path]
 
         command = " ".join(cmd_parts)
         _logger.info(f"Installing: {to_install if to_install else 'none'}; Updating: {to_update if to_update else 'none'}")
@@ -488,11 +476,7 @@ class OdooUpstreamRestorer:
         except subprocess.CalledProcessError as update_error:
             raise OdooRestorerError(f"Failed to install/update addons: {update_error}") from update_error
 
-    def run(self, do_sanitize: bool = True) -> None:
-        # Note: We intentionally do not try to stop/start the web service here.
-        # In containerized runs, the Docker CLI/socket are typically unavailable,
-        # and best-effort control caused noisy, non-fatal failures. The restore
-        # process itself is safe without pausing web in this environment.
+    def restore_from_upstream(self, do_sanitize: bool = True) -> None:
         filestore_proc = self.overwrite_filestore()
         self.overwrite_database()
         filestore_proc.wait()
@@ -518,7 +502,6 @@ class OdooUpstreamRestorer:
                 self.drop_database()
                 raise
 
-        # Final core sanity before handing back control
         self.assert_core_schema_healthy()
 
         _logger.info("Upstream overwrite completed successfully.")
@@ -530,4 +513,4 @@ if __name__ == "__main__":
     # noinspection PyArgumentList
     upstream_settings = UpstreamServerSettings()
     restore_upstream_to_local = OdooUpstreamRestorer(local_settings, upstream_settings)
-    restore_upstream_to_local.run()
+    restore_upstream_to_local.restore_from_upstream()

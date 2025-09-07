@@ -1682,7 +1682,7 @@ def run_docker_test_command(
     if test_password:
         cmd.extend(["-e", f"ODOO_TEST_PASSWORD={test_password}"])
 
-    # JS/Tour tests need workers and dev assets
+    # JS/Tour tests: tours run workers=0 for stability; for JS in Odoo 18, we also default to workers=0
     if is_tour_test or is_js_test:
         # For tours, default to workers=0 to improve stability of HttpCase-based flows.
         # For JS (browser_js/hoot) tests, keep a small number of workers (default 2) unless overridden.
@@ -1707,6 +1707,9 @@ def run_docker_test_command(
                 "--stop-after-init",
                 "--max-cron-threads=0",
                 f"--workers={js_workers_default if is_js_test else tour_workers_default}",
+                # Enable longpolling when running JS tests to support /websocket
+                # Note: harmless for tours (workers=0 disables it)
+                *( ["--longpolling-port", os.environ.get("LONGPOLLING_PORT", "8072")] if is_js_test else [] ),
                 f"--db-filter=^{db_name}$",
                 "--log-level=test",
                 "--without-demo=all",

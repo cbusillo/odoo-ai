@@ -155,6 +155,55 @@ def get_production_db_name() -> str:
     return "odoo"
 
 
+_COMPOSE_CONFIG_CACHE: dict | None = None
+
+
+def _load_compose_config() -> dict | None:
+    global _COMPOSE_CONFIG_CACHE
+    if _COMPOSE_CONFIG_CACHE is not None:
+        return _COMPOSE_CONFIG_CACHE
+    try:
+        res = subprocess.run(["docker", "compose", "config", "--format", "json"], capture_output=True, text=True)
+        if res.returncode == 0:
+            _COMPOSE_CONFIG_CACHE = json.loads(res.stdout)
+            return _COMPOSE_CONFIG_CACHE
+    except Exception:
+        pass
+    _COMPOSE_CONFIG_CACHE = None
+    return None
+
+
+def _get_env_from_compose(var_names: list[str], services: list[str] = ["web", "database"]) -> str | None:
+    cfg = _load_compose_config()
+    if not cfg:
+        return None
+    for svc_name, svc in cfg.get("services", {}).items():
+        if not any(s in svc_name.lower() for s in services):
+            continue
+        env = svc.get("environment", {})
+        # Dict form
+        if isinstance(env, dict):
+            for v in var_names:
+                if v in env:
+                    return env[v]
+        # List form
+        if isinstance(env, list):
+            for env_var in env:
+                for v in var_names:
+                    if env_var.startswith(v + "="):
+                        return env_var.split("=", 1)[1]
+    return None
+
+
+def get_db_user() -> str:
+    # Prefer explicit env, then compose config vars
+    return os.environ.get("ODOO_DB_USER") or _get_env_from_compose(["ODOO_DB_USER", "POSTGRES_USER"]) or "odoo"
+
+
+def get_filestore_root() -> str:
+    return os.environ.get("ODOO_FILESTORE_PATH") or _get_env_from_compose(["ODOO_FILESTORE_PATH"], ["web"]) or "/volumes/data"
+
+
 def get_script_runner_service() -> str:
     result = subprocess.run(["docker", "compose", "ps", "--services"], capture_output=True, text=True)
     services = result.stdout.strip().split("\n") if result.returncode == 0 else []
@@ -934,12 +983,13 @@ def cleanup_test_databases(production_db: str = None) -> None:
     ensure_services_up([get_database_service()])
     wait_for_database_ready()
     # Collect both legacy ("_ut_") and standard ("_test_") databases
+    dbu = get_db_user()
     result = _compose_exec(
         get_database_service(),
         [
             "psql",
             "-U",
-            "odoo",
+            dbu,
             "-d",
             "postgres",
             "-t",
@@ -970,7 +1020,7 @@ def cleanup_test_databases(production_db: str = None) -> None:
             [
                 "psql",
                 "-U",
-                "odoo",
+                dbu,
                 "-d",
                 "postgres",
                 "-c",
@@ -986,7 +1036,7 @@ def cleanup_test_databases(production_db: str = None) -> None:
         [
             "psql",
             "-U",
-            "odoo",
+            dbu,
             "-d",
             "postgres",
             "-t",
@@ -1010,8 +1060,9 @@ def create_filestore_snapshot(test_db_name: str, production_db: str) -> None:
     - Fallback to rsync -a
     - Avoid symlink production to prevent data mutation during tests
     """
-    production_filestore = f"/volumes/data/filestore/{production_db}"
-    test_filestore = f"/volumes/data/filestore/{test_db_name}"
+    root = get_filestore_root().rstrip("/")
+    production_filestore = f"{root}/filestore/{production_db}"
+    test_filestore = f"{root}/filestore/{test_db_name}"
     sr = get_script_runner_service()
     ensure_services_up([sr])
 
@@ -1054,12 +1105,13 @@ def cleanup_test_filestores(production_db: str = None) -> None:
 
     sr = get_script_runner_service()
     ensure_services_up([sr])
+    root = get_filestore_root().rstrip("/")
     result = _compose_exec(
         sr,
         [
             "sh",
             "-c",
-            f"ls -d /volumes/data/filestore/{production_db}_test_* 2>/dev/null || true",
+            f"ls -d {root}/filestore/{production_db}_test_* 2>/dev/null || true",
         ],
     )
     if not result.stdout.strip():
@@ -1097,7 +1149,8 @@ def cleanup_single_test_filestore(db_name: str) -> None:
     """Remove a specific test filestore directory if it exists."""
     sr = get_script_runner_service()
     ensure_services_up([sr])
-    target = f"/volumes/data/filestore/{db_name}"
+    root = get_filestore_root().rstrip("/")
+    target = f"{root}/filestore/{db_name}"
     result = _compose_exec(sr, ["sh", "-c", f"[ -e '{target}' ] && rm -rf '{target}' || true"])
     if result.returncode == 0:
         print(f"   ✅ Removed filestore (scoped): {db_name}")
@@ -1137,17 +1190,19 @@ def restart_script_runner_with_orphan_cleanup() -> None:
 
 def drop_and_create_test_database(db_name: str) -> None:
     print(f"🗄️  Cleaning up test database: {db_name}")
+    dbu = get_db_user()
 
     # Step 1: Kill active connections to test database
     print(f"   Terminating connections to {db_name}...")
 
     # First, get the connection count
+    dbu = get_db_user()
     result = _compose_exec(
         get_database_service(),
         [
             "psql",
             "-U",
-            "odoo",
+            dbu,
             "-d",
             "postgres",
             "-t",
@@ -1165,7 +1220,7 @@ def drop_and_create_test_database(db_name: str) -> None:
         [
             "psql",
             "-U",
-            "odoo",
+            dbu,
             "-d",
             "postgres",
             "-c",
@@ -1186,7 +1241,7 @@ def drop_and_create_test_database(db_name: str) -> None:
         [
             "psql",
             "-U",
-            "odoo",
+            dbu,
             "-d",
             "postgres",
             "-t",
@@ -1207,7 +1262,7 @@ def drop_and_create_test_database(db_name: str) -> None:
         [
             "psql",
             "-U",
-            "odoo",
+            dbu,
             "-d",
             "postgres",
             "-t",
@@ -1229,7 +1284,7 @@ def drop_and_create_test_database(db_name: str) -> None:
         [
             "psql",
             "-U",
-            "odoo",
+            dbu,
             "-d",
             "postgres",
             "-c",
@@ -1246,7 +1301,7 @@ def drop_and_create_test_database(db_name: str) -> None:
         [
             "psql",
             "-U",
-            "odoo",
+            dbu,
             "-d",
             "postgres",
             "-t",
@@ -1273,13 +1328,14 @@ def wait_for_database_ready(retries: int = 30, delay: float = 1.0) -> bool:
     Returns True if ready, False if timed out.
     """
     svc = get_database_service()
+    dbu = get_db_user()
     for _ in range(retries):
-        res = _compose_exec(svc, ["pg_isready", "-U", "odoo", "-d", "postgres"], capture_output=True)
+        res = _compose_exec(svc, ["pg_isready", "-U", dbu, "-d", "postgres"], capture_output=True)
         if res.returncode == 0:
             return True
         time.sleep(delay)
     # Last-chance simple query
-    res = _compose_exec(svc, ["psql", "-U", "odoo", "-d", "postgres", "-t", "-c", "SELECT 1"], capture_output=True)
+    res = _compose_exec(svc, ["psql", "-U", dbu, "-d", "postgres", "-t", "-c", "SELECT 1"], capture_output=True)
     return res.returncode == 0
 
 
@@ -1294,6 +1350,7 @@ def _force_drop_database(db_name: str) -> None:
     - Verify count
     """
     svc = get_database_service()
+    dbu = get_db_user()
     print(f"   Dropping database {db_name} (aggressive)...")
     # Prevent new connections
     _compose_exec(
@@ -1301,7 +1358,7 @@ def _force_drop_database(db_name: str) -> None:
         [
             "psql",
             "-U",
-            "odoo",
+            dbu,
             "-d",
             "postgres",
             "-c",
@@ -1313,7 +1370,7 @@ def _force_drop_database(db_name: str) -> None:
         [
             "psql",
             "-U",
-            "odoo",
+            dbu,
             "-d",
             "postgres",
             "-c",
@@ -1326,7 +1383,7 @@ def _force_drop_database(db_name: str) -> None:
         [
             "psql",
             "-U",
-            "odoo",
+            dbu,
             "-d",
             "postgres",
             "-c",
@@ -1339,7 +1396,7 @@ def _force_drop_database(db_name: str) -> None:
         [
             "psql",
             "-U",
-            "odoo",
+            dbu,
             "-d",
             "postgres",
             "-c",
@@ -1348,14 +1405,14 @@ def _force_drop_database(db_name: str) -> None:
     )
     if forced.returncode != 0:
         # Fallback plain drop
-        _compose_exec(svc, ["dropdb", "-U", "odoo", "--if-exists", db_name])
+        _compose_exec(svc, ["dropdb", "-U", dbu, "--if-exists", db_name])
     # Verify
     chk = _compose_exec(
         svc,
         [
             "psql",
             "-U",
-            "odoo",
+            dbu,
             "-d",
             "postgres",
             "-t",
@@ -1405,7 +1462,7 @@ def setup_test_authentication(db_name: str) -> str:
 
     result = _compose_exec(
         get_database_service(),
-        ["psql", "-U", "odoo", "-d", db_name, "-c", sql],
+        ["psql", "-U", get_db_user(), "-d", db_name, "-c", sql],
     )
     if result.returncode != 0:
         print(f"   ⚠️  Warning: Failed to update admin password: {result.stderr}")
@@ -1420,121 +1477,44 @@ def setup_test_authentication(db_name: str) -> str:
 
 def clone_production_database(db_name: str) -> str:
     production_db = get_production_db_name()
+    dbu = get_db_user()
     print(f"🗄️  Cloning production database: {production_db} → {db_name}")
     wait_for_database_ready()
 
-    # Step 1: Kill active connections to test database
-    print(f"   Terminating connections to {db_name}...")
-
-    # First, get the connection count
-    result = _compose_exec(
-        get_database_service(),
-        [
-            "psql",
-            "-U",
-            "odoo",
-            "-d",
-            "postgres",
-            "-t",
-            "-c",
-            f"SELECT count(*) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();",
-        ],
-    )
-    if result.returncode == 0:
-        connection_count = result.stdout.strip()
-        print(f"   Found {connection_count} active connections to {db_name}")
-
-    # Kill the connections
-    result = _compose_exec(
-        get_database_service(),
-        [
-            "psql",
-            "-U",
-            "odoo",
-            "-d",
-            "postgres",
-            "-c",
-            f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();",
-        ],
-    )
-    if result.returncode != 0:
-        print(f"   ⚠️  Warning: Could not kill connections: {result.stderr}")
-    else:
-        print(f"   Connection termination command executed")
-
-    # Wait a moment for connections to close
-    import time
-
-    time.sleep(2)
-
-    # Check again
-    result = _compose_exec(
-        get_database_service(),
-        [
-            "psql",
-            "-U",
-            "odoo",
-            "-d",
-            "postgres",
-            "-t",
-            "-c",
-            f"SELECT count(*) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();",
-        ],
-    )
-    if result.returncode == 0:
-        remaining_count = result.stdout.strip()
-        print(f"   {remaining_count} connections remaining after termination")
-
-    # Step 2: Drop existing test database (aggressive)
+    # Ensure test DB is gone first
     _force_drop_database(db_name)
 
-    # Step 3: Terminate connections to production database before cloning
-    print(f"   Terminating connections to production database {production_db}...")
+    # Create empty target database
     result = _compose_exec(
         get_database_service(),
         [
             "psql",
             "-U",
-            "odoo",
+            dbu,
             "-d",
             "postgres",
             "-c",
-            f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{production_db}' AND pid <> pg_backend_pid();",
+            f"CREATE DATABASE {db_name};",
         ],
     )
     if result.returncode != 0:
-        print(f"   ⚠️  Warning: Could not kill production connections: {result.stderr}")
-    else:
-        print(f"   Production connection termination executed")
-
-    # Wait for connections to close
-    time.sleep(2)
-
-    # Step 4: Clone from production database
-    print(f"   Cloning from production database {production_db}...")
-    result = _compose_exec(
-        get_database_service(),
-        [
-            "psql",
-            "-U",
-            "odoo",
-            "-d",
-            "postgres",
-            "-c",
-            f"CREATE DATABASE {db_name} WITH TEMPLATE {production_db};",
-        ],
-    )
-    if result.returncode != 0:
-        print(f"   ❌ Failed to clone database: {result.stderr}")
+        print(f"   ❌ Failed to create test database: {result.stderr}")
         return ""
 
-    # Step 4: Verify creation succeeded
+    # Non-disruptive dump/restore
+    cmd = f"set -o pipefail; pg_dump -Fc -U {dbu} {production_db} | pg_restore -U {dbu} -d {db_name} --no-owner --role={dbu}"
+    result = _compose_exec(get_database_service(), ["bash", "-lc", cmd])
+    if result.returncode != 0:
+        print(f"   ❌ Dump/restore failed: {result.stderr}")
+        return ""
+
+    # Verify creation succeeded
     result = _compose_exec(
         get_database_service(),
         [
             "psql",
             "-U",
-            "odoo",
+            dbu,
             "-d",
             "postgres",
             "-t",
@@ -1545,7 +1525,7 @@ def clone_production_database(db_name: str) -> str:
     if result.returncode == 0:
         count = result.stdout.strip()
         if count == "1":
-            print(f"   ✅ Database {db_name} successfully cloned from {production_db}")
+            print(f"   ✅ Database {db_name} is ready")
         else:
             print(f"   ⚠️  Warning: Database creation may have failed (count: {count})")
 
@@ -1709,7 +1689,7 @@ def run_docker_test_command(
                 f"--workers={js_workers_default if is_js_test else tour_workers_default}",
                 # Enable longpolling when running JS tests to support /websocket
                 # Note: harmless for tours (workers=0 disables it)
-                *( ["--longpolling-port", os.environ.get("LONGPOLLING_PORT", "8072")] if is_js_test else [] ),
+                *(["--longpolling-port", os.environ.get("LONGPOLLING_PORT", "8072")] if is_js_test else []),
                 f"--db-filter=^{db_name}$",
                 "--log-level=test",
                 "--without-demo=all",

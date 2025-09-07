@@ -1620,28 +1620,51 @@ def run_docker_test_command(
     # Build test tags - optionally scope tags to specific modules using proper Odoo syntax
     # Syntax: [-][tag][/module][:class][.method]
     # For example, restricting tag 'unit_test' to module 'user_name_extended' -> 'unit_test/user_name_extended'
-    if not test_tags:
-        # No tags specified, just limit by modules
-        # Use '/module' form so only those modules' tests run
-        test_tags_final = ",".join([f"/{module}" for module in modules_to_install])
-    elif not use_module_prefix:
-        # Use tags as-is without scoping to module(s)
-        test_tags_final = test_tags
-    else:
-        # Scope provided tag expression to modules.
-        # We only support the common case where the expression is a single positive tag
-        # or a simple comma-separated list where the last item is the primary tag to scope.
-        parts = [p.strip() for p in test_tags.split(",") if p.strip()]
-        if len(parts) == 1 and not parts[0].startswith("-"):
-            tag = parts[0]
-            test_tags_final = ",".join([f"{tag}/{module}" for module in modules_to_install])
+
+    # Allow targeted override via env TEST_TAGS without breaking defaults.
+    # When provided, we do NOT auto-scope to modules (caller is explicit), and we ensure
+    # the category tag is present to avoid running the entire Odoo test suite.
+    test_tags_override = os.environ.get("TEST_TAGS", "").strip()
+    if test_tags_override:
+        # Ensure category tag present based on flags (avoid referencing derived_category here)
+        if is_tour_test:
+            must_tag = "tour_test"
+        elif is_js_test:
+            must_tag = "js_test"
+        elif test_tags and "integration" in test_tags:
+            must_tag = "integration_test"
         else:
-            # Fallback: attach module scoping to the last positive tag
-            primary = next((p for p in reversed(parts) if not p.startswith("-")), parts[-1])
-            scoped = [f"{primary}/{module}" for module in modules_to_install]
-            # Keep the other parts (excluding the primary we scoped) and add scoped specs
-            keep = [p for p in parts if p != primary]
-            test_tags_final = ",".join(keep + scoped)
+            must_tag = "unit_test"
+        final_parts = []
+        if must_tag and must_tag not in test_tags_override:
+            final_parts.append(must_tag)
+        final_parts.append(test_tags_override)
+        test_tags_final = ",".join(p for p in final_parts if p)
+        use_module_prefix = False  # do not rescope explicit specs
+        print(f"🎯 Using TEST_TAGS override: {test_tags_final}")
+    else:
+        if not test_tags:
+            # No tags specified, just limit by modules
+            # Use '/module' form so only those modules' tests run
+            test_tags_final = ",".join([f"/{module}" for module in modules_to_install])
+        elif not use_module_prefix:
+            # Use tags as-is without scoping to module(s)
+            test_tags_final = test_tags
+        else:
+            # Scope provided tag expression to modules.
+            # We only support the common case where the expression is a single positive tag
+            # or a simple comma-separated list where the last item is the primary tag to scope.
+            parts = [p.strip() for p in test_tags.split(",") if p.strip()]
+            if len(parts) == 1 and not parts[0].startswith("-"):
+                tag = parts[0]
+                test_tags_final = ",".join([f"{tag}/{module}" for module in modules_to_install])
+            else:
+                # Fallback: attach module scoping to the last positive tag
+                primary = next((p for p in reversed(parts) if not p.startswith("-")), parts[-1])
+                scoped = [f"{primary}/{module}" for module in modules_to_install]
+                # Keep the other parts (excluding the primary we scoped) and add scoped specs
+                keep = [p for p in parts if p != primary]
+                test_tags_final = ",".join(keep + scoped)
 
     print(f"🏷️  Final test tags: {test_tags_final}")
 
@@ -1690,11 +1713,6 @@ def run_docker_test_command(
             ]
         )
         # Optionally disable enterprise addons for JS to avoid auto-installing enterprise stack (faster and avoids mismatches)
-        if is_js_test and os.environ.get("JS_COMMUNITY_ONLY", "1") != "0":
-            community_paths = (
-                "/odoo/odoo/addons,/opt/odoo-cleanup/odoo/addons,/volumes/data/addons/18.0,/opt/project/addons,/odoo/addons"
-            )
-            cmd.extend(["--addons-path", community_paths])
         # Note: Do not enable dev assets for JS tests. `--dev=all` slows
         # cold starts and triggers 20s websocket navigation timeouts in
         # `browser_js`. Keep it off by default for test reliability.

@@ -5,13 +5,14 @@ import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+from typing import Annotated
 
 import psycopg2
 
 from psycopg2 import sql
 from psycopg2.extensions import connection
-from pydantic import Field, SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, SecretStr, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict, NoDecode
 
 logging.basicConfig(level=logging.INFO)
 _logger = logging.getLogger(__name__)
@@ -56,6 +57,12 @@ class LocalServerSettings(BaseSettings):
     db_conn: connection | None = None
     filestore_path: Path = Field(..., alias="ODOO_FILESTORE_PATH")
     base_url: str = Field(None, alias="ODOO_BASE_URL")
+    # Script/runtime toggles
+    disable_cron: bool = Field(True, alias="SANITIZE_DISABLE_CRON")
+    skip_web_control: bool = Field(False, alias="ODOO_SKIP_WEB_CONTROL")
+    project_name: str = Field("odoo", alias="ODOO_PROJECT_NAME")
+    addons_path: str | None = Field(None, alias="ODOO_ADDONS_PATH")
+    update_modules: str | None = Field(None, alias="ODOO_UPDATE")
 
 
 class UpstreamServerSettings(BaseSettings):
@@ -75,22 +82,30 @@ class ShopifySettings(BaseSettings):
     api_token: SecretStr = Field(..., alias="SHOPIFY_API_TOKEN")
     api_version: str = Field(..., alias="SHOPIFY_API_VERSION")
     webhook_key: str = Field(..., alias="SHOPIFY_WEBHOOK_KEY")
+    production_indicators: Annotated[list[str], NoDecode, Field(alias="PRODUCTION_INDICATORS")] = ["production", "live", "prod-"]
+
+    @field_validator("production_indicators", mode="before")
+    @classmethod
+    def parse_production_indicators(cls, value: object) -> list[str]:
+        if value is None:
+            return ["production", "live", "prod-"]
+        if isinstance(value, str):
+            cleaned = [item.strip() for item in value.split(",") if item.strip()]
+            return cleaned or ["production", "live", "prod-"]
+        if isinstance(value, list):
+            return [str(item).strip() for item in value if str(item).strip()]
+        return ["production", "live", "prod-"]
 
     def validate_safe_environment(self) -> None:
-        # Get production indicators from environment or use defaults
-        import os
-
-        indicators_str = os.environ.get("PRODUCTION_INDICATORS", "production,live,prod-")
-        production_indicators = [ind.strip() for ind in indicators_str.split(",")]
-
         shop_url_lower = self.shop_url_key.lower()
-        for indicator in production_indicators:
+        for indicator in self.production_indicators:
             if indicator in shop_url_lower:
                 raise OdooDatabaseUpdateError(
                     f"SAFETY CHECK FAILED: shop_url_key '{self.shop_url_key}' appears to be production. "
                     f"This script should only run on development/test environments. "
                     f"Found production indicator: '{indicator}'. Database will be dropped for safety."
                 )
+        _logger.info(f"SAFETY CHECK PASSED: {self.production_indicators} not in shop_url_key.")
 
 
 class OdooUpstreamRestorer:
@@ -107,58 +122,21 @@ class OdooUpstreamRestorer:
         except subprocess.CalledProcessError as command_error:
             raise OdooRestorerError(f"Command failed: {cmd}\nError: {command_error}") from command_error
 
-    # --- Docker lifecycle helpers (best-effort; non-fatal if unavailable) ---
-    def _sdk_container_by_labels(self, service: str):
-        """Locate a Compose-managed container by project and service labels via Docker SDK."""
-        try:
-            import docker  # type: ignore
-
-            client = docker.from_env()
-            project = os.environ.get("ODOO_PROJECT_NAME", "odoo")
-            filters = {
-                "label": [
-                    f"com.docker.compose.project={project}",
-                    f"com.docker.compose.service={service}",
-                ]
-            }
-            matches = client.containers.list(all=True, filters=filters)
-            return matches[0] if matches else None
-        except Exception as e:
-            _logger.warning(f"Docker SDK unavailable: {e}")
-            return None
-
     def stop_web_service(self) -> None:
-        if os.environ.get("ODOO_SKIP_WEB_CONTROL", "0") == "1":
+        if self.local.skip_web_control:
             _logger.info("Skipping web stop (ODOO_SKIP_WEB_CONTROL=1)")
             return
-        c = self._sdk_container_by_labels("web")
-        if c is not None:
-            try:
-                _logger.info(f"Stopping container {c.name} via Docker SDK")
-                if c.status == "running":
-                    c.stop(timeout=30)
-                return
-            except Exception as e:
-                _logger.warning(f"SDK stop failed: {e}")
-        # Fallback to docker compose if SDK failed/unavailable
+        # Use Docker Compose CLI directly (preferred in this project)
         try:
             self.run_command("docker compose stop web")
         except OdooRestorerError as e:
             _logger.warning(f"Could not stop web via docker compose: {e}")
 
     def start_web_service(self) -> None:
-        if os.environ.get("ODOO_SKIP_WEB_CONTROL", "0") == "1":
+        if self.local.skip_web_control:
             _logger.info("Skipping web start (ODOO_SKIP_WEB_CONTROL=1)")
             return
-        c = self._sdk_container_by_labels("web")
-        if c is not None:
-            try:
-                _logger.info(f"Starting container {c.name} via Docker SDK")
-                c.start()
-                return
-            except Exception as e:
-                _logger.warning(f"SDK start failed: {e}")
-        # Fallback to docker compose if SDK failed/unavailable
+        # Use Docker Compose CLI directly (preferred in this project)
         try:
             self.run_command("docker compose up -d web")
         except OdooRestorerError as e:
@@ -271,13 +249,16 @@ class OdooUpstreamRestorer:
                 return []
 
     def sanitize_database(self) -> None:
+        disable_cron = self.local.disable_cron
+
         sql_calls: list[SqlCall] = [
             SqlCall("ir.mail_server", KeyValuePair("active", "False")),
             SqlCall("ir.config_parameter", KeyValuePair("value", "False"), KeyValuePair("key", "mail.catchall.domain")),
             SqlCall("ir.config_parameter", KeyValuePair("value", "False"), KeyValuePair("key", "mail.catchall.alias")),
             SqlCall("ir.config_parameter", KeyValuePair("value", "False"), KeyValuePair("key", "mail.bounce.alias")),
-            SqlCall("ir.cron", KeyValuePair("active", "False")),
         ]
+        if disable_cron:
+            sql_calls.append(SqlCall("ir.cron", KeyValuePair("active", "False")))
         if self.local.base_url:
             sql_calls.append(
                 SqlCall(
@@ -292,30 +273,19 @@ class OdooUpstreamRestorer:
             _logger.debug(f"Executing SQL call: {sql_call}")
             self.call_odoo_sql(sql_call, SqlCallType.UPDATE)
 
-        active_crons = self.call_odoo_sql(SqlCall("ir.cron", where=KeyValuePair("active", "True")), SqlCallType.SELECT)
-
-        if active_crons:
-            errors = "\n".join(f"- {cron[7]} (id: {cron[0]})" for cron in active_crons)
-            raise OdooDatabaseUpdateError(f"Error: The following cron jobs are still active:\n{errors}")
+        # If we asked to disable crons, verify no active cron remains
+        if disable_cron:
+            active_crons = self.call_odoo_sql(SqlCall("ir.cron", where=KeyValuePair("active", "True")), SqlCallType.SELECT)
+            if active_crons:
+                errors = "\n".join(f"- {cron[7]} (id: {cron[0]})" for cron in active_crons)
+                raise OdooDatabaseUpdateError(f"Error: The following cron jobs are still active after sanitization:\n{errors}")
 
     def update_shopify_config(self) -> None:
         # noinspection PyArgumentList
         settings = ShopifySettings()
 
         # Safety check: prevent setting production values, allow replacing production with development
-        import os
-
-        indicators_str = os.environ.get("PRODUCTION_INDICATORS", "production,live,prod-")
-        production_indicators = [ind.strip() for ind in indicators_str.split(",")]
-
-        # Check if we're trying to SET a production value (dangerous)
-        new_value_lower = settings.shop_url_key.lower()
-        for indicator in production_indicators:
-            if indicator in new_value_lower:
-                raise OdooDatabaseUpdateError(
-                    f"SAFETY CHECK FAILED: Attempting to set shop_url_key to '{settings.shop_url_key}' which appears to be production. "
-                    f"Found production indicator: '{indicator}'. Database will be dropped for safety."
-                )
+        settings.validate_safe_environment()
 
         # Log what we're doing for transparency
         current_shop_url = self.call_odoo_sql(
@@ -327,8 +297,6 @@ class OdooUpstreamRestorer:
             _logger.info(f"Replacing shop_url_key: '{current_value}' → '{settings.shop_url_key}'")
         else:
             _logger.info(f"Setting shop_url_key to: '{settings.shop_url_key}'")
-
-        settings.validate_safe_environment()
 
         sql_calls: list[SqlCall] = [
             SqlCall(
@@ -429,7 +397,7 @@ class OdooUpstreamRestorer:
         - Installs missing ones (-i) and updates all listed (-u)
         - Validates module dirs exist under known addons paths
         """
-        mods_env = os.environ.get("ODOO_UPDATE", "").strip()
+        mods_env = (self.local.update_modules or "").strip()
         if not mods_env:
             _logger.info("ODOO_UPDATE not set; skipping addon install/update.")
             return
@@ -441,7 +409,7 @@ class OdooUpstreamRestorer:
 
         # Resolve module presence using configured addons paths.
         # Prefer ODOO_ADDONS_PATH from the environment/.env; fallback to common defaults.
-        addons_env = os.environ.get("ODOO_ADDONS_PATH", "").strip()
+        addons_env = (self.local.addons_path or "").strip()
         addons_paths: list[Path] = []
         if addons_env:
             # Support both comma and colon separators

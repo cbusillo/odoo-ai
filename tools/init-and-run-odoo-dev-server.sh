@@ -40,7 +40,7 @@ if [ "$FLAG" = "init" ]; then
     set -a
     source ../.env
     set +a
-    ./overwrite_from_upstream.py
+    ./restore_from_upstream.py
 fi
 EOF
 

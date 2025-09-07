@@ -59,7 +59,6 @@ class LocalServerSettings(BaseSettings):
     base_url: str | None = Field(None, alias="ODOO_BASE_URL")
     # Script/runtime toggles
     disable_cron: bool = Field(True, alias="SANITIZE_DISABLE_CRON")
-    skip_web_control: bool = Field(False, alias="ODOO_SKIP_WEB_CONTROL")
     project_name: str = Field("odoo", alias="ODOO_PROJECT_NAME")
     addons_path: str | None = Field(None, alias="ODOO_ADDONS_PATH")
     update_modules: str | None = Field(None, alias="ODOO_UPDATE")
@@ -122,29 +121,9 @@ class OdooUpstreamRestorer:
         except subprocess.CalledProcessError as command_error:
             raise OdooRestorerError(f"Command failed: {command}\nError: {command_error}") from command_error
 
-    def stop_web_service(self) -> None:
-        if self.local.skip_web_control:
-            _logger.info("Skipping web stop (ODOO_SKIP_WEB_CONTROL=1)")
-            return
-        try:
-            self.run_command("docker compose stop web")
-        except OdooRestorerError as e:
-            _logger.warning(f"Could not stop web via docker compose: {e}")
-
-    def start_web_service(self) -> None:
-        if self.local.skip_web_control:
-            _logger.info("Skipping web start (ODOO_SKIP_WEB_CONTROL=1)")
-            return
-        try:
-            self.run_command("docker compose up -d web")
-        except OdooRestorerError as e:
-            _logger.warning(f"Could not start web via docker compose: {e}")
-
     def overwrite_filestore(self) -> subprocess.Popen:
         _logger.info("Overwriting filestore...")
-        rsync_command = (
-            f"rsync -az --delete {self.upstream.user}@{self.upstream.host}:{self.upstream.filestore_path} {self.local.filestore_path}"
-        )
+        rsync_command = f"rsync -az --delete {self.upstream.user}@{self.upstream.host}:{self.upstream.filestore_path} {self.local.filestore_path}"
         return subprocess.Popen(rsync_command, shell=True, env=self.os_env)
 
     def overwrite_database(self) -> None:

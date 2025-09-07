@@ -13,6 +13,9 @@ dependencies = [
     "rich",
     "click",
     "tomli",
+    "pydantic",
+    "pydantic_settings",
+    "ruff",
 ]
 
 [tool.setuptools.packages.find]
@@ -28,6 +31,7 @@ test-js = "tools.test_commands:run_js_tests"
 test-all = "tools.test_commands:run_all_tests"
 test-stats = "tools.test_commands:show_test_stats"
 test-clean = "tools.test_commands:cleanup_all_test_artifacts"
+restore-from-upstream = "tools.docker_runner:restore_from_upstream"
 
 [tool.odoo-test.timeouts]
 unit = 600

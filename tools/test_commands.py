@@ -101,7 +101,15 @@ def detect_repetitive_pattern(
 def kill_browser_processes() -> None:
     sr = get_script_runner_service()
     ensure_services_up([sr])
-    browser_patterns = ["chromium.*headless", "chrome.*headless", "chromium", "chrome", "WebDriver", "geckodriver", "chromedriver"]
+    browser_patterns = [
+        "chromium.*headless",
+        "chrome.*headless",
+        "chromium",
+        "chrome",
+        "WebDriver",
+        "geckodriver",
+        "chromedriver",
+    ]
     for pattern in browser_patterns:
         try:
             _compose_exec(sr, ["pkill", "-9", "-f", pattern])
@@ -160,8 +168,6 @@ def get_database_service() -> str:
 def get_production_db_name() -> str:
     result = subprocess.run(["docker", "compose", "config", "--format", "json"], capture_output=True, text=True)
     if result.returncode == 0:
-        import json
-
         config = json.loads(result.stdout)
         for service_name, service in config.get("services", {}).items():
             if "web" in service_name.lower():
@@ -193,10 +199,12 @@ def _load_compose_config() -> dict | None:
     return None
 
 
-def _get_env_from_compose(var_names: list[str], services: list[str] = ["web", "database"]) -> str | None:
+def _get_env_from_compose(var_names: list[str], services: list[str] | None = None) -> str | None:
     cfg = _load_compose_config()
     if not cfg:
         return None
+    if services is None:
+        services = ["web", "database"]
     for svc_name, svc in cfg.get("services", {}).items():
         if not any(s in svc_name.lower() for s in services):
             continue
@@ -242,7 +250,7 @@ def _compose_exec(service: str, args: list[str], capture_output: bool = True) ->
 def _compose_run(service: str, args: list[str], env: dict[str, str] | None = None) -> subprocess.Popen:
     cmd = ["docker", "compose", "run", "--rm", service] + args
     if env:
-        env_pairs = sum((["-e", f"{k}={v}"] for k, v in env.items()), [])
+        env_pairs = [item for k, v in env.items() for item in ("-e", f"{k}={v}")]
         cmd = ["docker", "compose", "run", "--rm"] + env_pairs + [service] + args
     return subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
 
@@ -298,7 +306,7 @@ def run_unit_tests(modules: list[str] | None = None, *, session_dir: Path | None
     split = TestSettings().test_unit_split
     if not split or (user_scoped and len(modules) == 1):
         test_db_name = f"{get_production_db_name()}_test_unit"
-        use_prefix = True if user_scoped else False
+        use_prefix = bool(user_scoped)
         return run_docker_test_command(
             "unit_test",
             test_db_name,
@@ -316,15 +324,7 @@ def run_unit_tests(modules: list[str] | None = None, *, session_dir: Path | None
         db = f"{get_production_db_name()}_ut_{module}"
         print("-" * 60)
         print(f"▶️  {module}")
-        rc = run_docker_test_command(
-            "unit_test",
-            db,
-            [module],
-            timeout=timeout_cfg,
-            use_module_prefix=True,
-            category="unit",
-            session_dir=session_dir,
-        )
+        rc = run_docker_test_command("unit_test", db, [module], timeout=timeout_cfg, category="unit", session_dir=session_dir)
         # Find the most recent log dir to report back (best-effort)
         try:
             latest_dir = max((d for d in (Path("tmp/test-logs")).iterdir() if d.is_dir()), key=lambda p: p.name)
@@ -414,7 +414,6 @@ def run_js_tests(modules: list[str] | None = None, *, session_dir: Path | None =
         test_db_name,
         modules,
         timeout=timeout_cfg,
-        use_production_clone=False,
         is_js_test=True,
         use_module_prefix=False,
         category="js",
@@ -537,7 +536,6 @@ def run_all_tests() -> int:
             "tour": rc_tour,
         },
     }
-    any_fail = any(code is not None and code != 0 for code in (rc_unit, rc_js, rc_integration, rc_tour))
     aggregate["success"] = not any_fail
 
     # Aggregate counters across phases when available
@@ -1301,12 +1299,12 @@ def wait_for_database_ready(retries: int = 30, delay: float = 1.0) -> bool:
     svc = get_database_service()
     dbu = get_db_user()
     for _ in range(retries):
-        res = _compose_exec(svc, ["pg_isready", "-U", dbu, "-d", "postgres"], capture_output=True)
+        res = _compose_exec(svc, ["pg_isready", "-U", dbu, "-d", "postgres"])
         if res.returncode == 0:
             return True
         time.sleep(delay)
     # Last-chance simple query
-    res = _compose_exec(svc, ["psql", "-U", dbu, "-d", "postgres", "-t", "-c", "SELECT 1"], capture_output=True)
+    res = _compose_exec(svc, ["psql", "-U", dbu, "-d", "postgres", "-t", "-c", "SELECT 1"])
     return res.returncode == 0
 
 
@@ -1401,7 +1399,7 @@ def setup_test_authentication(db_name: str) -> str:
     hash_cmd = [
         "python",
         "-c",
-        (f"from passlib.context import CryptContext; ctx=CryptContext(schemes=['pbkdf2_sha512']);print(ctx.hash('{password}'))"),
+        f"from passlib.context import CryptContext; ctx=CryptContext(schemes=['pbkdf2_sha512']);print(ctx.hash('{password}'))",
     ]
     hash_res = _compose_exec(sr, hash_cmd)
     if hash_res.returncode != 0:
@@ -2080,7 +2078,7 @@ def run_docker_test_command(
 def _hash_text(text: str) -> str:
     import hashlib
 
-    return hashlib.sha256(text.encode("utf-8", errors="ignore")).hexdigest()[:16]
+    return hashlib.sha256(text.encode(errors="ignore")).hexdigest()[:16]
 
 
 def _build_failures_from_log(log_path: Path, summary: dict) -> None:
@@ -2093,7 +2091,7 @@ def _build_failures_from_log(log_path: Path, summary: dict) -> None:
     cur: dict | None = None
     collecting_tb = False
     tb_lines: list[str] = []
-    with open(log_path, "r", errors="ignore") as f:
+    with open(log_path, errors="ignore") as f:
         for raw in f:
             line = raw.rstrip("\n")
             l = line.strip()
@@ -2121,7 +2119,7 @@ def _build_failures_from_log(log_path: Path, summary: dict) -> None:
                 continue
             # Unittest-style headers (avoid logging noise like DB "ERROR:" lines)
             if lw.startswith(("fail:", "error:")):
-                parts = l.split(None, 1)
+                parts = l.split(maxsplit=1)
                 typ = parts[0].rstrip(":").lower()
                 rest = parts[1] if len(parts) > 1 else ""
                 # Heuristic: only treat as a unit test header if the rest mentions a test id

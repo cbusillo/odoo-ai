@@ -44,8 +44,6 @@ class TestSettings(BaseSettings):
 
 
 def normalize_line_for_pattern_detection(line: str) -> str:
-    """Normalize a log line for pattern detection by removing timestamps and variable parts."""
-
     # Remove timestamps like "2025-08-26 02:10:28,708"
     line = re.sub(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}", "[TIMESTAMP]", line)
 
@@ -64,11 +62,9 @@ def normalize_line_for_pattern_detection(line: str) -> str:
     return line.strip()
 
 
-def detect_repetitive_pattern(recent_lines: list, pattern_occurrences: dict, min_occurrences: int = 5) -> tuple[bool, str]:
-    """
-    Detect if we're seeing repetitive patterns in the log output.
-    Returns (is_repetitive, pattern_description).
-    """
+def detect_repetitive_pattern(
+    recent_lines: list[str], pattern_occurrences: dict[str, int], min_occurrences: int = 5
+) -> tuple[bool, str]:
     if len(recent_lines) < min_occurrences:
         return False, ""
 
@@ -103,7 +99,6 @@ def detect_repetitive_pattern(recent_lines: list, pattern_occurrences: dict, min
 
 
 def kill_browser_processes() -> None:
-    """Aggressively kill browser processes to prevent websocket cleanup hangs."""
     sr = get_script_runner_service()
     ensure_services_up([sr])
     browser_patterns = ["chromium.*headless", "chrome.*headless", "chromium", "chrome", "WebDriver", "geckodriver", "chromedriver"]
@@ -114,8 +109,7 @@ def kill_browser_processes() -> None:
             pass
 
 
-def safe_terminate_process(process: subprocess.Popen, container_prefix: str = None) -> None:
-    """Safely terminate a process with proper cleanup."""
+def safe_terminate_process(process: subprocess.Popen, container_prefix: str | None = None) -> None:
     if container_prefix is None:
         container_prefix = get_container_prefix()
 
@@ -241,13 +235,11 @@ def get_script_runner_service() -> str:
 
 
 def _compose_exec(service: str, args: list[str], capture_output: bool = True) -> subprocess.CompletedProcess:
-    """Run `docker compose exec -T <service> ...` consistently."""
     cmd = ["docker", "compose", "exec", "-T", service] + args
     return subprocess.run(cmd, capture_output=capture_output, text=True)
 
 
-def _compose_run(service: str, args: list[str], env: dict | None = None) -> subprocess.Popen:
-    """Run `docker compose run --rm <service> ...` and stream output later."""
+def _compose_run(service: str, args: list[str], env: dict[str, str] | None = None) -> subprocess.Popen:
     cmd = ["docker", "compose", "run", "--rm", service] + args
     if env:
         env_pairs = sum((["-e", f"{k}={v}"] for k, v in env.items()), [])
@@ -256,13 +248,11 @@ def _compose_run(service: str, args: list[str], env: dict | None = None) -> subp
 
 
 def ensure_services_up(services: list[str]) -> None:
-    """Ensure listed services are started (idempotent)."""
     for s in services:
         subprocess.run(["docker", "compose", "up", "-d", s], capture_output=True)
 
 
 def load_timeouts() -> dict:
-    """Load timeouts from pyproject.toml [tool.odoo-test.timeouts]."""
     try:
         import tomli  # type: ignore
 
@@ -291,15 +281,6 @@ def get_our_modules() -> list[str]:
 
 
 def run_unit_tests(modules: list[str] | None = None, *, session_dir: Path | None = None) -> int:
-    """Run unit tests.
-
-    If ``modules`` is provided, restrict installation and test tags to that
-    subset. This enables focused runs like:
-
-        python -m tools.test_commands unit user_name_extended
-
-    Default behavior (``modules is None``) runs against all custom addons.
-    """
     user_scoped = modules is not None and len(modules) > 0
     if user_scoped:
         # Keep only valid modules present in our addons directory
@@ -408,10 +389,6 @@ def run_tour_tests(*, session_dir: Path | None = None) -> int:
 
 
 def run_js_tests(modules: list[str] | None = None, *, session_dir: Path | None = None) -> int:
-    """Run JS/hoot tests in a browser with dev assets and workers.
-
-    These are HttpCase-based and should not run with workers=0.
-    """
     if modules:
         available = set(get_our_modules())
         modules = [m for m in modules if m in available]
@@ -446,12 +423,6 @@ def run_js_tests(modules: list[str] | None = None, *, session_dir: Path | None =
 
 
 def _get_latest_log_summary() -> tuple[Path | None, dict | None]:
-    """Return most recent test session directory and its summary.
-
-    Prefers aggregate summary.json at the session root. If absent, falls back
-    to the newest per-phase *.summary.json file in that session.
-    If TEST_LOG_SESSION is set, uses that directory explicitly.
-    """
     log_root = Path("tmp/test-logs")
     if not log_root.exists():
         return None, None
@@ -488,12 +459,6 @@ def _get_latest_log_summary() -> tuple[Path | None, dict | None]:
 
 
 def run_all_tests() -> int:
-    """Run all test categories without hanging.
-
-    Runs unit → integration → tour in separate test sessions to avoid
-    cross-category interference and long single-run initialization that
-    can hang. Each category uses its tuned timeout and cleanup.
-    """
     print("🧪 Running ALL tests (unit → integration → tour)")
     print("=" * 60)
 
@@ -726,7 +691,6 @@ def _write_manifest(session_dir: Path) -> None:
 
 
 def _write_digest(session_dir: Path, aggregate: dict) -> None:
-    """Write a compact, LLM-friendly digest.json at the session root."""
     cats = {}
     for cat in ("unit", "js", "integration", "tour"):
         s = aggregate.get("results", {}).get(cat) or {}
@@ -753,13 +717,6 @@ def _write_digest(session_dir: Path, aggregate: dict) -> None:
 
 
 def _write_phase_aggregate_summary(session_dir: Path, category: str) -> Path | None:
-    """Aggregate multiple per-phase *.summary.json files into a single summary.
-
-    Intended for split runs (e.g., unit tests per-module). Sums counters across
-    all component summaries and writes an `all.summary.json` file in the phase
-    directory so downstream readers (_get_latest_log_summary, run_all_tests)
-    see accurate totals.
-    """
     phase_dir = session_dir / category
     if not phase_dir.exists():
         return None
@@ -1001,13 +958,7 @@ def show_test_stats() -> int:
     return 0
 
 
-def cleanup_test_databases(production_db: str = None) -> None:
-    """Drop test databases for this project.
-
-    Historically we created per-module unit DBs as "${PROD}_ut_<module>" and
-    other phases as "${PROD}_test_*". Clean up both patterns to avoid orphaned
-    databases accumulating between runs.
-    """
+def cleanup_test_databases(production_db: str | None = None) -> None:
     if production_db is None:
         production_db = get_production_db_name()
 
@@ -1087,13 +1038,6 @@ def cleanup_test_databases(production_db: str = None) -> None:
 
 
 def create_filestore_snapshot(test_db_name: str, production_db: str) -> None:
-    """Create a fast read/write test filestore copied from production.
-
-    Strategy:
-    - Prefer hardlink copy (cp -al) for speed/space when supported
-    - Fallback to rsync -a
-    - Avoid symlink production to prevent data mutation during tests
-    """
     root = get_filestore_root().rstrip("/")
     production_filestore = f"{root}/filestore/{production_db}"
     test_filestore = f"{root}/filestore/{test_db_name}"
@@ -1131,7 +1075,7 @@ def create_filestore_snapshot(test_db_name: str, production_db: str) -> None:
         print(f"   ❌ Failed to copy filestore: {result.stderr}")
 
 
-def cleanup_test_filestores(production_db: str = None) -> None:
+def cleanup_test_filestores(production_db: str | None = None) -> None:
     if production_db is None:
         production_db = get_production_db_name()
 
@@ -1180,7 +1124,6 @@ def cleanup_test_filestores(production_db: str = None) -> None:
 
 
 def cleanup_single_test_filestore(db_name: str) -> None:
-    """Remove a specific test filestore directory if it exists."""
     sr = get_script_runner_service()
     ensure_services_up([sr])
     root = get_filestore_root().rstrip("/")
@@ -1193,7 +1136,6 @@ def cleanup_single_test_filestore(db_name: str) -> None:
 
 
 def cleanup_all_test_artifacts() -> None:
-    """Complete cleanup of all test artifacts"""
     production_db = get_production_db_name()
     print(f"🧹 Complete test cleanup for production database: {production_db}")
     print("=" * 60)
@@ -1206,7 +1148,6 @@ def cleanup_all_test_artifacts() -> None:
 
 
 def cleanup_chrome_processes() -> None:
-    """Kill any lingering Chrome/Chromium processes in script runner container"""
     sr = get_script_runner_service()
     ensure_services_up([sr])
     _compose_exec(sr, ["pkill", "chrome"])  # graceful
@@ -1357,10 +1298,6 @@ def drop_and_create_test_database(db_name: str) -> None:
 
 
 def wait_for_database_ready(retries: int = 30, delay: float = 1.0) -> bool:
-    """Wait until the Postgres service responds to pg_isready/psql.
-
-    Returns True if ready, False if timed out.
-    """
     svc = get_database_service()
     dbu = get_db_user()
     for _ in range(retries):
@@ -1374,15 +1311,6 @@ def wait_for_database_ready(retries: int = 30, delay: float = 1.0) -> bool:
 
 
 def _force_drop_database(db_name: str) -> None:
-    """Attempt to drop a database even with active connections.
-
-    Strategy:
-    - REVOKE CONNECT, ALTER DATABASE ... ALLOW_CONNECTIONS false
-    - Terminate backends
-    - DROP DATABASE ... WITH (FORCE)
-    - Fallback to dropdb --if-exists
-    - Verify count
-    """
     svc = get_database_service()
     dbu = get_db_user()
     print(f"   Dropping database {db_name} (aggressive)...")
@@ -1461,11 +1389,6 @@ def _force_drop_database(db_name: str) -> None:
 
 
 def setup_test_authentication(db_name: str) -> str:
-    """Set up test authentication in the cloned database.
-
-    Generates a secure random password and updates the admin user's password
-    in the test database. Returns the generated password.
-    """
     # Generate a secure random password
     alphabet = string.ascii_letters + string.digits
     password = "".join(secrets.choice(alphabet) for _ in range(16))
@@ -1489,7 +1412,8 @@ def setup_test_authentication(db_name: str) -> str:
 
     if hashed:
         # On some versions the hashed value is stored in `password` directly
-        sql = "UPDATE res_users SET password='{}' WHERE login='admin';".format(hashed.replace("'", "''"))
+        sanitized = hashed.replace("'", "''")
+        sql = f"UPDATE res_users SET password='{sanitized}' WHERE login='admin';"
     else:
         # Fallback to setting plain text (old behavior) — may not work on new versions
         sql = f"UPDATE res_users SET password = '{password}' WHERE login='admin';"
@@ -2160,11 +2084,6 @@ def _hash_text(text: str) -> str:
 
 
 def _build_failures_from_log(log_path: Path, summary: dict) -> None:
-    """Parse a test log and emit failures.json next to the summary.
-
-    Extracts compact entries with type (fail/error), test id if seen, brief
-    message, and a traceback fingerprint.
-    """
     out_path = Path(summary.get("summary_file", "")).with_name(
         Path(summary.get("summary_file", "")).stem.replace(".summary", "") + ".failures.json"
     )

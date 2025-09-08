@@ -12,9 +12,35 @@ import time
 from datetime import datetime
 from pathlib import Path
 import shutil
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Summary schema version for all JSON outputs produced by test runner
 SUMMARY_SCHEMA_VERSION = "1.0"
+
+
+class TestSettings(BaseSettings):
+    # noinspection Pydantic
+    model_config = SettingsConfigDict(case_sensitive=False, env_file=".env", extra="ignore")
+
+    # Core project/env
+    project_name: str = Field("odoo", alias="ODOO_PROJECT_NAME")
+    db_user: str | None = Field(None, alias="ODOO_DB_USER")
+    filestore_path: str | None = Field(None, alias="ODOO_FILESTORE_PATH")
+
+    # Test runner toggles and parameters
+    test_unit_split: bool = Field(True, alias="TEST_UNIT_SPLIT")
+    test_keep_going: bool = Field(True, alias="TEST_KEEP_GOING")
+    test_log_keep: int = Field(12, alias="TEST_LOG_KEEP")
+    test_scoped_cleanup: bool = Field(True, alias="TEST_SCOPED_CLEANUP")
+
+    tour_warmup: int = Field(0, alias="TOUR_WARMUP")
+    longpolling_port: int = Field(8072, alias="LONGPOLLING_PORT")
+    js_workers: int = Field(2, alias="JS_WORKERS")
+    tour_workers: int = Field(0, alias="TOUR_WORKERS")
+
+    test_tags_override: str | None = Field(None, alias="TEST_TAGS")
+    test_log_session: str | None = Field(None, alias="TEST_LOG_SESSION")
 
 
 def normalize_line_for_pattern_detection(line: str) -> str:
@@ -129,8 +155,8 @@ def safe_terminate_process(process: subprocess.Popen, container_prefix: str = No
 
 
 def get_container_prefix() -> str:
-    """Get the Compose project name (container prefix)."""
-    return os.environ.get("ODOO_PROJECT_NAME", "odoo")
+    settings = TestSettings()
+    return settings.project_name
 
 
 def get_database_service() -> str:
@@ -196,12 +222,13 @@ def _get_env_from_compose(var_names: list[str], services: list[str] = ["web", "d
 
 
 def get_db_user() -> str:
-    # Prefer explicit env, then compose config vars
-    return os.environ.get("ODOO_DB_USER") or _get_env_from_compose(["ODOO_DB_USER", "POSTGRES_USER"]) or "odoo"
+    settings = TestSettings()
+    return settings.db_user or _get_env_from_compose(["ODOO_DB_USER", "POSTGRES_USER"]) or "odoo"
 
 
 def get_filestore_root() -> str:
-    return os.environ.get("ODOO_FILESTORE_PATH") or _get_env_from_compose(["ODOO_FILESTORE_PATH"], ["web"]) or "/volumes/data"
+    settings = TestSettings()
+    return settings.filestore_path or _get_env_from_compose(["ODOO_FILESTORE_PATH"], ["web"]) or "/volumes/data"
 
 
 def get_script_runner_service() -> str:
@@ -287,7 +314,7 @@ def run_unit_tests(modules: list[str] | None = None, *, session_dir: Path | None
     timeout_cfg = load_timeouts().get("unit", 300)
 
     # Split-by-module mode to avoid aborting on first failing module
-    split = os.environ.get("TEST_UNIT_SPLIT", "1") != "0"
+    split = TestSettings().test_unit_split
     if not split or (user_scoped and len(modules) == 1):
         test_db_name = f"{get_production_db_name()}_test_unit"
         use_prefix = True if user_scoped else False
@@ -429,7 +456,7 @@ def _get_latest_log_summary() -> tuple[Path | None, dict | None]:
     if not log_root.exists():
         return None, None
 
-    forced = os.environ.get("TEST_LOG_SESSION")
+    forced = TestSettings().test_log_session
     latest: Path | None = None
     if forced:
         cand = log_root / forced
@@ -813,7 +840,8 @@ def _maybe_update_summary_counters_from_line(line: str, summary: dict) -> None:
 
         # Heuristic for Odoo logs: count per-test start lines
         # Example: "... odoo.addons...: Starting TestFoo.test_bar ..."
-        if ": Starting " in ansi_free and re.search(r"\bTest\w*\.test_", ansi_free):
+        # Count per-test start lines (relax class name constraint to include JS runners like ProductConnectJSTests)
+        if ": Starting " in ansi_free and re.search(r"\b\w+\.test_", ansi_free):
             summary.setdefault("counters", {}).setdefault("tests_run", 0)
             summary["counters"]["tests_run"] += 1
 
@@ -840,6 +868,12 @@ def _maybe_update_summary_counters_from_line(line: str, summary: dict) -> None:
                     summary["counters"]["errors"] = val
             return
 
+        # JS runs often log errors as "ERROR: Class.test_method" lines; count them
+        if " ERROR: " in ansi_free and re.search(r"\b\w+\.test_", ansi_free):
+            summary.setdefault("counters", {}).setdefault("errors", 0)
+            summary["counters"]["errors"] += 1
+            return
+
         # OK (skipped=3) — uncommon but handle
         if "OK (" in ansi_free and "skipped=" in ansi_free:
             for pm in _RE_PART.finditer(ansi_free):
@@ -855,7 +889,7 @@ def _prune_old_log_sessions(keep: int | None = None) -> None:
     if not log_root.exists():
         return
     try:
-        keep = keep or int(os.environ.get("TEST_LOG_KEEP", "12"))
+        keep = keep or int(TestSettings().test_log_keep)
     except ValueError:
         keep = 12
     sessions = sorted([d for d in log_root.iterdir() if d.is_dir() and d.name.startswith("test-")])
@@ -1566,8 +1600,9 @@ def run_docker_test_command(
     print("-" * 60)
 
     # Cleanup before tests (scoped by default to avoid cross-run interference)
+    settings = TestSettings()
     if cleanup_before:
-        scoped = os.environ.get("TEST_SCOPED_CLEANUP", "1") != "0"
+        scoped = settings.test_scoped_cleanup
         if scoped:
             print("🧹 Scoped pre-test cleanup...")
             # Drop only the target DB/filestore for this run
@@ -1604,7 +1639,7 @@ def run_docker_test_command(
     # Allow targeted override via env TEST_TAGS without breaking defaults.
     # When provided, we do NOT auto-scope to modules (caller is explicit), and we ensure
     # the category tag is present to avoid running the entire Odoo test suite.
-    test_tags_override = os.environ.get("TEST_TAGS", "").strip()
+    test_tags_override = (settings.test_tags_override or "").strip()
     if test_tags_override:
         # Ensure category tag present based on flags (avoid referencing derived_category here)
         if is_tour_test:
@@ -1666,12 +1701,13 @@ def run_docker_test_command(
     if is_tour_test or is_js_test:
         # For tours, default to workers=0 to improve stability of HttpCase-based flows.
         # For JS (browser_js/hoot) tests, keep a small number of workers (default 2) unless overridden.
-        tour_workers_default = int(os.environ.get("TOUR_WORKERS", "0"))
-        js_workers_default = int(os.environ.get("JS_WORKERS", "2"))
+        tour_workers_default = int(settings.tour_workers)
+        js_workers_default = int(settings.js_workers)
 
-        # Respect optional warmup toggle; default to disabled (0) to avoid 30s pre-hit stalls
-        if is_tour_test:
-            cmd.extend(["-e", f"TOUR_WARMUP={os.environ.get('TOUR_WARMUP', '0')}"])
+        # Respect optional warmup toggle; enable the same flag for JS tests to pre-warm the server
+        # (TourTestCase honors TOUR_WARMUP in setUp to warm endpoints before browser_js navigations.)
+        if is_tour_test or is_js_test:
+            cmd.extend(["-e", f"TOUR_WARMUP={settings.tour_warmup}"])
 
         cmd.extend(
             [
@@ -1687,9 +1723,7 @@ def run_docker_test_command(
                 "--stop-after-init",
                 "--max-cron-threads=0",
                 f"--workers={js_workers_default if is_js_test else tour_workers_default}",
-                # Enable longpolling when running JS tests to support /websocket
-                # Note: harmless for tours (workers=0 disables it)
-                *(["--longpolling-port", os.environ.get("LONGPOLLING_PORT", "8072")] if is_js_test else []),
+                # Odoo 18 no longer accepts --longpolling-port; avoid passing it.
                 f"--db-filter=^{db_name}$",
                 "--log-level=test",
                 "--without-demo=all",
@@ -2034,7 +2068,7 @@ def run_docker_test_command(
         # Cleanup after tests (default behavior)
         if cleanup_after:
             print("-" * 60)
-            scoped = os.environ.get("TEST_SCOPED_CLEANUP", "1") != "0"
+            scoped = settings.test_scoped_cleanup
             if scoped:
                 print("🧹 Post-test cleanup (scoped)...")
                 try:

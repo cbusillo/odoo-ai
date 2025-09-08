@@ -20,13 +20,13 @@ SUMMARY_SCHEMA_VERSION = "1.0"
 
 
 class TestSettings(BaseSettings):
-    # noinspection Pydantic
     model_config = SettingsConfigDict(case_sensitive=False, env_file=".env", extra="ignore")
 
     # Core project/env
     project_name: str = Field("odoo", alias="ODOO_PROJECT_NAME")
     db_user: str | None = Field(None, alias="ODOO_DB_USER")
     filestore_path: str | None = Field(None, alias="ODOO_FILESTORE_PATH")
+    db_name: str = Field("odoo", alias="ODOO_DB_NAME")
 
     # Test runner toggles and parameters
     test_unit_split: bool = Field(True, alias="TEST_UNIT_SPLIT")
@@ -35,7 +35,6 @@ class TestSettings(BaseSettings):
     test_scoped_cleanup: bool = Field(True, alias="TEST_SCOPED_CLEANUP")
 
     tour_warmup: int = Field(0, alias="TOUR_WARMUP")
-    longpolling_port: int = Field(8072, alias="LONGPOLLING_PORT")
     js_workers: int = Field(2, alias="JS_WORKERS")
     tour_workers: int = Field(0, alias="TOUR_WORKERS")
 
@@ -43,19 +42,26 @@ class TestSettings(BaseSettings):
     test_log_session: str | None = Field(None, alias="TEST_LOG_SESSION")
 
 
+_SETTINGS: TestSettings | None = None
+
+
+def get_settings() -> "TestSettings":
+    global _SETTINGS
+    if _SETTINGS is None:
+        # noinspection PyArgumentList
+        _SETTINGS = TestSettings()
+    return _SETTINGS
+
+
 def normalize_line_for_pattern_detection(line: str) -> str:
     # Remove timestamps like "2025-08-26 02:10:28,708"
     line = re.sub(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}", "[TIMESTAMP]", line)
-
     # Remove IP addresses like "127.0.0.1"
     line = re.sub(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", "[IP]", line)
-
     # Remove process IDs and other numbers that might vary
     line = re.sub(r"\b\d+\b", "[NUM]", line)
-
     # Remove version strings like "18.0-5"
     line = re.sub(r"\d+\.\d+(-\d+)?", "[VERSION]", line)
-
     # Normalize whitespace
     line = " ".join(line.split())
 
@@ -98,28 +104,23 @@ def detect_repetitive_pattern(
     return False, ""
 
 
-def kill_browser_processes() -> None:
-    sr = get_script_runner_service()
-    ensure_services_up([sr])
-    browser_patterns = [
-        "chromium.*headless",
-        "chrome.*headless",
-        "chromium",
-        "chrome",
-        "WebDriver",
-        "geckodriver",
-        "chromedriver",
-    ]
-    for pattern in browser_patterns:
-        try:
-            _compose_exec(sr, ["pkill", "-9", "-f", pattern])
-        except Exception:
-            pass
+def kill_browsers_and_zombies() -> None:
+    script_runner_service = get_script_runner_service()
+    ensure_services_up([script_runner_service])
+    # graceful
+    for name in ("chrome", "chromium"):
+        _compose_exec(script_runner_service, ["pkill", name])
+    # force + drivers
+    for name in ("chrome", "chromium", "geckodriver", "chromedriver"):
+        _compose_exec(script_runner_service, ["pkill", "-9", name])
+    # defunct zombies
+    _compose_exec(
+        script_runner_service,
+        ["sh", "-c", "ps aux | grep defunct | awk '{print $2}' | xargs -r kill -9"],
+    )
 
 
-def safe_terminate_process(process: subprocess.Popen, container_prefix: str | None = None) -> None:
-    if container_prefix is None:
-        container_prefix = get_container_prefix()
+def safe_terminate_process(process: subprocess.Popen) -> None:
 
     try:
         # First attempt: gentle termination
@@ -145,20 +146,18 @@ def safe_terminate_process(process: subprocess.Popen, container_prefix: str | No
             "chrome",
         ]
 
-        sr = get_script_runner_service()
+        script_runner_service = get_script_runner_service()
         for pattern in patterns:
             try:
-                _compose_exec(sr, ["pkill", "-f", pattern])
-            except Exception:
+                _compose_exec(script_runner_service, ["pkill", "-f", pattern])
+            except OSError:
                 pass  # Ignore cleanup failures
 
     except Exception as e:
         print(f"Error during process termination: {e}")
 
 
-def get_container_prefix() -> str:
-    settings = TestSettings()
-    return settings.project_name
+## Removed: get_container_prefix() was unused after simplifying process handling
 
 
 def get_database_service() -> str:
@@ -166,71 +165,17 @@ def get_database_service() -> str:
 
 
 def get_production_db_name() -> str:
-    result = subprocess.run(["docker", "compose", "config", "--format", "json"], capture_output=True, text=True)
-    if result.returncode == 0:
-        config = json.loads(result.stdout)
-        for service_name, service in config.get("services", {}).items():
-            if "web" in service_name.lower():
-                env = service.get("environment", {})
-                if isinstance(env, dict):
-                    return env.get("ODOO_DB_NAME", "odoo")
-                elif isinstance(env, list):
-                    for env_var in env:
-                        if env_var.startswith("ODOO_DB_NAME="):
-                            return env_var.split("=", 1)[1]
-    return "odoo"
-
-
-_COMPOSE_CONFIG_CACHE: dict | None = None
-
-
-def _load_compose_config() -> dict | None:
-    global _COMPOSE_CONFIG_CACHE
-    if _COMPOSE_CONFIG_CACHE is not None:
-        return _COMPOSE_CONFIG_CACHE
-    try:
-        res = subprocess.run(["docker", "compose", "config", "--format", "json"], capture_output=True, text=True)
-        if res.returncode == 0:
-            _COMPOSE_CONFIG_CACHE = json.loads(res.stdout)
-            return _COMPOSE_CONFIG_CACHE
-    except Exception:
-        pass
-    _COMPOSE_CONFIG_CACHE = None
-    return None
-
-
-def _get_env_from_compose(var_names: list[str], services: list[str] | None = None) -> str | None:
-    cfg = _load_compose_config()
-    if not cfg:
-        return None
-    if services is None:
-        services = ["web", "database"]
-    for svc_name, svc in cfg.get("services", {}).items():
-        if not any(s in svc_name.lower() for s in services):
-            continue
-        env = svc.get("environment", {})
-        # Dict form
-        if isinstance(env, dict):
-            for v in var_names:
-                if v in env:
-                    return env[v]
-        # List form
-        if isinstance(env, list):
-            for env_var in env:
-                for v in var_names:
-                    if env_var.startswith(v + "="):
-                        return env_var.split("=", 1)[1]
-    return None
+    return get_settings().db_name
 
 
 def get_db_user() -> str:
-    settings = TestSettings()
-    return settings.db_user or _get_env_from_compose(["ODOO_DB_USER", "POSTGRES_USER"]) or "odoo"
+    settings = get_settings()
+    return settings.db_user or "odoo"
 
 
 def get_filestore_root() -> str:
-    settings = TestSettings()
-    return settings.filestore_path or _get_env_from_compose(["ODOO_FILESTORE_PATH"], ["web"]) or "/volumes/data"
+    settings = get_settings()
+    return settings.filestore_path or "/volumes/data"
 
 
 def get_script_runner_service() -> str:
@@ -247,12 +192,7 @@ def _compose_exec(service: str, args: list[str], capture_output: bool = True) ->
     return subprocess.run(cmd, capture_output=capture_output, text=True)
 
 
-def _compose_run(service: str, args: list[str], env: dict[str, str] | None = None) -> subprocess.Popen:
-    cmd = ["docker", "compose", "run", "--rm", service] + args
-    if env:
-        env_pairs = [item for k, v in env.items() for item in ("-e", f"{k}={v}")]
-        cmd = ["docker", "compose", "run", "--rm"] + env_pairs + [service] + args
-    return subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+## Removed: _compose_run() not used; we use compose exec or native subprocess for streaming
 
 
 def ensure_services_up(services: list[str]) -> None:
@@ -267,12 +207,12 @@ def load_timeouts() -> dict:
         with open("pyproject.toml", "rb") as f:
             data = tomli.load(f)
         return data.get("tool", {}).get("odoo-test", {}).get("timeouts", {}) or {}
-    except Exception:
+    except (OSError, ValueError):
         return {}
 
 
 def get_our_modules() -> list[str]:
-    modules = []
+    module_names: list[str] = []
     addons_path = Path("addons")
     if addons_path.exists():
         for module_dir in addons_path.iterdir():
@@ -284,33 +224,33 @@ def get_our_modules() -> list[str]:
                 lowered = name.lower()
                 if any(term in lowered for term in ("backup", "codex", "_bak", "~")):
                     continue
-                modules.append(name)
-    return modules
+                module_names.append(name)
+    return module_names
 
 
-def run_unit_tests(modules: list[str] | None = None, *, session_dir: Path | None = None) -> int:
-    user_scoped = modules is not None and len(modules) > 0
+def run_unit_tests(target_modules: list[str] | None = None, *, session_dir: Path | None = None) -> int:
+    user_scoped = target_modules is not None and len(target_modules) > 0
     if user_scoped:
         # Keep only valid modules present in our addons directory
         available = set(get_our_modules())
-        modules = [m for m in modules if m in available]
-        if not modules:
+        selected_modules = [m for m in (target_modules or []) if m in available]
+        if not selected_modules:
             print("❌ No matching modules found under ./addons for requested unit test run")
             return 1
     else:
-        modules = get_our_modules()
+        selected_modules = get_our_modules()
 
     timeout_cfg = load_timeouts().get("unit", 300)
 
     # Split-by-module mode to avoid aborting on first failing module
-    split = TestSettings().test_unit_split
-    if not split or (user_scoped and len(modules) == 1):
+    split = get_settings().test_unit_split
+    if not split or (user_scoped and len(selected_modules) == 1):
         test_db_name = f"{get_production_db_name()}_test_unit"
         use_prefix = bool(user_scoped)
         return run_docker_test_command(
             "unit_test",
             test_db_name,
-            modules,
+            selected_modules,
             timeout=timeout_cfg,
             use_module_prefix=use_prefix,
             category="unit",
@@ -320,7 +260,7 @@ def run_unit_tests(modules: list[str] | None = None, *, session_dir: Path | None
     print("🔀 Unit test matrix: per-module runs to collect all failures")
     overall_rc = 0
     results: list[tuple[str, int, Path]] = []
-    for module in modules:
+    for module in selected_modules:
         db = f"{get_production_db_name()}_ut_{module}"
         print("-" * 60)
         print(f"▶️  {module}")
@@ -328,7 +268,7 @@ def run_unit_tests(modules: list[str] | None = None, *, session_dir: Path | None
         # Find the most recent log dir to report back (best-effort)
         try:
             latest_dir = max((d for d in (Path("tmp/test-logs")).iterdir() if d.is_dir()), key=lambda p: p.name)
-        except Exception:
+        except (ValueError, OSError):
             latest_dir = Path("tmp/test-logs")
         results.append((module, rc, latest_dir))
         overall_rc |= rc != 0
@@ -342,7 +282,7 @@ def run_unit_tests(modules: list[str] | None = None, *, session_dir: Path | None
     if session_dir is not None:
         try:
             _write_phase_aggregate_summary(session_dir, "unit")
-        except Exception:
+        except OSError:
             # Non-fatal: logs still exist per-module
             pass
 
@@ -350,13 +290,13 @@ def run_unit_tests(modules: list[str] | None = None, *, session_dir: Path | None
 
 
 def run_integration_tests(*, session_dir: Path | None = None) -> int:
-    modules = get_our_modules()
+    selected_modules = get_our_modules()
     test_db_name = f"{get_production_db_name()}_test_integration"
     timeout_cfg = load_timeouts().get("integration", 600)
     return run_docker_test_command(
         "integration_test",
         test_db_name,
-        modules,
+        selected_modules,
         timeout=timeout_cfg,
         use_production_clone=True,
         use_module_prefix=False,
@@ -367,10 +307,10 @@ def run_integration_tests(*, session_dir: Path | None = None) -> int:
 
 def run_tour_tests(*, session_dir: Path | None = None) -> int:
     print("🧪 Starting tour tests...")
-    modules = get_our_modules()
+    selected_modules = get_our_modules()
     test_db_name = f"{get_production_db_name()}_test_tour"
     print(f"   Database: {test_db_name}")
-    print(f"   Modules: {', '.join(modules)}")
+    print(f"   Modules: {', '.join(selected_modules)}")
     timeout_cfg = load_timeouts().get("tour", 1800)
     # Exclude JS unit tests explicitly from tour runs to avoid double-running
     # browser_js suites here. JS tests have their own phase and settings.
@@ -378,7 +318,7 @@ def run_tour_tests(*, session_dir: Path | None = None) -> int:
     return run_docker_test_command(
         tour_tags,
         test_db_name,
-        modules,
+        selected_modules,
         timeout=timeout_cfg,
         use_production_clone=True,
         is_tour_test=True,
@@ -388,31 +328,31 @@ def run_tour_tests(*, session_dir: Path | None = None) -> int:
     )
 
 
-def run_js_tests(modules: list[str] | None = None, *, session_dir: Path | None = None) -> int:
-    if modules:
+def run_js_tests(target_modules: list[str] | None = None, *, session_dir: Path | None = None) -> int:
+    if target_modules:
         available = set(get_our_modules())
-        modules = [m for m in modules if m in available]
-        if not modules:
+        selected_modules = [m for m in target_modules if m in available]
+        if not selected_modules:
             print("❌ No matching modules found under ./addons for requested JS test run")
             return 1
     else:
         # Default: restrict to addons that actually contain JS tests to reduce install surface
         all_modules = get_our_modules()
-        modules = []
+        selected_modules = []
         for m in all_modules:
             js_dir = Path(f"addons/{m}/static/tests")
             if js_dir.exists() and any(js_dir.rglob("*.test.js")):
-                modules.append(m)
+                selected_modules.append(m)
         # Fallback: if none detected, use all custom modules (preserves legacy behavior)
-        if not modules:
-            modules = all_modules
+        if not selected_modules:
+            selected_modules = all_modules
 
     test_db_name = f"{get_production_db_name()}_test_js"
     timeout_cfg = load_timeouts().get("js", 1200)
     return run_docker_test_command(
         "js_test",
         test_db_name,
-        modules,
+        selected_modules,
         timeout=timeout_cfg,
         is_js_test=True,
         use_module_prefix=False,
@@ -426,7 +366,7 @@ def _get_latest_log_summary() -> tuple[Path | None, dict | None]:
     if not log_root.exists():
         return None, None
 
-    forced = TestSettings().test_log_session
+    forced = get_settings().test_log_session
     latest: Path | None = None
     if forced:
         cand = log_root / forced
@@ -443,7 +383,7 @@ def _get_latest_log_summary() -> tuple[Path | None, dict | None]:
         try:
             with open(root_summary) as f:
                 return latest, json.load(f)
-        except Exception:
+        except (OSError, json.JSONDecodeError):
             pass
 
     # Fallback to latest per-phase summary (search recursively)
@@ -452,7 +392,7 @@ def _get_latest_log_summary() -> tuple[Path | None, dict | None]:
         try:
             with open(candidates[0]) as f:
                 return latest, json.load(f)
-        except Exception:
+        except (OSError, json.JSONDecodeError):
             return latest, None
     return latest, None
 
@@ -473,13 +413,9 @@ def run_all_tests() -> int:
     # Prune older sessions (keep last N)
     try:
         _prune_old_log_sessions()
-    except Exception:
+    except OSError:
         pass
-    # Track per-phase return codes and logs for accurate summary
-    rc_unit: int | None = None
-    rc_js: int | None = None
-    rc_integration: int | None = None
-    rc_tour: int | None = None
+    # Track per-phase logs and summaries for accurate session aggregate
     logs: dict[str, Path | None] = {"unit": None, "js": None, "integration": None, "tour": None}
     summaries: dict[str, dict | None] = {"unit": None, "js": None, "integration": None, "tour": None}
 
@@ -535,8 +471,8 @@ def run_all_tests() -> int:
             "integration": rc_integration,
             "tour": rc_tour,
         },
+        "success": not any_fail,
     }
-    aggregate["success"] = not any_fail
 
     # Aggregate counters across phases when available
     def _sum_counter(key: str) -> int:
@@ -546,7 +482,7 @@ def run_all_tests() -> int:
             c = (s.get("counters") or {}) if isinstance(s, dict) else {}
             try:
                 total += int(c.get(key, 0))
-            except Exception:
+            except (TypeError, ValueError):
                 pass
         return total
 
@@ -565,14 +501,14 @@ def run_all_tests() -> int:
         _write_manifest(session_dir)
         _write_latest_json(session_dir)
         _write_digest(session_dir, aggregate)
-    except Exception:
+    except (OSError, json.JSONDecodeError):
         pass
 
     # Write a simple index.md for quick navigation and update latest symlink
     try:
         _write_session_index(session_dir, aggregate)
         _update_latest_symlink(session_dir)
-    except Exception:
+    except OSError:
         pass
 
     if not any_fail:
@@ -620,14 +556,15 @@ def run_all_tests() -> int:
 
 
 def _write_session_index(session_dir: Path, aggregate: dict) -> None:
-    lines: list[str] = []
-    lines.append(f"# Test Session {aggregate.get('session', session_dir.name)}")
     ok = aggregate.get("success", False)
     overall = "PASSED" if ok else "FAILED"
-    lines.append("")
-    lines.append(f"Overall: {overall}")
-    lines.append("")
-    lines.append("## Phases")
+    lines: list[str] = [
+        f"# Test Session {aggregate.get('session', session_dir.name)}",
+        "",
+        f"Overall: {overall}",
+        "",
+        "## Phases",
+    ]
     for cat in ("unit", "js", "integration", "tour"):
         cat_dir = session_dir / cat
         if not cat_dir.exists():
@@ -649,12 +586,12 @@ def _update_latest_symlink(session_dir: Path) -> None:
     try:
         if latest.exists() or latest.is_symlink():
             latest.unlink()
-    except Exception:
+    except OSError:
         pass
     rel = os.path.relpath(session_dir, latest.parent)
     try:
         latest.symlink_to(rel)
-    except Exception:
+    except OSError:
         # On systems without symlink support, write a pointer file
         latest.with_suffix(".json").write_text(
             json.dumps({"schema_version": SUMMARY_SCHEMA_VERSION, "latest": str(session_dir)}, indent=2)
@@ -683,7 +620,7 @@ def _write_manifest(session_dir: Path) -> None:
                         "mtime": int(stat.st_mtime),
                     }
                 )
-            except Exception:
+            except OSError:
                 pass
     (session_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
 
@@ -729,17 +666,17 @@ def _write_phase_aggregate_summary(session_dir: Path, category: str) -> Path | N
                 data = json.load(f)
                 if isinstance(data, dict):
                     parts.append((session_file, data))
-        except Exception:
+        except (OSError, json.JSONDecodeError):
             pass
 
     if not parts:
         return None
 
-    def _get_counter(d: dict, key: str) -> int:
-        c = d.get("counters") or {}
+    def _get_counter(data_dict: dict, key: str) -> int:
+        c = data_dict.get("counters") or {}
         try:
             return int(c.get(key, 0))
-        except Exception:
+        except (TypeError, ValueError):
             return 0
 
     total = {
@@ -760,7 +697,7 @@ def _write_phase_aggregate_summary(session_dir: Path, category: str) -> Path | N
         try:
             if rc is None or int(rc) != 0:
                 all_rc_zero = False
-        except Exception:
+        except (TypeError, ValueError):
             all_rc_zero = False
 
     aggregate = {
@@ -778,7 +715,7 @@ def _write_phase_aggregate_summary(session_dir: Path, category: str) -> Path | N
     try:
         with open(out_path, "w") as f:
             json.dump(aggregate, f, indent=2)
-    except Exception:
+    except OSError:
         return None
     return out_path
 
@@ -835,7 +772,7 @@ def _maybe_update_summary_counters_from_line(line: str, summary: dict) -> None:
                 if pm.group("key").lower() == "skipped":
                     summary["counters"]["skips"] = int(pm.group("val"))
                     break
-    except Exception:
+    except (re.error, ValueError):
         pass
 
 
@@ -844,7 +781,7 @@ def _prune_old_log_sessions(keep: int | None = None) -> None:
     if not log_root.exists():
         return
     try:
-        keep = keep or int(TestSettings().test_log_keep)
+        keep = keep or int(get_settings().test_log_keep)
     except ValueError:
         keep = 12
     sessions = sorted([d for d in log_root.iterdir() if d.is_dir() and d.name.startswith("test-")])
@@ -854,12 +791,12 @@ def _prune_old_log_sessions(keep: int | None = None) -> None:
     for d in to_remove:
         try:
             shutil.rmtree(d, ignore_errors=True)
-        except Exception:
+        except OSError:
             pass
 
 
 def show_test_stats() -> int:
-    modules = get_our_modules()
+    all_modules_list = get_our_modules()
 
     print("Test Statistics for all modules:")
     print("=" * 50)
@@ -872,7 +809,7 @@ def show_test_stats() -> int:
         "validation_test": 0,
     }
 
-    for module in modules:
+    for module in all_modules_list:
         print(f"\nModule: {module}")
         print("-" * 30)
 
@@ -946,7 +883,7 @@ def show_test_stats() -> int:
                             elapsed = summary.get("elapsed_seconds", 0)
                             print(f"  {test_dir.name}: {status} ({test_type}, {elapsed:.1f}s)")
                             print(f"    📁 Logs: {test_dir}")
-                    except:
+                    except (OSError, json.JSONDecodeError):
                         print(f"  {test_dir.name}: [Could not read summary]")
         else:
             print("  No recent test runs found")
@@ -966,13 +903,13 @@ def cleanup_test_databases(production_db: str | None = None) -> None:
     ensure_services_up([get_database_service()])
     wait_for_database_ready()
     # Collect both legacy ("_ut_") and standard ("_test_") databases
-    dbu = get_db_user()
+    db_user = get_db_user()
     result = _compose_exec(
         get_database_service(),
         [
             "psql",
             "-U",
-            dbu,
+            db_user,
             "-d",
             "postgres",
             "-t",
@@ -1003,7 +940,7 @@ def cleanup_test_databases(production_db: str | None = None) -> None:
             [
                 "psql",
                 "-U",
-                dbu,
+                db_user,
                 "-d",
                 "postgres",
                 "-c",
@@ -1019,7 +956,7 @@ def cleanup_test_databases(production_db: str | None = None) -> None:
         [
             "psql",
             "-U",
-            dbu,
+            db_user,
             "-d",
             "postgres",
             "-t",
@@ -1039,15 +976,15 @@ def create_filestore_snapshot(test_db_name: str, production_db: str) -> None:
     root = get_filestore_root().rstrip("/")
     production_filestore = f"{root}/filestore/{production_db}"
     test_filestore = f"{root}/filestore/{test_db_name}"
-    sr = get_script_runner_service()
-    ensure_services_up([sr])
+    script_runner_service = get_script_runner_service()
+    ensure_services_up([script_runner_service])
 
     # Clean target first
-    _compose_exec(sr, ["sh", "-c", f"rm -rf '{test_filestore}' || true"])
+    _compose_exec(script_runner_service, ["sh", "-c", f"rm -rf '{test_filestore}' || true"])
 
     # Try hardlink clone
     result = _compose_exec(
-        sr,
+        script_runner_service,
         [
             "sh",
             "-c",
@@ -1060,7 +997,7 @@ def create_filestore_snapshot(test_db_name: str, production_db: str) -> None:
 
     # Fallback to rsync copy
     result = _compose_exec(
-        sr,
+        script_runner_service,
         [
             "sh",
             "-c",
@@ -1079,11 +1016,11 @@ def cleanup_test_filestores(production_db: str | None = None) -> None:
 
     print(f"🧹 Cleaning up test filestores for {production_db}...")
 
-    sr = get_script_runner_service()
-    ensure_services_up([sr])
+    script_runner_service = get_script_runner_service()
+    ensure_services_up([script_runner_service])
     root = get_filestore_root().rstrip("/")
     result = _compose_exec(
-        sr,
+        script_runner_service,
         [
             "sh",
             "-c",
@@ -1100,7 +1037,7 @@ def cleanup_test_filestores(production_db: str | None = None) -> None:
     for filestore in test_filestores:
         if filestore:
             check_result = _compose_exec(
-                sr,
+                script_runner_service,
                 [
                     "sh",
                     "-c",
@@ -1110,9 +1047,9 @@ def cleanup_test_filestores(production_db: str | None = None) -> None:
             is_symlink = check_result.stdout.strip() == "symlink"
 
             if is_symlink:
-                result = _compose_exec(sr, ["rm", filestore])
+                result = _compose_exec(script_runner_service, ["rm", filestore])
             else:
-                result = _compose_exec(sr, ["rm", "-rf", filestore])
+                result = _compose_exec(script_runner_service, ["rm", "-rf", filestore])
             if result.returncode == 0:
                 filestore_name = filestore.split("/")[-1]
                 type_str = "symlink" if is_symlink else "directory"
@@ -1122,11 +1059,11 @@ def cleanup_test_filestores(production_db: str | None = None) -> None:
 
 
 def cleanup_single_test_filestore(db_name: str) -> None:
-    sr = get_script_runner_service()
-    ensure_services_up([sr])
+    script_runner_service = get_script_runner_service()
+    ensure_services_up([script_runner_service])
     root = get_filestore_root().rstrip("/")
     target = f"{root}/filestore/{db_name}"
-    result = _compose_exec(sr, ["sh", "-c", f"[ -e '{target}' ] && rm -rf '{target}' || true"])
+    result = _compose_exec(script_runner_service, ["sh", "-c", f"[ -e '{target}' ] && rm -rf '{target}' || true"])
     if result.returncode == 0:
         print(f"   ✅ Removed filestore (scoped): {db_name}")
     else:
@@ -1145,37 +1082,28 @@ def cleanup_all_test_artifacts() -> None:
     print("✅ Test cleanup completed")
 
 
-def cleanup_chrome_processes() -> None:
-    sr = get_script_runner_service()
-    ensure_services_up([sr])
-    _compose_exec(sr, ["pkill", "chrome"])  # graceful
-    _compose_exec(sr, ["pkill", "chromium"])  # graceful
-    _compose_exec(sr, ["pkill", "-9", "chrome"])  # force
-    _compose_exec(sr, ["pkill", "-9", "chromium"])  # force
-    _compose_exec(sr, ["sh", "-c", "ps aux | grep defunct | awk '{print $2}' | xargs -r kill -9"])  # zombies
+
 
 
 def restart_script_runner_with_orphan_cleanup() -> None:
-    sr = get_script_runner_service()
+    script_runner_service = get_script_runner_service()
     # Start script-runner and clean orphans to reduce noisy warnings
-    subprocess.run(["docker", "compose", "up", "-d", "--remove-orphans", sr], capture_output=True)
+    subprocess.run(["docker", "compose", "up", "-d", "--remove-orphans", script_runner_service], capture_output=True)
 
 
 def drop_and_create_test_database(db_name: str) -> None:
     print(f"🗄️  Cleaning up test database: {db_name}")
-    dbu = get_db_user()
-
     # Step 1: Kill active connections to test database
     print(f"   Terminating connections to {db_name}...")
 
     # First, get the connection count
-    dbu = get_db_user()
+    db_user = get_db_user()
     result = _compose_exec(
         get_database_service(),
         [
             "psql",
             "-U",
-            dbu,
+            db_user,
             "-d",
             "postgres",
             "-t",
@@ -1193,7 +1121,7 @@ def drop_and_create_test_database(db_name: str) -> None:
         [
             "psql",
             "-U",
-            dbu,
+            db_user,
             "-d",
             "postgres",
             "-c",
@@ -1214,7 +1142,7 @@ def drop_and_create_test_database(db_name: str) -> None:
         [
             "psql",
             "-U",
-            dbu,
+            db_user,
             "-d",
             "postgres",
             "-t",
@@ -1235,7 +1163,7 @@ def drop_and_create_test_database(db_name: str) -> None:
         [
             "psql",
             "-U",
-            dbu,
+            db_user,
             "-d",
             "postgres",
             "-t",
@@ -1252,42 +1180,15 @@ def drop_and_create_test_database(db_name: str) -> None:
 
     # Step 4: Create fresh database
     print(f"   Creating fresh database {db_name}...")
-    result = _compose_exec(
-        get_database_service(),
-        [
-            "psql",
-            "-U",
-            dbu,
-            "-d",
-            "postgres",
-            "-c",
-            f"CREATE DATABASE {db_name};",
-        ],
-    )
-    if result.returncode != 0:
-        print(f"   ❌ Failed to create database: {result.stderr}")
+    if not _create_database(db_name, db_user):
+        print("   ❌ Failed to create database")
         return
 
     # Step 5: Verify creation succeeded
-    result = _compose_exec(
-        get_database_service(),
-        [
-            "psql",
-            "-U",
-            dbu,
-            "-d",
-            "postgres",
-            "-t",
-            "-c",
-            f"SELECT count(*) FROM pg_database WHERE datname = '{db_name}';",
-        ],
-    )
-    if result.returncode == 0:
-        count = result.stdout.strip()
-        if count == "1":
-            print(f"   ✅ Database {db_name} successfully created")
-        else:
-            print(f"   ⚠️  Warning: Database creation may have failed (count: {count})")
+    if _db_exists(db_name, db_user):
+        print(f"   ✅ Database {db_name} successfully created")
+    else:
+        print(f"   ⚠️  Warning: Database creation may have failed")
 
     # Ensure Postgres is ready to accept connections for the new DB before we
     # launch Odoo; avoids transient "not currently accepting connections" errors
@@ -1296,29 +1197,72 @@ def drop_and_create_test_database(db_name: str) -> None:
 
 
 def wait_for_database_ready(retries: int = 30, delay: float = 1.0) -> bool:
-    svc = get_database_service()
-    dbu = get_db_user()
+    database_service = get_database_service()
+    db_user = get_db_user()
     for _ in range(retries):
-        res = _compose_exec(svc, ["pg_isready", "-U", dbu, "-d", "postgres"])
+        res = _compose_exec(database_service, ["pg_isready", "-U", db_user, "-d", "postgres"])
         if res.returncode == 0:
             return True
         time.sleep(delay)
     # Last-chance simple query
-    res = _compose_exec(svc, ["psql", "-U", dbu, "-d", "postgres", "-t", "-c", "SELECT 1"])
+    res = _compose_exec(database_service, ["psql", "-U", db_user, "-d", "postgres", "-t", "-c", "SELECT 1"])
+    return res.returncode == 0
+
+
+def _psql_exec(db_user: str, sql: str, database: str = "postgres") -> subprocess.CompletedProcess:
+    return _compose_exec(
+        get_database_service(),
+        [
+            "psql",
+            "-U",
+            db_user,
+            "-d",
+            database,
+            "-c",
+            sql,
+        ],
+    )
+
+
+def _psql_query(db_user: str, sql: str, database: str = "postgres") -> subprocess.CompletedProcess:
+    return _compose_exec(
+        get_database_service(),
+        [
+            "psql",
+            "-U",
+            db_user,
+            "-d",
+            database,
+            "-t",
+            "-c",
+            sql,
+        ],
+    )
+
+
+def _db_exists(db_name: str, db_user: str) -> bool:
+    result = _psql_query(db_user, f"SELECT count(*) FROM pg_database WHERE datname = '{db_name}';")
+    if result.returncode == 0:
+        return result.stdout.strip() == "1"
+    return False
+
+
+def _create_database(db_name: str, db_user: str) -> bool:
+    res = _psql_exec(db_user, f"CREATE DATABASE {db_name};")
     return res.returncode == 0
 
 
 def _force_drop_database(db_name: str) -> None:
-    svc = get_database_service()
-    dbu = get_db_user()
+    database_service = get_database_service()
+    db_user = get_db_user()
     print(f"   Dropping database {db_name} (aggressive)...")
     # Prevent new connections
     _compose_exec(
-        svc,
+        database_service,
         [
             "psql",
             "-U",
-            dbu,
+            db_user,
             "-d",
             "postgres",
             "-c",
@@ -1326,11 +1270,11 @@ def _force_drop_database(db_name: str) -> None:
         ],
     )
     _compose_exec(
-        svc,
+        database_service,
         [
             "psql",
             "-U",
-            dbu,
+            db_user,
             "-d",
             "postgres",
             "-c",
@@ -1339,11 +1283,11 @@ def _force_drop_database(db_name: str) -> None:
     )
     # Terminate any remaining
     _compose_exec(
-        svc,
+        database_service,
         [
             "psql",
             "-U",
-            dbu,
+            db_user,
             "-d",
             "postgres",
             "-c",
@@ -1352,11 +1296,11 @@ def _force_drop_database(db_name: str) -> None:
     )
     # Try forced drop (Postgres 13+)
     forced = _compose_exec(
-        svc,
+        database_service,
         [
             "psql",
             "-U",
-            dbu,
+            db_user,
             "-d",
             "postgres",
             "-c",
@@ -1365,14 +1309,14 @@ def _force_drop_database(db_name: str) -> None:
     )
     if forced.returncode != 0:
         # Fallback plain drop
-        _compose_exec(svc, ["dropdb", "-U", dbu, "--if-exists", db_name])
+        _compose_exec(database_service, ["dropdb", "-U", db_user, "--if-exists", db_name])
     # Verify
     chk = _compose_exec(
-        svc,
+        database_service,
         [
             "psql",
             "-U",
-            dbu,
+            db_user,
             "-d",
             "postgres",
             "-t",
@@ -1394,14 +1338,14 @@ def setup_test_authentication(db_name: str) -> str:
     print(f"   Setting up test authentication...")
 
     # Compute a proper pbkdf2-sha512 hash using passlib inside the image
-    sr = get_script_runner_service()
-    ensure_services_up([sr])
+    script_runner_service = get_script_runner_service()
+    ensure_services_up([script_runner_service])
     hash_cmd = [
         "python",
         "-c",
         f"from passlib.context import CryptContext; ctx=CryptContext(schemes=['pbkdf2_sha512']);print(ctx.hash('{password}'))",
     ]
-    hash_res = _compose_exec(sr, hash_cmd)
+    hash_res = _compose_exec(script_runner_service, hash_cmd)
     if hash_res.returncode != 0:
         print(f"   ⚠️  Warning: Could not hash password: {hash_res.stderr}")
         hashed = None
@@ -1433,7 +1377,7 @@ def setup_test_authentication(db_name: str) -> str:
 
 def clone_production_database(db_name: str) -> str:
     production_db = get_production_db_name()
-    dbu = get_db_user()
+    db_user = get_db_user()
     print(f"🗄️  Cloning production database: {production_db} → {db_name}")
     wait_for_database_ready()
 
@@ -1441,49 +1385,22 @@ def clone_production_database(db_name: str) -> str:
     _force_drop_database(db_name)
 
     # Create empty target database
-    result = _compose_exec(
-        get_database_service(),
-        [
-            "psql",
-            "-U",
-            dbu,
-            "-d",
-            "postgres",
-            "-c",
-            f"CREATE DATABASE {db_name};",
-        ],
-    )
-    if result.returncode != 0:
-        print(f"   ❌ Failed to create test database: {result.stderr}")
+    if not _create_database(db_name, db_user):
+        print("   ❌ Failed to create test database")
         return ""
 
     # Non-disruptive dump/restore
-    cmd = f"set -o pipefail; pg_dump -Fc -U {dbu} {production_db} | pg_restore -U {dbu} -d {db_name} --no-owner --role={dbu}"
+    cmd = f"set -o pipefail; pg_dump -Fc -U {db_user} {production_db} | pg_restore -U {db_user} -d {db_name} --no-owner --role={db_user}"
     result = _compose_exec(get_database_service(), ["bash", "-lc", cmd])
     if result.returncode != 0:
         print(f"   ❌ Dump/restore failed: {result.stderr}")
         return ""
 
     # Verify creation succeeded
-    result = _compose_exec(
-        get_database_service(),
-        [
-            "psql",
-            "-U",
-            dbu,
-            "-d",
-            "postgres",
-            "-t",
-            "-c",
-            f"SELECT count(*) FROM pg_database WHERE datname = '{db_name}';",
-        ],
-    )
-    if result.returncode == 0:
-        count = result.stdout.strip()
-        if count == "1":
-            print(f"   ✅ Database {db_name} is ready")
-        else:
-            print(f"   ⚠️  Warning: Database creation may have failed (count: {count})")
+    if _db_exists(db_name, db_user):
+        print(f"   ✅ Database {db_name} is ready")
+    else:
+        print(f"   ⚠️  Warning: Database creation may have failed")
 
     print(f"🗄️  Database clone completed")
 
@@ -1522,7 +1439,7 @@ def run_docker_test_command(
     print("-" * 60)
 
     # Cleanup before tests (scoped by default to avoid cross-run interference)
-    settings = TestSettings()
+    settings = get_settings()
     if cleanup_before:
         scoped = settings.test_scoped_cleanup
         if scoped:
@@ -1530,7 +1447,7 @@ def run_docker_test_command(
             # Drop only the target DB/filestore for this run
             try:
                 _force_drop_database(db_name)
-            except Exception:
+            except OSError:
                 pass
             cleanup_single_test_filestore(db_name)
         else:
@@ -1548,8 +1465,8 @@ def run_docker_test_command(
         if is_tour_test or "tour" in test_tags or "integration" in test_tags:
             print(f"   Preparing filestore snapshot for tests...")
             create_filestore_snapshot(db_name, production_db)
-            print(f"   Cleaning up Chrome processes...")
-            cleanup_chrome_processes()
+            print(f"   Cleaning up browser processes...")
+            kill_browsers_and_zombies()
             print(f"   ✅ Keeping modules installed to preserve production data; will run with -u")
     else:
         drop_and_create_test_database(db_name)
@@ -1618,6 +1535,12 @@ def run_docker_test_command(
     # Add environment variable for test password if we have one
     if test_password:
         cmd.extend(["-e", f"ODOO_TEST_PASSWORD={test_password}"])
+
+    # Pass through selected debug env vars for JS diagnostics
+    for var in ("JS_PRECHECK", "JS_DEBUG"):
+        val = os.environ.get(var)
+        if val:
+            cmd.extend(["-e", f"{var}={val}"])
 
     # JS/Tour tests: tours run workers=0 for stability; for JS in Odoo 18, we also default to workers=0
     if is_tour_test or is_js_test:
@@ -1881,7 +1804,7 @@ def run_docker_test_command(
                                 if is_tour_test:
                                     print(f"🔫 Preemptively killing browser processes...")
                                     f.write(f"🔫 Preemptively killing browser processes...\n")
-                                    kill_browser_processes()
+                                    kill_browsers_and_zombies()
 
                         # Check cleanup timeout (much shorter than overall timeout)
                         if hasattr(locals(), "cleanup_start_time"):
@@ -1946,7 +1869,7 @@ def run_docker_test_command(
                     print(line, end="")
                     f.write(line)
                     f.flush()
-            except:
+            except OSError:
                 pass
 
             # Ensure process is terminated
@@ -1995,7 +1918,7 @@ def run_docker_test_command(
                 print("🧹 Post-test cleanup (scoped)...")
                 try:
                     _force_drop_database(db_name)
-                except Exception:
+                except OSError:
                     pass
                 cleanup_single_test_filestore(db_name)
             else:
@@ -2006,7 +1929,7 @@ def run_docker_test_command(
         # Build failures.json for machine parsing
         try:
             _build_failures_from_log(log_file, summary)
-        except Exception:
+        except OSError:
             pass
 
         if result_code == 0:
@@ -2153,7 +2076,7 @@ def _build_failures_from_log(log_path: Path, summary: dict) -> None:
         # Link in summary
         summary["failures_file"] = str(out_path)
         summary["failures_count"] = len(entries)
-    except Exception:
+    except OSError:
         pass
 
 

@@ -83,18 +83,18 @@ Use accessibility tree refs from `browser_snapshot`:
 
 ## Model Selection
 
-**Default**: Sonnet (optimal for browser testing complexity)
+Model selection: use your default profile; upgrade only if scenarios are complex and long.
 
 **Override Guidelines**:
 
-- **Simple element interactions** → `Model: haiku` (basic click/type operations)
-- **Complex tour debugging** → `Model: opus` (multi-step UI workflows)
+- **Simple element interactions** → default profile
+- **Complex tour debugging** → deep‑reasoning profile
 - **Performance testing** → `Model: sonnet` (default, good balance)
 
 ```python
 # ← Program Manager delegates to Playwright agent
 
-# Standard browser testing (default Sonnet)
+# Standard browser testing
 # After debugging browser issues, delegate test writing
 Task(
     description="Write tour tests",

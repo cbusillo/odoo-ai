@@ -138,12 +138,12 @@ recent = orders.filtered(lambda o: o.state == 'sale')[:100]
 
 ## Model Selection
 
-**Default**: Sonnet (optimal for performance analysis complexity)
+Model selection: use your default profile; upgrade only for deep performance investigations.
 
 **Override Guidelines**:
 
-- **Simple performance checks** → `Model: haiku` (basic N+1 detection)
-- **Complex optimization strategies** → `Model: opus` (architectural performance)
+- **Simple performance checks** → default profile
+- **Complex optimization strategies** → deep‑reasoning profile
 - **Standard analysis** → `Model: sonnet` (default, good balance)
 
 ```python

@@ -26,7 +26,7 @@ This document provides quick reference for Codex MCP usage in the Odoo project c
 When using Codex MCP for Odoo development, use these configurations:
 
 ```python
-mcp__gpt-codex__codex(
+mcp__codex__codex(
     prompt="Your Odoo task",
     profile="deep-reasoning",  # For complex Odoo patterns
     sandbox="workspace-write",  # For code modifications
@@ -51,10 +51,9 @@ mcp__gpt-codex__codex(
 
 ### Session Management
 
-- Codex MCP server runs in **compatibility mode** for synchronous responses
-- Session IDs are returned directly in the response's `structuredContent.sessionId` field
-- Direct tool calls return immediate responses with session information
-- The GPT agent can extract session IDs from the response for multi-turn conversations
+- Our local Codex MCP server exposes two tools: `mcp__codex__codex` (start) and `mcp__codex__codex_reply` (continue).
+- Session IDs are returned directly in the response's `structuredContent.sessionId` field.
+- Use the returned `sessionId` with `codex_reply` to continue multi-turn conversations; do not fabricate IDs.
 
 ## Quick Reference
 
@@ -71,7 +70,7 @@ mcp__gpt-codex__codex(
 - **read-only**: Code analysis, pattern searches
 - **workspace-write**: Implementation, refactoring (default)
 
-Note: Package installation and system operations should be done directly in Claude Code.
+Note: Package installation and system operations should be done directly in Claude Code or via appropriate MCP tools; avoid using Codex for global system mutation.
 
 ## See Also
 

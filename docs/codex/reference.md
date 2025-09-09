@@ -12,17 +12,14 @@ See also:
 - Basic usage and examples: [usage.md](./usage.md)
 - Advanced configuration: [advanced.md](./advanced.md)
 
-## Model Selection
+## Model Selection (Provider‑Agnostic)
 
-| Model (env)                  | Best For                   | Context Window | Notes                                         |
-|------------------------------|----------------------------|----------------|-----------------------------------------------|
-| `OPENAI_PRIMARY_MODEL`       | Most tasks, fast & capable | provider-typed | Set in env (e.g., `gpt-4.1`, `o4`, `o4-mini`) |
-| `OPENAI_LARGE_CONTEXT_MODEL` | Extremely large contexts   | provider-typed | Optional; only if you need larger contexts    |
+- `OPENAI_PRIMARY_MODEL` — Primary model to use when you need to override the CLI default.
+- `OPENAI_LARGE_CONTEXT_MODEL` — Optional; set only if you have a configured large‑context model and a task truly needs it.
 
-### Model Priority
-
-1. **OPENAI_PRIMARY_MODEL** - Primary choice for most tasks
-2. **OPENAI_LARGE_CONTEXT_MODEL** - Alternative for massive contexts (if configured)
+Guidance:
+- Omit the `model` parameter to use the CLI’s configured default.
+- Override only for specific requirements (e.g., very large context or provider‑specific features available in your account).
 
 ## Sandbox Modes
 
@@ -44,7 +41,7 @@ See also:
 - Session ID is returned in the direct response's `structuredContent.sessionId` field
 - Session IDs are standard UUIDs: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
 - Never manually create session IDs - always extract from the response
-- Use the session ID with `mcp__gpt-codex__codex_reply` to maintain context across turns.
+- Use the session ID with `mcp__codex__codex_reply` to maintain context across turns.
 - For the code snippet to continue a session, see: [usage.md#continuing-a-session](./usage.md#continuing-a-session)
 
 ## Common Issues

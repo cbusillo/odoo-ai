@@ -2,7 +2,7 @@
 
 ## Overview
 
-Codex MCP (`mcp__gpt-codex__codex`) is a powerful tool for delegating complex tasks to OpenAI models via the Codex CLI
+Codex MCP (`mcp__codex__codex`) is a powerful tool for delegating complex tasks to OpenAI models via the Codex CLI
 MCP server.
 
 ## Basic Usage
@@ -10,17 +10,18 @@ MCP server.
 ### Starting a Conversation
 
 ```python
-response = mcp__gpt-codex__codex(
+response = mcp__codex__codex(
     prompt="Your request here",
     sandbox="workspace-write",  # or "read-only" for analysis only
-    model=env("OPENAI_PRIMARY_MODEL"),
+    # model: omit to use CLI default; set env("OPENAI_PRIMARY_MODEL") only when you must override.
+    # model=env("OPENAI_PRIMARY_MODEL"),
     approval_policy="never",  # or "untrusted", "on-failure", "on-request"
     # Additional optional parameters:
     profile="profile-name",  # Config profile from ~/.codex/config.toml
     cwd="/path/to/dir",  # Working directory
     config={"key": "value"},  # Config overrides (as TOML)
     base_instructions="custom",  # Replace default instructions
-    include_plan_tool=true  # Include plan tool
+    include_plan_tool=True  # Include plan tool
 )
 
 # Extract session ID from response
@@ -33,7 +34,7 @@ session_id = response['structuredContent']['sessionId']
 
 ```python
 # Use the session ID from the initial codex call response
-mcp__gpt-codex__codex_reply(
+mcp__codex__codex_reply(
     prompt="Follow-up request",
     sessionId=session_id  # From response['structuredContent']['sessionId']
 )
@@ -82,10 +83,10 @@ See: [reference.md#common-issues](./reference.md#common-issues)
 ### Web Research
 
 ```python
-response = mcp__gpt-codex__codex(
+response = mcp__codex__codex(
     prompt="Research the best practices for [topic]. Search the web for current information.",
     sandbox="workspace-write",  # Sufficient for network access
-    model=env("OPENAI_PRIMARY_MODEL")
+    # Omit model to use CLI default; select a large‑context model via env only if configured and truly needed.
 )
 session_id = response['structuredContent']['sessionId']
 ```
@@ -93,7 +94,7 @@ session_id = response['structuredContent']['sessionId']
 ### Large Refactoring
 
 ```python
-response = mcp__gpt-codex__codex(
+response = mcp__codex__codex(
     prompt="Refactor all files in @/path/to/directory to use async patterns",
     sandbox="workspace-write",
     model=env("OPENAI_PRIMARY_MODEL")
@@ -104,14 +105,14 @@ session_id = response['structuredContent']['sessionId']
 ### Debug and Fix
 
 ```python
-response = mcp__gpt-codex__codex(
+response = mcp__codex__codex(
     prompt="Debug and fix the failing tests in @/tests/. Run the tests and fix any issues.",
     sandbox="workspace-write"
 )
 session_id = response['structuredContent']['sessionId']
 
 # Continue with follow-up if needed
-mcp__gpt-codex__codex_reply(
+mcp__codex__codex_reply(
     prompt="Now add test coverage for the edge cases",
     sessionId=session_id
 )

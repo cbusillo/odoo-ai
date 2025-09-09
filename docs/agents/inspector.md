@@ -2,7 +2,7 @@
 
 ## My Tools
 
-MCP tools provide 1000x better coverage than manual analysis. See [Tool Selection Guide](../TOOL_SELECTION.md).
+MCP tools provide project‑wide coverage compared to single‑file views. See [Tool Selection Guide](../TOOL_SELECTION.md).
 
 ### 1. For PROJECT-WIDE Analysis:
 
@@ -29,7 +29,7 @@ MCP tools provide 1000x better coverage than manual analysis. See [Tool Selectio
 ## Quick Analysis Commands
 
 ```python
-# ✅ PROJECT-WIDE (Preferred - 1000x coverage)
+# ✅ PROJECT‑WIDE (Preferred)
 mcp__odoo-intelligence__analysis_query(analysis_type="patterns", pattern_type="all")
 mcp__odoo-intelligence__analysis_query(analysis_type="performance", model_name="product.template")
 
@@ -132,9 +132,9 @@ Load style guides for quality analysis:
 
 ## Model Selection
 
-**Default**: Sonnet (optimal for code analysis)
+Model selection: use your default profile; upgrade only for deep, cross-module analysis.
 
-**Override**: `Model: haiku` (basic linting) | `Model: opus` (deep analysis)
+Profile override: use default for linting; deep‑reasoning for cross‑module analysis.
 
 ```python
 # ← Inspector agent delegating after finding issues

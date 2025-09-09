@@ -53,6 +53,36 @@ uv run ruff format .      # Format Python
 uv run ruff check --fix   # Fix Python issues
 ```
 
+## CLI Sanity Checks (Codex)
+
+- Quick non-interactive check (read-only, prints a short reply):
+  - `codex exec --sandbox read-only "Reply with exactly: ok"`
+- Start MCP server (for Claude integration):
+  - `codex mcp`
+
+Notes
+- MCP server alias: `codex`. Tools exposed: `codex`, `codex_reply`.
+- Model selection: omit `--model` to use the CLI default. Override via env only when a task requires it (e.g., large context).
+
+## Claude Subagent Trial (Operator run)
+
+- Purpose: Exercise real subagent delegation end‑to‑end; Claude should APPLY changes, run tests, and iterate.
+- Run inline (simple):
+  - Ensure Claude CLI is available. If not on PATH, use the known binary: `/Users/cbusillo/.claude/local/claude` or set `CLAUDE_BIN`.
+  - `chmod +x tools/claude_subagent_test.sh && CLAUDE_BIN=/Users/cbusillo/.claude/local/claude tools/claude_subagent_test.sh`
+- Run isolated (worktree, non‑destructive):
+  - `CLAUDE_BIN=/Users/cbusillo/.claude/local/claude tools/claude_subagent_test.sh --worktree --cleanup`
+- Expect:
+  - Applied changes under `addons/` and tests under `addons/<module>/tests/`.
+  - Tests executed via `uv run test-unit addons/<module>` by a testing subagent.
+  - Iterative fixes until tests pass.
+- Observe:
+  - Transcript: `tmp/claude-subagent-test/transcript.jsonl`
+  - Artifacts (long logs): `tmp/subagent-runs/<RUN_ID>/...`
+- Docs:
+  - `docs/agents/SUBAGENT_WORKFLOW.md`
+  - `docs/agents/SUBAGENT_TEST_SCENARIO.md`
+
 ## Codex CLI Operating Rules
 
 - Planning: Use the plan tool; update as you proceed.
@@ -60,7 +90,7 @@ uv run ruff check --fix   # Fix Python issues
 - File edits: Use `apply_patch` with minimal, focused changes; prefer editing existing files over creating new ones.
 - Validation: Run targeted tests for what you changed; expand scope only after green.
 - Brevity: Default to concise, structured updates; avoid filler. Prefer bullets with bolded keywords.
-- Shell: Prefer the built‑in shell tool over the JetBrains terminal; avoid shell for basic file operations.
+- Shell & IO: Prefer built‑in tools for routine work. Use `rg` via the built‑in shell (or built‑in file ops) for reads/search/listing, and `apply_patch` for edits. Use JetBrains/IDE tools only for IDE‑specific actions (inspections, rename refactors, symbol info), not for routine file IO.
 
 ## Tooling Priority (Fast Path)
 

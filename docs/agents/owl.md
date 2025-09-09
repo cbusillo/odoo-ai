@@ -114,13 +114,13 @@ test("component works", async () => {
 
 ## Model Selection
 
-**Default**: Sonnet (optimal for frontend development complexity)
+Model selection: use your default profile; upgrade only if task complexity demands it.
 
 **Override Guidelines**:
 
-- **Simple CSS/style fixes** → `Model: haiku` (basic styling changes)
-- **Complex component architecture** → `Model: opus` (multi-component systems)
-- **Framework migrations** → `Model: opus` (jQuery to Owl conversion)
+- **Simple CSS/style fixes** → default profile
+- **Complex component architecture** → deep‑reasoning profile
+- **Framework migrations** → deep‑reasoning profile
 
 ```python
 # ← Program Manager delegates to Owl agent

@@ -3,11 +3,11 @@
 ## 30-Second Quick Decision
 
 1. **Complex task?** → Route to specialized agent (preserves context)
-2. **MCP tool exists?** → Use it (10-100x faster than alternatives)
+2. **MCP tool exists?** → Use it (structured outputs, better reliability)
 3. **Simple file operation?** → Read/Write/Edit/Grep/Glob
 4. **No other option?** → Bash (document why)
 
-**Key Insight**: Agents work in separate contexts, keeping Claude's main window clean for coordination
+**Key Insight**: Agents work in separate contexts, keeping the main window clean for coordination
 
 ## Common Tasks Reference
 
@@ -18,7 +18,7 @@
 | Find patterns    | Archer agent                            | `grep -r`               | Research in separate context      |
 | Frontend work    | Owl agent                               | Edit JS directly        | Framework expertise isolated      |
 | Code quality     | Inspector agent                         | Manual review           | Full analysis without bloat       |
-| Simple search    | `mcp__odoo-intelligence__search_code()` | `bash grep`             | Instant vs 30+ seconds            |
+| Simple search    | `mcp__odoo-intelligence__search_code()` | `bash grep`             | Structured output                 |
 | Container status | `mcp__docker__list_containers()`        | `docker ps`             | Structured data                   |
 | Run tests        | `mcp__odoo-intelligence__test_runner()` | `docker exec`           | Proper environment                |
 
@@ -31,11 +31,10 @@
 - Complex tasks don't bloat the conversation
 - Multiple agents can work in parallel
 
-### MCP Tools Are Fast
+### MCP Tools Are Structured
 
-- **Speed**: 10-100x faster (0.3s vs 30s for searches)
-- **Reliability**: Structured output, proper error handling
-- **Context**: Understand Odoo relationships, not just text matching
+- **Reliability**: Structured output with proper error handling
+- **Context**: Odoo-aware operations (models, views, rules) vs raw text matching
 - **Coverage**: Analyze entire codebase, not just visible files
 
 ## When Bash Is Actually OK
@@ -62,7 +61,7 @@ docker exec ${ODOO_PROJECT_NAME}-web-1 /odoo/odoo-bin --dev=all --stop-after-ini
 - **docker**: Container management (status, logs, deployment)
 - **pycharm**: IDE operations (single file scope)
 - **playwright**: Browser automation
-- **gpt-codex**: AI consultation via Codex CLI
+- **codex**: AI consultation via Codex CLI
 
 ### Built-in Tools
 
@@ -77,7 +76,7 @@ docker exec ${ODOO_PROJECT_NAME}-web-1 /odoo/odoo-bin --dev=all --stop-after-ini
 - System operations not covered by MCP
 - Always document why MCP wasn't suitable
 
-## Tool Performance Comparison
+## Tool Comparison
 
 | Task             | Best (Saves Context)             | Alternative          | Benefit                        |
 |------------------|----------------------------------|----------------------|--------------------------------|
@@ -86,31 +85,30 @@ docker exec ${ODOO_PROJECT_NAME}-web-1 /odoo/odoo-bin --dev=all --stop-after-ini
 | Find patterns    | Agent (Archer)                   | `mcp__search_code()` | Research in separate context   |
 | Container ops    | Agent (Dock)                     | `mcp__docker__*`     | Keeps main context clean       |
 | Code quality     | Agent (Inspector)                | Manual review        | Full project analysis isolated |
-| Simple search    | `mcp__search_code()`             | `bash("grep")`       | <1s vs 30s, structured         |
+| Simple search    | `mcp__search_code()`             | `bash("grep")`       | Structured output              |
 | Container status | `mcp__docker__list_containers()` | `bash("docker ps")`  | JSON vs text parsing           |
 
-## Performance Impact
+## Impact of Tool Choice
 
 | Wrong Choice           | Real Impact  | Example              |
 |------------------------|--------------|----------------------|
-| `grep` instead of MCP  | 30s wait     | User watches spinner |
+| `grep` instead of MCP  | Loss of structure | Hard to chain tools      |
 | Raw `docker` commands  | Parse errors | Silent test failures |
 | Manual file inspection | Missed bugs  | Production issues    |
 
-## Detailed Performance Analysis
+## Detailed Behavior Notes
 
-### MCP vs Generic Tool Performance
+### MCP vs Generic Tool Behavior
 
-**Key Insight**: MCP tools are purpose-built and optimized. They consistently outperform generic alternatives by
-10-100x.
+**Key Insight**: MCP tools return structured data and handle errors consistently. Prefer them when available.
 
-| Operation            | MCP Tool                                     | Generic Tool  | Speed Difference   | Why It Matters     |
-|----------------------|----------------------------------------------|---------------|--------------------|--------------------|
-| Search code patterns | `mcp__odoo-intelligence__search_code`        | `bash grep`   | **100x faster**    | <1s vs 30s+        |
-| Container status     | `mcp__docker__list_containers`               | `docker ps`   | **10x faster**     | Structured data    |
-| Code quality check   | `mcp__odoo-intelligence__analysis_query`     | Manual review | **1000x coverage** | Entire project     |
-| Module update        | `mcp__odoo-intelligence__odoo_update_module` | `docker exec` | **5x safer**       | Proper environment |
-| File search          | `Glob`                                       | `bash find`   | **50x faster**     | Optimized patterns |
+| Operation            | MCP Tool                                     | Generic Tool  | Why It Matters     |
+|----------------------|----------------------------------------------|---------------|--------------------|
+| Search code patterns | `mcp__odoo-intelligence__search_code`        | `bash grep`   | Structured JSON    |
+| Container status     | `mcp__docker__list_containers`               | `docker ps`   | JSON vs text parse |
+| Code quality check   | `mcp__odoo-intelligence__analysis_query`     | Manual review | Project-wide scope |
+| Module update        | `mcp__odoo-intelligence__odoo_update_module` | `docker exec` | Correct environment|
+| File search          | `Glob`                                       | `bash find`   | Simpler, safer     |
 
 ### Real-World Performance Examples
 
@@ -119,7 +117,7 @@ docker exec ${ODOO_PROJECT_NAME}-web-1 /odoo/odoo-bin --dev=all --stop-after-ini
 **❌ SLOW: Bash grep through Docker**
 
 ```python
-# Takes 30+ seconds, requires parsing
+# Requires parsing and multiple passes over files
 bash("docker exec ${ODOO_PROJECT_NAME}-web-1 grep -r 'class.*Controller' /odoo/addons/")
 ```
 
@@ -133,7 +131,7 @@ bash("docker exec ${ODOO_PROJECT_NAME}-web-1 grep -r 'class.*Controller' /odoo/a
 **✅ FAST: MCP Odoo Intelligence**
 
 ```python
-# Returns in <1 second with structured data
+# Returns structured data
 mcp__odoo-intelligence__search_code(
     pattern="class.*Controller",
     file_type="py"
@@ -223,14 +221,14 @@ mcp__odoo-intelligence__analysis_query(analysis_type="performance", model_name="
 ```python
 # ✅ RIGHT: Single optimized search
 models = mcp__odoo-intelligence__search_decorators(decorator="depends")
-# Time: <2 seconds for entire codebase
+# Single call over entire codebase
 
 # ❌ WRONG: Multiple file reads
 files = Glob("**/*.py")
 for file in files[:100]:  # Can only handle subset
     content = Read(file)
     # Manual parsing...
-# Time: 2+ minutes for subset only
+# Multiple calls and partial coverage
 ```
 
 #### Pattern 2: Container Management
@@ -240,11 +238,11 @@ for file in files[:100]:  # Can only handle subset
 ```python
 # ✅ RIGHT: Targeted restart
 mcp__odoo-intelligence__odoo_restart(services="web-1,shell-1")
-# Time: 5 seconds
+# Targeted restart
 
 # ❌ WRONG: Full stack restart
 bash("docker-compose down && docker-compose up -d")
-# Time: 30+ seconds, disrupts everything
+# Avoid disrupting unrelated services
 ```
 
 #### Pattern 3: Module Development Cycle
@@ -260,14 +258,14 @@ mcp__odoo-intelligence__odoo_update_module(
 )
 # 2. Check logs efficiently  
 mcp__odoo-intelligence__odoo_logs(lines=100)
-# Total time: 10 seconds
+# Integrated flow
 
 # ❌ WRONG: Manual process
 # 1. Wrong container (interferes with web)
 bash("docker exec ${ODOO_PROJECT_NAME}-web-1 /odoo/odoo-bin -u product_connect")
 # 2. Full log dump
 bash("docker logs ${ODOO_PROJECT_NAME}-web-1")
-# Total time: 45+ seconds, potential issues
+# Potential for misconfiguration and noise
 ```
 
 ### Performance Anti-Patterns to Avoid
@@ -373,19 +371,8 @@ Need Odoo operations?
 - **Not sure which tool?** → Check the quick reference above
 - **Complex task?** → Route to appropriate agent
 - **Tool not working?** → Document the issue, use fallback
-- **Want benchmarks?** → See [Performance Reference Guide](PERFORMANCE_REFERENCE.md)
+- **Want performance patterns?** → See [Flash agent](agents/flash.md) and [Odoo performance ORM](odoo18/PERFORMANCE_ORM.md)
 
 ## Conclusion
 
-The performance difference between optimal and suboptimal tool choice is dramatic:
-
-- **Search operations**: 100x faster with MCP tools
-- **Container operations**: 10x faster with proper tools
-- **Quality analysis**: 1000x better coverage
-- **Development cycle**: 3-5x faster overall
-
-By following these patterns, you can significantly improve development speed and reduce waiting time. The key is knowing
-which tool is purpose-built for your task.
-
-Remember: Using the right tool makes development 3-5x faster. The few seconds to check this guide save minutes of
-waiting.
+Choosing the right tool yields cleaner outputs, fewer errors, and less manual parsing. Prefer purpose‑built MCP tools, fall back to built‑ins, and use Bash only when necessary.

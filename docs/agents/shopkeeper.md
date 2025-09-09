@@ -87,12 +87,12 @@ result = client.execute(query, variables)
 
 ## Model Selection
 
-**Default**: Sonnet (optimal for integration complexity)
+Model selection: use your default profile; upgrade only if analysis spans many files or APIs.
 
 **Override Guidelines**:
 
-- **Simple GraphQL queries** → `Model: haiku` (basic schema queries)
-- **Complex sync patterns** → `Model: opus` (multi-system integration)
+- **Simple GraphQL queries** → default profile
+- **Complex sync patterns** → deep‑reasoning profile
 - **Standard integration** → `Model: sonnet` (default, good balance)
 
 ```python

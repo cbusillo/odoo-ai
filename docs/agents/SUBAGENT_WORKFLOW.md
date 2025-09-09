@@ -19,6 +19,9 @@ Subagent contract (do the work, then report)
 - Evidence: cite file paths and key lines; save long logs/artifacts to `tmp/subagent-runs/<RUN_ID>/<agent>/`
 - Summary: Decision • Diffs/Paths • Test results • Next steps • Risks/assumptions
 
+Acceptance gate
+- Do not finish until the targeted tests pass, or you’ve applied fixes and provided a concise failure summary with next actions.
+
 Tool scope and safety
 - Grant only needed MCP tools (e.g., odoo‑intelligence, docker, playwright) per subagent.
 - Use read‑only modes by default; enable write only for implementation steps with human approval.
@@ -47,3 +50,10 @@ Delegation examples
 - Scaffold and run tests → Scout subagent (write tests into addon, run `uv run test-unit addons/<module>`, iterate).
 - Implement feature → Odoo Engineer subagent (edit files; small, focused commits; run tests each pass).
 - Inspect/fix → Inspector subagent (low‑risk fixes; rerun tests; summarize issues and applied fixes).
+
+Extra addons as submodules (operator rule of thumb)
+- When adding external addons, initialize them as submodules:
+  - `git submodule add <repo-url> addons/<addon_name>`
+  - Commit `.gitmodules` and the submodule entry
+  - Ensure compose mounts already include `./addons` → `/volumes/addons` (no extra mapping needed)
+- For integration work on submodules, prefer PRs against the submodule repo rather than committing generated files inside this repo.

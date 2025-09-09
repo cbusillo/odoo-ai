@@ -10,6 +10,6 @@ Scope
 - Summarize findings with file paths and short fixes.
 
 Rules
-- Apply low‑risk fixes where clear; otherwise report.
-- Run tests after fixes; summarize remaining issues.
+- Apply low‑risk fixes where clear; prefer Edit/Write, fall back to Bash here‑docs if edit prompts cannot be approved.
+- Run tests after fixes (`uv run test-unit addons/<module>` via Bash); summarize remaining issues.
 - Save long reports under `tmp/subagent-runs/${RUN_ID}/inspector/`.

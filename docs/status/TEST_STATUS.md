@@ -1,6 +1,6 @@
 # 🗂️ Current Test Infrastructure Status
 
-**LAST UPDATED - August 16, 2025:**
+**LAST UPDATED - September 9, 2025:**
 
 ## Test Database Strategy (IMPLEMENTED)
 
@@ -20,7 +20,8 @@
 2. **Production Clone Function**: Added `clone_production_database()` for real data testing
 3. **Tour Test Filestore Fix**: Implemented symlink approach to share production assets without 70GB copying
 4. **Shopify Sync Context**: Fixed async threading issues in test environment
-5. **Test Categorization**: Moved JS tests from integration to tour category
+5. **Test Categorization**: Rationalized JS tests — pure unit logic stays in Hoot; integration-ish JS tests replaced by
+   Tours
 6. **Tour Test Discovery Fixed**: Corrected test tags from `module/tests` to `post_install,-at_install`
 7. **JavaScript Module Loading**: Resolved with shared test helper bundle configuration
 
@@ -33,8 +34,9 @@
 
 ## Remaining Priority Work
 
-1. **Fix Tour Test Authentication**: Tests execute but fail at login - need to fix user/password setup
-2. **Code Quality Issues**: 102 issues found, prioritized for fixing
+1. **Motor Happy-Path Tour**: Expand to cover create → tests/missing parts → generate/enable parts → (mocked) export
+   checks
+2. **Docs**: Keep asset bundle guidance and JS vs Tour policy aligned (TESTING.md, agents/owl.md) — updated in this pass
 3. **Performance Optimization**: Address N+1 queries identified by Flash agent
 
 ## Performance Improvements

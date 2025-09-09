@@ -67,3 +67,6 @@ See also
 - docs/style/TESTING.md
 - docs/TOOL_SELECTION.md
 - docs/system/AGENT_SAFEGUARDS.md
+- docs/odoo18/API_PATTERNS.md
+- docs/odoo18/SECURITY_PATTERNS.md
+- docs/odoo18/PERFORMANCE_ORM.md

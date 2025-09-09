@@ -75,10 +75,39 @@ registry.category("fields").add("my_widget", {
 ```python
 # In __manifest__.py
 'web.assets_backend': [
-    'module/static/src/components/**/*.js',
-    'module/static/src/components/**/*.xml',
+    'module/static/src/js/utils/*',
+    'module/static/src/js/widgets/*',
+    'module/static/src/xml/*',
+],
+
+'web.assets_backend_lazy': [
+    # Load all view code dynamically
+    'module/static/src/views/**/*.js',
+    'module/static/src/views/**/*.xml',
+    'module/static/src/views/**/*.scss',
+],
+
+'web.assets_unit_tests_setup': [
+    ('include', 'module.test_helpers'),
+    'module/static/src/views/**/*.js',
+    'module/static/src/views/**/*.xml',
+],
+
+'web.assets_unit_tests': [
+    ('include', 'module.test_helpers'),
+    'module/static/tests/*.test.js',
+],
+
+'web.assets_tests': [
+    'module/static/tests/tours/**/*.js',
 ],
 ```
+
+Guidelines:
+
+- Do not include tests in backend bundles.
+- Prefer recursive globs for view code so new files auto-load.
+- Keep Hoot unit tests for pure client logic; use tours for server-backed flows.
 
 ## Hoot Testing
 

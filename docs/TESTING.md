@@ -104,6 +104,33 @@ summaries.
 - **Examples**: UI interactions, complete user workflows
 - **Features**: Pattern detection prevents hanging, Chrome process cleanup
 
+### JS Unit (Hoot) vs. Tours
+
+- Use Hoot JS unit tests for pure frontend logic (parsers, client-side models, small render helpers) that do not require
+  server RPC/services.
+- Use Tour tests for anything that needs real views, `useService('orm')`, or cross‑service flows (forms, pivot/graph,
+  mail/discuss, exports). Tours boot the full stack and are far more stable for workflows.
+
+JS locations and manifest entries:
+
+- JS unit tests live in `addons/<module>/static/tests/*.test.js` and are included in `web.assets_unit_tests`.
+- Browser tours live in `addons/<module>/static/tests/tours/**/*.js` and are included in `web.assets_tests` only.
+- Prefer recursive globs for view code so new files auto‑load:
+
+```python
+"web.assets_backend_lazy": [
+    "<module>/static/src/views/**/*.js",
+    "<module>/static/src/views/**/*.xml",
+    "<module>/static/src/views/**/*.scss",
+]
+
+"web.assets_unit_tests_setup": [
+    ("include", "<module>.test_helpers"),
+    "<module>/static/src/views/**/*.js",
+    "<module>/static/src/views/**/*.xml",
+]
+```
+
 ## Writing Tests
 
 ### 1. Choose the Right Test Type

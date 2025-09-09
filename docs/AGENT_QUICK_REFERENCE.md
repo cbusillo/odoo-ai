@@ -73,11 +73,13 @@ Task(
 )
 
 # GPT agent (special case - direct MCP)
-mcp__gpt-codex__codex(
+response = mcp__codex__codex(
     prompt="[request]",
     sandbox="workspace-write",
     profile="deep-reasoning"  # Available: deep-reasoning, dev-standard, test-runner, safe-production, quick
 )
+session_id = response['structuredContent']['sessionId']
+mcp__codex__codex_reply(prompt="follow‑up", sessionId=session_id)
 ```
 
 ## Agent Power & Collaboration

@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='UTF-8'?>
+<?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="IssueNavigationConfiguration">
     <option name="links">
@@ -15,6 +15,7 @@
     <mapping directory="$PROJECT_DIR$/addons/cm_custom" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/addons/disable_odoo_online" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/addons/external_ids" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/addons/external_ids_backup" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/addons/hr_employee_name_extended" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/addons/product_connect" vcs="Git" />
   </component>

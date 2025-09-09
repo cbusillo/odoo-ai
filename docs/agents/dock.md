@@ -113,11 +113,11 @@ Always use script-runner with `--stop-after-init`
 
 ## Model Selection
 
-**Default**: Haiku (optimal for simple container operations)
+Model selection: use your default profile; lightweight profiles are fine for simple container operations.
 
 **Override Guidelines**:
 
-- **Simple status checks** → `Model: haiku` (default, fastest)
+- **Simple status checks** → default profile
 - **Complex orchestration** → `Model: sonnet` (multi-container coordination)
 - **Troubleshooting issues** → `Model: sonnet` (log analysis, debugging)
 

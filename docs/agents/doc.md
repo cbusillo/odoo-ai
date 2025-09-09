@@ -118,12 +118,12 @@ Grep(pattern="TODO|FIXME|XXX", path="docs/", output_mode="content")
 
 ## Model Selection
 
-**Default**: Sonnet (optimal for documentation analysis and writing)
+Model selection: use your default profile; upgrade only if long-context synthesis is required.
 
 **Override Guidelines**:
 
-- **Simple link checks** → `Model: haiku` (fast verification tasks)
-- **Complex architecture docs** → `Model: opus` (deep technical writing)
+- **Simple link checks** → default profile
+- **Complex architecture docs** → deep‑reasoning profile
 - **Bulk documentation updates** → `Model: sonnet` (default, good balance)
 
 ```python

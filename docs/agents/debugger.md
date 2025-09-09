@@ -103,12 +103,12 @@ Focus on:
 
 ## Model Selection
 
-**Default**: Sonnet (optimal for error analysis complexity)
+Model selection: use your default profile; upgrade only if debugging requires extensive multi-file reasoning.
 
 **Override Guidelines**:
 
-- **Simple error traces** → `Model: haiku` (basic stack trace analysis)
-- **Complex multi-system debugging** → `Model: opus` (integration issues, deep analysis)
+- **Simple error traces** → default profile
+- **Complex multi-system debugging** → deep‑reasoning profile
 - **Performance error analysis** → `Model: sonnet` (default, good balance)
 
 ```python

@@ -9,7 +9,6 @@ This document provides links to external documentation and API references for th
 ### Odoo 18 Enterprise
 
 **Website**: https://www.odoo.com/documentation/18.0/
-**Your version**: 18.0 Enterprise
 
 Key sections for development:
 
@@ -23,42 +22,30 @@ Key sections for development:
 ### Shopify GraphQL API
 
 **Website**: https://shopify.dev/docs/api/admin-graphql
-**Your version**: 2025-04 (latest stable)
-**Local schema**: `addons/product_connect/graphql/schema/shopify_schema_2025-04.sdl` (61k+ lines)
+**Local schema**: `addons/product_connect/graphql/schema/shopify_schema_2025-04.sdl`
 
 Use the local schema file for complete type definitions and the online docs for guides and best practices.
 
-### PostgreSQL 17
+### PostgreSQL
 
-**Website**: https://www.postgresql.org/docs/17/
-**Your version**: 17 (latest)
-**Note**: Basic SQL usage only, comprehensive docs probably not needed
+**Website**: https://www.postgresql.org/docs/
+**Note**: Basic SQL usage only
 
-### Python 3.12+
+### Python
 
-**Website**: https://docs.python.org/3.12/
-**Your version**: 3.12+
-**Note**: In Claude's training data ✓
+**Website**: https://docs.python.org/
 
 ### Docker Compose
 
 **Website**: https://docs.docker.com/compose/
-**Your version**: v2
-**Note**: In Claude's training data ✓
 
 ### Other Technologies in Stack
 
-**Pydantic v2** - https://docs.pydantic.dev/latest/
-
-- Your version: v2 (in Claude's training ✓)
+**Pydantic** - https://docs.pydantic.dev/latest/
 
 **httpx** - https://www.python-httpx.org/
 
-- HTTP client library (in Claude's training ✓)
-
-**Owl.js 2.0** - https://github.com/odoo/owl
-
-- Frontend framework (covered in Odoo docs)
+**Owl.js** - https://github.com/odoo/owl
 
 **ariadne-codegen** - https://ariadne-codegen.readthedocs.io/
 

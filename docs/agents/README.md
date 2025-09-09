@@ -7,7 +7,7 @@ agent has focused knowledge to avoid context pollution and ensure expertise in t
 
 **See [Tool Selection Guide](../TOOL_SELECTION.md)** for complete decision tree and performance benchmarks.
 
-**Quick reminder**: MCP tools (`mcp__*`) are 10-100x faster than Bash alternatives.
+**Quick reminder**: Prefer MCP tools (`mcp__*`) for structured outputs and reliability.
 
 ## Available Agents
 
@@ -92,14 +92,14 @@ Task(
 For detailed performance benchmarks and real-world examples, see:
 
 - [Tool Selection Guide](../TOOL_SELECTION.md) - Complete patterns, anti-patterns, and performance analysis
-- [Performance Reference Guide](../PERFORMANCE_REFERENCE.md) - Agent-specific improvements
+- Performance patterns: see [Flash agent](./flash.md) and [Odoo performance ORM](../odoo18/PERFORMANCE_ORM.md)
 
-### Quick Performance Summary
+### Quick Summary
 
-- **Speed**: 10-100x faster searches, instant analysis
-- **Coverage**: 1000x better than manual review
-- **Quality**: 90% fewer test failures, 75% fewer bugs
-- **Development**: 3-5x faster complex tasks
+- **Speed**: Less parsing and fewer retries when using structured tools
+- **Coverage**: Project-wide analysis vs single-file views
+- **Quality**: Consistent, repeatable operations reduce mistakes
+- **Development**: Cleaner contexts enable parallel work
 
 ### Key Improvements by Agent
 
@@ -211,5 +211,5 @@ if bulk_issues_found:
 For detailed tool examples, performance comparisons, and anti-patterns, see:
 
 - **[Tool Selection Guide](../TOOL_SELECTION.md)** - Complete decision trees and performance benchmarks
-- **[Performance Reference Guide](../PERFORMANCE_REFERENCE.md)** - Real-world examples and metrics
+- **Performance patterns**: [Flash agent](./flash.md) and [Odoo performance ORM](../odoo18/PERFORMANCE_ORM.md)
 - **[Codex Configuration](../CODEX_CONFIG.md)** - Profiles and settings for GPT agent (Codex CLI)

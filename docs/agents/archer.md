@@ -2,7 +2,7 @@
 
 ## My Tools
 
-MCP search tools are 100x faster than grep/find. See [Tool Selection Guide](../TOOL_SELECTION.md).
+Prefer MCP search tools over grep/find for structured, filterable results. See [Tool Selection Guide](../TOOL_SELECTION.md).
 
 ### 1. MCP Tools FIRST
 
@@ -86,18 +86,18 @@ mcp__odoo-intelligence__model_query(operation="inheritance", model_name="sale.or
 
 - ❌ **Cannot call myself** (Archer agent → Archer agent loops prohibited)
 - ❌ Guess patterns from memory (always search and verify)
-- ❌ Use bash find/grep first (MCP tools are 100x faster)
+- ❌ Use bash find/grep first (prefer MCP tools for structured results)
 - ❌ Modify any code (research only, delegate implementation)
 - ❌ Make implementation recommendations without thorough research
 - ❌ Skip inheritance chain analysis for model research
 
 ## Model Selection
 
-**Default**: Haiku (optimal for simple research tasks)
+Model selection: use your default profile; lightweight profiles are fine for simple research.
 
 **Override Guidelines**:
 
-- **Basic pattern searches** → `Model: haiku` (default, fast searches)
+- **Basic pattern searches** → default profile
 - **Complex pattern analysis** → `Model: sonnet` (multi-pattern research)
 - **Deep inheritance chains** → `Model: sonnet` (complex relationships)
 

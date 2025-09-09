@@ -69,12 +69,12 @@ When delegating to coding agents, I include relevant style guides:
 
 ## Model Selection
 
-**Default**: Sonnet (balanced analysis and coordination)
+Model selection: use your default profile; upgrade only if cross-module synthesis is heavy.
 
 **Override Guidelines**:
 
-- **Quick checks** → `Model: haiku` (simple validations)
-- **Deep analysis** → `Model: opus` (complex quality assessment)
+- **Quick checks** → default profile
+- **Deep analysis** → deep‑reasoning profile
 - **Bulk coordination** → `Model: sonnet` (default, efficient)
 
 ```python

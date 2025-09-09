@@ -96,12 +96,12 @@ MultiEdit(
 
 ## Model Selection
 
-**Default**: Sonnet (optimal for refactoring complexity)
+Model selection: use your default profile; upgrade only for large or intricate refactors.
 
 **Override Guidelines**:
 
-- **Simple bulk replacements** → `Model: haiku` (basic find/replace operations)
-- **Complex refactoring patterns** → `Model: opus` (architectural changes)
+- **Simple bulk replacements** → default profile
+- **Complex refactoring patterns** → deep‑reasoning profile
 - **Standard code improvements** → `Model: sonnet` (default, good balance)
 
 ```python

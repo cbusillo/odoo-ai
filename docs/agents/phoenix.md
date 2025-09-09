@@ -140,13 +140,13 @@ mcp__odoo-intelligence__search_code(
 
 ## Model Selection
 
-**Default**: Opus (optimal for complex migration patterns)
+Model selection: use your default profile; upgrade only if migration complexity requires it.
 
 **Override Guidelines**:
 
 - **Simple pattern updates** → `Model: sonnet` (basic syntax migration)
-- **Complex framework migration** → `Model: opus` (default, architectural changes)
-- **Version-specific updates** → `Model: opus` (framework expertise needed)
+- **Complex framework migration** → deep‑reasoning profile
+- **Version-specific updates** → deep‑reasoning profile
 
 ```python
 # ← Program Manager delegates to Phoenix agent

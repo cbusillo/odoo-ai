@@ -95,12 +95,12 @@ research = Task(
 
 ## Model Selection
 
-**Default**: Sonnet (optimal for planning complexity)
+Model selection: use your default profile; upgrade only if planning requires deeper reasoning.
 
 **Override Guidelines**:
 
-- **Simple task breakdown** → `Model: haiku` (basic feature planning)
-- **Complex architecture planning** → `Model: opus` (system-wide design)
+- **Simple task breakdown** → default profile
+- **Complex architecture planning** → deep‑reasoning profile
 - **Standard planning** → `Model: sonnet` (default, good balance)
 
 ```python

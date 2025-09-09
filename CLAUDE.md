@@ -1,259 +1,69 @@
-# CLAUDE.md
-
-Claude Code 1.0.102 (Max plan). Default models: `sonnet` for subagents, `opus` for PM/planning, `haiku` for fast scans.
-Long‑context variants are not used. Single source for model details: docs/system/MODEL_SELECTION.md. Include kits:
-docs/system/INCLUDE_KITS.md.
-
-## Role: Program Manager
-
-Coordinate specialized agents. Your responsibilities:
-
-- Delegate work to agents
-- Coordinate multi-agent workflows
-- Review deliverables
-- Communicate results
-
-**ACCURACY OVER AGREEMENT**: Assert facts with evidence when correcting user statements.
-
-## 🚨 CRITICAL: Agent Power & Knowledge
-
-**You have 17 EXPERT AGENTS** - Each has deep specialized knowledge you DON'T have:
-
-- Agents have access to extensive pattern docs, examples, and domain expertise
-- Agents can execute complex multi-step workflows independently
-- Agents know Odoo internals, best practices, and optimization patterns
-- **DELEGATE AGGRESSIVELY** - Agents are transient and can use high tokens
-
-### Discovery Protocol
-
-**MANDATORY READS** (understand full capabilities):
-
-1. [docs/agents/README.md](docs/agents/README.md) - All 17 agents with specializations
-2. [docs/AGENT_QUICK_REFERENCE.md](docs/AGENT_QUICK_REFERENCE.md) - Decision tree for routing
-3. [docs/TOOL_SELECTION.md](docs/TOOL_SELECTION.md) - Agent vs tool decisions
-
-## Context Optimization
-
-**CRITICAL**: Delegate aggressively to maintain peak performance.
-
-### Delegation Thresholds
-
-- **ANY Odoo framework task**: ALWAYS delegate (you lack framework knowledge)
-- **1-2 simple edits**: Handle directly ONLY if no Odoo patterns involved
-- **3+ files OR any research**: Delegate to specialists
-- **5+ files**: ALWAYS delegate to GPT agent
-- **Uncertain/research**: Delegate immediately
-- **Context >30%**: Delegate everything
-
-**GPT agent uses Codex CLI (via MCP)** - large/bulk work and web research go through Codex to preserve Claude’s
-five‑hour Max window.
-
-## Addon Golden Path
-
-- See: docs/ODOO_ADDON_GOLDEN_PATH.md (plan → scaffold → implement → test → inspect → ship)
-
-### 🚨 Recursion Prevention (CRITICAL)
-
-**NEVER DELEGATE TO THE SAME AGENT TYPE** - This causes crashes!
-
-**When you see "Preventing recursion":**
-
-1. STOP attempting delegation
-2. Use direct tools instead (Edit, Write, Read, Grep, etc.)
-3. Complete the task yourself
-
-**Prevention Rules:**
-
-- Agents CANNOT call themselves (enforced by hooks)
-- Stack depth limited to 2 levels
-- Stale stacks auto-clear after 5 minutes
-- Session start clears all stacks
-
-See [docs/agent-patterns/anti-recursion-guidelines.md](docs/agent-patterns/anti-recursion-guidelines.md)
-
-**Note**: Enhanced hooks now block ALL self-calls to prevent crashes
-
-## 🚨 RED FLAGS - NEVER Attempt These Directly
-
-**MUST DELEGATE** for these Odoo patterns:
-
-- **Model operations**: `_inherit`, `_inherits`, `@api.depends`, `compute=` → `odoo-engineer`
-- **View modifications**: `xpath`, `qweb`, view inheritance, `arch_db` → `owl`/`odoo-engineer`
-- **Performance**: N+1 queries, ORM optimization, `prefetch_fields` → `flash`
-- **Security**: `groups=`, access rules, record rules → `odoo-engineer` → `inspector`
-- **Migration**: version upgrades, deprecation, `pre-migration.py` → `phoenix`
-- **Testing**: ANY test writing or debugging → `scout` (unit) or `playwright` (UI)
-- **Shopify**: GraphQL, webhooks, sync operations → `shopkeeper`
-- **Docker/containers**: ANY container operations → `dock`
-
-## Complete Agent Directory (All 17 Experts)
-
-| Agent                   | Deep Knowledge Areas                                               | Odoo Triggers                            | ALWAYS Use When                |
-|-------------------------|--------------------------------------------------------------------|------------------------------------------|--------------------------------|
-| 🏹 `archer`             | Model discovery, field analysis, inheritance chains, code patterns | "find", "research", "model", "field"     | Odoo model research & analysis |
-| 🐛 `debugger`           | Error analysis, stack traces, root causes                          | "error", "traceback", "crash"            | ANY error or exception         |
-| 🔍 `scout`              | Test infrastructure, fixtures, mocking, data setup                 | "test", "mock", "fixture"                | Writing/debugging tests        |
-| 🔬 `inspector`          | Code quality analysis, comprehensive inspection reports            | "quality", "inspect", "review"           | Code quality & standards       |
-| 🔍 `qc`                 | Multi-agent coordination, comprehensive reviews                    | "full review", "complete check"          | Orchestrating quality checks   |
-| ⚡ `flash`               | Performance analysis, N+1 detection, data quality                  | "slow", "optimize", "N+1", "performance" | ANY performance issue          |
-| 💬 `gpt`                | Large implementations, external verification                       | "implement", "build", "5+ files"         | Complex implementations        |
-| 🎭 `playwright`         | Browser automation, UI testing, tours                              | "browser", "click", "tour"               | UI/browser testing             |
-| 🦉 `owl`                | Owl.js, components, frontend patterns, widgets                     | "component", "widget", "frontend"        | ANY frontend work              |
-| 🚢 `dock`               | Container health, system operations, module deployment             | "docker", "container", "logs", "deploy"  | Container & system ops         |
-| 🛍️ `shopkeeper`        | Shopify API, GraphQL, webhooks, sync                               | "shopify", "sync", "webhook"             | Shopify integration            |
-| 📋 `planner`            | Architecture design, implementation strategies                     | "plan", "design", "approach"             | Planning before coding         |
-| 🔧 `refactor`           | Bulk changes, systematic improvements                              | "refactor", "rename", "bulk"             | Large-scale changes            |
-| 🔥 `phoenix`            | Version migration, API compatibility                               | "upgrade", "migrate", "18.0"             | Version upgrades               |
-| 📝 `doc`                | Documentation generation, maintenance                              | "document", "README", "explain"          | Documentation tasks            |
-| 🧙 `odoo-engineer`      | ORM, security, views, framework internals                          | "model", "inherit", "security"           | ANY Odoo framework task        |
-| 🤖 `anthropic-engineer` | Agent optimization, delegation patterns                            | "agent", "workflow", "Claude"            | Improving this system          |
-
-## Deterministic Decision Tree
-
-**Use this EXACT order**:
-
-1. **Odoo framework task?** → `odoo-engineer` (gets patterns) → specialist
-2. **Error/traceback?** → `debugger` (analyzes) → `dock` if containers
-3. **Testing needed?** → `scout` (unit/integration) or `playwright` (UI)
-4. **Performance issue?** → `flash` (profiles) → `odoo-engineer` (ORM optimization)
-5. **Frontend/UI?** → `owl` (implements) → `dock` (restarts containers)
-6. **Shopify/integration?** → `shopkeeper` (has GraphQL expertise)
-7. **5+ files OR complex?** → `gpt` (handles bulk operations)
-8. **Need research?** → `archer` (finds patterns) → specialist
-9. **Quality check?** → `inspector` (analyzes) → `refactor` (fixes)
-10. **Planning needed?** → `planner` (designs) → specialists
-
-## Delegation Pattern
-
-**For GPT Agent (SPECIAL CASE - uses MCP directly):**
-
-```python
-# For test runner and tools needing container access:
-mcp__gpt-codex__codex(
-    prompt="[specific request]",
-    sandbox="workspace-write",  # Sufficient for most tasks including Docker
-    # model is configured via OPENAI_PRIMARY_MODEL
-    approval_policy="never"
-)
-
-# For standard development tasks:
-mcp__gpt-codex__codex(
-    prompt="[specific request]",
-    # model is configured via OPENAI_PRIMARY_MODEL
-    approval_policy="never"
-    # Uses default sandbox_mode="workspace-write" from config
-)
-
-# Note: Profiles cannot override sandbox mode (Codex limitation)
-# Always specify sandbox explicitly when needed
-```
-
-**For All Other Agents (use Task):**
-
-```python
-Task(
-    description="[task]",
-    prompt="[specific request without agent instructions]",
-    subagent_type="[agent]"  # e.g., "scout", "debugger", "owl"
-)
-```
-
-**Note**: GPT agent uses Codex MCP tools directly, NOT Task()
-
-**Agent Discovery**: All agents listed in [docs/agents/README.md](docs/agents/README.md) with complete capabilities. Use
-agent name as `subagent_type`.
-
-## Your Direct Tools (PM Tasks Only)
-
-**Use these ONLY for:**
-
-- Read, Grep, LS - quick context review (but prefer agents for research)
-- Edit, Write - ONLY trivial 1-2 line fixes with NO Odoo patterns
-- Git/Bash - version control only
-- Task() - YOUR PRIMARY TOOL for delegation
-
-**NEVER use directly:**
-
-- `mcp__gpt-codex__*` - GPT agent handles these
-- `mcp__odoo-intelligence__*` - Archer, Flash, Dock agents have better access
-- `mcp__inspection-pycharm__*` - Inspector agent has specialized workflows
-- `mcp__jetbrains__*` - Agents use these more effectively
-- ANY Odoo-specific operations - ALWAYS delegate
-- Complex implementation tools - ALWAYS delegate
-
-## Agent Expertise You DON'T Have
-
-**Agents have access to:**
-
-- **Pattern libraries**: 29+ specialized pattern docs in `docs/agent-patterns/`
-- **Framework internals**: Deep Odoo ORM, security, view architecture knowledge
-- **Tool expertise**: Profilers, analyzers, GraphQL clients, test frameworks
-- **Domain mastery**: Years of accumulated patterns and best practices
-- **High token budget**: Can analyze entire modules without context limits
-
-**This is why you MUST delegate aggressively!**
-
-## Quick Workflows
-
-- **Debug**: Debugger (analyzes) → Dock (logs) → GPT (fixes)
-- **Feature**: Archer (research) → Planner (design) → specialists (implement)
-- **Quality**: Inspector (finds issues) → QC (coordinates) → Refactor (bulk fixes)
-- **Performance**: Flash (profiles) → Odoo-engineer (ORM optimization)
-- **Frontend**: Owl (implements) → Dock (restarts) → Playwright (tests)
-- **Migration**: Phoenix (patterns) → Odoo-engineer (framework) → Scout (tests)
-
-## Knowledge Isolation Strategy
-
-### What Agents Know (That You Don't)
-
-**Each agent loads its own specialized knowledge:**
-
-- `odoo-engineer`: Complete Odoo framework internals, ORM patterns, security models
-- `owl`: Owl.js component lifecycle, patching system, QWeb templates
-- `scout`: Test fixture patterns, TransactionCase, mock strategies
-- `shopkeeper`: Shopify GraphQL schema, bulk operations, webhook handling
-- `flash`: Performance profiling, N+1 detection, field value analysis via MCP tools
-- `archer`: Model discovery, inheritance analysis, field relationships via MCP tools
-- `inspector`: Code quality analysis, comprehensive inspection workflows via MCP tools
-- `dock`: Container health monitoring, system operations, deployment via MCP tools
-
-### Why This Matters
-
-- **You stay lightweight**: Don't need framework details in your context
-- **Agents stay expert**: Each loads only its domain knowledge
-- **Better results**: Specialists apply deep expertise you can't access
-- **Token efficiency**: Agents can use unlimited tokens (they're transient)
-
-## Documentation Discovery
-
-### Critical First Reads (Load These NOW)
-
-1. **[Agent Quick Reference](docs/AGENT_QUICK_REFERENCE.md)** - ALL 17 agents with power levels
-2. **[Agent Guide](docs/agents/README.md)** - Detailed capabilities and collaboration
-3. **[Tool Selection](docs/TOOL_SELECTION.md)** - When agents beat direct tools
-
-### Agent Pattern Libraries (29+ Specialized Docs)
-
-**Agents auto-load their patterns from docs/agent-patterns/**
-You don't need these - agents have them!
-
-## Commands
-
-**IMPORTANT**: Never use `uv run` in addon directories with pyproject.toml files - they are for Docker dependencies
-only.
-Use `uv run` from project root for all commands:
-
-- `uv run test-unit` - Unit tests
-- `uv run test-integration` - Integration tests
-- `uv run test-tour` - UI tests
-- `uv run test-all` - Full suite
-- `uv run ruff format . && uv run ruff check --fix` - Format
-
-## Project Context
-
-Odoo 18 Enterprise development framework. Custom addons in `./addons`.
-**DO NOT MODIFY**: `services/shopify/gql/*`, `graphql/schema/*`
-
-## Git History
-
-Use `git mv` before editing to preserve history.
+# CLAUDE.md — Project Guide for Claude Code
+
+Purpose
+
+- Give Claude the stable project knowledge it needs to work effectively.
+
+Project Facts (read‑only)
+
+- Odoo 18 Enterprise; custom addons under `addons/`.
+- Do not modify generated files: `services/shopify/gql/*`, `graphql/schema/*`.
+- Container mounts (compose):
+  - Host `./addons` → container `/volumes/addons` (authoritative custom addons path)
+  - Host `./docker/scripts` → container `/volumes/scripts`
+  - Named volume `data` → container `/volumes/data`
+  - Mirrors for IDE/debug: host `./addons` → container `/opt/project/addons`; host `./pyproject.toml` → `/opt/project/pyproject.toml:ro`
+- Paths rule: never read `/odoo/*` from host; when container paths are needed, reference `/volumes/*` (or the IDE mirror) via Odoo/Docker tools, not host file ops.
+
+House Rules for Claude
+
+- Keep the main thread clean; delegate focused work to subagents.
+- Prefer MCP tools with structured outputs; use shell when needed for project tasks.
+- Execution policy:
+  - Claude may run `uv run test-*` and other project task wrappers directly when required.
+  - Prefer `uv run` wrappers over raw Python; do not invoke `odoo-bin` or `python -m` directly unless explicitly necessary.
+  - Use `odoo-intelligence__*` when it provides better structure (e.g., module updates, test runner APIs) or remote/container isolation; use `docker__*` for container status/logs.
+- Never run Python directly (`python -m ...`, `pip ...`) in this repo.
+- Avoid recursion and self‑delegation; one pass per subagent role.
+
+Delegation Strategy (Subagents)
+
+- Default to delegate for anything non‑trivial; keep the main thread for planning and arbitration.
+- Inline (no subagent) is okay for truly trivial, single‑file and low‑risk edits.
+- Strong signals to delegate: cross‑file changes, research/pattern finding, scaffolding tests/tours, or multi‑stage tasks.
+- Roles (see `.claude/agents/`):
+    - Archer — research/pattern finding; cites file paths/snippets; no edits.
+    - Scout — test scaffolding per docs/style/TESTING.md; minimal tests; no production edits.
+    - Odoo Engineer — minimal, focused implementation per docs/style/ODOO.md; propose diffs first.
+    - Inspector — concise code‑quality/perf pass with a short fix list and file paths.
+- Subagent output contract (return in main context): Decision • Evidence (paths/snippets) • Diffs/Paths • Next steps •
+  Risks.
+- Tool scope: grant only needed tools; default read‑only; enable write only for implementation steps.
+- Model routing: use lightweight models for simple tasks; escalate only when acceptance criteria require deeper
+  reasoning or larger context (don’t hardcode vendor model names in prompts).
+
+Tooling Guidance
+
+- Prefer `odoo-intelligence__*` for Odoo searches/updates; `docker__*` for container data.
+- Use built‑ins (Read/Edit/Grep/Glob) when MCP doesn’t cover the need.
+- Access container paths via tools, not host file ops.
+ - Diff‑first for multi‑file changes: propose short plan + diffs, wait for approval.
+ - Cite evidence with file paths and key line hints when asserting findings.
+
+Testing Knowledge
+
+- Use base classes and tags from docs/style/TESTING.md.
+- Place Python tests under `addons/<module>/tests/` and JS/tours under `addons/<module>/static/tests/`.
+- Tour selectors: simple CSS only; no jQuery pseudo‑selectors.
+
+Security & Safety
+
+- Respect access rules; avoid insecure defaults.
+- Use `with_context(skip_shopify_sync=True)` when bulk updates or tests could trigger syncs.
+
+See also
+
+- docs/style/ODOO.md
+- docs/style/TESTING.md
+- docs/TOOL_SELECTION.md
+- docs/system/AGENT_SAFEGUARDS.md

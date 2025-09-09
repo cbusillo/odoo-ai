@@ -31,7 +31,7 @@ def initialize_gpt_session(task_context):
 def determine_optimal_model(task_context):
     """Choose the best model for the task"""
 
-    primary = os.environ.get('OPENAI_PRIMARY_MODEL', 'gpt-5')
+    primary = os.environ.get('OPENAI_PRIMARY_MODEL') or 'default'
     model_selection = {
         'quick_fixes': primary,
         'complex_analysis': primary,
@@ -57,7 +57,10 @@ def continue_gpt_session(session_id, new_prompt):
     if not validate_session_health(session_id):
         return restart_session_with_context(session_id, new_prompt)
 
-    return codex_reply(session_id, enhanced_prompt)
+    return mcp__codex__codex_reply(
+        prompt=enhanced_prompt,
+        sessionId=session_id
+    )
 ```
 
 ## Task Orchestration Patterns

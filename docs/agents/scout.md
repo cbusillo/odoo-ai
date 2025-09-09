@@ -2,7 +2,7 @@
 
 ## My Tools
 
-See [Tool Selection Guide](../TOOL_SELECTION.md). Key: MCP tools are 10x faster for analysis.
+See [Tool Selection Guide](../TOOL_SELECTION.md). Key: MCP tools return structured results for analysis.
 
 - `mcp__odoo-intelligence__model_query` - Understand what to test (operation="info")
 - `mcp__odoo-intelligence__field_query` - See how fields are used (operation="usages")
@@ -119,13 +119,13 @@ def test_action_validation(self):
 
 ## Model Selection
 
-**Default**: Sonnet (optimal for test writing complexity)
+Model selection: use your default profile; upgrade only for large or complex test suites.
 
 **Override Guidelines**:
 
-- **Simple unit tests** → `Model: haiku` (basic CRUD testing)
-- **Complex architecture tests** → `Model: opus` (multi-system integration)
-- **Bulk test generation** → `Model: haiku` (repetitive patterns)
+- **Simple unit tests** → default profile
+- **Complex architecture tests** → deep‑reasoning profile
+- **Bulk test generation** → default profile
 
 ```python
 # ← Scout agent delegating test-related tasks

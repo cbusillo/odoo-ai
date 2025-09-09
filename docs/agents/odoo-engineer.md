@@ -145,12 +145,12 @@ record.sudo().write()  # Why: [explanation]
 
 ## Model Selection
 
-**Default**: Opus (optimal for complex framework analysis)
+Model selection: use your default profile; upgrade only for deep framework analysis.
 
 **Override Guidelines**:
 
 - **Simple pattern lookup** → `Model: sonnet` (basic Odoo pattern searches)
-- **Deep architectural review** → `Model: opus` (default, complex framework knowledge)
+- **Deep architectural review** → deep‑reasoning profile
 - **Quick consultations** → `Model: sonnet` (standard advice)
 
 ```python

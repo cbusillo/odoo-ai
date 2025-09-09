@@ -56,43 +56,49 @@ uv run ruff check --fix   # Fix Python issues
 ## CLI Sanity Checks (Codex)
 
 - Quick non-interactive check (read-only, prints a short reply):
-  - `codex exec --sandbox read-only "Reply with exactly: ok"`
+    - `codex exec --sandbox read-only "Reply with exactly: ok"`
 - Start MCP server (for Claude integration):
-  - `codex mcp`
+    - `codex mcp`
 
 Notes
+
 - MCP server alias: `codex`. Tools exposed: `codex`, `codex_reply`.
-- Model selection: omit `--model` to use the CLI default. Override via env only when a task requires it (e.g., large context).
+- Model selection: omit `--model` to use the CLI default. Override via env only when a task requires it (e.g., large
+  context).
 
 ## Claude Subagent Trial (Operator run)
 
 - Purpose: Exercise real subagent delegation end‑to‑end; Claude should APPLY changes, run tests, and iterate.
 - Run (simple, no worktrees):
-  - Ensure Claude CLI is available. If not on PATH, use the known binary: `/Users/cbusillo/.claude/local/claude` or set `CLAUDE_BIN`.
-  - `chmod +x tools/claude_subagent_quick.sh && CLAUDE_BIN=/Users/cbusillo/.claude/local/claude tools/claude_subagent_quick.sh`
+    - Ensure Claude CLI is available. If not on PATH, use the known binary: `/Users/cbusillo/.claude/local/claude` or
+      set `CLAUDE_BIN`.
+    -
+    `chmod +x tools/claude_subagent_quick.sh && CLAUDE_BIN=/Users/cbusillo/.claude/local/claude tools/claude_subagent_quick.sh`
+    - By default the runner uses `--permission-mode bypassPermissions` for non-interactive writes/tests. Override with
+      `PERMISSION_MODE=acceptEdits` if you want to auto-accept edits but keep other prompts.
 - Expect:
-  - Applied changes under `addons/` and tests under `addons/<module>/tests/`.
-  - Tests executed via `uv run test-unit addons/<module>` by a testing subagent.
-  - Iterative fixes until tests pass.
+    - Applied changes under `addons/` and tests under `addons/<module>/tests/`.
+    - Tests executed via `uv run test-unit addons/<module>` by a testing subagent.
+    - Iterative fixes until tests pass.
 - Observe:
-  - Transcript: `tmp/claude-subagent-test/transcript.jsonl`
-  - Artifacts (long logs): `tmp/subagent-runs/<RUN_ID>/...`
+    - Transcript: `tmp/claude-subagent-test/transcript.jsonl`
+    - Artifacts (long logs): `tmp/subagent-runs/<RUN_ID>/...`
 - Docs:
-  - `docs/agents/SUBAGENT_WORKFLOW.md`
-  - `docs/agents/SUBAGENT_TEST_SCENARIO.md`
+    - `docs/agents/SUBAGENT_WORKFLOW.md`
+    - `docs/agents/SUBAGENT_TEST_SCENARIO.md`
 
 ## Extra Addons as Submodules (Operator Rule)
 
 - When introducing external addons, add them as Git submodules:
-  - `git submodule add <repo-url> addons/<addon_name>`
-  - Commit `.gitmodules` and the submodule path
+    - `git submodule add <repo-url> addons/<addon_name>`
+    - Commit `.gitmodules` and the submodule path
 - Compose already mounts `./addons` to `/volumes/addons`; no extra mapping needed.
 - For submodule changes, prefer opening a PR in the submodule repo; avoid committing generated files here.
 
 ## Integration Test Digest
 
 - After running the Claude subagent trial, summarize the transcript:
-  - `uv run python tools/claude_subagent_digest.py`
+    - `uv run python tools/claude_subagent_digest.py`
 - The digest reports: permission mode, subagents used, Bash writes to addon files, and uv test invocations.
 
 ## Codex CLI Operating Rules
@@ -102,7 +108,9 @@ Notes
 - File edits: Use `apply_patch` with minimal, focused changes; prefer editing existing files over creating new ones.
 - Validation: Run targeted tests for what you changed; expand scope only after green.
 - Brevity: Default to concise, structured updates; avoid filler. Prefer bullets with bolded keywords.
-- Shell & IO: Prefer built‑in tools for routine work. Use `rg` via the built‑in shell (or built‑in file ops) for reads/search/listing, and `apply_patch` for edits. Use JetBrains/IDE tools only for IDE‑specific actions (inspections, rename refactors, symbol info), not for routine file IO.
+- Shell & IO: Prefer built‑in tools for routine work. Use `rg` via the built‑in shell (or built‑in file ops) for
+  reads/search/listing, and `apply_patch` for edits. Use JetBrains/IDE tools only for IDE‑specific actions (inspections,
+  rename refactors, symbol info), not for routine file IO.
 
 ## Tooling Priority (Fast Path)
 

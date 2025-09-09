@@ -13,6 +13,8 @@ Run
 
 - Operator-run script (simple, no worktrees):
     - `CLAUDE_BIN=/Users/cbusillo/.claude/local/claude tools/claude_subagent_quick.sh`
+    - The runner defaults to `--permission-mode bypassPermissions` so writes/tests proceed non‑interactively. Override
+      with `PERMISSION_MODE=acceptEdits` if desired.
 
 What to observe
 

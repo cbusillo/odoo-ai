@@ -12,5 +12,6 @@ Scope
 
 Rules
 - Create minimal tests under `addons/<module>/tests/` with correct tags, naming, and layout.
-- Run `uv run test-unit addons/<module>` and iterate until green.
+- Prefer Edit/Write to create test files; fall back to Bash here‑docs if edit prompts cannot be approved in this non‑interactive run.
+- Use Bash to run `uv run test-unit addons/<module>`; iterate until green.
 - Save long outputs under `tmp/subagent-runs/${RUN_ID}/scout/`.

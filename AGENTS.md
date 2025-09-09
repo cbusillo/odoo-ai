@@ -67,11 +67,9 @@ Notes
 ## Claude Subagent Trial (Operator run)
 
 - Purpose: Exercise real subagent delegation end‑to‑end; Claude should APPLY changes, run tests, and iterate.
-- Run inline (simple):
+- Run (simple, no worktrees):
   - Ensure Claude CLI is available. If not on PATH, use the known binary: `/Users/cbusillo/.claude/local/claude` or set `CLAUDE_BIN`.
-  - `chmod +x tools/claude_subagent_test.sh && CLAUDE_BIN=/Users/cbusillo/.claude/local/claude tools/claude_subagent_test.sh`
-- Run isolated (worktree, non‑destructive):
-  - `CLAUDE_BIN=/Users/cbusillo/.claude/local/claude tools/claude_subagent_test.sh --worktree --cleanup`
+  - `chmod +x tools/claude_subagent_quick.sh && CLAUDE_BIN=/Users/cbusillo/.claude/local/claude tools/claude_subagent_quick.sh`
 - Expect:
   - Applied changes under `addons/` and tests under `addons/<module>/tests/`.
   - Tests executed via `uv run test-unit addons/<module>` by a testing subagent.
@@ -82,6 +80,20 @@ Notes
 - Docs:
   - `docs/agents/SUBAGENT_WORKFLOW.md`
   - `docs/agents/SUBAGENT_TEST_SCENARIO.md`
+
+## Extra Addons as Submodules (Operator Rule)
+
+- When introducing external addons, add them as Git submodules:
+  - `git submodule add <repo-url> addons/<addon_name>`
+  - Commit `.gitmodules` and the submodule path
+- Compose already mounts `./addons` to `/volumes/addons`; no extra mapping needed.
+- For submodule changes, prefer opening a PR in the submodule repo; avoid committing generated files here.
+
+## Integration Test Digest
+
+- After running the Claude subagent trial, summarize the transcript:
+  - `uv run python tools/claude_subagent_digest.py`
+- The digest reports: permission mode, subagents used, Bash writes to addon files, and uv test invocations.
 
 ## Codex CLI Operating Rules
 

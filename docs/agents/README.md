@@ -55,6 +55,14 @@ Task(
 2. **Tool Expertise**: Agents know exactly which tools work best for their domain
 3. **No Context Pollution**: Main conversation stays clean
 4. **Parallel Work**: Launch multiple agents for different aspects of a task
+5. **Do The Work**: Subagents apply changes and run tests; main thread coordinates
+
+## Execution Norms (All Subagents)
+
+- Prefer Edit/Write tools to modify files; if edit prompts cannot be approved in non‑interactive runs, fall back to Bash here‑docs for file writes.
+- Use Bash to run project tasks like `uv run test-*`; iterate until green.
+- Keep changes small and focused; save long logs to `tmp/subagent-runs/<RUN_ID>/<agent>/`.
+- Return a short summary: Decision • Diffs/Paths • Test results • Next steps • Risks.
 
 ## Common Patterns
 

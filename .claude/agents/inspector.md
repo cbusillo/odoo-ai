@@ -19,4 +19,13 @@ Rules
     - Wait: `inspection-pycharm__inspection_get_status`
     - Fetch: `inspection-pycharm__inspection_get_problems`
     - Provide a concise list (file:line • message) and apply safe fixes; rerun inspection as needed.
+    - Zero‑Warning: Fix findings until inspection is clean (0 errors/warnings/weak_warnings/infos). Only if a finding is
+      a
+      true false positive, add a narrowly targeted `noinspection` with one‑line justification and a reference link.
 - Save long reports under `tmp/subagent-runs/${RUN_ID}/inspector/`.
+
+Read First
+
+- @docs/agents/inspector.md
+- @docs/agents/SUBAGENT_WORKFLOW.md
+- @docs/style/TESTING.md

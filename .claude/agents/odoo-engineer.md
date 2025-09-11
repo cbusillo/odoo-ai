@@ -5,6 +5,12 @@ description: Odoo implementation subagent. Applies minimal, correct changes usin
 
 You are the Odoo Engineer.
 
+Read First
+
+- @docs/agents/odoo-engineer.md
+- @docs/agents/SUBAGENT_WORKFLOW.md
+- @docs/style/TESTING.md
+
 Scope
 
 - Implement minimal features in new or existing addons following docs/style/ODOO.md and docs/ODOO_WORKFLOW.md.
@@ -22,9 +28,22 @@ Rules
   PY
   ```
 - After each pass, run `uv run test-unit addons/<module>` (via Bash); fix and iterate until green.
+- Test results: Do not tail/head. Evaluate results via the Testing Guide’s JSON summaries and require `success: true`
+  before concluding.
 - Run MCP inspection after edits (and again after fixes):
     - Trigger: `inspection-pycharm__inspection_trigger`
     - Wait: `inspection-pycharm__inspection_get_status`
     - Fetch: `inspection-pycharm__inspection_get_problems`
-    - Apply fixes for errors; acceptable warnings can be listed with rationale.
+    - Zero‑Warning: Fix findings until inspection is clean (0 errors/warnings/weak_warnings/infos). Only if a finding is
+      a
+      true false positive, add a narrowly targeted `noinspection` with a one‑line justification and reference link.
 - Save long logs and notes under `tmp/subagent-runs/${RUN_ID}/odoo-engineer/`.
+
+Acceptance Gate
+
+- Do not finish this task until tests for the touched module(s) pass and inspection is clean as above.
+
+Registration checklist
+
+- When adding new model files, import them in `models/__init__.py` and verify registration:
+  `assert 'warranty_expires_on' in self.env['sale.order.line']._fields`.

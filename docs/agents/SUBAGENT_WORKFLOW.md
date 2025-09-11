@@ -23,10 +23,14 @@ Subagent contract (do the work, then report)
 - Evidence: cite file paths and key lines; save long logs/artifacts to `tmp/subagent-runs/<RUN_ID>/<agent>/`
 - Summary: Decision • Diffs/Paths • Test results • Next steps • Risks/assumptions
 
-Acceptance gate
+Acceptance gate (Zero‑Warning Policy)
 
-- Do not finish until targeted tests pass AND an MCP inspection run has no errors; otherwise apply fixes and provide a
-  concise failure summary with next actions.
+- Do not finish until BOTH are true:
+    - Targeted tests pass; and
+    - MCP inspection reports 0 errors, warnings, weak_warnings, and infos for the touched files.
+- If a finding is a true false positive, add a targeted `noinspection` with a one‑line justification and a reference
+  link
+  (rare; prefer fixing the code). Never add blanket/regex suppressions.
 
 Inspection (MCP)
 
@@ -34,7 +38,30 @@ Inspection (MCP)
     - Trigger: `inspection-pycharm__inspection_trigger`
     - Wait: `inspection-pycharm__inspection_get_status`
     - Fetch: `inspection-pycharm__inspection_get_problems`
-    - Fix issues, then rerun inspection if needed.
+    - Fix issues, then rerun inspection until clean (per Zero‑Warning Policy).
+
+Test Results (Do not tail/head)
+
+- Run tests without piping (no `| tail`/`| head`). After completion, read the JSON summary:
+    - Prefer `uv run test-gate --json` and use the single JSON payload; or read `tmp/test-logs/latest/summary.json` (
+      overall), and `tmp/test-logs/<session>/unit/all.summary.json` for details.
+- Treat `success: true` as the only passing condition. If false, iterate and fix; then rerun tests and re‑read JSON.
+- Example check:
+  ```bash
+  python - <<'PY'
+  import json, pathlib, sys
+  s = json.load(open(pathlib.Path('tmp/test-logs/latest')/'summary.json'))
+  sys.exit(0 if s.get('success') else 1)
+  PY
+  ```
+
+Registration sanity (new models)
+
+- When adding new model files, update `models/__init__.py` to import them.
+- Quick check in Odoo shell or test context:
+  ```python
+  assert 'warranty_expires_on' in self.env['sale.order.line']._fields
+  ```
 
 Tool scope and safety
 

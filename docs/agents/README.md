@@ -59,8 +59,10 @@ Task(
 
 ## Execution Norms (All Subagents)
 
-- Prefer Edit/Write tools to modify files; if edit prompts cannot be approved in non‑interactive runs, fall back to Bash here‑docs for file writes.
-- Use Bash to run project tasks like `uv run test-*`; iterate until green.
+- Prefer Edit/Write tools to modify files; if edit prompts cannot be approved in non‑interactive runs, fall back to Bash
+  here‑docs for file writes.
+- To run and gate tests reliably in one call, use `uv run test-gate --json` (exits 0/1). For targeted phases, use
+  `uv run test-*` and read JSON summaries under `tmp/test-logs/latest/`.
 - Keep changes small and focused; save long logs to `tmp/subagent-runs/<RUN_ID>/<agent>/`.
 - Return a short summary: Decision • Diffs/Paths • Test results • Next steps • Risks.
 

@@ -9,28 +9,57 @@ Project Facts (read‑only)
 - Odoo 18 Enterprise; custom addons under `addons/`.
 - Do not modify generated files: `services/shopify/gql/*`, `graphql/schema/*`.
 - Container mounts (compose):
-  - Host `./addons` → container `/volumes/addons` (authoritative custom addons path)
-  - Host `./docker/scripts` → container `/volumes/scripts`
-  - Named volume `data` → container `/volumes/data`
-  - Mirrors for IDE/debug: host `./addons` → container `/opt/project/addons`; host `./pyproject.toml` → `/opt/project/pyproject.toml:ro`
-- Paths rule: never read `/odoo/*` from host; when container paths are needed, reference `/volumes/*` (or the IDE mirror) via Odoo/Docker tools, not host file ops.
+    - Host `./addons` → container `/volumes/addons` (authoritative custom addons path)
+    - Host `./docker/scripts` → container `/volumes/scripts`
+    - Named volume `data` → container `/volumes/data`
+    - Mirrors for IDE/debug: host `./addons` → container `/opt/project/addons`; host `./pyproject.toml` →
+      `/opt/project/pyproject.toml:ro`
+- Paths rule: never read `/odoo/*` from host; when container paths are needed, reference `/volumes/*` (or the IDE
+  mirror) via Odoo/Docker tools, not host file ops.
 
 House Rules for Claude
 
 - Keep the main thread clean; delegate focused work to subagents.
 - Prefer MCP tools with structured outputs; use shell when needed for project tasks.
 - Execution policy:
-  - Claude may run `uv run test-*` and other project task wrappers directly when required.
-  - Prefer `uv run` wrappers over raw Python; do not invoke `odoo-bin` or `python -m` directly unless explicitly necessary.
-  - Use `odoo-intelligence__*` when it provides better structure (e.g., module updates, test runner APIs) or remote/container isolation; use `docker__*` for container status/logs.
+    - Claude may run `uv run test-*` and other project task wrappers directly when required.
+    - Prefer `uv run` wrappers over raw Python; do not invoke `odoo-bin` or `python -m` directly unless explicitly
+      necessary.
+    - Use `odoo-intelligence__*` when it provides better structure (e.g., module updates, test runner APIs) or
+      remote/container isolation; use `docker__*` for container status/logs.
 - Never run Python directly (`python -m ...`, `pip ...`) in this repo.
 - Avoid recursion and self‑delegation; one pass per subagent role.
+
+Zero‑Warning Policy
+
+- Treat MCP inspection warnings (warning, weak_warning, info) as failures during subagent runs. Fix them or add a
+  narrowly targeted `noinspection` with a one‑line justification and reference link (only for true false positives). Do
+  not use blanket suppressions.
+
+Acceptance Gate
+
+- Do not conclude a task until BOTH are true:
+    - Targeted tests pass via `uv run test-*` for the touched module(s); and
+    - MCP inspection reports 0 errors, warnings, weak_warnings, and infos for the touched files.
+- If MCP inspection is unavailable in this session, state that explicitly and treat it as blocking unless the operator
+  accepts a narrowly justified exception.
+
+Test Results (Read JSON, not terminal tails)
+
+- Run `uv run test-*` without piping. Then parse `tmp/test-logs/latest/summary.json` (or per‑phase `all.summary.json`).
+- Treat `success: true` as pass; otherwise, iterate. Do not use `tail`/`head`/`timeout ... | tail` to infer success.
+
+Registration Sanity
+
+- After adding new model files, update `models/__init__.py` and verify field registration:
+  `assert 'warranty_expires_on' in env['sale.order.line']._fields` (in test context or Odoo shell).
 
 Delegation Strategy (Subagents)
 
 - Default to delegate for anything non‑trivial; keep the main thread for planning and arbitration.
 - Inline (no subagent) is okay for truly trivial, single‑file and low‑risk edits.
-- Strong signals to delegate: cross‑file changes, research/pattern finding, scaffolding tests/tours, or multi‑stage tasks.
+- Strong signals to delegate: cross‑file changes, research/pattern finding, scaffolding tests/tours, or multi‑stage
+  tasks.
 - Roles (see `.claude/agents/`):
     - Archer — research/pattern finding; cites file paths/snippets; no edits.
     - Scout — test scaffolding per docs/style/TESTING.md; minimal tests; no production edits.
@@ -47,8 +76,8 @@ Tooling Guidance
 - Prefer `odoo-intelligence__*` for Odoo searches/updates; `docker__*` for container data.
 - Use built‑ins (Read/Edit/Grep/Glob) when MCP doesn’t cover the need.
 - Access container paths via tools, not host file ops.
- - Diff‑first for multi‑file changes: propose short plan + diffs, wait for approval.
- - Cite evidence with file paths and key line hints when asserting findings.
+- Diff‑first for multi‑file changes: propose short plan + diffs, wait for approval.
+- Cite evidence with file paths and key line hints when asserting findings.
 
 Testing Knowledge
 

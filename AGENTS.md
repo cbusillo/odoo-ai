@@ -33,9 +33,19 @@ doc before writing or updating tests.
 
 - Tools: ALWAYS favor MCP tools when appropriate; see docs/TOOL_SELECTION.md
 - Git: Use `git mv` to preserve history
-- Tests: Use only `uv run` commands below
+- Tests: Use only `uv run` commands below. Preferred single-call gate: `uv run test-gate --json`.
 - Formatting: Use Ruff for Python; Owl.js patterns and no semicolons for JS
 - Python line length: 133 characters max
+
+## Acceptance Gate (Zero‑Warning)
+
+- Do not mark a task complete until BOTH are true:
+    - Targeted tests pass via `uv run test-*` for the touched module(s), and
+    - MCP inspection reports 0 errors, warnings, weak_warnings, and infos for the touched files.
+- If a finding is a true false positive, add a narrowly targeted `noinspection` with a one‑line justification and a
+  reference link. Never add blanket or broad suppressions.
+- If the Inspection MCP is unavailable, state that explicitly and treat inspection as blocking unless the operator
+  accepts a justified exception.
 
 ## Commands
 
@@ -47,6 +57,7 @@ uv run test-tour          # Browser/UI tests
 uv run test-js            # JS/hoot and browser_js tests
 uv run test-all           # Full test suite
 uv run test-clean         # Drop test DBs/filestores and artifacts
+uv run test-gate          # One-call: run/wait/exit 0 on success, 1 on failure
 
 # Code Quality
 uv run ruff format .      # Format Python
@@ -57,7 +68,7 @@ uv run ruff check --fix   # Fix Python issues
 
 - Quick non-interactive check (read-only, prints a short reply):
     - `codex exec --sandbox read-only "Reply with exactly: ok"`
-- Start MCP server (for Claude integration):
+- Start MCP server:
     - `codex mcp`
 
 Notes
@@ -66,26 +77,12 @@ Notes
 - Model selection: omit `--model` to use the CLI default. Override via env only when a task requires it (e.g., large
   context).
 
-## Claude Subagent Trial (Operator run)
+## Codex Workflow (Entry Point)
 
-- Purpose: Exercise real subagent delegation end‑to‑end; Claude should APPLY changes, run tests, and iterate.
-- Run (simple, no worktrees):
-    - Ensure Claude CLI is available. If not on PATH, use the known binary: `/Users/cbusillo/.claude/local/claude` or
-      set `CLAUDE_BIN`.
-    -
-    `chmod +x tools/claude_subagent_quick.sh && CLAUDE_BIN=/Users/cbusillo/.claude/local/claude tools/claude_subagent_quick.sh`
-    - By default the runner uses `--permission-mode bypassPermissions` for non-interactive writes/tests. Override with
-      `PERMISSION_MODE=acceptEdits` if you want to auto-accept edits but keep other prompts.
-- Expect:
-    - Applied changes under `addons/` and tests under `addons/<module>/tests/`.
-    - Tests executed via `uv run test-unit addons/<module>` by a testing subagent.
-    - Iterative fixes until tests pass.
-- Observe:
-    - Transcript: `tmp/claude-subagent-test/transcript.jsonl`
-    - Artifacts (long logs): `tmp/subagent-runs/<RUN_ID>/...`
-- Docs:
-    - `docs/agents/SUBAGENT_WORKFLOW.md`
-    - `docs/agents/SUBAGENT_TEST_SCENARIO.md`
+- Codex workflow: `docs/codex/WORKFLOW.md`
+- Codex task template: `docs/codex/TASK_TEMPLATE.md`
+- Odoo 18 canon: `docs/odoo18/API_PATTERNS.md`, `docs/odoo18/SECURITY_PATTERNS.md`, `docs/odoo18/PERFORMANCE_ORM.md`
+- Style & Testing: `docs/style/ODOO.md`, `docs/style/TESTING.md`
 
 ## Extra Addons as Submodules (Operator Rule)
 
@@ -95,18 +92,24 @@ Notes
 - Compose already mounts `./addons` to `/volumes/addons`; no extra mapping needed.
 - For submodule changes, prefer opening a PR in the submodule repo; avoid committing generated files here.
 
-## Integration Test Digest
+## Tests (How-To Docs)
 
-- After running the Claude subagent trial, summarize the transcript:
-    - `uv run python tools/claude_subagent_digest.py`
-- The digest reports: permission mode, subagents used, Bash writes to addon files, and uv test invocations.
+- Codex integration test guide: `docs/llm-cli-tests/CODEX.md`
 
 ## Codex CLI Operating Rules
 
 - Planning: Use the plan tool; update as you proceed.
 - Preambles: Before grouped tool calls, send a one‑sentence preamble describing what you are about to do.
 - File edits: Use `apply_patch` with minimal, focused changes; prefer editing existing files over creating new ones.
-- Validation: Run targeted tests for what you changed; expand scope only after green.
+- Validation: Prefer `uv run test-gate --json` to run/wait/gate in one call; expand scope only after green.
+    - If using targeted phases, read JSON summaries, not terminal tails. See “LLM‑Friendly Results” in
+      docs/style/TESTING.md. Parse `tmp/test-logs/latest/summary.json` and require `success: true`.
+    - Test counts: JS totals default to definition counts (number of `test(...)` in `*.test.js`). Set
+      `JS_COUNT_STRATEGY=runtime` to report executed Hoot totals.
+    - Pointers: `tmp/test-logs/current` points to the in‑progress session; `tmp/test-logs/latest` points to the last
+      completed session.
+    - Long tours: you may enable detached mode to avoid agent timeouts by setting `TEST_DETACHED=1`.
+      Logs and summaries are still written under `tmp/test-logs/`.
 - Brevity: Default to concise, structured updates; avoid filler. Prefer bullets with bolded keywords.
 - Shell & IO: Prefer built‑in tools for routine work. Use `rg` via the built‑in shell (or built‑in file ops) for
   reads/search/listing, and `apply_patch` for edits. Use JetBrains/IDE tools only for IDE‑specific actions (inspections,
@@ -209,6 +212,7 @@ Prefer MCP over Bash; only fall back to Bash if a needed flag isn’t supported 
 
 1) Scaffold minimal addon (manifest, init) and access rules early.
 2) Add smallest model or extension with a single field/compute.
+    - Update `models/__init__.py` to import new files; verify field registration in `_fields`.
 3) Write minimal tests with Scout (fixtures, factories, a passing unit).
 4) Add views/data; keep security in place; re‑run targeted tests.
 5) If integration needed, add service skeleton and mocks; avoid secrets.

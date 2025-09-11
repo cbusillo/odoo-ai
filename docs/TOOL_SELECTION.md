@@ -41,7 +41,7 @@
 
 ✅ **Use Bash when:**
 
-- Running custom scripts (use `uv run test-*` commands)
+- Running tests: prefer `uv run test-gate --json` to run/wait/gate in one call; for targeted phases use `uv run test-*`.
 - MCP doesn't support specific flags you need
 - Complex piping operations
 - One-off system administration

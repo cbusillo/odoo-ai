@@ -50,6 +50,22 @@ uv run test-report        # Generate HTML report
 
 **That's it!** These commands handle all the complexity internally.
 
+### Long Tours (Detached Mode)
+
+If a tour may run longer than your terminal or agent timeout, run it in detached mode. The runner will start the
+container in the background and stream logs to the usual location.
+
+```bash
+# Enable detached mode for long tours
+TEST_DETACHED=1 uv run test-tour addons/<module>
+
+# Increase overall tour timeout if needed
+TOUR_TIMEOUT=600 uv run test-tour addons/<module>
+```
+
+Logs still go to `tmp/test-logs/<session>/tour/` and JSON summaries are written as usual. Detached mode applies only to
+JS/Tour phases (HttpCase-based).
+
 ### Logs & Summaries (Machine-Friendly)
 
 Every test run writes a single session folder under `tmp/test-logs/test-YYYYMMDD_HHMMSS/` with:

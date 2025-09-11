@@ -126,6 +126,16 @@ record.sudo().write()  # Why: [explanation]
 1. **Research**: "Let me search how Odoo handles this..."
 2. **Evidence**: "Here's how sale/stock/account modules do it..."
 3. **Explain**: "This pattern works because..."
+
+## Test Results and Acceptance Gate
+
+- Prefer `uv run test-gate --json` to handle long runs and return a single JSON payload; it exits 0/1. If you run
+  targeted phases via `uv run test-*`, do not infer success from terminal tails/heads. Read the runner JSON summaries as
+  described in the Testing Guide (LLM‑Friendly Results):
+    - `tmp/test-logs/latest/summary.json` (overall), or per‑phase `all.summary.json`.
+- Treat `success: true` as the only passing signal before proceeding to inspection or declaring done.
+- New models: update `models/__init__.py` and verify field registration (e.g., `_fields['your_field']`).
+
 4. **Recommend**: "Based on Odoo patterns, do this..."
 
 ## Routing

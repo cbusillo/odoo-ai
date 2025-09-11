@@ -61,6 +61,7 @@ from unittest.mock import patch, MagicMock
 # PREFERRED: patch.object
 from ..services.shopify.client import ShopifyClient
 
+
 @patch.object(ShopifyClient, "execute")
 def test_with_mock(self, mock_execute: MagicMock):
     mock_execute.return_value = {"data": {...}}
@@ -134,10 +135,49 @@ Use our Docker‑aware runner to execute tests and collect structured artifacts.
     - `uv run test-all` — run all phases and aggregate results
     - `uv run test-unit` | `uv run test-js` | `uv run test-integration` | `uv run test-tour`
     - `uv run test-clean` — drop test DBs and filestores
+    - `uv run test-gate [--json]` — one-call: ensure running, wait, print bottom line, exit 0/1
+    - Advanced:
+        - `uv run test-launch` — start in background (JSON pid)
+        - `uv run test-wait [--wait --timeout 7200 --json]` — poll/await completion
+        - `uv run test-bottomline [--json]` — bottom-line summary only
 - Timeouts: configured in `pyproject.toml` under `[tool.odoo-test.timeouts]`
 - Logs: `tmp/test-logs/test-YYYYMMDD_HHMMSS/` with per‑phase `all.log`, `all.summary.json`, `all.failures.json` and a
-  session `summary.json`/`digest.json` at the root. `tmp/test-logs/latest` points to the latest session.
+  session `summary.json`/`digest.json` at the root.
+    - `tmp/test-logs/current` → the in‑progress session (set when a run starts; cleared when it finishes)
+    - `tmp/test-logs/latest`  → the most recent completed session
 - DB strategy: unit split uses `opw_ut_<module>`; clone‑based phases use `opw_test_<phase>`. Cleanup removes both
   patterns.
 - Tips: If your shell sandbox blocks Docker, use the PyCharm “All Tests” run config. For JS/Tour timeouts, warm the
   instance or raise the phase timeout in `pyproject.toml`.
+
+## LLM‑Friendly Results (Do Not Tail/Head)
+
+- The runner writes structured JSON you can parse instead of scraping terminal output.
+- Preferred checks (in order):
+    - During a run: `tmp/test-logs/current/summary.json` (if present), otherwise
+    - After completion: `tmp/test-logs/latest/summary.json` → overall session summary (`success: true|false`).
+    - Per‑phase aggregate: `tmp/test-logs/<session>/<phase>/all.summary.json` (e.g., `unit/all.summary.json`).
+    - Counts:
+        - By default, JS counts use definitions (number of `test(...)` in `*.test.js`). Python counts come from Odoo
+          logs.
+        - To use executed Hoot totals instead, set `JS_COUNT_STRATEGY=runtime`.
+
+Tips
+
+- `uv run test-wait` prefers `current` when present, then falls back to `latest`. Use `--session` to target a specific
+  run.
+    - Simplest agent path: `uv run test-gate --json` (single call; exits 0/1).
+- Minimal Python snippet to assert pass/fail:
+  ```bash
+  python - <<'PY'
+  import json, pathlib, sys
+  latest = pathlib.Path('tmp/test-logs/latest')
+  with open(latest/'summary.json') as f:
+      s = json.load(f)
+  ok = bool(s.get('success'))
+  print('tests_success:', ok)
+  sys.exit(0 if ok else 1)
+  PY
+  ```
+- Never rely on `| tail` / `| head` / `timeout ... | tail` to infer success; these can truncate summaries and mislead
+  agents. Always read the JSON files.

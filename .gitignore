@@ -204,3 +204,5 @@ odoo.*.conf
 
 # Claude Code agent stack files (recursion prevention)
 .claude/agent-stack/
+
+*.local.*

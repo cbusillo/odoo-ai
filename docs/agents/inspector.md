@@ -102,6 +102,7 @@ name = fields.Char()  # Auto-generates "Name" label
 ## Routing
 
 **Who I delegate TO (CAN call):**
+
 - **Refactor agent** → Bulk fixes and systematic code improvements
 - **Flash agent** → Performance issues and optimization
 - **Owl agent** → Frontend quality and component issues
@@ -160,3 +161,10 @@ Task(
 - **Model selection details**: Load @docs/system/MODEL_SELECTION.md
 - **MCP tool optimization**: Load @docs/TOOL_SELECTION.md
 - **Style guide integration**: Load @docs/style/README.md
+
+## Test Results and Acceptance Gate
+
+- After fixes, the simplest gate is `uv run test-gate --json` (exits 0/1). For targeted phases use `uv run test-*`. Do
+  not rely on piped output; evaluate JSON summaries per the Testing Guide (LLM‑Friendly Results):
+    - `tmp/test-logs/latest/summary.json` (overall), or per‑phase `all.summary.json`.
+- Proceed only when tests `success` is true and MCP inspection reports zero errors/warnings/weak_warnings/infos.

@@ -59,6 +59,14 @@ class TestFeature(ProductConnectTransactionCase):
 
 **See [Testing Guide](../TESTING.md) for complete documentation**
 
+Result evaluation (must follow)
+
+- Do not pipe output through `head`/`tail`/`timeout ... | tail`.
+- Easiest: run `uv run test-gate --json` to wait and gate in one call (exit 0/1). If you run phases separately, read the
+  runner JSON summary per the Testing Guide’s “LLM‑Friendly Results” section:
+    - `tmp/test-logs/latest/summary.json` (overall), or per‑phase `all.summary.json`.
+- Treat `success: true` as the only passing condition before handing back to the main thread.
+
 ```bash
 # IMPORTANT: Always use uv run commands - NEVER call Python scripts directly!
 

@@ -7,7 +7,7 @@ Steps
 - Check approvals and sandbox mode; escalate only if necessary.
 - Verify paths (host vs container). Use Odoo/Docker tools for container files.
 - Run targeted tests: `uv run test-unit addons/<module>` to narrow the blast radius.
-- Capture logs: `uv run test-all` writes to `tmp/test-logs/latest/`.
+- Gate and capture: `uv run test-gate --json` waits and exits 0/1, writing artifacts under `tmp/test-logs/latest/`.
 - If Claude/Codex session is inconsistent, start a fresh session and re-attach minimal context.
 
 Notes

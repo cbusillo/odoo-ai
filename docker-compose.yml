@@ -48,8 +48,8 @@ services:
     restart: unless-stopped
     shm_size: "2gb"
     environment:
-      - CHROMIUM_BIN=/usr/bin/chromium
-      - CHROMIUM_FLAGS=--headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-software-rasterizer --window-size=1920,1080 --no-first-run --no-default-browser-check --disable-features=TranslateUI,site-per-process,IsolateOrigins,BlockInsecurePrivateNetworkRequests
+      CHROMIUM_BIN: /usr/bin/chromium
+      CHROMIUM_FLAGS: --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-software-rasterizer --window-size=1920,1080 --no-first-run --no-default-browser-check --disable-features=TranslateUI,site-per-process,IsolateOrigins,BlockInsecurePrivateNetworkRequests
   shell:
     <<: *odoo-base
     command: odoo shell -d ${ODOO_DB_NAME}

@@ -25,7 +25,7 @@ COPY --from=pg17 /usr/lib/postgresql/17/bin/pg_dump      /usr/local/bin/pg_dump
 ARG PYTHON_VERSION
 
 RUN apt-get update && \
-    apt-get install -y git openssh-client rsync software-properties-common curl && \
+    apt-get install -y git openssh-client rsync software-properties-common curl ripgrep && \
     add-apt-repository -y ppa:xtradeb/apps && \
     apt-get install -y --no-install-recommends chromium fonts-liberation libu2f-udev && \
     rm -rf /var/lib/apt/lists/*

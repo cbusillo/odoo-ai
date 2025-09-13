@@ -2,7 +2,8 @@
 
 ## My Tools
 
-Prefer MCP search tools over grep/find for structured, filterable results. See [Tool Selection Guide](../TOOL_SELECTION.md).
+Prefer MCP search tools over grep/find for structured, filterable results.
+See [Tool Selection Guide](../TOOL_SELECTION.md).
 
 ### 1. MCP Tools FIRST
 
@@ -76,6 +77,7 @@ mcp__odoo-intelligence__model_query(operation="inheritance", model_name="sale.or
 ## Routing
 
 **Who I delegate TO (CAN call):**
+
 - **GPT agent** → Implementation based on research findings
 - **Planner agent** → Strategic planning using discovered patterns
 - **Refactor agent** → Pattern-based refactoring guidance

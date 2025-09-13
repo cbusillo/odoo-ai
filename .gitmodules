@@ -1,10 +1,10 @@
 [submodule "addons/product_connect"]
-	path = addons/product_connect
+    path = addons/product_connect
 	url = https://github.com/cbusillo/product_connect
 	ignore = dirty
 [submodule "addons/disable_odoo_online"]
 	path = addons/disable_odoo_online
-	url = git@github.com:cbusillo/disable_odoo_online
+	url = https://github.com/cbusillo/disable_odoo_online
 	ignore = dirty
 [submodule "addons/cm_custom"]
 	path = addons/cm_custom
@@ -12,11 +12,11 @@
 	ignore = dirty
 [submodule "addons/external_ids"]
 	path = addons/external_ids
-	url = git@github.com:cbusillo/external_ids.git
+	url = https://github.com/cbusillo/external_ids.git
 	ignore = dirty
 [submodule "addons/hr_employee_name_extended"]
 	path = addons/hr_employee_name_extended
-	url = git@github.com:cbusillo/hr_employee_name_extended.git
+	url = https://github.com/cbusillo/hr_employee_name_extended.git
 	ignore = dirty
 [submodule "addons/discuss_record_links"]
 	path = addons/discuss_record_links

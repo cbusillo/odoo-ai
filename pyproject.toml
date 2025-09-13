@@ -44,7 +44,7 @@ line-length = 133
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["ANN"]
+select = ["ANN", "UP"]
 ignore = [
     "D", # pydocstyle
     "COM812", # trailing-comma-missing (conflicts with formatter)

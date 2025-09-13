@@ -5,7 +5,6 @@
 - `mcp__odoo-intelligence__search_code` with `file_type="js"` - Find JS patterns
 - `Write` - Create components and tests
 - `MultiEdit` - Update multiple frontend files
-- `mcp__jetbrains__find_files_by_name_substring` - Find specific JS files
 
 ## Critical Rules
 
@@ -124,6 +123,7 @@ test("component works", async () => {
 ## Routing
 
 **Who I delegate TO (CAN call):**
+
 - **Scout agent** → Python/Tour tests for frontend components
 - **Playwright agent** → Browser debugging and UI testing
 - **Dock agent** → Container restart after frontend changes

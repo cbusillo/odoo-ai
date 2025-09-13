@@ -206,9 +206,7 @@ if bulk_issues_found:
 
 ## Important Notes
 
-- **Project-wide vs Single-file**:
-    - `mcp__odoo-intelligence__*` = Entire project analysis
-    - `mcp__jetbrains__*` = Current/single file only
+- **Project-wide**: `mcp__odoo-intelligence__*` = Entire project analysis
 - **Always include agent doc**: Use @mention to include the agent's instructions
 - **Be specific**: Clear, focused prompts get better results
 - **Check agent specialties**: Use the right agent for the job

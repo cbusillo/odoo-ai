@@ -15,7 +15,7 @@
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
     <option name="SCRIPT_NAME" value="/odoo/odoo-bin" />
-    <option name="PARAMETERS" value="-u product_connect,disable_odoo_online,external_ids,hr_employee_name_extended,cm_custom --dev=all" />
+    <option name="PARAMETERS" value="-u product_connect,disable_odoo_online,external_ids,hr_employee_name_extended,cm_custom,discuss_record_links --dev=all" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <method v="2" />

@@ -14,6 +14,7 @@
     <mapping directory="" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/addons/cm_custom" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/addons/disable_odoo_online" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/addons/discuss_record_links" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/addons/external_ids" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/addons/hr_employee_name_extended" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/addons/product_connect" vcs="Git" />

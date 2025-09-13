@@ -19,7 +19,7 @@ mcp__odoo-intelligence__model_query(operation="inheritance", model_name="product
 
 # Step 3: Test theories
 mcp__odoo-intelligence__execute_code(
-    code="env['ir.ui.view'].search([('type','=','tree')]).mapped('arch')[:100]"
+    code="env['ir.ui.view'].search([('type','=','list')]).mapped('arch')[:100]"
 )
 
 # Step 4: Read specific implementations

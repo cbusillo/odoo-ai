@@ -96,7 +96,7 @@ def research_specific_implementations(pattern):
 <record id="action_product_multigraph" model="ir.actions.act_window">
     <field name="name">Product Analysis</field>
     <field name="res_model">product.template</field>
-    <field name="view_mode">tree,form,graph</field>
+    <field name="view_mode">list,form,graph</field>
     <field name="context">{
         'graph_view': 'multigraph',
         'default_view_type': 'graph'

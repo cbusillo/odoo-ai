@@ -32,6 +32,11 @@ test-all = "tools.test_commands:run_all_tests"
 test-stats = "tools.test_commands:show_test_stats"
 test-clean = "tools.test_commands:cleanup_all_test_artifacts"
 restore-from-upstream = "tools.docker_runner:restore_from_upstream"
+test-wait = "tools.test_wait:main"
+test-launch = "tools.test_launch:main"
+test-bottomline = "tools.test_bottomline:main"
+test-gate = "tools.test_gate:main"
+
 
 [tool.odoo-test.timeouts]
 unit = 600

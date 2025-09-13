@@ -141,7 +141,7 @@ const mockAction = {
             type: "ir.actions.act_window",
             name: "Test Action",
             res_model: "product.template",
-            view_mode: "tree,form"
+            view_mode: "list,form"
         }
     },
     
@@ -305,7 +305,7 @@ const mockField = {
                     arch: '<form><field name="name"/></form>'
                 },
                 list: {
-                    arch: '<tree><field name="name"/></tree>'
+                    arch: '<list><field name="name"/></list>'
                 }
             }
         }

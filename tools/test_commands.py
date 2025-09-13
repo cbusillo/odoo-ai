@@ -34,9 +34,12 @@ class TestSettings(BaseSettings):
     test_log_keep: int = Field(12, alias="TEST_LOG_KEEP")
     test_scoped_cleanup: bool = Field(True, alias="TEST_SCOPED_CLEANUP")
 
-    tour_warmup: int = Field(0, alias="TOUR_WARMUP")
-    js_workers: int = Field(2, alias="JS_WORKERS")
+    tour_warmup: int = Field(1, alias="TOUR_WARMUP")
+    js_workers: int = Field(0, alias="JS_WORKERS")
     tour_workers: int = Field(0, alias="TOUR_WORKERS")
+    # Run docker compose test containers detached and stream logs (helps long tours)
+    # Optional detached mode for JS/Tour. Set TEST_DETACHED=1 to enable.
+    test_detached: bool = Field(False, alias="TEST_DETACHED")
 
     test_tags_override: str | None = Field(None, alias="TEST_TAGS")
     test_log_session: str | None = Field(None, alias="TEST_LOG_SESSION")
@@ -121,7 +124,6 @@ def kill_browsers_and_zombies() -> None:
 
 
 def safe_terminate_process(process: subprocess.Popen) -> None:
-
     try:
         # First attempt: gentle termination
         if process.poll() is None:
@@ -355,7 +357,6 @@ def run_js_tests(target_modules: list[str] | None = None, *, session_dir: Path |
         selected_modules,
         timeout=timeout_cfg,
         is_js_test=True,
-        use_module_prefix=False,
         category="js",
         session_dir=session_dir,
     )
@@ -409,6 +410,26 @@ def run_all_tests() -> int:
     session_dir.mkdir(parents=True, exist_ok=True)
     os.environ["TEST_LOG_SESSION"] = session_name
     session_started = time.time()
+    # Advertise in-progress session via 'current' pointer to avoid confusion with 'latest'
+    try:
+        def _update_current_symlink(path: Path) -> None:
+            cur = Path("tmp/test-logs") / "current"
+            try:
+                if cur.exists() or cur.is_symlink():
+                    cur.unlink()
+            except OSError:
+                pass
+            rel = os.path.relpath(path, cur.parent)
+            try:
+                cur.symlink_to(rel)
+            except OSError:
+                (cur.with_suffix(".json")).write_text(
+                    json.dumps({"schema_version": SUMMARY_SCHEMA_VERSION, "current": str(path)}, indent=2)
+                )
+
+        _update_current_symlink(session_dir)
+    except OSError:
+        pass
 
     # Prune older sessions (keep last N)
     try:
@@ -452,6 +473,41 @@ def run_all_tests() -> int:
         rc_tour = None
 
     any_fail = any(code is not None and code != 0 for code in (rc_unit, rc_js, rc_integration, rc_tour))
+
+    # Compute source-defined test counts for visibility and parity checks
+    def _count_py_tests(glob_pattern: str) -> int:
+        try:
+            total = 0
+            for p in Path("addons").glob(glob_pattern):
+                if p.is_file() and p.suffix == ".py":
+                    try:
+                        txt = p.read_text(errors="ignore")
+                        total += len(re.findall(r"^\s*def\s+test_", txt, flags=re.MULTILINE))
+                    except OSError:
+                        pass
+            return total
+        except Exception:
+            return 0
+
+    def _count_js_tests() -> int:
+        try:
+            total = 0
+            for p in Path("addons").rglob("*.test.js"):
+                try:
+                    txt = p.read_text(errors="ignore")
+                    total += len(re.findall(r"\btest\s*\(", txt))
+                except OSError:
+                    pass
+            return total
+        except Exception:
+            return 0
+
+    source_counts = {
+        "unit": _count_py_tests("**/tests/unit/**/*.py"),
+        "integration": _count_py_tests("**/tests/integration/**/*.py"),
+        "tour": _count_py_tests("**/tests/tour/**/*.py"),
+        "js": _count_js_tests(),
+    }
     # Build aggregate summary for the whole session
     aggregate = {
         "schema_version": SUMMARY_SCHEMA_VERSION,
@@ -472,6 +528,8 @@ def run_all_tests() -> int:
             "tour": rc_tour,
         },
         "success": not any_fail,
+        "counters_source": source_counts,
+        "counters_source_total": sum(int(v or 0) for v in source_counts.values()),
     }
 
     # Aggregate counters across phases when available
@@ -508,6 +566,17 @@ def run_all_tests() -> int:
     try:
         _write_session_index(session_dir, aggregate)
         _update_latest_symlink(session_dir)
+    except OSError:
+        pass
+
+    # Clear 'current' pointer now that the run has finished
+    try:
+        cur = Path("tmp/test-logs") / "current"
+        if cur.exists() or cur.is_symlink():
+            cur.unlink()
+        cj = cur.with_suffix(".json")
+        if cj.exists():
+            cj.unlink()
     except OSError:
         pass
 
@@ -745,6 +814,28 @@ def _maybe_update_summary_counters_from_line(line: str, summary: dict) -> None:
             summary["counters"]["tests_run"] = max(summary["counters"]["tests_run"], tests)
             return
 
+        # odoo.tests.result: "0 failed, 0 error(s) of 20 tests when loading database ..."
+        m = re.search(r"(?P<fail>\d+)\s+failed,\s+(?P<err>\d+)\s+error\(s\)\s+of\s+(?P<tests>\d+)\s+tests\b", ansi_free)
+        if m:
+            tests = int(m.group("tests"))
+            fails = int(m.group("fail"))
+            errs = int(m.group("err"))
+            c = summary.setdefault("counters", {})
+            c["tests_run"] = max(int(c.get("tests_run", 0)), tests)
+            # Only set failures/errors if they’re higher than current (avoid lowering on mixed lines)
+            c["failures"] = max(int(c.get("failures", 0)), fails)
+            c["errors"] = max(int(c.get("errors", 0)), errs)
+            return
+
+        # odoo.tests.stats: "module_name: 48 tests 104.74s ..."
+        m = re.search(r"\b(?P<tests>\d+)\s+tests\b", ansi_free)
+        if m and "odoo.tests.stats:" in ansi_free:
+            tests = int(m.group("tests"))
+            summary.setdefault("counters", {}).setdefault("tests_run", 0)
+            summary["counters"]["tests_run"] = max(summary["counters"]["tests_run"], tests)
+            # stats line doesn’t include failure counts, so we don’t touch them here
+            return
+
         # FAILED (failures=1, errors=0, skipped=2)
         m = _RE_FAILED.search(ansi_free)
         if m:
@@ -760,6 +851,25 @@ def _maybe_update_summary_counters_from_line(line: str, summary: dict) -> None:
                     summary["counters"]["errors"] = val
             return
 
+        # HOOT overall result: either "[HOOT] Failed 28 tests (45 passed, ...)" or "[HOOT] Passed 49 tests (...)"
+        m = re.search(r"\[HOOT]\s+Failed\s+(?P<fail>\d+)\s+tests?\s*\((?P<pass>\d+)\s+passed", ansi_free)
+        if m:
+            fails = int(m.group("fail"))
+            passed = int(m.group("pass"))
+            total = fails + passed
+            c = summary.setdefault("counters", {})
+            c["tests_run"] = max(int(c.get("tests_run", 0)), total)
+            c["failures"] = fails
+            return
+
+        m = re.search(r"\[HOOT]\s+Passed\s+(?P<pass>\d+)\s+tests?\b", ansi_free)
+        if m:
+            passed = int(m.group("pass"))
+            c = summary.setdefault("counters", {})
+            c["tests_run"] = max(int(c.get("tests_run", 0)), passed)
+            # On pure success line, failures remain unchanged (implicitly 0)
+            return
+
         # JS runs often log errors as "ERROR: Class.test_method" lines; count them
         if " ERROR: " in ansi_free and re.search(r"\b\w+\.test_", ansi_free):
             summary.setdefault("counters", {}).setdefault("errors", 0)
@@ -773,6 +883,92 @@ def _maybe_update_summary_counters_from_line(line: str, summary: dict) -> None:
                     summary["counters"]["skips"] = int(pm.group("val"))
                     break
     except (re.error, ValueError):
+        pass
+
+
+def _recompute_counters_from_log(log_path: Path, summary: dict) -> None:
+    """Second-pass counter computation from the full saved log.
+
+    This ensures detached runs (where streaming may miss lines) still get
+    accurate `tests_run`/`failures`/`errors` based on authoritative result lines.
+    """
+    try:
+        if not log_path.exists():
+            return
+        # Start fresh but keep greater-of values if something was already seen
+        base = dict(summary.get("counters") or {})
+        counters = {"tests_run": int(base.get("tests_run", 0)), "failures": int(base.get("failures", 0)), "errors": int(base.get("errors", 0)), "skips": int(base.get("skips", 0))}
+        hoot_pass_total = 0
+        hoot_fail_total = 0
+        # Track the authoritative last seen Odoo result totals for Python phases
+        last_total = None  # (tests, failures, errors, skips)
+        with open(log_path, "r", errors="ignore") as f:
+            for raw in f:
+                line = raw.rstrip("\n")
+                # Prefer the authoritative phase totals from odoo.tests.result
+                m_res = re.search(r"(?P<fail>\d+)\s+failed,\s+(?P<err>\d+)\s+error\(s\)\s+of\s+(?P<tests>\d+)\s+tests\b", line)
+                if m_res:
+                    fails = int(m_res.group("fail"))
+                    errs = int(m_res.group("err"))
+                    tests = int(m_res.group("tests"))
+                    # Skips often not present on this line; preserve previous value
+                    last_total = (tests, fails, errs, counters.get("skips", 0))
+                    continue
+
+                # Accumulate HOOT totals for JS runtime mode
+                m = re.search(r"\[HOOT]\s+Passed\s+(?P<pass>\d+)\s+tests?\b", line)
+                if m:
+                    hoot_pass_total += int(m.group("pass"))
+                    continue
+                m = re.search(r"\[HOOT]\s+Failed\s+(?P<fail>\d+)\s+tests?\s*\((?P<pass>\d+)\s+passed", line)
+                if m:
+                    hoot_fail_total += int(m.group("fail"))
+                    hoot_pass_total += int(m.group("pass"))
+                    continue
+
+                # Limited incremental parsing: allow FAILED(...) lines to set skips if present
+                m_failed = re.search(r"FAILED\s*\((?P<parts>[^)]*)\)", line)
+                if m_failed:
+                    parts = m_failed.group("parts")
+                    msk = re.search(r"skipped\s*=\s*(?P<val>\d+)", parts)
+                    if msk:
+                        try:
+                            counters["skips"] = max(int(counters.get("skips", 0)), int(msk.group("val")))
+                        except Exception:
+                            pass
+                    continue
+        # Write back
+        if summary.get("category") == "js":
+            # Default strategy now matches source-defined counts to avoid confusion
+            strategy = os.environ.get("JS_COUNT_STRATEGY", "definitions").lower()
+            if strategy == "definitions":
+                # Mirror source-defined count for parity
+                try:
+                    def_count = 0
+                    for p in Path("addons").rglob("*.test.js"):
+                        try:
+                            txt = p.read_text(errors="ignore")
+                            def_count += len(re.findall(r"\btest\s*\(", txt))
+                        except OSError:
+                            pass
+                    counters["tests_run"] = def_count
+                except Exception:
+                    pass
+            elif (hoot_pass_total + hoot_fail_total) > 0:
+                counters["tests_run"] = hoot_pass_total + hoot_fail_total
+                counters["failures"] = max(int(counters.get("failures", 0)), hoot_fail_total)
+        else:
+            # For Python phases, override with authoritative last_total if available
+            if last_total is not None:
+                tests, fails, errs, skips = last_total
+                counters["tests_run"] = tests
+                counters["failures"] = fails
+                counters["errors"] = errs
+                counters["skips"] = max(int(counters.get("skips", 0)), int(skips or 0))
+
+        summary["counters"] = counters
+    except Exception:
+        # Non-fatal: leave prior counters
         pass
 
 
@@ -1080,9 +1276,6 @@ def cleanup_all_test_artifacts() -> None:
 
     print("=" * 60)
     print("✅ Test cleanup completed")
-
-
-
 
 
 def restart_script_runner_with_orphan_cleanup() -> None:
@@ -1421,6 +1614,7 @@ def run_docker_test_command(
     use_module_prefix: bool = True,
     category: str | None = None,
     session_dir: Path | None = None,
+    _attempt: int = 1,
 ) -> int:
     if modules_to_install is None:
         modules_to_install = get_our_modules()
@@ -1458,6 +1652,10 @@ def run_docker_test_command(
 
     restart_script_runner_with_orphan_cleanup()
 
+    # Ensure a clean browser environment before JS/tour tests to avoid stray processes
+    if is_js_test or is_tour_test:
+        kill_browsers_and_zombies()
+
     test_password = None
     if use_production_clone:
         test_password = clone_production_database(db_name)
@@ -1470,6 +1668,8 @@ def run_docker_test_command(
             print(f"   ✅ Keeping modules installed to preserve production data; will run with -u")
     else:
         drop_and_create_test_database(db_name)
+        if is_js_test or is_tour_test:
+            test_password = setup_test_authentication(db_name)
 
     # Build test tags - optionally scope tags to specific modules using proper Odoo syntax
     # Syntax: [-][tag][/module][:class][.method]
@@ -1536,8 +1736,8 @@ def run_docker_test_command(
     if test_password:
         cmd.extend(["-e", f"ODOO_TEST_PASSWORD={test_password}"])
 
-    # Pass through selected debug env vars for JS diagnostics
-    for var in ("JS_PRECHECK", "JS_DEBUG"):
+    # Pass through selected debug/timeouts env vars for JS/Tour diagnostics and control
+    for var in ("JS_PRECHECK", "JS_DEBUG", "TOUR_TIMEOUT"):
         val = os.environ.get(var)
         if val:
             cmd.extend(["-e", f"{var}={val}"])
@@ -1560,6 +1760,7 @@ def run_docker_test_command(
                 "/odoo/odoo-bin",
                 "-d",
                 db_name,
+                "--load=web",
                 module_flag,
                 modules_str,
                 "--test-tags",
@@ -1574,6 +1775,10 @@ def run_docker_test_command(
                 "--without-demo=all",
             ]
         )
+        # Force fresh assets for tours to avoid stale web.assets_tests bundles
+        if is_tour_test:
+            cmd.append("--dev=assets")
+        # Do not enable dev assets for JS tests; dev can slow cold starts and trigger navigate timeouts.
         # Optionally disable enterprise addons for JS to avoid auto-installing enterprise stack (faster and avoids mismatches)
         # Note: Do not enable dev assets for JS tests. `--dev=all` slows
         # cold starts and triggers 20s websocket navigation timeouts in
@@ -1585,6 +1790,7 @@ def run_docker_test_command(
                 "/odoo/odoo-bin",
                 "-d",
                 db_name,
+                # Keep default addons path for unit/integration; explicit path only matters for JS/tour
                 module_flag,
                 modules_str,
                 "--test-tags",
@@ -1683,7 +1889,24 @@ def run_docker_test_command(
             f.flush()
 
             # Use Popen to stream output to both console and file
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+            detached = get_settings().test_detached and (is_tour_test or is_js_test)
+            container_id = None
+            if detached:
+                name = f"{get_settings().project_name}-{derived_category}-{timestamp}-{secrets.token_hex(3)}"
+                run_cmd = ["docker", "compose", "run", "-d", "--name", name] + cmd[4:]
+                run = subprocess.run(run_cmd, capture_output=True, text=True)
+                if run.returncode != 0:
+                    f.write(run.stdout or "")
+                    f.write(run.stderr or "")
+                    print(run.stdout)
+                    print(run.stderr)
+                    return 1
+                container_id = (run.stdout or name).strip()
+                f.write(f"Detached container: {container_id}\n")
+                print(f"🌀 Detached: {container_id}")
+                process = None
+            else:
+                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
 
             # Track timing for timeout and stall detection
             last_output_time = time.time()
@@ -1724,135 +1947,173 @@ def run_docker_test_command(
                 if current_time - start_time > timeout:
                     print(f"\n⏱️ TIMEOUT: Test execution exceeded {timeout} seconds")
                     f.write(f"\n⏱️ TIMEOUT: Test execution exceeded {timeout} seconds\n")
-                    safe_terminate_process(process)
+                    if detached:
+                        try:
+                            subprocess.run(["docker", "rm", "-f", container_id], capture_output=True)
+                        except Exception:
+                            pass
+                    else:
+                        safe_terminate_process(process)
                     result_code = -1
                     break
 
                 # Use select to check if data is available (non-blocking)
                 try:
-                    ready, _, _ = select.select([process.stdout], [], [], 3.0)
-
-                    if ready:
-                        line = process.stdout.readline()
-                        if not line:  # EOF - process ended
+                    if detached:
+                        # Stream logs in small chunks
+                        chunk = subprocess.run(["docker", "logs", "--since", "3s", container_id], capture_output=True, text=True)
+                        out = chunk.stdout or ""
+                        if out:
+                            print(out, end="")
+                            f.write(out)
+                            f.flush()
+                        # Check if container exited
+                        state = subprocess.run(["docker", "inspect", "-f", "{{.State.Running}}", container_id], capture_output=True, text=True)
+                        if state.stdout.strip() == "false":
+                            # Get exit code
+                            rc = subprocess.run(["docker", "inspect", "-f", "{{.State.ExitCode}}", container_id], capture_output=True, text=True)
+                            try:
+                                result_code = int((rc.stdout or "1").strip())
+                            except Exception:
+                                result_code = 1
                             break
-                        print(line, end="")  # To console
-                        f.write(line)  # To file
-                        f.flush()
-                        last_output_time = current_time
-                        stall_warnings = 0  # Reset on new output
-
-                        # Add line to pattern detection buffer
-                        recent_lines.append(line.strip())
-                        if len(recent_lines) > 20:  # Keep only last 20 lines
-                            recent_lines.pop(0)
-
-                        # Detect hard errors that should mark the run as failed
-                        lower = line.lower()
-                        if (
-                            "critical" in lower and "failed to initialize database" in lower
-                        ) or "traceback (most recent call last):" in lower:
-                            error_detected = True
-
-                        # Opportunistically parse unittest-style counters
-                        _maybe_update_summary_counters_from_line(line, summary)
-
-                        # Environment diagnostics
-                        if "permission denied" in lower and "docker daemon socket" in lower:
-                            diagnostics.append(line.strip())
-                            reason = reason or "docker-permission-denied"
-                        if "unable to get image 'postgres" in lower:
-                            diagnostics.append(line.strip())
-                            reason = reason or "docker-image-access"
-                        if 'fatal:  database "' in lower and "does not exist" in lower:
-                            diagnostics.append(line.strip())
-                            reason = reason or "db-missing"
-                        if 'could not translate host name "database"' in lower:
-                            diagnostics.append(line.strip())
-                            reason = reason or "db-host-unavailable"
-
-                        # Check for repetitive patterns periodically
-                        if current_time - last_pattern_check > pattern_check_interval:
-                            is_repetitive, pattern_desc = detect_repetitive_pattern(recent_lines, pattern_occurrences)
-                            if is_repetitive:
-                                print(f"\n🔄 REPETITIVE PATTERN DETECTED: {pattern_desc}")
-                                print(f"❌ STALLED: Process stuck in repetitive output. Terminating...")
-                                f.write(f"\n🔄 REPETITIVE PATTERN DETECTED: {pattern_desc}\n")
-                                f.write(f"❌ STALLED: Process stuck in repetitive output. Terminating...\n")
-                                safe_terminate_process(process)
-                                result_code = -3  # New code for pattern-based stall
-                                break
-                            last_pattern_check = current_time
-
-                        # Enhanced test completion detection
-                        test_completion_indicators = [
-                            "Test completed successfully",
-                            "tests started in",
-                            "post-tests in",
-                            "failed, 0 error(s) of",
-                            "Initiating shutdown",
-                        ]
-
-                        if any(indicator in line for indicator in test_completion_indicators):
-                            # Test framework signaled completion - start cleanup timer
-                            if not hasattr(locals(), "cleanup_start_time"):
-                                cleanup_start_time = current_time
-                                print(f"\n🧹 Test completion detected. Starting cleanup timer...")
-                                f.write(f"\n🧹 Test completion detected. Starting cleanup timer...\n")
-
-                                # For tour tests, immediately kill browsers to prevent websocket hang
-                                if is_tour_test:
-                                    print(f"🔫 Preemptively killing browser processes...")
-                                    f.write(f"🔫 Preemptively killing browser processes...\n")
-                                    kill_browsers_and_zombies()
-
-                        # Check cleanup timeout (much shorter than overall timeout)
-                        if hasattr(locals(), "cleanup_start_time"):
-                            cleanup_elapsed = current_time - cleanup_start_time
-                            if cleanup_elapsed > 30:  # 30 seconds max for cleanup
-                                print(f"\n❌ CLEANUP HUNG: Process stuck in cleanup for {cleanup_elapsed:.1f}s. Terminating...")
-                                f.write(f"\n❌ CLEANUP HUNG: Process stuck in cleanup for {cleanup_elapsed:.1f}s. Terminating...\n")
-                                safe_terminate_process(process)
-                                result_code = -4  # New code for cleanup hang
-                                break
-
-                        # Simple test progress tracking
-                        if "test_" in line and ("(" in line or ":" in line):
-                            # Looks like a test name
-                            parts = line.split()
-                            for part in parts:
-                                if part.startswith("test_") and part != last_test:
-                                    test_count += 1
-                                    last_test = part
-                                    current_test = part.strip("():")
-                                    if test_count % 10 == 0:
-                                        print(f"\nℹ️  Progress: {test_count} tests started...\n")
-                                        f.write(f"\nℹ️  Progress: {test_count} tests started...\n")
-                                    break
                     else:
-                        # No output available - check for stall
-                        if current_time - last_output_time > stall_threshold:
-                            stall_warnings += 1
-                            test_info = f" (last test: {current_test})" if current_test else ""
-                            print(
-                                f"\n⚠️  WARNING: No output for {current_time - last_output_time:.1f}s [{stall_warnings}/{max_stall_warnings}]{test_info}"
-                            )
-                            f.write(
-                                f"\n⚠️  WARNING: No output for {current_time - last_output_time:.1f}s [{stall_warnings}/{max_stall_warnings}]{test_info}\n"
-                            )
+                        ready, _, _ = select.select([process.stdout], [], [], 3.0)
 
-                            if stall_warnings >= max_stall_warnings:
-                                print(f"\n❌ STALLED: Process appears stuck. Terminating...")
-                                f.write(f"\n❌ STALLED: Process appears stuck. Terminating...\n")
-                                safe_terminate_process(process)
-                                result_code = -2
+                        if ready:
+                            line = process.stdout.readline()
+                            if not line:  # EOF - process ended
                                 break
+                            print(line, end="")  # To console
+                            f.write(line)  # To file
+                            f.flush()
+                            last_output_time = current_time
+                            stall_warnings = 0  # Reset on new output
 
-                    # Check if process ended
-                    poll_result = process.poll()
-                    if poll_result is not None:
-                        result_code = poll_result
-                        break
+                            # Add line to pattern detection buffer
+                            recent_lines.append(line.strip())
+                            if len(recent_lines) > 20:  # Keep only last 20 lines
+                                recent_lines.pop(0)
+
+                            # Detect hard errors that should mark the run as failed
+                            lower = line.lower()
+                            if (
+                                "critical" in lower and "failed to initialize database" in lower
+                            ) or "traceback (most recent call last):" in lower:
+                                error_detected = True
+
+                            # Opportunistically parse unittest-style counters
+                            _maybe_update_summary_counters_from_line(line, summary)
+
+                            # Environment diagnostics
+                            if "permission denied" in lower and "docker daemon socket" in lower:
+                                diagnostics.append(line.strip())
+                                reason = reason or "docker-permission-denied"
+                            if "unable to get image 'postgres" in lower:
+                                diagnostics.append(line.strip())
+                                reason = reason or "docker-image-access"
+                            if 'fatal:  database "' in lower and "does not exist" in lower:
+                                diagnostics.append(line.strip())
+                                reason = reason or "db-missing"
+                            if 'could not translate host name "database"' in lower:
+                                diagnostics.append(line.strip())
+                                reason = reason or "db-host-unavailable"
+
+                            # Check for repetitive patterns periodically
+                            if current_time - last_pattern_check > pattern_check_interval:
+                                is_repetitive, pattern_desc = detect_repetitive_pattern(recent_lines, pattern_occurrences)
+                                if is_repetitive:
+                                    print(f"\n🔄 REPETITIVE PATTERN DETECTED: {pattern_desc}")
+                                    print(f"❌ STALLED: Process stuck in repetitive output. Terminating...")
+                                    f.write(f"\n🔄 REPETITIVE PATTERN DETECTED: {pattern_desc}\n")
+                                    f.write(f"❌ STALLED: Process stuck in repetitive output. Terminating...\n")
+                                    if detached:
+                                        try:
+                                            subprocess.run(["docker", "rm", "-f", container_id], capture_output=True)
+                                        except Exception:
+                                            pass
+                                    else:
+                                        safe_terminate_process(process)
+                                    result_code = -3  # New code for pattern-based stall
+                                    break
+                                last_pattern_check = current_time
+
+                            # Enhanced test completion detection
+                            test_completion_indicators = [
+                                "Test completed successfully",
+                                "tests started in",
+                                "post-tests in",
+                                "failed, 0 error(s) of",
+                                "Initiating shutdown",
+                            ]
+
+                            if any(indicator in line for indicator in test_completion_indicators):
+                                # Test framework signaled completion - start cleanup timer
+                                if not hasattr(locals(), "cleanup_start_time"):
+                                    cleanup_start_time = current_time
+                                    print(f"\n🧹 Test completion detected. Starting cleanup timer...")
+                                    f.write(f"\n🧹 Test completion detected. Starting cleanup timer...\n")
+
+                                    # For tour tests, immediately kill browsers to prevent websocket hang
+                                    if is_tour_test:
+                                        print(f"🔫 Preemptively killing browser processes...")
+                                        f.write(f"🔫 Preemptively killing browser processes...\n")
+                                        kill_browsers_and_zombies()
+
+                            # Check cleanup timeout (much shorter than overall timeout)
+                            if hasattr(locals(), "cleanup_start_time"):
+                                cleanup_elapsed = current_time - cleanup_start_time
+                                if cleanup_elapsed > 30:  # 30 seconds max for cleanup
+                                    print(f"\n❌ CLEANUP HUNG: Process stuck in cleanup for {cleanup_elapsed:.1f}s. Terminating...")
+                                    f.write(f"\n❌ CLEANUP HUNG: Process stuck in cleanup for {cleanup_elapsed:.1f}s. Terminating...\n")
+                                    safe_terminate_process(process)
+                                    result_code = -4  # New code for cleanup hang
+                                    break
+
+                            # Simple test progress tracking
+                            if "test_" in line and ("(" in line or ":" in line):
+                                # Looks like a test name
+                                parts = line.split()
+                                for part in parts:
+                                    if part.startswith("test_") and part != last_test:
+                                        test_count += 1
+                                        last_test = part
+                                        current_test = part.strip("():")
+                                        if test_count % 10 == 0:
+                                            print(f"\nℹ️  Progress: {test_count} tests started...\n")
+                                            f.write(f"\nℹ️  Progress: {test_count} tests started...\n")
+                                        break
+                        else:
+                            # No output available - check for stall
+                            if current_time - last_output_time > stall_threshold:
+                                stall_warnings += 1
+                                test_info = f" (last test: {current_test})" if current_test else ""
+                                print(
+                                    f"\n⚠️  WARNING: No output for {current_time - last_output_time:.1f}s [{stall_warnings}/{max_stall_warnings}]{test_info}"
+                                )
+                                f.write(
+                                    f"\n⚠️  WARNING: No output for {current_time - last_output_time:.1f}s [{stall_warnings}/{max_stall_warnings}]{test_info}\n"
+                                )
+
+                                if stall_warnings >= max_stall_warnings:
+                                    print(f"\n❌ STALLED: Process appears stuck. Terminating...")
+                                    f.write(f"\n❌ STALLED: Process appears stuck. Terminating...\n")
+                                    if detached:
+                                        try:
+                                            subprocess.run(["docker", "rm", "-f", container_id], capture_output=True)
+                                        except Exception:
+                                            pass
+                                    else:
+                                        safe_terminate_process(process)
+                                    result_code = -2
+                                    break
+
+                        # Check if process ended
+                        if process is not None:
+                            poll_result = process.poll()
+                            if poll_result is not None:
+                                result_code = poll_result
+                                break
 
                 except Exception as e:
                     print(f"\n⚠️  Error reading output: {e}")
@@ -1861,19 +2122,20 @@ def run_docker_test_command(
                     continue
 
             # Get any remaining output
-            try:
-                for _ in range(100):  # Limit iterations
-                    line = process.stdout.readline()
-                    if not line:
-                        break
-                    print(line, end="")
-                    f.write(line)
-                    f.flush()
-            except OSError:
-                pass
+            if not detached and process is not None:
+                try:
+                    for _ in range(100):  # Limit iterations
+                        line = process.stdout.readline()
+                        if not line:
+                            break
+                        print(line, end="")
+                        f.write(line)
+                        f.flush()
+                except OSError:
+                    pass
 
             # Ensure process is terminated
-            if process.poll() is None:
+            if not detached and process is not None and process.poll() is None:
                 try:
                     result_code = process.wait(timeout=5)
                 except subprocess.TimeoutExpired:
@@ -1932,6 +2194,17 @@ def run_docker_test_command(
         except OSError:
             pass
 
+        # Treat early configuration errors as failures even if exit code is 0
+        try:
+            tail = Path(log_file).read_text()[-4000:]
+            if "odoo-bin server: error:" in tail or "not a valid addons directory" in tail or "option --addons-path" in tail:
+                result_code = 1
+                summary["returncode"] = 1
+                summary["success"] = False
+                summary["reason"] = "config-error"
+        except Exception:
+            pass
+
         if result_code == 0:
             print("✅ Tests passed!")
             print(f"📄 Logs saved to: {log_file}")
@@ -1942,9 +2215,53 @@ def run_docker_test_command(
             print(f"📄 Check logs at: {log_file}")
             print("🔴 Overall: NOT GREEN")
 
+        # Final counter recompute from full log (covers detached streaming gaps)
+        try:
+            _recompute_counters_from_log(log_file, summary)
+        except Exception:
+            pass
+
         # Save summary for AI agents to parse
         with open(summary_file, "w") as f:
             json.dump(summary, f, indent=2, default=str)
+
+        # Targeted JS retry on DevTools navigate flake
+        if is_js_test and result_code != 0 and _attempt == 1:
+            ff = summary.get("failures_file")
+            retry_reason = None
+            try:
+                if ff and Path(ff).exists():
+                    data = json.loads(Path(ff).read_text())
+                    for e in data.get("entries", []):
+                        tb = e.get("traceback") or ""
+                        if "TimeoutError: Page.navigate(" in tb:
+                            retry_reason = "page-navigate-timeout"
+                            break
+            except (OSError, ValueError, json.JSONDecodeError):
+                pass
+
+            if retry_reason:
+                print("\n↻ JS navigate timeout detected; retrying once after warm cleanup...")
+                print("   • Killing browsers")
+                kill_browsers_and_zombies()
+                print("   • Short wait to let server settle")
+                time.sleep(5)
+                # Do not full-clean DB/filestore; re-use environment for faster warm start
+                return run_docker_test_command(
+                    test_tags,
+                    db_name,
+                    modules_to_install,
+                    timeout=timeout,
+                    use_production_clone=use_production_clone,
+                    cleanup_before=False,
+                    cleanup_after=cleanup_after,
+                    is_tour_test=is_tour_test,
+                    is_js_test=is_js_test,
+                    use_module_prefix=use_module_prefix,
+                    category=category,
+                    session_dir=session_dir,
+                    _attempt=2,
+                )
 
         return result_code
 
@@ -2011,9 +2328,14 @@ def _build_failures_from_log(log_path: Path, summary: dict) -> None:
     if not log_path.exists():
         return
     entries: list[dict] = []
+    hoot_entries: list[dict] = []
     cur: dict | None = None
     collecting_tb = False
     tb_lines: list[str] = []
+    # HOOT per-test failure capture
+    collecting_hoot = False
+    hoot_lines: list[str] = []
+    hoot_test: str | None = None
     with open(log_path, errors="ignore") as f:
         for raw in f:
             line = raw.rstrip("\n")
@@ -2040,6 +2362,18 @@ def _build_failures_from_log(log_path: Path, summary: dict) -> None:
                 else:
                     tb_lines.append(l)
                 continue
+            # Commit any pending HOOT block when we reach a timestamped new log line that
+            # is not part of the current failure context.
+            if collecting_hoot and re.match(r"^\d{4}-\d{2}-\d{2} ", l):
+                if hoot_lines:
+                    msg = "\n".join(hoot_lines).strip()
+                    ent = {"type": "js_fail", "test": hoot_test, "message": msg}
+                    ent["fingerprint"] = _hash_text(f"{hoot_test}\n{msg}")
+                    hoot_entries.append(ent)
+                collecting_hoot = False
+                hoot_lines = []
+                hoot_test = None
+
             # Unittest-style headers (avoid logging noise like DB "ERROR:" lines)
             if lw.startswith(("fail:", "error:")):
                 parts = l.split(maxsplit=1)
@@ -2054,6 +2388,23 @@ def _build_failures_from_log(log_path: Path, summary: dict) -> None:
                 test_id = rest
                 cur = {"type": "fail" if typ == "fail" else "error", "test": test_id, "message": ""}
                 continue
+            # HOOT per-test failure lines
+            m_hoot = re.search(r"\[HOOT] Test \"(?P<name>.+?)\" failed:", l)
+            if m_hoot:
+                # Flush any previous block
+                if collecting_hoot and hoot_lines:
+                    msg = "\n".join(hoot_lines).strip()
+                    ent = {"type": "js_fail", "test": hoot_test, "message": msg}
+                    ent["fingerprint"] = _hash_text(f"{hoot_test}\n{msg}")
+                    hoot_entries.append(ent)
+                # Start a new HOOT failure block
+                collecting_hoot = True
+                hoot_lines = [l]
+                hoot_test = m_hoot.group("name")
+                continue
+            if collecting_hoot:
+                hoot_lines.append(l)
+                continue
             # Short failure lines like AssertionError: ...
             if cur and ("assert" in lw or lw.startswith(("valueerror:", "keyerror:", "typeerror:", "psycopg2"))):
                 cur["message"] = l
@@ -2064,6 +2415,19 @@ def _build_failures_from_log(log_path: Path, summary: dict) -> None:
                 entries.append(cur)
                 cur = None
                 continue
+    # Finalize any open HOOT block
+    if collecting_hoot and hoot_lines:
+        msg = "\n".join(hoot_lines).strip()
+        ent = {"type": "js_fail", "test": hoot_test, "message": msg}
+        ent["fingerprint"] = _hash_text(f"{hoot_test}\n{msg}")
+        hoot_entries.append(ent)
+
+    # Prefer granular HOOT entries when available; filter out generic wrappers
+    if hoot_entries:
+        # Keep non-generic Python errors, drop blanket 'Some js test failed'
+        filtered = [e for e in entries if e.get("message") not in {"Some js test failed"}]
+        entries = filtered + hoot_entries
+
     # Save
     out = {
         "schema_version": SUMMARY_SCHEMA_VERSION,

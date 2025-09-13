@@ -20,6 +20,8 @@ Following the Zen of Python (PEP 20):
 - **Always specify return types**: Include `-> None` for functions that don't return a value
     - Explicit return types improve IDE support and catch bugs early
     - Consistency: every function should have a return type annotation
+- **No `from __future__ import annotations` needed**: We rely on Odoo Plugin “magic” type hints; postponed annotation
+  evaluation is unnecessary in this codebase.
 
 ## String Formatting
 

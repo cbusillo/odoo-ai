@@ -290,10 +290,10 @@ test("list view interactions", async () => {
             }
         },
         arch: `
-            <tree>
+            <list>
                 <field name="name"/>
                 <field name="active" widget="boolean_toggle"/>
-            </tree>
+            </list>
         `
     })
     

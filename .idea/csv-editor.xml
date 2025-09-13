@@ -10,6 +10,13 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="/addons/discuss_record_links/security/ir.model.access.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="/addons/external_ids/security/ir.model.access.csv">
           <value>
             <Attribute>
@@ -25,20 +32,6 @@
           </value>
         </entry>
         <entry key="/addons/product_connect/security/ir.model.access.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="/docs/odoo18/SECURITY_PATTERNS.md">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="/ir.model.access.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

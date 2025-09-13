@@ -10,24 +10,24 @@ Model Planning:
     - Constraints and validation
     - Computed fields with dependencies
     - Related fields
-    
+
   Business Logic:
     - CRUD method overrides
     - Custom actions
     - Workflow states
     - Button methods
-    
+
   Integration:
     - Related model updates
     - External API sync points
     - Event triggers
-    
+
   UI/UX:
     - Form view layout
     - List view columns
     - Search filters
     - Menu structure
-    
+
   Testing:
     - Unit test scenarios
     - Integration test flows
@@ -40,8 +40,8 @@ Model Planning:
 
 ```python
 # 1. Analyze existing structure
-product_info = mcp__odoo-intelligence__model_query(operation="info", model_name="product.template")
-bundle_examples = mcp__odoo-intelligence__model_query(operation="search", pattern="bundle|kit")
+product_info = mcp__odoo - intelligence__model_query(operation="info", model_name="product.template")
+bundle_examples = mcp__odoo - intelligence__model_query(operation="search", pattern="bundle|kit")
 
 # 2. Create implementation tasks
 TodoWrite([
@@ -58,8 +58,8 @@ TodoWrite([
 
 ```python
 # 1. Current structure analysis
-motor_info = mcp__odoo-intelligence__model_query(operation="info", model_name="motor.product")
-relationships = mcp__odoo-intelligence__model_query(operation="relationships", model_name="motor.product")
+motor_info = mcp__odoo - intelligence__model_query(operation="info", model_name="motor.product")
+relationships = mcp__odoo - intelligence__model_query(operation="relationships", model_name="motor.product")
 
 # 2. Design decisions
 """
@@ -67,7 +67,7 @@ Schema Design:
 - motor.compatibility (M2M through model)
 - Fields: motor_id, compatible_motor_id, compatibility_type
 - Bidirectional compatibility checking
-- Views: Tree/form for management
+- Views: List/form for management
 """
 ```
 
@@ -75,8 +75,8 @@ Schema Design:
 
 ```python
 # 1. Research existing patterns
-shipping_models = mcp__odoo-intelligence__model_query(operation="search", pattern="shipping|delivery")
-integration_patterns = mcp__odoo-intelligence__search_code(
+shipping_models = mcp__odoo - intelligence__model_query(operation="search", pattern="shipping|delivery")
+integration_patterns = mcp__odoo - intelligence__search_code(
     pattern="class.*Integration|service.*api",
     file_type="py"
 )
@@ -95,12 +95,14 @@ Integration Architecture:
 ## Performance Planning
 
 ### Database Optimization
+
 - Identify high-traffic tables
 - Plan indexing strategy
 - Design denormalization if needed
 - Plan batch operations
 
 ### Caching Strategy
+
 - What data to cache
 - Cache invalidation rules
 - Memory usage planning
@@ -109,6 +111,7 @@ Integration Architecture:
 ## Security Planning
 
 ### Access Control Design
+
 ```python
 """
 User Groups:
@@ -123,6 +126,7 @@ Record Rules:
 ```
 
 ### Data Validation
+
 - Input sanitization points
 - Business rule enforcement
 - Audit trail requirements

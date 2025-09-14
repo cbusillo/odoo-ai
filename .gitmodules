@@ -21,3 +21,4 @@
 [submodule "addons/discuss_record_links"]
 	path = addons/discuss_record_links
 	url = https://github.com/cbusillo/discuss_record_links
+    ignore = dirty

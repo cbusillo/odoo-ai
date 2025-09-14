@@ -36,6 +36,12 @@ class TestSettings(BaseSettings):
     integration_shards: int = Field(0, alias="INTEGRATION_SHARDS")
     tour_shards: int = Field(0, alias="TOUR_SHARDS")
     max_procs: int = Field(0, alias="TEST_MAX_PROCS")  # 0 -> auto
+    # Within-module sharding (split heavy modules by class/file)
+    unit_within_shards: int = Field(0, alias="UNIT_WITHIN_SHARDS")
+    integration_within_shards: int = Field(0, alias="INTEGRATION_WITHIN_SHARDS")
+    tour_within_shards: int = Field(0, alias="TOUR_WITHIN_SHARDS")
+    # Phase overlap (run unit+js in parallel; integration+tour in parallel)
+    phases_overlap: bool = Field(False, alias="PHASES_OVERLAP")
 
     # Filestore snapshot control for prod-clone phases
     skip_filestore_integration: bool = Field(False, alias="SKIP_FILESTORE_INTEGRATION")

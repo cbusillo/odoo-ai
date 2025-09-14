@@ -27,6 +27,7 @@ packages = ["tools"]
 [project.scripts]
 test = "tools.testkit.cli:main"
 restore-from-upstream = "tools.docker_runner:restore_from_upstream"
+test-validate = "tools.testkit.validate:main"
 test-plan = "tools.testkit.shortcuts:test_plan"
 test-unit = "tools.testkit.shortcuts:test_unit"
 test-js = "tools.testkit.shortcuts:test_js"

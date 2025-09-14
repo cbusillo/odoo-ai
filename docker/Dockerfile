@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.2
 FROM postgres:17-bullseye AS pg17
 
 FROM alpine/git as enterprise

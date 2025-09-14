@@ -5,6 +5,7 @@ x-odoo-base: &odoo-base
   # 3. To prevent accidental push: keep image name local (no registry prefix)
   # If registry push ever needed: refactor Dockerfile to use BuildKit secrets
   image: ${DOCKER_IMAGE:-odoo-ai}:latest
+  pull_policy: never
   build:
     dockerfile: docker/Dockerfile
     args:

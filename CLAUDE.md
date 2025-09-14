@@ -22,7 +22,7 @@ House Rules for Claude
 - Keep the main thread clean; delegate focused work to subagents.
 - Prefer MCP tools with structured outputs; use shell when needed for project tasks.
 - Execution policy:
-    - Claude may run `uv run test-*` and other project task wrappers directly when required.
+    - Claude may run `uv run test run --json` (preferred) or `uv run test <phase>` directly when required.
     - Prefer `uv run` wrappers over raw Python; do not invoke `odoo-bin` or `python -m` directly unless explicitly
       necessary.
     - Use `odoo-intelligence__*` when it provides better structure (e.g., module updates, test runner APIs) or
@@ -39,14 +39,15 @@ Zero‑Warning Policy
 Acceptance Gate
 
 - Do not conclude a task until BOTH are true:
-    - Targeted tests pass via `uv run test-*` for the touched module(s); and
+    - Targeted tests pass via `uv run test <phase>` (or `uv run test run --json` overall); and
     - MCP inspection reports 0 errors, warnings, weak_warnings, and infos for the touched files.
 - If MCP inspection is unavailable in this session, state that explicitly and treat it as blocking unless the operator
   accepts a narrowly justified exception.
 
 Test Results (Read JSON, not terminal tails)
 
-- Run `uv run test-*` without piping. Then parse `tmp/test-logs/latest/summary.json` (or per‑phase `all.summary.json`).
+- Run `uv run test run --json` or `uv run test <phase>` without piping. Then parse `tmp/test-logs/latest/summary.json` (
+  or per‑phase `all.summary.json`).
 - Treat `success: true` as pass; otherwise, iterate. Do not use `tail`/`head`/`timeout ... | tail` to infer success.
 
 Registration Sanity

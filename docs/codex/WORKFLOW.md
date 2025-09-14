@@ -9,8 +9,8 @@ Execution Norms
 
 - File edits: Prefer structured edits (Edit/Write). If the session cannot approve edits, fall back to Bash here‑docs to
   write files.
-- Tests: Prefer `uv run test-gate --json` to run/wait and gate in one call. For targeted phases, still use
-  `uv run test-*` and read JSON summaries.
+- Tests: Prefer `uv run test run --json` to run/wait and gate in one call. For targeted phases, use
+  `uv run test <phase>` and read JSON summaries.
 - Inspection: Use the Inspection MCP (if available) to lint/inspect dynamic Odoo types and fix issues; rerun until
   clean.
 - Zero‑Warning Policy: Treat inspection warnings (warning, weak_warning, info) as failures; fix them or add a narrowly
@@ -19,7 +19,8 @@ Execution Norms
 Acceptance Gate
 
 - Do not declare completion until BOTH are true:
-    - Tests gate green via `uv run test-gate` (exit 0) or targeted `uv run test-*` with JSON summary success, and
+    - Tests gate green via `uv run test run --json` (exit 0/1) or targeted `uv run test <phase>` with JSON summary
+      success, and
     - MCP inspection reports 0 errors, warnings, weak_warnings, and infos for the touched files.
 - If the Inspection MCP is not available, call this out explicitly and treat inspection as blocking unless the operator
   agrees to a narrowly justified exception.
@@ -31,7 +32,7 @@ Odoo 18 Canon & Local Examples
 
 Typical Definition of Done (DoD)
 
-- Tests pass (e.g., `uv run test-unit addons/<module>`)
+- Tests pass (e.g., `uv run test unit`)
 - MCP inspection clean (0 errors/warnings/weak_warnings/infos) on touched files
 - Adheres to Odoo 18 checklist for fields/compute/views
 
@@ -46,7 +47,7 @@ How to Run
 
 Test Results (LLM‑friendly)
 
-- Do not rely on terminal tails/heads. Simplest path: `uv run test-gate --json` (exits 0/1 and prints a single JSON
+- Do not rely on terminal tails/heads. Simplest path: `uv run test run --json` (exits 0/1 and prints a single JSON
   payload). While a run is active, `tmp/test-logs/current` points to the in‑progress session; after completion, use
   `tmp/test-logs/latest/summary.json` (or per‑phase `all.summary.json`).
 - Treat `success: true` as the only passing signal; otherwise, iterate and rerun.

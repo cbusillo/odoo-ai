@@ -126,7 +126,7 @@ for i in range(0, len(files_to_update), batch_size):
         )
     
     # Test after each batch
-    test_result = Bash("uv run test-unit")
+    test_result = Bash("uv run test unit")
     if not test_result.success:
         print(f"Batch {i//batch_size} failed, investigating...")
         break

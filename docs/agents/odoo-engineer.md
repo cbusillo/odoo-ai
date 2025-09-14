@@ -129,7 +129,7 @@ record.sudo().write()  # Why: [explanation]
 
 ## Test Results and Acceptance Gate
 
-- Prefer `uv run test-gate --json` to handle long runs and return a single JSON payload; it exits 0/1. If you run
+- Prefer `uv run test run --json` to handle long runs and return a single JSON payload; it exits 0/1. If you run
   targeted phases via `uv run test-*`, do not infer success from terminal tails/heads. Read the runner JSON summaries as
   described in the Testing Guide (LLM‑Friendly Results):
     - `tmp/test-logs/latest/summary.json` (overall), or per‑phase `all.summary.json`.

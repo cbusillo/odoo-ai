@@ -30,13 +30,13 @@ MCP tools provide project‑wide coverage compared to single‑file views. See [
 
 ```python
 # ✅ PROJECT‑WIDE (Preferred)
-mcp__odoo-intelligence__analysis_query(analysis_type="patterns", pattern_type="all")
-mcp__odoo-intelligence__analysis_query(analysis_type="performance", model_name="product.template")
+mcp__odoo - intelligence__analysis_query(analysis_type="patterns", pattern_type="all")
+mcp__odoo - intelligence__analysis_query(analysis_type="performance", model_name="product.template")
 
 # ✅ CURRENT FILE ONLY (PyCharm)
-mcp__inspection-pycharm__inspection_trigger()
+mcp__inspection - pycharm__inspection_trigger()
 # Wait for completion, then:
-mcp__inspection-pycharm__inspection_get_problems(severity="error")
+mcp__inspection - pycharm__inspection_get_problems(severity="error")
 ```
 
 ## Critical Issues I Find
@@ -51,7 +51,7 @@ mcp__inspection-pycharm__inspection_get_problems(severity="error")
 
 ```python
 # Prioritize: errors → warnings → info
-problems = mcp__inspection-pycharm__inspection_get_problems(
+problems = mcp__inspection - pycharm__inspection_get_problems(
     severity="error",
     limit=50,
     problem_type="PyUnresolvedReferences"  # Focus on specific type
@@ -76,7 +76,9 @@ from odoo.addons.product_connect.models.product_template import ProductTemplate
 # Before
 from typing import Optional, List, Dict
 
+
 def method(self, vals: Optional[Dict]) -> List[str]:
+
 
 # After
 def method(self, vals: dict | None) -> list[str]:
@@ -164,7 +166,8 @@ Task(
 
 ## Test Results and Acceptance Gate
 
-- After fixes, the simplest gate is `uv run test-gate --json` (exits 0/1). For targeted phases use `uv run test-*`. Do
+- After fixes, the simplest gate is `uv run test run --json` (exits 0/1). For targeted phases use `uv run test <phase>`.
+  Do
   not rely on piped output; evaluate JSON summaries per the Testing Guide (LLM‑Friendly Results):
     - `tmp/test-logs/latest/summary.json` (overall), or per‑phase `all.summary.json`.
 - Proceed only when tests `success` is true and MCP inspection reports zero errors/warnings/weak_warnings/infos.

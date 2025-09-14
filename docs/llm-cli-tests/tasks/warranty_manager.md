@@ -30,8 +30,8 @@ Task
 2) Tests: add `addons/warranty_manager_<runner>/tests/test_model_warranty_manager.py` with cases for:
     - Normal case; zero/None warranty; missing date_order; multiple periods; dependency triggers.
     - Add explicit `-> None` on all test methods and setUp/tearDown.
-3) Run tests: simplest gate is `uv run test-gate --json` (exits 0/1). For targeted scope use
-   `uv run test-unit addons/warranty_manager_<runner>` (no piping), then parse `tmp/test-logs/latest/summary.json` and
+3) Run tests: simplest gate is `uv run test run --json` (exits 0/1). For targeted scope use
+   `uv run test unit` (no piping), then parse `tmp/test-logs/latest/summary.json` and
    require `success: true`. Iterate until green.
 4) Inspection: if Inspection MCP is available, trigger → wait → get problems and fix until clean.
 
@@ -44,7 +44,7 @@ Constraints & Tools
 
 Definition of Done (Zero‑Warning Policy)
 
-- Tests pass locally: `uv run test-gate` exits 0 (or `uv run test-unit addons/warranty_manager_<runner>` and JSON
+- Tests pass locally: `uv run test run --json` exits 0 (or `uv run test unit` and JSON
   summary shows `success: true`).
 - Inspection clean: 0 errors/warnings/weak_warnings/infos on touched files; only use targeted `noinspection` with
   one‑line justification for true false positives.

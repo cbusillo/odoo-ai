@@ -14,14 +14,14 @@ Task
 
 1) Implement …
 2) Tests …
-3) Run tests: `uv run test-unit addons/<module>` and iterate until green.
+3) Run tests: `uv run test run --json` (or `uv run test unit`) and iterate until green.
 4) Run IDE inspection (if MCP inspection is available): trigger → wait → get problems and fix until clean.
 
 Constraints & Tools
 
 - Prefer structured edits (Edit/Write). If edits are blocked in this session, fall back to Bash here‑docs for file
   writes.
-- Prefer `uv run test-gate --json` to launch/wait/gate in one call. For targeted phases, use `uv run test-*`.
+- Prefer `uv run test run --json` to launch/wait/gate in one call. For targeted phases, use `uv run test <phase>`.
 - If Inspection MCP is available, use it to lint/inspect dynamic Odoo types.
 
 Definition of Done (Zero‑Warning Policy)

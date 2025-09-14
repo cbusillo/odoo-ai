@@ -43,7 +43,7 @@ chain = mcp__odoo-intelligence__model_query(
 
 ```bash
 # Run tests before changes
-uv run test-all
+uv run test run
 
 # Save test results
 uv run test-stats > pre-refactor-tests.txt
@@ -64,7 +64,7 @@ MultiEdit(
 )
 
 # Step 2: Test that file
-test_result = Bash("uv run test-unit")
+test_result = Bash("uv run test unit")
 
 # Step 3: Only continue if tests pass
 if test_result.success:
@@ -250,7 +250,7 @@ docker exec ${ODOO_PROJECT_NAME}-script-runner-1 /odoo/odoo-bin \
   -u product_connect --stop-after-init
 
 # 3. Unit tests
-uv run test-all
+uv run test run
 
 # 4. UI tests
 uv run test-tour

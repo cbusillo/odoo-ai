@@ -132,14 +132,10 @@ Use our Docker‑aware runner to execute tests and collect structured artifacts.
 
 - Phases: Unit → JS → Integration → Tour (in that order)
 - Commands:
-    - `uv run test-all` — run all phases and aggregate results
-    - `uv run test-unit` | `uv run test-js` | `uv run test-integration` | `uv run test-tour`
-    - `uv run test-clean` — drop test DBs and filestores
-    - `uv run test-gate [--json]` — one-call: ensure running, wait, print bottom line, exit 0/1
-    - Advanced:
-        - `uv run test-launch` — start in background (JSON pid)
-        - `uv run test-wait [--wait --timeout 7200 --json]` — poll/await completion
-        - `uv run test-bottomline [--json]` — bottom-line summary only
+    - `uv run test run [--json]` — run all phases with parallel sharding and print bottom line JSON
+    - `uv run test unit|js|integration|tour` — run a single phase (supports sharding flags)
+    - `uv run test clean` — drop test DBs and filestores
+    - `uv run test plan --phase all|unit|js|integration|tour` — print the weight-aware shard plan (JSON)
 - Timeouts: configured in `pyproject.toml` under `[tool.odoo-test.timeouts]`
 - Logs: `tmp/test-logs/test-YYYYMMDD_HHMMSS/` with per‑phase `all.log`, `all.summary.json`, `all.failures.json` and a
   session `summary.json`/`digest.json` at the root.
@@ -149,6 +145,15 @@ Use our Docker‑aware runner to execute tests and collect structured artifacts.
   patterns.
 - Tips: If your shell sandbox blocks Docker, use the PyCharm “All Tests” run config. For JS/Tour timeouts, warm the
   instance or raise the phase timeout in `pyproject.toml`.
+
+### Cleanup Semantics
+
+- The runner attempts aggressive cleanup to avoid orphaned resources:
+    - Before a session: removes all test databases named `${ODOO_DB_NAME}_test_*` and legacy `${ODOO_DB_NAME}_ut_*`, and
+      deletes matching test filestores.
+    - After a session (success or cancellation): repeats the same cleanup pass.
+    - During phases: each shard uses a unique DB name; scoped pre‑test cleanup drops that DB and its filestore before
+      use.
 
 ## LLM‑Friendly Results (Do Not Tail/Head)
 
@@ -164,9 +169,8 @@ Use our Docker‑aware runner to execute tests and collect structured artifacts.
 
 Tips
 
-- `uv run test-wait` prefers `current` when present, then falls back to `latest`. Use `--session` to target a specific
-  run.
-    - Simplest agent path: `uv run test-gate --json` (single call; exits 0/1).
+- Simplest agent path: `uv run test run --json` (single call; exits 0/1). While a run is active, `tmp/test-logs/current`
+  points to the in‑progress session; after completion, use `tmp/test-logs/latest/summary.json`.
 - Minimal Python snippet to assert pass/fail:
   ```bash
   python - <<'PY'

@@ -215,10 +215,10 @@ tests/
 # Standard inheritance pattern
 class ProductTemplate(models.Model):
     _inherit = 'product.template'
-    
+
     # Add fields
     custom_field = fields.Char()
-    
+
     # Override methods
     def create(self, vals_list):
         # Custom logic
@@ -234,7 +234,7 @@ import { Component } from "@odoo/owl";
 export class CustomWidget extends Component {
     static template = "product_connect.CustomWidget";
     static props = ["*"];
-    
+
     setup() {
         // Component setup
     }
@@ -249,7 +249,7 @@ class ShopifyService:
     def __init__(self, env):
         self.env = env
         self.client = ShopifyClient()
-    
+
     def sync_product(self, product):
         try:
             result = self.client.execute(query, variables)
@@ -266,6 +266,8 @@ class ShopifyService:
 - **Indexes**: Added for frequently searched fields
 - **Batch Operations**: Use operations for bulk processing
 - **N+1 Prevention**: Proper prefetching patterns
+- For high‑parallel CI runs, see `docs/DB_TUNING.md` for a docker‑compose override that increases `max_connections` and
+  memory settings.
 
 ### Frontend Optimization
 

@@ -62,7 +62,7 @@ class TestFeature(ProductConnectTransactionCase):
 Result evaluation (must follow)
 
 - Do not pipe output through `head`/`tail`/`timeout ... | tail`.
-- Easiest: run `uv run test-gate --json` to wait and gate in one call (exit 0/1). If you run phases separately, read the
+- Easiest: run `uv run test run --json` to wait and gate in one call (exit 0/1). If you run phases separately, read the
   runner JSON summary per the Testing Guide’s “LLM‑Friendly Results” section:
     - `tmp/test-logs/latest/summary.json` (overall), or per‑phase `all.summary.json`.
 - Treat `success: true` as the only passing condition before handing back to the main thread.
@@ -71,10 +71,10 @@ Result evaluation (must follow)
 # IMPORTANT: Always use uv run commands - NEVER call Python scripts directly!
 
 # Quick test commands (recommended)
-uv run test-unit        # Fast unit tests (< 2 min)
+uv run test unit        # Fast unit tests (sharded)
 uv run test-integration # Integration tests (< 10 min)
 uv run test-tour       # Browser UI tests (< 15 min)
-uv run test-all        # Complete test suite (< 30 min)
+uv run test run         # Complete test suite (parallel)
 
 # Test management commands
 uv run test-stats      # Show test statistics and discovered tests

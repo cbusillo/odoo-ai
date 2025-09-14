@@ -33,7 +33,7 @@ doc before writing or updating tests.
 
 - Tools: ALWAYS favor MCP tools when appropriate; see docs/TOOL_SELECTION.md
 - Git: Use `git mv` to preserve history
-- Tests: Use only `uv run` commands below. Preferred single-call gate: `uv run test-gate --json`.
+- Tests: Use only `uv run` commands below. Preferred single-call gate: `uv run test run --json`.
 - Formatting: Use Ruff for Python; Owl.js patterns and no semicolons for JS
 - Python line length: 133 characters max
 
@@ -50,14 +50,20 @@ doc before writing or updating tests.
 ## Commands
 
 ```bash
-# Testing
-uv run test-unit          # Unit tests
-uv run test-integration   # Integration tests
-uv run test-tour          # Browser/UI tests
-uv run test-js            # JS/hoot and browser_js tests
-uv run test-all           # Full test suite
-uv run test-clean         # Drop test DBs/filestores and artifacts
-uv run test-gate          # One-call: run/wait/exit 0 on success, 1 on failure
+# Testing (unified CLI)
+uv run test run           # Run all phases with parallel sharding
+  - Add --detached to run in background and use `uv run test wait --json` to gate
+uv run test unit          # Unit tests (sharded)
+uv run test js            # JS/hoot tests (sharded)
+uv run test integration   # Integration tests (optional sharding)
+uv run test tour          # Browser/UI tours (optional sharding)
+uv run test clean         # Drop test DBs/filestores and artifacts
+uv run test plan --phase all  # Print sharding plan (JSON)
+uv run test doctor           # Environment diagnostics (Docker, DB, disk)
+  - Filters: add `--modules m1,m2` and/or `--exclude x,y` to scope phases. Works with `test run` and `test plan`.
+  - Per-phase filters: `--unit-modules/--unit-exclude`, `--js-modules/--js-exclude`, `--integration-modules/--integration-exclude`, `--tour-modules/--tour-exclude`.
+  - Add --json to print a single bottom-line JSON payload and exit 0/1
+  - Sharding flags: --unit-shards N, --js-shards N, --integration-shards N, --tour-shards N
 
 # Code Quality
 uv run ruff format .      # Format Python
@@ -101,8 +107,8 @@ Notes
 - Planning: Use the plan tool; update as you proceed.
 - Preambles: Before grouped tool calls, send a one‑sentence preamble describing what you are about to do.
 - File edits: Use `apply_patch` with minimal, focused changes; prefer editing existing files over creating new ones.
-- Validation: Prefer `uv run test-gate --json` to run/wait/gate in one call; expand scope only after green.
-    - If using targeted phases, read JSON summaries, not terminal tails. See “LLM‑Friendly Results” in
+- Validation: Prefer `uv run test run --json` to run/wait/gate in one call; expand scope only after green.
+    - If running targeted phases, read JSON summaries, not terminal tails. See “LLM‑Friendly Results” in
       docs/style/TESTING.md. Parse `tmp/test-logs/latest/summary.json` and require `success: true`.
     - Test counts: JS totals default to definition counts (number of `test(...)` in `*.test.js`). Set
       `JS_COUNT_STRATEGY=runtime` to report executed Hoot totals.
@@ -200,9 +206,9 @@ Related patterns and templates:
     - `odoo-intelligence__search_code(pattern="def create\(", file_type="py")`
     - `odoo-intelligence__analysis_query(analysis_type="inheritance", model_name="product.template")`
 - Run targeted tests:
-    - `uv run test-unit addons/<module>`
-    - `uv run test-integration addons/<module>`
-    - `uv run test-tour addons/<module>`
+    - `uv run test unit`
+    - `uv run test integration`
+    - `uv run test tour`
 - Update a module in proper env:
     - `odoo-intelligence__odoo_update_module(modules="<module>")`
 

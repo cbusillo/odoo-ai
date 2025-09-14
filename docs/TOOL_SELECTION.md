@@ -41,7 +41,8 @@
 
 ✅ **Use Bash when:**
 
-- Running tests: prefer `uv run test-gate --json` to run/wait/gate in one call; for targeted phases use `uv run test-*`.
+- Running tests: prefer `uv run test run --json` to run/wait/gate in one call; for targeted phases use
+  `uv run test <phase>`.
 - MCP doesn't support specific flags you need
 - Complex piping operations
 - One-off system administration
@@ -90,11 +91,11 @@ docker exec ${ODOO_PROJECT_NAME}-web-1 /odoo/odoo-bin --dev=all --stop-after-ini
 
 ## Impact of Tool Choice
 
-| Wrong Choice           | Real Impact  | Example              |
-|------------------------|--------------|----------------------|
-| `grep` instead of MCP  | Loss of structure | Hard to chain tools      |
-| Raw `docker` commands  | Parse errors | Silent test failures |
-| Manual file inspection | Missed bugs  | Production issues    |
+| Wrong Choice           | Real Impact       | Example              |
+|------------------------|-------------------|----------------------|
+| `grep` instead of MCP  | Loss of structure | Hard to chain tools  |
+| Raw `docker` commands  | Parse errors      | Silent test failures |
+| Manual file inspection | Missed bugs       | Production issues    |
 
 ## Detailed Behavior Notes
 
@@ -102,13 +103,13 @@ docker exec ${ODOO_PROJECT_NAME}-web-1 /odoo/odoo-bin --dev=all --stop-after-ini
 
 **Key Insight**: MCP tools return structured data and handle errors consistently. Prefer them when available.
 
-| Operation            | MCP Tool                                     | Generic Tool  | Why It Matters     |
-|----------------------|----------------------------------------------|---------------|--------------------|
-| Search code patterns | `mcp__odoo-intelligence__search_code`        | `bash grep`   | Structured JSON    |
-| Container status     | `mcp__docker__list_containers`               | `docker ps`   | JSON vs text parse |
-| Code quality check   | `mcp__odoo-intelligence__analysis_query`     | Manual review | Project-wide scope |
-| Module update        | `mcp__odoo-intelligence__odoo_update_module` | `docker exec` | Correct environment|
-| File search          | `Glob`                                       | `bash find`   | Simpler, safer     |
+| Operation            | MCP Tool                                     | Generic Tool  | Why It Matters      |
+|----------------------|----------------------------------------------|---------------|---------------------|
+| Search code patterns | `mcp__odoo-intelligence__search_code`        | `bash grep`   | Structured JSON     |
+| Container status     | `mcp__docker__list_containers`               | `docker ps`   | JSON vs text parse  |
+| Code quality check   | `mcp__odoo-intelligence__analysis_query`     | Manual review | Project-wide scope  |
+| Module update        | `mcp__odoo-intelligence__odoo_update_module` | `docker exec` | Correct environment |
+| File search          | `Glob`                                       | `bash find`   | Simpler, safer      |
 
 ### Real-World Performance Examples
 
@@ -371,8 +372,10 @@ Need Odoo operations?
 - **Not sure which tool?** → Check the quick reference above
 - **Complex task?** → Route to appropriate agent
 - **Tool not working?** → Document the issue, use fallback
-- **Want performance patterns?** → See [Flash agent](agents/flash.md) and [Odoo performance ORM](odoo18/PERFORMANCE_ORM.md)
+- **Want performance patterns?** → See [Flash agent](agents/flash.md)
+  and [Odoo performance ORM](odoo18/PERFORMANCE_ORM.md)
 
 ## Conclusion
 
-Choosing the right tool yields cleaner outputs, fewer errors, and less manual parsing. Prefer purpose‑built MCP tools, fall back to built‑ins, and use Bash only when necessary.
+Choosing the right tool yields cleaner outputs, fewer errors, and less manual parsing. Prefer purpose‑built MCP tools,
+fall back to built‑ins, and use Bash only when necessary.

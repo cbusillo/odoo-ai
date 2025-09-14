@@ -16,7 +16,7 @@
 
 ## Key Infrastructure Fixes Made
 
-1. **Database Lock Issue Resolved**: Fixed PostgreSQL connection cleanup in `tools/test_commands.py`
+1. **Database Lock Issue Resolved**: PostgreSQL connection cleanup handled in testkit (db.py)
 2. **Production Clone Function**: Added `clone_production_database()` for real data testing
 3. **Tour Test Filestore Fix**: Implemented symlink approach to share production assets without 70GB copying
 4. **Shopify Sync Context**: Fixed async threading issues in test environment
@@ -27,7 +27,7 @@
 
 ## Critical Files Modified
 
-- **`tools/test_commands.py`**: Production clone database strategy, robust cleanup, filestore symlink creation
+- **testkit**: Production clone database strategy, robust cleanup, filestore snapshot creation
 - **`addons/product_connect/models/shopify_sync.py`**: Added `skip_shopify_sync` context check
 - **`addons/product_connect/tests/fixtures/base.py`**: Fixed test context, SKU sequences
 - **Test categorization**: JS tests moved to tour directory with proper inheritance

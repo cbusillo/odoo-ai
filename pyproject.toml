@@ -1,42 +1,45 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
 
 [project]
 name = "odoo-ai"
-version = "0.1.0"
+version = "0.0.0"
 description = "AI-powered Odoo 18 Enterprise development framework"
 requires-python = ">=3.12"
 
 dependencies = [
     "psutil",
-    "rich",
     "click",
-    "tomli",
     "pydantic",
     "pydantic_settings",
-    "ruff",
 ]
 
-[tool.setuptools.packages.find]
-include = ["tools*"]
-exclude = ["addons*", "tmp*", "docker*", "patches*"]
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "rich",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["tools"]
 
 [project.scripts]
-# Core test commands
-test-unit = "tools.test_commands:run_unit_tests"
-test-integration = "tools.test_commands:run_integration_tests"
-test-tour = "tools.test_commands:run_tour_tests"
-test-js = "tools.test_commands:run_js_tests"
-test-all = "tools.test_commands:run_all_tests"
-test-stats = "tools.test_commands:show_test_stats"
-test-clean = "tools.test_commands:cleanup_all_test_artifacts"
+test = "tools.testkit.cli:main"
 restore-from-upstream = "tools.docker_runner:restore_from_upstream"
-test-wait = "tools.test_wait:main"
-test-launch = "tools.test_launch:main"
-test-bottomline = "tools.test_bottomline:main"
-test-gate = "tools.test_gate:main"
+test-plan = "tools.testkit.shortcuts:test_plan"
+test-unit = "tools.testkit.shortcuts:test_unit"
+test-js = "tools.testkit.shortcuts:test_js"
+test-integration = "tools.testkit.shortcuts:test_integration"
+test-tour = "tools.testkit.shortcuts:test_tour"
+test-clean = "tools.testkit.shortcuts:test_clean"
+test-status = "tools.testkit.shortcuts:test_status"
+test-wait = "tools.testkit.shortcuts:test_wait"
+test-rerun = "tools.testkit.shortcuts:test_rerun_failures"
+test-doctor = "tools.testkit.shortcuts:test_doctor"
 
+[tool.uv]
+preview = true
 
 [tool.odoo-test.timeouts]
 unit = 600
@@ -49,7 +52,7 @@ line-length = 133
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["ANN", "UP"]
+select = ["ANN", "UP", "B", "I"]
 ignore = [
     "D", # pydocstyle
     "COM812", # trailing-comma-missing (conflicts with formatter)

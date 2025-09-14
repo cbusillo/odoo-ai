@@ -19,7 +19,7 @@ When to delegate (thresholds)
 Subagent contract (do the work, then report)
 
 - Apply changes: make the minimal edits/files needed (don’t wait for manual apply unless the change is risky/large)
-- Test: run `uv run test-unit addons/<module>` (or targeted tests) and iterate until green
+- Test: run `uv run test unit` (or targeted phase) and iterate until green
 - Evidence: cite file paths and key lines; save long logs/artifacts to `tmp/subagent-runs/<RUN_ID>/<agent>/`
 - Summary: Decision • Diffs/Paths • Test results • Next steps • Risks/assumptions
 
@@ -43,7 +43,7 @@ Inspection (MCP)
 Test Results (Do not tail/head)
 
 - Run tests without piping (no `| tail`/`| head`). After completion, read the JSON summary:
-    - Prefer `uv run test-gate --json` and use the single JSON payload; or read `tmp/test-logs/latest/summary.json` (
+    - Prefer `uv run test run --json` and use the single JSON payload; or read `tmp/test-logs/latest/summary.json` (
       overall), and `tmp/test-logs/<session>/unit/all.summary.json` for details.
 - Treat `success: true` as the only passing condition. If false, iterate and fix; then rerun tests and re‑read JSON.
 - Example check:
@@ -98,7 +98,7 @@ Parallelization
 Delegation examples
 
 - Research patterns → Archer subagent (search tools); lighter model; no edits.
-- Scaffold and run tests → Scout subagent (write tests into addon, run `uv run test-unit addons/<module>`, iterate).
+- Scaffold and run tests → Scout subagent (write tests into addon, run `uv run test unit`, iterate).
 - Implement feature → Odoo Engineer subagent (edit files; small, focused commits; run tests each pass).
 - Inspect/fix → Inspector subagent (low‑risk fixes; rerun tests; summarize issues and applied fixes).
 

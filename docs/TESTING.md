@@ -26,26 +26,98 @@ See: [Advanced Testing Patterns](odoo18/TESTING_ADVANCED.md)
 
 **NEVER run test scripts directly!** The test infrastructure requires `uv run`:
 
-- ✅ **CORRECT**: `uv run test-unit`
+- ✅ **CORRECT**: `uv run test unit`
 - ❌ **WRONG**: `python tools/test_runner.py`
 - ❌ **WRONG**: `.venv/bin/python tools/test_runner.py`
 
 ### Simple Commands (Recommended)
 
 ```bash
-# Core test commands (these just work!)
-uv run test-unit          # Fast unit tests (< 2 min)
-uv run test-integration   # Integration tests (< 10 min)  
-uv run test-tour          # Browser UI tests (< 15 min)
-uv run test-all           # Complete test suite (< 30 min)
-uv run test-quick         # Quick verification tests
-uv run test-stats         # Show test statistics
+# Unified test commands (parallel by default)
+uv run test run           # All phases with sharding
+  # Add --detached to run in background and avoid CLI timeouts
+uv run test unit          # Fast unit tests (sharded)
+uv run test integration   # Integration tests (optional sharding)
+uv run test tour          # Browser UI tests (optional sharding)
+uv run test js            # JS/hoot tests (sharded)
+uv run test clean         # Remove test artifacts
+uv run test plan --phase all  # Print weight-aware sharding plan (JSON)
+uv run test rerun-failures    # Re-run only failing modules from latest session
+uv run test doctor            # Environment diagnostics (Docker, DB, disk)
 
-# Test utilities
-uv run test-setup         # Initialize test databases
-uv run test-clean         # Remove test artifacts  
-uv run test-report        # Generate HTML report
-# uv run test-watch       # TDD watch mode (not yet implemented)
+# Options
+#   --json                 # Print bottom-line JSON after run
+#   --unit-shards N        # Shard unit tests across N containers
+#   --js-shards N          # Shard JS tests across N containers
+#   --integration-shards N # Shard integration tests across N containers
+#   --tour-shards N        # Shard tour tests across N containers
+#   --modules a,b          # Only include these modules (comma or repeat flag)
+#   --exclude x,y          # Exclude these modules (comma or repeat flag)
+#   --unit-modules ...     # Phase-specific include (unit)
+#   --unit-exclude ...     # Phase-specific exclude (unit)
+#   --js-modules ...       # Phase-specific include (js)
+#   --js-exclude ...       # Phase-specific exclude (js)
+#   --integration-modules ...  # Phase-specific include (integration)
+#   --integration-exclude ...  # Phase-specific exclude (integration)
+#   --tour-modules ...     # Phase-specific include (tour)
+#   --tour-exclude ...     # Phase-specific exclude (tour)
+#   --skip-filestore-integration  # Do not snapshot filestore for integration
+#   --skip-filestore-tour         # Do not snapshot filestore for tours
+
+### Weight-Aware Sharding
+
+- The runner estimates per-module weights by counting tests inside each addon:
+  - Unit/Integration/Tour: number of `def test_...` in `tests/<phase>/**/*.py`
+  - JS: number of `test(...)` in `static/tests/**/*.test.js`
+- Modules are assigned to shards using LPT (Longest Processing Time) bin packing to balance total weight.
+ - Weight v2: The runner blends historical execution times from `tmp/test-logs/weights.json` (per phase/module) into
+   the static weights before bin packing. Times are bucketed in ~5s units to avoid dwarfing counts. The cache updates at
+   the end of each session.
+- Inspect the plan without running tests:
+
+```bash
+uv run test plan --phase unit            # unit only
+uv run test plan --phase all             # all phases
+uv run test plan --phase js --js-shards 6
+uv run test run --modules product_connect,disable_odoo_online --exclude internal_tools
+uv run test run --unit-modules product_connect --js-modules web_theme --tour-exclude storefront_beta
+```
+
+### Cleanup Behavior
+
+- On start: the runner prunes orphaned test resources by dropping all `${ODOO_DB_NAME}_test_*`/`${ODOO_DB_NAME}_ut_*`
+  databases and removing matching filestores.
+- On finish (success or cancellation): it repeats the cleanup to ensure no test DBs/filestores are left behind.
+- Each shard also performs scoped pre‑test cleanup of its own DB/filestore before running.
+
+### Detached Mode and Gate
+
+- For long JS/tour runs or agent timeouts, use detached mode:
+
+```bash
+uv run test run --detached              # fire-and-forget; prints JSON {status:"running", session}
+uv run test js --detached               # phase-only detached
+uv run test tour --detached             # phase-only detached
+
+# Poll or wait for completion
+uv run test status --json               # prints overall success/failure when finished, otherwise running
+uv run test wait --timeout 7200 --json  # blocks until done, exits 0/1
+```
+
+### Live Events (NDJSON)
+
+- The runner writes session events to `<session>/events.ndjson` (one JSON object per line):
+    - `session_started`, `phase_done`, `shard_started`, `shard_finished`, `session_finished`.
+- Set `EVENTS_STDOUT=1` to also echo events to stdout.
+
+### Database Template Optimization
+
+- For prod-clone phases (integration/tour), the runner now creates one template database per session from production and
+  spawns each shard DB from that template (CREATE DATABASE ... TEMPLATE ...). This avoids repeated pg_restore for every
+  shard and significantly reduces wall‑clock time.
+- You can skip the filestore snapshot when media is not needed using `--skip-filestore-integration` or
+  `--skip-filestore-tour` (or env `SKIP_FILESTORE_INTEGRATION=1`, `SKIP_FILESTORE_TOUR=1`).
+
 ```
 
 **That's it!** These commands handle all the complexity internally.
@@ -57,7 +129,7 @@ container in the background and stream logs to the usual location.
 
 ```bash
 # Enable detached mode for long tours
-TEST_DETACHED=1 uv run test-tour addons/<module>
+TEST_DETACHED=1 uv run test tour
 
 # Increase overall tour timeout if needed
 TOUR_TIMEOUT=600 uv run test-tour addons/<module>
@@ -77,7 +149,8 @@ Every test run writes a single session folder under `tmp/test-logs/test-YYYYMMDD
 - `unit/`, `js/`, `integration/`, `tour/`: Per-phase subfolders with:
     - `all.log` (or `<module>.log` for unit matrix)
     - `all.summary.json` / `<module>.summary.json`
-    - `failures.json` (parsed failures/errors with short messages and fingerprints)
+    - `all.failures.json` (parsed failures/errors with short messages and fingerprints)
+    - `junit.xml` (JUnit testsuite for CI)
 
 Shortcuts:
 
@@ -562,12 +635,11 @@ These PyCharm warnings are **false positives** - ignore them:
 
 ```mermaid
 graph TD
-    A[uv run test-unit] --> B[tools.test_commands:run_unit_tests]
-    B --> C[Script-runner container]
-    C --> D[Odoo with test tags]
-    D --> E[Test discovery & execution]
-    E --> F[Output streaming]
-    F --> G[Results & cleanup]
+    A[uv run test run] --> B[TestSession (tools/testkit)]
+    B --> C[Sharding Planner]
+    C --> D[OdooExecutor (N containers)]
+    D --> E[Streaming logs + JSON summaries]
+    E --> F[Reporter (summary.json/digest.json)]
 ```
 
 ### Test Categories
@@ -678,13 +750,13 @@ class TestProductCreationTour(TourTestCase):
 
 ```bash
 # Quick feedback loop
-uv run test-unit           # Run your unit tests (< 2 min)
+uv run test unit           # Run your unit tests
 
 # Test specific area
-uv run test-integration    # Integration tests (< 10 min)
+uv run test integration    # Integration tests
 
 # Full validation
-uv run test-all           # Everything (< 30 min)
+uv run test run            # Everything
 ```
 
 ### Development Workflow
@@ -694,12 +766,11 @@ uv run test-all           # Everything (< 30 min)
 uv run test-quick           # Smoke tests
 
 # 2. Feature development
-uv run test-unit           # Business logic
-uv run test-integration    # Service integration
+uv run test unit           # Business logic
+uv run test integration    # Service integration
 
 # 3. Pre-commit validation  
-uv run test-all            # Complete suite
-uv run test-report         # Analysis
+uv run test run            # Complete suite
 ```
 
 ### Debugging Test Issues
@@ -842,7 +913,7 @@ The project migrated from a monolithic 1572-line test_runner.py to this modern s
 
 ### Command Implementation
 
-Each UV command is implemented in `tools/test_commands.py`:
+Each UV command is implemented via the unified CLI in `tools/testkit/cli.py`:
 
 ```python
 def run_unit_tests():
@@ -863,11 +934,7 @@ def run_unit_tests():
 
 ```toml
 [project.scripts]
-# Core commands
-test-unit = "tools.test_commands:run_unit_tests"
-test-integration = "tools.test_commands:run_integration_tests"
-test-tour = "tools.test_commands:run_tour_tests"
-test-all = "tools.test_commands:run_all_tests"
+test = "tools.testkit.cli:main"
 
 [tool.odoo-test]
 # Container settings

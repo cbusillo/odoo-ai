@@ -3,7 +3,6 @@
     <option name="myName" value="Project Default" />
     <option name="scopesOrder">
       <list>
-        <option value="Temp" />
         <option value="Docs" />
         <option value="Conf" />
         <option value="All Changed Files" />
@@ -83,11 +82,6 @@
       <scope name="Docs" level="WEAK WARNING" enabled="false" />
     </inspection_tool>
     <inspection_tool class="SpellCheckingInspection" enabled="true" level="TYPO" enabled_by_default="true">
-      <scope name="Temp" level="TYPO" enabled="false">
-        <option name="processCode" value="true" />
-        <option name="processLiterals" value="true" />
-        <option name="processComments" value="true" />
-      </scope>
       <scope name="Conf" level="TYPO" enabled="false">
         <option name="processCode" value="true" />
         <option name="processLiterals" value="true" />

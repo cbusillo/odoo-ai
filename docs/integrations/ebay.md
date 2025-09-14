@@ -1,14 +1,19 @@
-# eBay Integration Notes
+# eBay Integration — Research & TODO (Not Implemented)
 
-## Current State
+Status: This integration is not implemented. This document serves as an
+information repository to capture discoveries, requirements, and design
+decisions before any production work begins.
 
-We're currently extracting eBay order information from Shopify orders (via the Note Attributes field), which includes:
+## Current State (Data Sources)
+
+We currently extract eBay‑related order information from Shopify orders (via
+the Note Attributes field), which includes:
 
 - eBay Sales Record Number
 - eBay Order ID
 - Delivery dates
 
-## Future Enhancements
+## Future Enhancements (Proposed)
 
 ### eBay Product URLs
 

@@ -1,6 +1,7 @@
 # Addon Management Guide
 
-This directory contains Odoo addons managed as git submodules. This approach provides version control, independent development, and easy sharing across projects.
+This directory contains Odoo addons managed as git submodules. This approach provides version control, independent
+development, and easy sharing across projects.
 
 ## Current Addons
 
@@ -89,24 +90,28 @@ my_addon/
 ├── data/
 ├── static/
 ├── tests/
-└── CLAUDE.md        # Optional: Addon-specific AI context
+└── AGENTS.md        # Addon-specific notes for LLM agents (design, tests)
 ```
 
-## AI Context for Addons
+## Addon Notes (Agent‑Focused)
 
-Each addon can have its own `CLAUDE.md` file that will be automatically picked up by Claude Code. This allows addon-specific instructions and context without polluting the main project.
+Each addon should include a short `AGENTS.md` with focused guidance for LLM agents (implementation hints, test entry
+points, and links). Keep it small and link to project docs by handle instead of copying content.
 
-Example `addons/my_addon/CLAUDE.md`:
+Example `addons/my_addon/AGENTS.md`:
+
 ```markdown
 # My Addon Context
 
 This addon handles [specific business logic].
 
 ## Key Patterns
+
 - Pattern 1: [Description]
 - Pattern 2: [Description]
 
 ## Testing
+
 Run tests with: `uv run test-unit my_addon`
 ```
 
@@ -131,25 +136,5 @@ git push origin main
 
 1. **Version Control**: Tag stable versions of your addons
 2. **Documentation**: Include README.md in each addon
-3. **Testing**: Write tests for your addons (see docs/TESTING.md)
-4. **CI/CD**: Addon repos can have their own GitHub Actions for deployment
-5. **Dependencies**: Document addon dependencies in `__manifest__.py`
-
-## Alternative: Docker Volumes
-
-If submodules are too complex, you can mount addons via Docker volumes:
-
-```yaml
-# docker-compose.override.yml
-services:
-  web:
-    volumes:
-      - ../my-addons:/opt/project/custom_addons
-```
-
-Then update your `.env`:
-```bash
-ODOO_ADDONS_PATH=/opt/project/custom_addons,/opt/project/addons,/odoo/addons,/volumes/enterprise
-```
-
-This approach is simpler but doesn't provide version control integration.
+3. **Testing**: Write tests for your addons (see docs/testing.md)
+4. **Dependencies**: Document addon dependencies in `__manifest__.py`

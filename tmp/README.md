@@ -17,7 +17,7 @@ tmp/
 The `tmp/` directory is used for:
 
 1. **Test Results** (`tests/`)
-   - Output from `tools/test_runner.py`
+   - Output from `uv run test *` (see docs/testing.md)
    - Each test run creates a timestamped subdirectory
    - Contains logs, summaries, and progress tracking files
    - Example: `tmp/tests/odoo-tests-20250204_143022/`
@@ -37,7 +37,7 @@ The `tmp/` directory is used for:
 ## Important Notes
 
 - **This directory is gitignored** - Nothing here will be committed
-- **Safe for Claude/AI agents** - Can read/write without system restrictions
+- **Safe for AI agents** - Can read/write without system restrictions
 - **Clean regularly** - Delete old test results to save disk space
 - **No production code** - Only temporary/test files belong here
 
@@ -54,7 +54,7 @@ rm -rf tmp/tests/odoo-tests-*
 
 ## Why tmp/ instead of /tmp?
 
-- **Accessibility**: Claude and other tools can access local paths more reliably than system /tmp
+- **Accessibility**: Agents can access local paths more reliably than system /tmp
 - **Project scope**: Keeps temporary files within the project directory
 - **Portability**: Works consistently across different systems
 - **Visibility**: Easy to see and manage temporary files

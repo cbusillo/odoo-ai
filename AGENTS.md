@@ -1,22 +1,19 @@
 # AGENTS.md — Codex CLI Operating Guide (Read Me First)
 
-This project is optimized for Codex CLI. Follow these rules to work fast, safely, and in the house style. Always prefer
-MCP tools when appropriate and validate with our test commands.
+This project is optimized for Codex CLI. Follow these rules to work fast, safely, and in the house style. Prefer
+project MCP tools (Inspection, Odoo, Docker) where appropriate and validate with our test commands.
 
 ## Read Order (Before You Start)
 
-- Core rules: docs/style/CORE.md
-- Language/style: docs/style/PYTHON.md, docs/style/JAVASCRIPT.md
-- Odoo patterns: docs/style/ODOO.md, docs/ODOO_WORKFLOW.md
-- Testing: docs/style/TESTING.md, docs/odoo18/TESTING_ADVANCED.md
-    - See “Runner & Logs” section in docs/style/TESTING.md
-- Odoo 18 canon: docs/odoo18/API_PATTERNS.md, docs/odoo18/SECURITY_PATTERNS.md, docs/odoo18/PERFORMANCE_ORM.md
-- Tooling strategy: docs/TOOL_SELECTION.md, docs/system/AGENT_SAFEGUARDS.md, docs/system/ERROR_RECOVERY.md,
-  docs/system/MODEL_SELECTION.md
-- Agents overview: docs/agents/README.md (then specific agents under docs/agents/*.md)
-- Patterns library: docs/agent-patterns/*, docs/references/*
-- Codex specifics: docs/CODEX_CONFIG.md, docs/codex/reference.md, docs/codex/usage.md, docs/codex/advanced.md,
-  docs/system/CODEX_MCP_REFERENCE.md
+- ToC: docs/README.md
+- Policies: docs/policies/coding-standards.md
+- Style: docs/style/python.md, docs/style/javascript.md, docs/style/testing.md
+- Odoo canon: docs/odoo/orm.md, docs/odoo/security.md, docs/odoo/performance.md, docs/odoo/workflow.md
+- Workflows: docs/workflows/codex-workflow.md, docs/workflows/odoo-development.md, docs/workflows/testing-workflow.md
+  and docs/workflows/refactor-workflows.md, docs/workflows/debugging.md
+- Policies: docs/policies/acceptance-gate.md, docs/policies/coding-standards.md, docs/policies/doc-style.md
+- Tooling: docs/tooling/codex-cli.md, docs/tooling/testing-cli.md, docs/tooling/inspection.md,
+  docs/tooling/odoo-intelligence.md
 
 When implementing a feature, skim the most relevant style doc right before coding (Python, JS, or Odoo) and the Testing
 doc before writing or updating tests.
@@ -31,11 +28,13 @@ doc before writing or updating tests.
 
 ## Critical Rules
 
-- Tools: ALWAYS favor MCP tools when appropriate; see docs/TOOL_SELECTION.md
+- Tools: Prefer project tools (Inspection, Odoo Intelligence) and keep docs policy‑level.
 - Git: Use `git mv` to preserve history
 - Tests: Use only `uv run` commands below. Preferred single-call gate: `uv run test run --json`.
 - Formatting: Use Ruff for Python; Owl.js patterns and no semicolons for JS
 - Python line length: 133 characters max
+- Docs-as-code: When you change behavior, update relevant docs (and fix inaccuracies) in the same PR. Small improvements
+  are welcome.
 
 ## Acceptance Gate (Zero‑Warning)
 
@@ -72,23 +71,19 @@ uv run ruff check --fix   # Fix Python issues
 
 ## CLI Sanity Checks (Codex)
 
-- Quick non-interactive check (read-only, prints a short reply):
+- Quick non-interactive check (read-only):
     - `codex exec --sandbox read-only "Reply with exactly: ok"`
-- Start MCP server:
-    - `codex mcp`
 
 Notes
 
-- MCP server alias: `codex`. Tools exposed: `codex`, `codex_reply`.
 - Model selection: omit `--model` to use the CLI default. Override via env only when a task requires it (e.g., large
   context).
 
 ## Codex Workflow (Entry Point)
 
-- Codex workflow: `docs/codex/WORKFLOW.md`
-- Codex task template: `docs/codex/TASK_TEMPLATE.md`
-- Odoo 18 canon: `docs/odoo18/API_PATTERNS.md`, `docs/odoo18/SECURITY_PATTERNS.md`, `docs/odoo18/PERFORMANCE_ORM.md`
-- Style & Testing: `docs/style/ODOO.md`, `docs/style/TESTING.md`
+- Working loop: docs/workflows/codex-workflow.md
+- Style & Testing: docs/style/*
+- Odoo canon: docs/odoo/*
 
 ## Extra Addons as Submodules (Operator Rule)
 
@@ -100,8 +95,6 @@ Notes
 
 ## Tests (How-To Docs)
 
-- Codex integration test guide: `docs/llm-cli-tests/CODEX.md`
-
 ## Codex CLI Operating Rules
 
 - Planning: Use the plan tool; update as you proceed.
@@ -109,7 +102,7 @@ Notes
 - File edits: Use `apply_patch` with minimal, focused changes; prefer editing existing files over creating new ones.
 - Validation: Prefer `uv run test run --json` to run/wait/gate in one call; expand scope only after green.
     - If running targeted phases, read JSON summaries, not terminal tails. See “LLM‑Friendly Results” in
-      docs/style/TESTING.md. Parse `tmp/test-logs/latest/summary.json` and require `success: true`.
+      docs/style/testing.md. Parse `tmp/test-logs/latest/summary.json` and require `success: true`.
     - Test counts: JS totals default to definition counts (number of `test(...)` in `*.test.js`). Set
       `JS_COUNT_STRATEGY=runtime` to report executed Hoot totals.
     - Pointers: `tmp/test-logs/current` points to the in‑progress session; `tmp/test-logs/latest` points to the last
@@ -147,13 +140,13 @@ Add citations for any unstable facts or external claims. Prefer primary document
 - Use the odoo-intelligence MCP when possible
 - Context flags: Use `with_context(skip_shopify_sync=True)` to avoid sync loops when appropriate.
 
-See docs/style/ODOO.md for details and container rules. Its very important to respect the style rules.
+See docs/odoo/workflow.md for details and container rules. It’s important to respect the style rules.
 
-## Odoo 18 Canon (Consult Before Coding)
+## Odoo Canon (Consult Before Coding)
 
-- APIs and ORM: docs/odoo18/API_PATTERNS.md
-- Security: docs/odoo18/SECURITY_PATTERNS.md
-- Performance & batching: docs/odoo18/PERFORMANCE_ORM.md
+- APIs and ORM: docs/odoo/orm.md
+- Security: docs/odoo/security.md
+- Performance & batching: docs/odoo/performance.md
 
 Skim these before: adding fields/methods, writing constraints/onchanges, batch writes/importers, computed fields, and
 access rules.
@@ -161,20 +154,20 @@ access rules.
 ## Language Style Snapshots
 
 - Python: Type hints everywhere (explicit `-> None` when applicable), f‑strings only, early returns allowed; see
-  docs/style/PYTHON.md.
-- JavaScript: Owl.js 2.0, ES modules, no semicolons, simple selectors for tours; see docs/style/JAVASCRIPT.md.
+  docs/style/python.md.
+- JavaScript: Owl.js 2.0, ES modules, no semicolons, simple selectors for tours; see docs/style/javascript.md.
 
 ## Testing Rules (Start Here)
 
-- Use base classes and tags from docs/style/TESTING.md to avoid SKU validation pitfalls and brittle tours.
+- Use base classes and tags from docs/style/testing.md to avoid SKU validation pitfalls and brittle tours.
 - Place tests under `tests/` (Python) and `static/tests/` (JS, tours) following naming patterns.
 - For tour tests: only simple CSS selectors; no jQuery patterns like `:visible` or `:contains()`.
 
 Related patterns and templates:
 
-- Playwright selectors: docs/agent-patterns/playwright-selectors.md
-- Playwright patterns & debugging: docs/agent-patterns/playwright-patterns.md, docs/agent-patterns/tour-debugging.md
-- Test templates and mocking: docs/agent-patterns/test-templates.md, docs/references/service-mocking.md
+- Playwright selectors: docs/style/playwright-selectors.md
+- Playwright patterns & debugging: docs/style/playwright-patterns.md, docs/style/tour-debugging.md
+- Test templates and mocking: docs/references/test-templates.md, docs/references/service-mocking.md
 
 ## Large/Complex Workflows
 
@@ -191,28 +184,16 @@ Related patterns and templates:
 
 ## References You Will Use Often
 
-- Odoo patterns and workflow: docs/style/ODOO.md, docs/ODOO_WORKFLOW.md
-- Testing patterns: docs/style/TESTING.md, docs/odoo18/TESTING_ADVANCED.md
-- Tool selection and speed: docs/TOOL_SELECTION.md
-- Codex configuration and MCP details: docs/CODEX_CONFIG.md, docs/codex/reference.md, docs/codex/usage.md,
-  docs/codex/advanced.md, docs/system/CODEX_MCP_REFERENCE.md
+- Odoo canon and workflow: docs/odoo/*, docs/workflows/odoo-development.md, docs/architecture.md
+- Testing patterns: docs/style/testing.md
 
-## MCP Recipes (Copy/Paste Starters)
+## Recipes
 
-- List models/fields quickly:
-    - `odoo-intelligence__model_query(operation="list", pattern="product.*")`
-    - `odoo-intelligence__field_query(model_name="product.template", operation="list")`
-- Find overrides/patterns:
-    - `odoo-intelligence__search_code(pattern="def create\(", file_type="py")`
-    - `odoo-intelligence__analysis_query(analysis_type="inheritance", model_name="product.template")`
 - Run targeted tests:
     - `uv run test unit`
     - `uv run test integration`
     - `uv run test tour`
-- Update a module in proper env:
-    - `odoo-intelligence__odoo_update_module(modules="<module>")`
-
-Prefer MCP over Bash; only fall back to Bash if a needed flag isn’t supported (document why).
+    - See docs/tooling/testing-cli.md for scoping flags and JSON summaries.
 
 ## New Addon Happy Path
 
@@ -224,25 +205,23 @@ Prefer MCP over Bash; only fall back to Bash if a needed flag isn’t supported 
 5) If integration needed, add service skeleton and mocks; avoid secrets.
 6) Iterate with Inspector → Refactor for quality/perf fixes.
 
-References: docs/style/TESTING.md, docs/agent-patterns/test-templates.md, addons/README.md.
+References: docs/style/testing.md, docs/references/test-templates.md, addons/README.md.
 
 ## Tours & Frontend (Owl)
 
-- Keep selectors simple (no jQuery‑style). See: docs/agent-patterns/playwright-selectors.md.
-- Follow Owl patterns and troubleshooting: docs/agent-patterns/owl-troubleshooting.md.
-- Use Playwright patterns & debugging: docs/agent-patterns/playwright-patterns.md,
-  docs/agent-patterns/tour-debugging.md.
+- Keep selectors simple (no jQuery‑style). See: docs/style/playwright-selectors.md.
+- Follow Owl patterns and troubleshooting: docs/style/owl-troubleshooting.md.
+- Use Playwright patterns & debugging: docs/style/playwright-patterns.md,
+  docs/style/tour-debugging.md.
 
 ## Integrations (Shopify)
 
-- Read: docs/integrations/shopify.md, docs/agent-patterns/graphql-patterns.md, docs/agent-patterns/webhook-patterns.md.
+- Read: docs/integrations/shopify-sync.md, docs/integrations/graphql.md, docs/integrations/webhooks.md.
 - Service mocking patterns: docs/references/service-mocking.md.
 - Use `with_context(skip_shopify_sync=True)` for imports/bulk updates/test data.
 - Do not edit generated files: `services/shopify/gql/*`, `graphql/schema/*`.
 
 ## Project Health
-
-- Known issues, flakiness, and status: docs/status/TEST_STATUS.md.
 
 Keep this document as your operating baseline. When in doubt, re‑read the relevant style doc before coding and prefer
 MCP tools to keep iterations fast and reliable.

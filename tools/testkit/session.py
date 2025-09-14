@@ -75,6 +75,14 @@ class TestSession:
     def _begin(self) -> None:
         self.session_dir, self.session_name, self.session_started = begin_session_dir()
         os.environ["TEST_LOG_SESSION"] = self.session_name or ""
+        # Events stream
+        from .events import EventStream
+
+        self._events = EventStream((self.session_dir / "events.ndjson"), echo=self.settings.events_stdout)
+        try:
+            self._events.emit("session_started", session=self.session_name)
+        except Exception:
+            pass
         # prune older sessions
         try:
             prune_old_sessions(Path("tmp/test-logs"), max(1, int(self.settings.test_log_keep)))
@@ -276,9 +284,17 @@ class TestSession:
 
         try:
             # Unit (sharded)
+            try:
+                self._events.emit("phase_start", phase="unit")
+            except Exception:
+                pass
             outcomes["unit"] = self._run_unit_sharded(unit_modules, timeouts.get("unit", 600))
             # JS (sharded)
             if self.keep_going or outcomes["unit"].ok:
+                try:
+                    self._events.emit("phase_start", phase="js")
+                except Exception:
+                    pass
                 outcomes["js"] = self._run_js_sharded(js_modules, timeouts.get("js", 1200))
             else:
                 outcomes["js"] = PhaseOutcome("js", None, None, None)
@@ -292,12 +308,20 @@ class TestSession:
                 pass
             # Integration (optionally sharded)
             if self.keep_going or (outcomes["js"].ok if outcomes["js"].ok is not None else True):
+                try:
+                    self._events.emit("phase_start", phase="integration")
+                except Exception:
+                    pass
                 outcomes["integration"] = self._run_integration_sharded(integration_modules, timeouts.get("integration", 900))
             else:
                 outcomes["integration"] = PhaseOutcome("integration", None, None, None)
                 print("   Skipping integration due to earlier failures")
             # Tour (optionally sharded)
             if self.keep_going or (outcomes["integration"].ok if outcomes["integration"].ok is not None else True):
+                try:
+                    self._events.emit("phase_start", phase="tour")
+                except Exception:
+                    pass
                 outcomes["tour"] = self._run_tour_sharded(tour_modules, timeouts.get("tour", 1800))
             else:
                 outcomes["tour"] = PhaseOutcome("tour", None, None, None)

@@ -15,6 +15,7 @@ from .auth import setup_test_authentication
 from .browser import kill_browsers_and_zombies, restart_script_runner_with_orphan_cleanup
 from .db import (
     clone_production_database,
+    drop_and_create,
     drop_and_create_test_database,
     get_production_db_name,
 )

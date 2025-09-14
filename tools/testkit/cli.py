@@ -157,9 +157,12 @@ def run_all(
             cmd += ["--skip-filestore-integration"]
         if skip_filestore_tour:
             cmd += ["--skip-filestore-tour"]
-        from subprocess import DEVNULL, Popen
+        from subprocess import Popen
 
-        Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)
+        out = Path("tmp/test-logs/launcher.out")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with out.open("ab", buffering=0) as f:
+            Popen(cmd, stdout=f, stderr=f)
         # Try to identify session quickly
         session = None
         cur = Path("tmp/test-logs/current")
@@ -230,7 +233,17 @@ def run_unit(
         unit_modules=_parse_multi(unit_modules) or None,
         unit_exclude=_parse_multi(unit_exclude) or None,
     )
-    rc = ts._run_unit_sharded(ts._discover_unit_modules(), 600).return_code or 0
+    ts._begin()
+    out_unit = ts._run_unit_sharded(ts._discover_unit_modules(), 600)
+    from .phases import PhaseOutcome
+
+    outcomes = {
+        "unit": out_unit,
+        "js": PhaseOutcome("js", None, None, None),
+        "integration": PhaseOutcome("integration", None, None, None),
+        "tour": PhaseOutcome("tour", None, None, None),
+    }
+    rc = ts._finish(outcomes)
     if json_out:
         _emit_bottomline(Path("tmp/test-logs/latest"), True)
     sys.exit(rc)
@@ -269,9 +282,12 @@ def run_js(
             cmd += ["--js-modules", m]
         for x in _parse_multi(js_exclude):
             cmd += ["--js-exclude", x]
-        from subprocess import DEVNULL, Popen
+        from subprocess import Popen
 
-        Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)
+        out = Path("tmp/test-logs/launcher.out")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with out.open("ab", buffering=0) as f:
+            Popen(cmd, stdout=f, stderr=f)
         print(json.dumps({"status": "running"}))
         sys.exit(0)
 
@@ -282,7 +298,17 @@ def run_js(
         js_modules=_parse_multi(js_modules) or None,
         js_exclude=_parse_multi(js_exclude) or None,
     )
-    rc = ts._run_js_sharded(ts._discover_js_modules(), 1200).return_code or 0
+    ts._begin()
+    out_js = ts._run_js_sharded(ts._discover_js_modules(), 1200)
+    from .phases import PhaseOutcome
+
+    outcomes = {
+        "unit": PhaseOutcome("unit", None, None, None),
+        "js": out_js,
+        "integration": PhaseOutcome("integration", None, None, None),
+        "tour": PhaseOutcome("tour", None, None, None),
+    }
+    rc = ts._finish(outcomes)
     if json_out:
         _emit_bottomline(Path("tmp/test-logs/latest"), True)
     sys.exit(rc)
@@ -318,7 +344,17 @@ def run_integration(
         integration_modules=_parse_multi(integration_modules) or None,
         integration_exclude=_parse_multi(integration_exclude) or None,
     )
-    rc = ts._run_integration_sharded(ts._discover_integration_modules(), 900).return_code or 0
+    ts._begin()
+    out_int = ts._run_integration_sharded(ts._discover_integration_modules(), 900)
+    from .phases import PhaseOutcome
+
+    outcomes = {
+        "unit": PhaseOutcome("unit", None, None, None),
+        "js": PhaseOutcome("js", None, None, None),
+        "integration": out_int,
+        "tour": PhaseOutcome("tour", None, None, None),
+    }
+    rc = ts._finish(outcomes)
     if json_out:
         _emit_bottomline(Path("tmp/test-logs/latest"), True)
     sys.exit(rc)
@@ -376,7 +412,17 @@ def run_tour(
         tour_modules=_parse_multi(tour_modules) or None,
         tour_exclude=_parse_multi(tour_exclude) or None,
     )
-    rc = ts._run_tour_sharded(ts._discover_tour_modules(), 1800).return_code or 0
+    ts._begin()
+    out_tour = ts._run_tour_sharded(ts._discover_tour_modules(), 1800)
+    from .phases import PhaseOutcome
+
+    outcomes = {
+        "unit": PhaseOutcome("unit", None, None, None),
+        "js": PhaseOutcome("js", None, None, None),
+        "integration": PhaseOutcome("integration", None, None, None),
+        "tour": out_tour,
+    }
+    rc = ts._finish(outcomes)
     if json_out:
         _emit_bottomline(Path("tmp/test-logs/latest"), True)
     sys.exit(rc)

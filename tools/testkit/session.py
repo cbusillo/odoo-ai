@@ -519,8 +519,10 @@ class TestSession:
     def _run_unit_sharded(self, modules: list[str], timeout: int) -> PhaseOutcome:
         within = int(self.settings.unit_within_shards)
         if within and within > 0:
-            shards = self._compute_within_shards(modules, within, phase="unit")
-            return self._fanout_class("unit", shards, timeout)
+            class_shards = self._compute_within_shards(modules, within, phase="unit")
+            if not class_shards or len(class_shards) < within:
+                return self._fanout_method("unit", modules, timeout, within)
+            return self._fanout_class("unit", class_shards, timeout)
         shards = self._compute_shards(modules, default_auto=4, env_value=self.settings.unit_shards, phase="unit")
         return self._fanout("unit", shards, timeout)
 
@@ -531,16 +533,21 @@ class TestSession:
     def _run_integration_sharded(self, modules: list[str], timeout: int) -> PhaseOutcome:
         within = int(self.settings.integration_within_shards)
         if within and within > 0:
-            shards = self._compute_within_shards(modules, within, phase="integration")
-            return self._fanout_class("integration", shards, timeout)
+            class_shards = self._compute_within_shards(modules, within, phase="integration")
+            # If class-level sharding yields fewer shards than requested, fall back to method-level slicing
+            if not class_shards or len(class_shards) < within:
+                return self._fanout_method("integration", modules, timeout, within)
+            return self._fanout_class("integration", class_shards, timeout)
         shards = self._compute_shards(modules, default_auto=2, env_value=self.settings.integration_shards, phase="integration")
         return self._fanout("integration", shards, timeout)
 
     def _run_tour_sharded(self, modules: list[str], timeout: int) -> PhaseOutcome:
         within = int(self.settings.tour_within_shards)
         if within and within > 0:
-            shards = self._compute_within_shards(modules, within, phase="tour")
-            return self._fanout_class("tour", shards, timeout)
+            class_shards = self._compute_within_shards(modules, within, phase="tour")
+            if not class_shards or len(class_shards) < within:
+                return self._fanout_method("tour", modules, timeout, within)
+            return self._fanout_class("tour", class_shards, timeout)
         shards = self._compute_shards(modules, default_auto=2, env_value=self.settings.tour_shards, phase="tour")
         return self._fanout("tour", shards, timeout)
 
@@ -586,6 +593,75 @@ class TestSession:
         for s in shards:
             out.append([{"module": it.module, "class": it.cls, "weight": it.weight} for it in s])
         return out
+
+    def _cap_by_db_guardrail(self, n: int) -> int:
+        try:
+            from .db import db_capacity
+
+            max_conn, active = db_capacity()
+            per_shard = max(1, int(self.settings.conn_per_shard))
+            reserve = int(self.settings.conn_reserve)
+            allowed = max(1, (max_conn - active - reserve) // per_shard)
+            return max(1, min(n, allowed))
+        except Exception:
+            return max(1, n)
+
+    def _fanout_method(self, phase: str, modules: list[str], timeout: int, n: int) -> PhaseOutcome:
+        """Run N shards by slicing test methods across shards via sitecustomize hook.
+
+        This keeps CPU busy even when a phase has very few classes.
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from .executor import OdooExecutor
+
+        assert self.session_dir is not None
+        n = self._cap_by_db_guardrail(max(1, int(n)))
+        print(f"▶️  Phase {phase} with {n} method-slice shard(s)")
+
+        def _run(idx: int) -> int:
+            ex = OdooExecutor(self.session_dir, phase)
+            is_js = phase == "js"
+            is_tour = phase == "tour"
+            use_prod = phase in {"integration", "tour"}
+            base_tag = "js_test" if is_js else ("tour_test" if is_tour else ("integration_test" if use_prod else "unit_test"))
+            tag_expr = base_tag
+            db_base = f"{self.settings.db_name}_test_{phase}"
+            # Ensure unique DB per slice
+            db_name = f"{db_base}_m{idx:03d}"
+            template_db = self._ensure_template_db() if use_prod else None
+            # Slicer env passed to container; add our tools path for sitecustomize
+            extra_env = {
+                "OAI_TEST_SLICER": "1",
+                "TEST_SLICE_TOTAL": str(n),
+                "TEST_SLICE_INDEX": str(idx),
+                "TEST_SLICE_PHASE": phase,
+                "TEST_SLICE_MODULES": ",".join(modules),
+                # Prepend tools dir for sitecustomize.py
+                "PYTHONPATH": "/volumes/tools/testkit:$PYTHONPATH",
+            }
+            return ex.run(
+                test_tags=tag_expr,
+                db_name=db_name,
+                modules_to_install=modules,
+                timeout=timeout,
+                is_tour_test=is_tour,
+                is_js_test=is_js,
+                use_production_clone=use_prod,
+                template_db=template_db,
+                use_module_prefix=False,
+                extra_env=extra_env,
+                shard_label=f"ms{idx:03d}",
+            ).returncode
+
+        max_workers = self.settings.max_procs or min(8, n)
+        rc_agg = 0
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = {pool.submit(_run, i): i for i in range(n)}
+            for fut in as_completed(futures):
+                rc = fut.result()
+                if rc != 0:
+                    rc_agg = rc_agg or rc
+        return PhaseOutcome(phase, 0 if rc_agg == 0 else rc_agg, self.session_dir / phase, None)
 
     def _fanout(self, phase: str, shards: list[list[str]], timeout: int) -> PhaseOutcome:
         from concurrent.futures import ThreadPoolExecutor, as_completed

@@ -86,6 +86,8 @@ class OdooExecutor:
         use_production_clone: bool = False,
         template_db: str | None = None,
         use_module_prefix: bool = False,
+        extra_env: dict[str, str] | None = None,
+        shard_label: str | None = None,
     ) -> ExecResult:
         script_runner_service = get_script_runner_service()
         modules_str = ",".join(modules_to_install)
@@ -156,6 +158,12 @@ class OdooExecutor:
         module_flag = "-u" if use_production_clone else "-i"
 
         cmd = ["docker", "compose", "run", "--rm"]
+        # Per-shard environment injection (for slicer etc.)
+        if extra_env:
+            for k, v in extra_env.items():
+                if v is None:
+                    continue
+                cmd.extend(["-e", f"{k}={v}"])
         # pass-through debug/timeouts
         for var in ("JS_PRECHECK", "JS_DEBUG", "TOUR_TIMEOUT"):
             val = os.environ.get(var)
@@ -222,6 +230,8 @@ class OdooExecutor:
             return f"shard-{hid}"
 
         base = _shard_base(modules_to_install)
+        if shard_label:
+            base = f"{base}-{shard_label}"
         log_file = phase_dir / f"{base}.log"
         summary_file = phase_dir / f"{base}.summary.json"
 

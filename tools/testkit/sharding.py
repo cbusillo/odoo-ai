@@ -146,3 +146,65 @@ def plan_shards_for_phase(modules: list[str], phase: str, n_shards: int) -> Shar
     plan.shards = [s for s in plan.shards if s.get("modules")]
     plan.shards_count = len(plan.shards)
     return plan
+
+
+# ---------------- Within-module sharding (by class) ----------------
+
+
+@dataclass
+class ClassItem:
+    module: str
+    cls: str
+    weight: int
+
+
+def _test_classes_in_file(text: str) -> list[tuple[str, int]]:
+    classes: list[tuple[str, int]] = []
+    class_iter = list(re.finditer(r"^\s*class\s+([A-Za-z_][\w]*)\s*\([^)]*\):", text, flags=re.M))
+    for i, m in enumerate(class_iter):
+        name = m.group(1)
+        start = m.end()
+        end = class_iter[i + 1].start() if i + 1 < len(class_iter) else len(text)
+        block = text[start:end]
+        tests = len(re.findall(r"^\s*def\s+test_", block, flags=re.M))
+        if tests > 0:
+            classes.append((name, tests))
+    return classes
+
+
+def discover_test_classes(modules: list[str], phase: str) -> list[ClassItem]:
+    root = Path("addons")
+    out: list[ClassItem] = []
+    patterns = {
+        "unit": "tests/unit/**/*.py",
+        "integration": "tests/integration/**/*.py",
+        "tour": "tests/tour/**/*.py",
+    }
+    pat = patterns.get(phase)
+    if not pat:
+        return out
+    for mod in modules:
+        mdir = root / mod
+        for p in mdir.glob(pat):
+            if not p.is_file():
+                continue
+            try:
+                txt = p.read_text(errors="ignore")
+            except Exception:
+                continue
+            for cname, wt in _test_classes_in_file(txt):
+                out.append(ClassItem(module=mod, cls=cname, weight=wt))
+    return out
+
+
+def plan_within_module_shards(modules: list[str], phase: str, n: int) -> list[list[ClassItem]]:
+    items = discover_test_classes(modules, phase)
+    if not items or n <= 1:
+        return [items] if items else []
+    shards: list[list[ClassItem]] = [[] for _ in range(n)]
+    weights = [0] * n
+    for it in sorted(items, key=lambda x: x.weight, reverse=True):
+        idx = min(range(n), key=lambda i: weights[i])
+        shards[idx].append(it)
+        weights[idx] += it.weight
+    return [s for s in shards if s]

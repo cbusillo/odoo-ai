@@ -87,6 +87,10 @@ def _parse_multi(values: tuple[str, ...]) -> list[str]:
 @click.option("--skip-filestore-integration", is_flag=True, default=False, help="Skip filestore snapshot in integration phase")
 @click.option("--skip-filestore-tour", is_flag=True, default=False, help="Skip filestore snapshot in tour phase")
 @click.option("--detached", is_flag=True, default=False, help="Run in background and return immediately")
+@click.option("--unit-within-shards", type=int, default=None, help="Split unit by class across N shards")
+@click.option("--integration-within-shards", type=int, default=None, help="Split integration by class across N shards")
+@click.option("--tour-within-shards", type=int, default=None, help="Split tour by class across N shards")
+@click.option("--overlap", is_flag=True, default=False, help="Run phases in parallel (unit+js, integration+tour)")
 def run_all(
     json_out: bool,
     unit_shards: int | None,
@@ -106,6 +110,10 @@ def run_all(
     skip_filestore_integration: bool,
     skip_filestore_tour: bool,
     detached: bool,
+    unit_within_shards: int | None,
+    integration_within_shards: int | None,
+    tour_within_shards: int | None,
+    overlap: bool,
 ) -> None:
     # Set env overrides for settings
     if unit_shards is not None:
@@ -120,6 +128,14 @@ def run_all(
         os.environ["SKIP_FILESTORE_INTEGRATION"] = "1"
     if skip_filestore_tour:
         os.environ["SKIP_FILESTORE_TOUR"] = "1"
+    if unit_within_shards is not None:
+        os.environ["UNIT_WITHIN_SHARDS"] = str(unit_within_shards)
+    if integration_within_shards is not None:
+        os.environ["INTEGRATION_WITHIN_SHARDS"] = str(integration_within_shards)
+    if tour_within_shards is not None:
+        os.environ["TOUR_WITHIN_SHARDS"] = str(tour_within_shards)
+    if overlap:
+        os.environ["PHASES_OVERLAP"] = "1"
     include = _parse_multi(modules)
     omit = _parse_multi(exclude)
     if detached and not os.environ.get("DETACHED_SPAWNED"):

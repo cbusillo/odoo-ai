@@ -283,59 +283,102 @@ class TestSession:
         outcomes: dict[str, PhaseOutcome] = {}
 
         try:
-            # Unit (sharded)
-            try:
-                self._events.emit("phase_start", phase="unit")
-            except Exception:
-                pass
-            outcomes["unit"] = self._run_unit_sharded(unit_modules, timeouts.get("unit", 600))
-            # JS (sharded)
-            if self.keep_going or outcomes["unit"].ok:
-                try:
-                    self._events.emit("phase_start", phase="js")
-                except Exception:
-                    pass
-                outcomes["js"] = self._run_js_sharded(js_modules, timeouts.get("js", 1200))
-            else:
-                outcomes["js"] = PhaseOutcome("js", None, None, None)
-                print("   Skipping JS tests due to unit failures")
-            # Aggregate unit/js for quick feedback
-            try:
-                if self.session_dir:
-                    aggregate_phase(self.session_dir, "unit")
-                    aggregate_phase(self.session_dir, "js")
-            except Exception:
-                pass
-            # Integration (optionally sharded)
-            if self.keep_going or (outcomes["js"].ok if outcomes["js"].ok is not None else True):
-                try:
-                    self._events.emit("phase_start", phase="integration")
-                except Exception:
-                    pass
-                outcomes["integration"] = self._run_integration_sharded(integration_modules, timeouts.get("integration", 900))
-            else:
-                outcomes["integration"] = PhaseOutcome("integration", None, None, None)
-                print("   Skipping integration due to earlier failures")
-            # Tour (optionally sharded)
-            if self.keep_going or (outcomes["integration"].ok if outcomes["integration"].ok is not None else True):
-                try:
-                    self._events.emit("phase_start", phase="tour")
-                except Exception:
-                    pass
-                outcomes["tour"] = self._run_tour_sharded(tour_modules, timeouts.get("tour", 1800))
-            else:
-                outcomes["tour"] = PhaseOutcome("tour", None, None, None)
-                print("   Skipping tour due to earlier failures")
+            if self.settings.phases_overlap:
+                from concurrent.futures import ThreadPoolExecutor
 
-            # Aggregate all phases
-            try:
-                if self.session_dir:
-                    aggregate_phase(self.session_dir, "integration")
-                    aggregate_phase(self.session_dir, "tour")
-            except Exception:
-                pass
-
-            return self._finish(outcomes)
+                # Unit + JS in parallel
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    try:
+                        self._events.emit("phase_start", phase="unit")
+                    except Exception:
+                        pass
+                    try:
+                        self._events.emit("phase_start", phase="js")
+                    except Exception:
+                        pass
+                    fu = pool.submit(self._run_unit_sharded, unit_modules, timeouts.get("unit", 600))
+                    fj = pool.submit(self._run_js_sharded, js_modules, timeouts.get("js", 1200))
+                    outcomes["unit"] = fu.result()
+                    outcomes["js"] = fj.result()
+                try:
+                    if self.session_dir:
+                        aggregate_phase(self.session_dir, "unit")
+                        aggregate_phase(self.session_dir, "js")
+                except Exception:
+                    pass
+                # Proceed or stop based on keep_going
+                if not self.keep_going and (not outcomes["unit"].ok or not outcomes["js"].ok):
+                    outcomes.setdefault("integration", PhaseOutcome("integration", None, None, None))
+                    outcomes.setdefault("tour", PhaseOutcome("tour", None, None, None))
+                    return self._finish(outcomes)
+                # Integration + Tour in parallel
+                with ThreadPoolExecutor(max_workers=2) as pool2:
+                    try:
+                        self._events.emit("phase_start", phase="integration")
+                    except Exception:
+                        pass
+                    try:
+                        self._events.emit("phase_start", phase="tour")
+                    except Exception:
+                        pass
+                    fi = pool2.submit(self._run_integration_sharded, integration_modules, timeouts.get("integration", 900))
+                    ft = pool2.submit(self._run_tour_sharded, tour_modules, timeouts.get("tour", 1800))
+                    outcomes["integration"] = fi.result()
+                    outcomes["tour"] = ft.result()
+                try:
+                    if self.session_dir:
+                        aggregate_phase(self.session_dir, "integration")
+                        aggregate_phase(self.session_dir, "tour")
+                except Exception:
+                    pass
+                return self._finish(outcomes)
+            else:
+                # Sequential path
+                try:
+                    self._events.emit("phase_start", phase="unit")
+                except Exception:
+                    pass
+                outcomes["unit"] = self._run_unit_sharded(unit_modules, timeouts.get("unit", 600))
+                if self.keep_going or outcomes["unit"].ok:
+                    try:
+                        self._events.emit("phase_start", phase="js")
+                    except Exception:
+                        pass
+                    outcomes["js"] = self._run_js_sharded(js_modules, timeouts.get("js", 1200))
+                else:
+                    outcomes["js"] = PhaseOutcome("js", None, None, None)
+                    print("   Skipping JS tests due to unit failures")
+                try:
+                    if self.session_dir:
+                        aggregate_phase(self.session_dir, "unit")
+                        aggregate_phase(self.session_dir, "js")
+                except Exception:
+                    pass
+                if self.keep_going or (outcomes["js"].ok if outcomes["js"].ok is not None else True):
+                    try:
+                        self._events.emit("phase_start", phase="integration")
+                    except Exception:
+                        pass
+                    outcomes["integration"] = self._run_integration_sharded(integration_modules, timeouts.get("integration", 900))
+                else:
+                    outcomes["integration"] = PhaseOutcome("integration", None, None, None)
+                    print("   Skipping integration due to earlier failures")
+                if self.keep_going or (outcomes["integration"].ok if outcomes["integration"].ok is not None else True):
+                    try:
+                        self._events.emit("phase_start", phase="tour")
+                    except Exception:
+                        pass
+                    outcomes["tour"] = self._run_tour_sharded(tour_modules, timeouts.get("tour", 1800))
+                else:
+                    outcomes["tour"] = PhaseOutcome("tour", None, None, None)
+                    print("   Skipping tour due to earlier failures")
+                try:
+                    if self.session_dir:
+                        aggregate_phase(self.session_dir, "integration")
+                        aggregate_phase(self.session_dir, "tour")
+                except Exception:
+                    pass
+                return self._finish(outcomes)
         finally:
             # Post-run cleanup (success or cancellation): remove all test DBs/filestores
             try:
@@ -474,6 +517,10 @@ class TestSession:
 
     # ————— Sharded runners —————
     def _run_unit_sharded(self, modules: list[str], timeout: int) -> PhaseOutcome:
+        within = int(self.settings.unit_within_shards)
+        if within and within > 0:
+            shards = self._compute_within_shards(modules, within, phase="unit")
+            return self._fanout_class("unit", shards, timeout)
         shards = self._compute_shards(modules, default_auto=4, env_value=self.settings.unit_shards, phase="unit")
         return self._fanout("unit", shards, timeout)
 
@@ -482,10 +529,18 @@ class TestSession:
         return self._fanout("js", shards, timeout)
 
     def _run_integration_sharded(self, modules: list[str], timeout: int) -> PhaseOutcome:
+        within = int(self.settings.integration_within_shards)
+        if within and within > 0:
+            shards = self._compute_within_shards(modules, within, phase="integration")
+            return self._fanout_class("integration", shards, timeout)
         shards = self._compute_shards(modules, default_auto=2, env_value=self.settings.integration_shards, phase="integration")
         return self._fanout("integration", shards, timeout)
 
     def _run_tour_sharded(self, modules: list[str], timeout: int) -> PhaseOutcome:
+        within = int(self.settings.tour_within_shards)
+        if within and within > 0:
+            shards = self._compute_within_shards(modules, within, phase="tour")
+            return self._fanout_class("tour", shards, timeout)
         shards = self._compute_shards(modules, default_auto=2, env_value=self.settings.tour_shards, phase="tour")
         return self._fanout("tour", shards, timeout)
 
@@ -523,6 +578,15 @@ class TestSession:
             return [[m["name"] for m in shard["modules"]] for shard in plan.shards]
         return greedy_shards(modules, n)
 
+    def _compute_within_shards(self, modules: list[str], within: int, *, phase: str) -> list[list[dict]]:
+        from .sharding import plan_within_module_shards
+
+        shards = plan_within_module_shards(modules, phase, max(1, within))
+        out: list[list[dict]] = []
+        for s in shards:
+            out.append([{"module": it.module, "class": it.cls, "weight": it.weight} for it in s])
+        return out
+
     def _fanout(self, phase: str, shards: list[list[str]], timeout: int) -> PhaseOutcome:
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -559,6 +623,50 @@ class TestSession:
         rc_agg = 0
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
             futures = {pool.submit(_run, mods): mods for mods in shards}
+            for fut in as_completed(futures):
+                rc = fut.result()
+                if rc != 0:
+                    rc_agg = rc_agg or rc
+        return PhaseOutcome(phase, 0 if rc_agg == 0 else rc_agg, self.session_dir / phase, None)
+
+    def _fanout_class(self, phase: str, shards: list[list[dict]], timeout: int) -> PhaseOutcome:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from .executor import OdooExecutor
+
+        assert self.session_dir is not None
+        print(f"▶️  Phase {phase} with {len(shards)} class-shard(s)")
+
+        def _run(items: list[dict]) -> int:
+            if not items:
+                return 0
+            is_js = phase == "js"
+            is_tour = phase == "tour"
+            use_prod = phase in {"integration", "tour"}
+            base_tag = "js_test" if is_js else ("tour_test" if is_tour else ("integration_test" if use_prod else "unit_test"))
+            modules = sorted({i["module"] for i in items})
+            parts = [f"{base_tag}/{i['module']}:{i['class']}" for i in items]
+            if is_tour:
+                parts.append("-js_test")
+            tag_expr = ",".join(parts)
+            ex = OdooExecutor(self.session_dir, phase)
+            db = f"{self.settings.db_name}_test_{phase}"
+            template_db = self._ensure_template_db() if use_prod else None
+            return ex.run(
+                test_tags=tag_expr,
+                db_name=f"{db}_{abs(hash('::'.join(parts))) % 10_000}",
+                modules_to_install=modules,
+                timeout=timeout,
+                is_tour_test=is_tour,
+                is_js_test=is_js,
+                use_production_clone=use_prod,
+                template_db=template_db,
+                use_module_prefix=False,
+            ).returncode
+
+        max_workers = self.settings.max_procs or min(8, len(shards))
+        rc_agg = 0
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = {pool.submit(_run, items): items for items in shards}
             for fut in as_completed(futures):
                 rc = fut.result()
                 if rc != 0:

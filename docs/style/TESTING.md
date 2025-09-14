@@ -1,187 +1,24 @@
-# Testing Style Rules
+# Testing Style
 
-Test-specific patterns and validation rules.
+Basics
 
-## SKU Validation Rules
+- Place Python tests under `addons/<module>/tests/` and JS/tours under `addons/<module>/static/tests/`.
+- Use base classes and factory helpers; avoid ad‑hoc data creation where possible.
+- Tag tests appropriately (unit/integration/tour) to keep runs predictable.
 
-**Consumable products require 4-8 digit SKUs**: Products with `type='consu'` must have numeric SKUs
+Selectors (tours)
 
-- **Valid examples**: "1234", "12345678", "00001234"
-- **Invalid examples**: "ABC123", "TEST-001", "12", "123456789"
-- **Service products exempt**: Products with `type='service'` can have any SKU format
-- **Bypass validation**: Use `with_context(skip_sku_check=True)` when needed
+- Prefer simple, stable selectors (role/name) and avoid brittle CSS chains.
+- Add explicit waits for UI state rather than fixed sleeps.
 
-## Test Class Inheritance
+See also
 
-**Always use base test classes** to avoid SKU validation errors:
+- Advanced: [style/testing-advanced.md](testing-advanced.md)
+- Workflow: [../workflows/testing-workflow.md](../workflows/testing-workflow.md)
 
-```python
-from odoo.addons.product_connect.tests.fixtures.test_base import (
-    ProductConnectTransactionCase,  # For unit tests
-    ProductConnectHttpCase,  # For browser/auth tests  
-    ProductConnectIntegrationCase  # For motor integration
-)
-```
+LLM‑Friendly Results
 
-**Pre-created test data** (don't create duplicates!):
-
-- `self.test_product` - Standard consumable (SKU: 10000001)
-- `self.test_service` - Service product (SKU: SERVICE-001)
-- `self.test_product_ready` - Ready-for-sale product
-- `self.test_products` - List of 10 products
-- `self.test_partner` - Test customer
-- `self.test_user` - Test user (HttpCase only)
-
-## Test Tags (REQUIRED)
-
-```python
-@tagged("post_install", "-at_install")  # Python tests
-@tagged("post_install", "-at_install", "product_connect_tour")  # Tour runners
-```
-
-## File Naming Patterns
-
-```
-tests/
-├── test_model_*.py       # Model tests (e.g., test_model_motor.py)
-├── test_service_*.py     # Service tests (e.g., test_service_shopify.py)
-├── test_tour_*.py        # Tour runners (e.g., test_tour_workflow.py)
-└── test_*.py             # Other tests
-
-static/tests/
-├── *.test.js            # JavaScript unit tests
-└── tours/*.js           # Tour definitions
-```
-
-## Mocking Best Practices
-
-```python
-from unittest.mock import patch, MagicMock
-
-# PREFERRED: patch.object
-from ..services.shopify.client import ShopifyClient
-
-
-@patch.object(ShopifyClient, "execute")
-def test_with_mock(self, mock_execute: MagicMock):
-    mock_execute.return_value = {"data": {...}}
-```
-
-## Tour Test Patterns
-
-**JavaScript Tour Tests:**
-
-```javascript
-// static/tests/tours/feature_tour.js
-import { registry } from "@web/core/registry";
-
-registry.category("web_tour.tours").add("feature_tour", {
-    test: true,  // REQUIRED!
-    url: "/odoo",  // Odoo 18 uses /odoo, not /web
-    steps: () => [
-        {
-            trigger: ".o_app[data-menu-xmlid='module.menu_id']",
-            content: "Open app",
-            run: "click",
-        },
-        // Simple selectors only - no :visible or :contains()
-    ],
-});
-```
-
-**Python Tour Runner:**
-
-```python
-@tagged("post_install", "-at_install", "product_connect_tour")
-class TestFeatureTour(ProductConnectHttpCase):
-    def test_feature_tour(self):
-        self.start_tour("/odoo", "feature_tour", login=self.test_user.login)
-```
-
-## Common Test Patterns
-
-### Testing Model Methods
-
-```python
-def test_compute_method(self):
-    # Trigger compute
-    self.test_product.invalidate_recordset(['computed_field'])
-    # Force recomputation
-    self.assertEqual(self.test_product.computed_field, expected_value)
-```
-
-### Testing Constraints
-
-```python
-def test_constraint_violation(self):
-    with self.assertRaisesRegex(ValidationError, "Expected message"):
-        self.test_product.write({'invalid_field': 'bad_value'})
-```
-
-## What NOT to Do
-
-- ❌ Create products with invalid SKUs (use base classes!)
-- ❌ Forget test tags (tests won't run!)
-- ❌ Use jQuery patterns in tours (`:visible`, `:contains`)
-- ❌ Create test users without secure passwords
-- ❌ Commit in tests (Odoo handles transactions)
-
-## Runner & Logs
-
-Use our Docker‑aware runner to execute tests and collect structured artifacts.
-
-- Phases: Unit → JS → Integration → Tour (in that order)
-- Commands:
-    - `uv run test run [--json]` — run all phases with parallel sharding and print bottom line JSON
-    - `uv run test unit|js|integration|tour` — run a single phase (supports sharding flags)
-    - `uv run test clean` — drop test DBs and filestores
-    - `uv run test plan --phase all|unit|js|integration|tour` — print the weight-aware shard plan (JSON)
-- Timeouts: configured in `pyproject.toml` under `[tool.odoo-test.timeouts]`
-- Logs: `tmp/test-logs/test-YYYYMMDD_HHMMSS/` with per‑phase `all.log`, `all.summary.json`, `all.failures.json` and a
-  session `summary.json`/`digest.json` at the root.
-    - `tmp/test-logs/current` → the in‑progress session (set when a run starts; cleared when it finishes)
-    - `tmp/test-logs/latest`  → the most recent completed session
-- DB strategy: unit split uses `opw_ut_<module>`; clone‑based phases use `opw_test_<phase>`. Cleanup removes both
-  patterns.
-- Tips: If your shell sandbox blocks Docker, use the PyCharm “All Tests” run config. For JS/Tour timeouts, warm the
-  instance or raise the phase timeout in `pyproject.toml`.
-
-### Cleanup Semantics
-
-- The runner attempts aggressive cleanup to avoid orphaned resources:
-    - Before a session: removes all test databases named `${ODOO_DB_NAME}_test_*` and legacy `${ODOO_DB_NAME}_ut_*`, and
-      deletes matching test filestores.
-    - After a session (success or cancellation): repeats the same cleanup pass.
-    - During phases: each shard uses a unique DB name; scoped pre‑test cleanup drops that DB and its filestore before
-      use.
-
-## LLM‑Friendly Results (Do Not Tail/Head)
-
-- The runner writes structured JSON you can parse instead of scraping terminal output.
-- Preferred checks (in order):
-    - During a run: `tmp/test-logs/current/summary.json` (if present), otherwise
-    - After completion: `tmp/test-logs/latest/summary.json` → overall session summary (`success: true|false`).
-    - Per‑phase aggregate: `tmp/test-logs/<session>/<phase>/all.summary.json` (e.g., `unit/all.summary.json`).
-    - Counts:
-        - By default, JS counts use definitions (number of `test(...)` in `*.test.js`). Python counts come from Odoo
-          logs.
-        - To use executed Hoot totals instead, set `JS_COUNT_STRATEGY=runtime`.
-
-Tips
-
-- Simplest agent path: `uv run test run --json` (single call; exits 0/1). While a run is active, `tmp/test-logs/current`
-  points to the in‑progress session; after completion, use `tmp/test-logs/latest/summary.json`.
-- Minimal Python snippet to assert pass/fail:
-  ```bash
-  python - <<'PY'
-  import json, pathlib, sys
-  latest = pathlib.Path('tmp/test-logs/latest')
-  with open(latest/'summary.json') as f:
-      s = json.load(f)
-  ok = bool(s.get('success'))
-  print('tests_success:', ok)
-  sys.exit(0 if ok else 1)
-  PY
-  ```
-- Never rely on `| tail` / `| head` / `timeout ... | tail` to infer success; these can truncate summaries and mislead
-  agents. Always read the JSON files.
+- Always gate on JSON: parse `tmp/test-logs/latest/summary.json` and require `success: true`.
+- For long tours, run detached and wait: `TEST_DETACHED=1 uv run test run --json` then `uv run test wait --json`.
+- JS totals: by default count definitions (number of `test(...)`). Set `JS_COUNT_STRATEGY=runtime` to report executed
+  Hoot totals.

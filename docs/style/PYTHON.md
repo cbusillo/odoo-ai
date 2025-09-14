@@ -1,120 +1,98 @@
-# Python Style Rules
+# Python Style (3.12, Odoo 18)
 
-Python-specific coding standards and patterns.
+Purpose
 
-## Guiding Philosophy
+- Define our house style for Python used in Odoo 18 projects and utilities.
 
-Following the Zen of Python (PEP 20):
+Targets & Tooling
 
-- **Explicit is better than implicit**: Always specify return types, even `-> None`
-- **Readability counts**: Clear type hints improve code understanding
-- **In the face of ambiguity, refuse the temptation to guess**: Be precise with types
+- Python 3.12 features are allowed (pattern matching, `typing.Self`, improved `|` unions, `dataclass(slots=True)`).
+- Lint/format with Ruff: run `uv run ruff format .` then `uv run ruff check --fix`.
+- Line length: 133 chars max (to match AGENTS.md).
 
-## Type Hints
+Core Rules
 
-- **Use built-in types**: `list`, `dict`, `set` instead of `List`, `Dict`, `Set` from typing
-- **Use union operator**: `str | None` instead of `Optional[str]`
-- **Avoid unnecessary imports**: Prefer fewer imports when the result is the same
-- **Never use `Any` or `object`**: Be specific with types
-- **Use Odoo Plugin types**: `odoo.model.product_template`, `odoo.values.product_template`
-- **Always specify return types**: Include `-> None` for functions that don't return a value
-    - Explicit return types improve IDE support and catch bugs early
-    - Consistency: every function should have a return type annotation
-- **No `from __future__ import annotations` needed**: We rely on Odoo Plugin “magic” type hints; postponed annotation
-  evaluation is unnecessary in this codebase.
+- Type hints everywhere, including `-> None` for procedures.
+- f‑strings only; no `%` or `str.format()`.
+- Early returns encouraged to reduce nesting.
+- Prefer small, single‑purpose functions and modules.
+- Do not run Python directly; use Odoo env and `uv run` tasks.
+- Descriptive naming: functions as verbs (e.g., `compute_margin`), variables as clear nouns; avoid cryptic
+  abbreviations. Prefer code that obviates comments.
+- DRY: extract helpers for repeated logic/queries; prefer composition over copy/paste.
 
-## String Formatting
+Odoo Plugin “Magic Types” (PyCharm)
 
-- **Always use f-strings**: Even for logging and exceptions
-- **No % formatting or .format()**: F-strings only
-
-## Comments and Documentation
-
-- **NO comments or docstrings**: Code should be self-documenting through:
-    - Descriptive names using full words (no abbreviations)
-    - Clear function/variable names that state their purpose
-    - Method chains that read like sentences
-- **Exceptions allowed (use very rarely, only when absolutely necessary):**
-    - Comments in config files when not clear what something does or why it's set to a value
-    - `# noinspection` comments (only when absolutely necessary for IDE directives, e.g., suppressing spell check on
-      base64 strings)
-    - `# TODO:` comments for temporary code that needs to be fixed later (shows in PyCharm TODO list)
-
-## Control Flow
-
-- **Early returns preferred**: No else after return
-- **Ignore ruff rule TRY300**: Early returns are our preference
-
-## Field Definitions
-
-- **String attributes**: Omit `string` attribute when the display text should match the field name
-    - **Python fields**: `processed_today = fields.Boolean()` displays as "Processed Today"
-    - Odoo automatically converts underscores to spaces and capitalizes appropriately
-    - This ensures consistency and reduces duplication
-    - Use explicit `string` only when display text differs from name: `qty = fields.Integer(string="Quantity")`
-
-## File Organization
-
-- **Model tests**: Model tests go in `tests/`
-- **Service tests**: Service-layer tests go in `services/tests/`
-- **Temporary files**: Use prefixes `test_*` or `temp_*` in project root
-
-## Common Python Patterns
-
-### Fix Examples
-
-**Import Errors:**
+- Enable the Odoo plugin and use its provided types for precise hints:
+    - Recordsets: `odoo.model.product_template`, `odoo.model.res_partner`.
+    - Values payloads: `odoo.values.product_templates`, `odoo.values.sale_orders`.
+    - Environment: `odoo.api.Environment` for `self.env` when needed.
+- Import types behind `TYPE_CHECKING` so runtime has no dependency on the plugin:
 
 ```python
-# Before
-from ..models.product import ProductTemplate  # Error if path wrong
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from odoo.model import product_template as ProductTemplate
+    from odoo.values import product_templates as ProductTemplatesVals
 
-# After  
-from odoo.addons.product_connect.models.product_template import ProductTemplate
+def ensure_product_defaults(product: 'ProductTemplate') -> None:
+    if not product.default_code:
+        product.default_code = f"SKU-{product.id}"
+
+def bulk_create(vals: 'ProductTemplatesVals') -> None:
+    self.env['product.template'].create(vals)
 ```
 
-**Type Hints:**
+JetBrains `noinspection` Policy
+
+- Zero‑warning gate on touched files. Add `noinspection` only when 100% appropriate:
+    - Prefer fixing code over suppressing warnings.
+    - Scope narrowly (single line or the smallest block possible).
+    - Include a one‑line justification and a reference link if helpful.
+    - Never add broad or file‑level blanket suppressions.
 
 ```python
-# Before
-from typing import Optional, List, Dict
-
-
-def method(self, vals: Optional[Dict]) -> List[str]:
-
-
-# After
-def method(self, vals: dict | None) -> list[str]:
+# noinspection PyTypeChecker  # False positive: Odoo plugin types refine recordset at runtime.
+partner: 'odoo.model.res_partner' = self.env['res.partner'].browse(pid)
 ```
 
-**Return Type Annotations:**
+Typing Patterns (Recordsets & Domains)
 
 ```python
-# Before (implicit None return)
-def update_record(self, vals: dict):
-    self.write(vals)
+from typing import Iterable, TypedDict
 
+class PartnerVals(TypedDict, total=False):
+    name: str
+    email: str
+    company_id: int
 
-# After (explicit is better)
-def update_record(self, vals: dict) -> None:
-    self.write(vals)
+def find_partners(self, domain: list[tuple]) -> 'odoo.model.res_partner':
+    return self.env['res.partner'].search(domain)
 
-
-# Always specify return type
-def calculate_total(self) -> float:
-    return sum(self.amounts)
-
-
-def get_name(self) -> str:
-    return self.name or "Unknown"
+def create_partners(self, vals_list: Iterable[PartnerVals]) -> 'odoo.model.res_partner':
+    return self.env['res.partner'].create(list(vals_list))
 ```
 
-**Field Definitions:**
+Exceptions & Logging
 
-```python
-# Before
-name = fields.Char(string="Product Name")  # Redundant string
+- Raise specific Odoo exceptions (`ValidationError`, `AccessError`) for business rules and permissions.
+- Log with `_logger` at the appropriate level (`info`, `warning`, `error`). No prints.
 
-# After
-name = fields.Char()  # Auto-generates "Name" label
-```
+I/O, Dates, and Strings
+
+- Use `pathlib.Path` for filesystem paths in utilities.
+- Use timezone‑aware datetimes; prefer `fields.Datetime` within models.
+- Always interpolate with f‑strings; escape external inputs where relevant.
+
+Testing
+
+- Put tests under `addons/<module>/tests/`.
+- Keep fixtures small; prefer factories and Scout helpers where available.
+- Use the Testing CLI (`docs/tooling/testing-cli.md`) and require JSON success.
+
+Anti‑Patterns
+
+- Broad `except Exception` without re‑raise or logging.
+- Silent pass in `except` blocks.
+- Untyped public functions or method parameters.
+- Blanket JetBrains suppressions.

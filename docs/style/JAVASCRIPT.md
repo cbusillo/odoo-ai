@@ -1,79 +1,27 @@
-# JavaScript Style Rules
+# JavaScript Style
 
-JavaScript-specific coding standards for Odoo 18 development.
+Modules and Frameworks (Odoo 18)
 
-## Semicolons
+- Use native ES modules with imports from `@web/...` and Odoo namespaces.
+- Do not use AMD `odoo.define` modules in this project.
+- Do not add `/** @odoo-module */` to new files; we ship native ESM only.
+- No semicolons; prefer clean ES syntax consistent with Owl.js style.
 
-- **No semicolons**: Omit semicolons at the end of statements
-- Modern JavaScript with proper file separation doesn't require them
-- Cleaner and easier to read
+Libraries
 
-## Libraries and Frameworks
+- Owl.js 2.0 for components; use hooks like `useState`, `useRef`, `onMounted`.
+- @odoo/hoot for JS tests.
 
-**Use:**
+Patterns
 
-- **Owl.js 2.0**: Odoo's modern component framework
-    - Use hooks: `useState`, `useRef`, `onMounted`, etc.
-    - Component-based architecture
-- **Odoo Web Framework** (`@web/*`): Core Odoo utilities
-- **@odoo/hoot**: For JavaScript testing
-- **Chart.js**: Via Odoo's asset bundle for visualizations
+- Components extend Owl Component; avoid legacy Widget.
+- Use ES imports; avoid RequireJS.
+- Prefer JSDoc for hints when helpful; keep files small and cohesive.
 
-**Do NOT use:**
+Formatting
 
-- **jQuery** (`$` or `jQuery`): Odoo 18 is jQuery-free
-- **Legacy widget system**: No `widget.extend` or `include()`
-- **Old translation**: Use `import { _t } from "@web/core/l10n/translation"` not global `_t`
-- **RequireJS/AMD**: Use ES6 modules instead
-- **odoo.define()**: Use ES6 imports/exports instead
-
-## JavaScript Patterns
-
-- **Module files**: Start directly with ES6 imports (no module declaration comment needed)
-- **Imports**: Use ES6 imports from Odoo namespaces
-  ```javascript
-  import { Component } from "@odoo/owl"
-  import { registry } from "@web/core/registry"
-  ```
-- **Components**: Extend Owl Component, not old Widget class
-- **No inline scripts**: All JS should be in module files
-- **Type hints**: Use JSDoc for better IDE support
-  ```javascript
-  /** @type {import("./model").MyModel} */
-  const model = this.model
-  ```
-
-## Component Structure
-
-**Modern Owl.js 2.0 Pattern:**
-
-```javascript
-import { Component } from "@odoo/owl";
-
-export class CustomWidget extends Component {
-    static template = "product_connect.CustomWidget";
-    static props = ["*"];
-    
-    setup() {
-        // Component setup
-    }
-}
-```
-
-## Tour Test Selectors
-
-- **Simple selectors only**: No `:visible` or `:contains()` jQuery patterns
-- **Use basic CSS selectors**: `.class`, `[data-attribute]`, `#id`
-- **Avoid complex queries**: They fail in Odoo 18 tour tests
-
-**Good:**
-
-```javascript
-trigger: ".o_app[data-menu-xmlid='module.menu']"
-```
-
-**Bad:**
-
-```javascript
-trigger: ".o_app:visible:contains('Menu')"  // jQuery patterns don't work
-```
+- Quotes: single quotes by default; template literals for interpolation.
+- Trailing commas: enabled in multi-line arrays/objects/params.
+- Descriptive naming: camelCase for variables/functions, PascalCase for classes/components; prefer intention‑revealing
+  names. If you need a comment to explain “what”, rename or refactor instead.
+- DRY: extract utilities/hooks for shared logic; avoid duplicating selectors or event wiring.

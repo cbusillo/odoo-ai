@@ -55,29 +55,18 @@ ensure_role_and_db() {
   db_literal=$(sql_escape_literal "$db_name")
   db_ident=$(sql_escape_identifier "$db_name")
 
-  read -r -d '' role_do <<SQL || true
-DO $$
-DECLARE
-  target_role text := '$role_literal';
-  target_password text := '$password_literal';
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = target_role) THEN
-    EXECUTE format('CREATE ROLE %I LOGIN PASSWORD %L', target_role, target_password);
-  ELSE
-    EXECUTE format('ALTER ROLE %I WITH LOGIN PASSWORD %L', target_role, target_password);
-  END IF;
-END
-$$;
-SQL
-
-  as_postgres psql -v ON_ERROR_STOP=1 -p "$port" --command "$role_do"
+  local role_exists
+  role_exists=$(as_postgres psql -p "$port" -tAc "SELECT 1 FROM pg_roles WHERE rolname = '$role_literal'")
+  if [[ -z "$role_exists" ]]; then
+    as_postgres psql -p "$port" --command "CREATE ROLE \"$role_ident\" LOGIN PASSWORD '$password_literal'"
+  else
+    as_postgres psql -p "$port" --command "ALTER ROLE \"$role_ident\" WITH LOGIN PASSWORD '$password_literal'"
+  fi
 
   local db_exists
   db_exists=$(as_postgres psql -p "$port" -tAc "SELECT 1 FROM pg_database WHERE datname = '$db_literal'")
   if [[ -z "$db_exists" ]]; then
-    local create_db
-    printf -v create_db 'CREATE DATABASE "%s" OWNER "%s";' "$db_ident" "$role_ident"
-    as_postgres psql -p "$port" --command "$create_db"
+    as_postgres psql -p "$port" --command "CREATE DATABASE \"$db_ident\" OWNER \"$role_ident\""
   fi
 }
 

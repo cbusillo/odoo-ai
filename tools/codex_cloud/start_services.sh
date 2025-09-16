@@ -10,16 +10,23 @@ log() {
   printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*"
 }
 
-if command -v sudo >/dev/null 2>&1; then
-  SUDO="sudo"
-else
-  SUDO=""
-fi
-
-if [[ -z "$SUDO" && "$(id -u)" -ne 0 ]]; then
-  log "sudo is required to manage PostgreSQL services"
+# Codex Cloud runs setup as root; fail fast if not.
+if [[ "$(id -u)" -ne 0 ]]; then
+  log "start_services requires root privileges"
   exit 1
 fi
+
+run_cmd() {
+  "$@"
+}
+
+as_postgres() {
+  if command -v runuser >/dev/null 2>&1; then
+    runuser -u postgres -- "$@"
+  else
+    su -s /bin/sh postgres -c "$*"
+  fi
+}
 
 VOLUMES_ROOT="${VOLUMES_ROOT:-/volumes}"
 PGDATA_ROOT="${PGDATA_ROOT:-$VOLUMES_ROOT/data/postgres}"
@@ -32,9 +39,7 @@ ensure_role_and_db() {
   local role_password="${ODOO_DB_PASSWORD:-odoo}"
   local db_name="${ODOO_DB_NAME:-odoo_dev}"
 
-  local psql_cmd=( ${SUDO:+$SUDO }psql -v ON_ERROR_STOP=1 -p "${POSTGRES_PORT:-5433}" )
-
-  ${SUDO:+$SUDO }-u postgres "${psql_cmd[@]}" <<SQL
+  as_postgres psql -v ON_ERROR_STOP=1 -p "${POSTGRES_PORT:-5433}" <<SQL
 DO
 $$
 BEGIN
@@ -47,7 +52,7 @@ END
 $$;
 SQL
 
-  ${SUDO:+$SUDO }-u postgres "${psql_cmd[@]}" <<SQL
+  as_postgres psql -v ON_ERROR_STOP=1 -p "${POSTGRES_PORT:-5433}" <<SQL
 DO
 $$
 BEGIN
@@ -69,17 +74,17 @@ if command -v pg_ctlcluster >/dev/null 2>&1; then
   CLUSTER_NAME="${POSTGRES_CLUSTER_NAME:-codex}"
   CLUSTER_PORT="${POSTGRES_PORT:-5433}"
 
-  if ! ${SUDO:+$SUDO }pg_lsclusters | awk '{print $1" "$2}' | grep -q "^${PG_MAJOR} ${CLUSTER_NAME}$"; then
+  if ! run_cmd pg_lsclusters | awk '{print $1" "$2}' | grep -q "^${PG_MAJOR} ${CLUSTER_NAME}$"; then
     log "Creating PostgreSQL cluster ${PG_MAJOR}/${CLUSTER_NAME}"
-    ${SUDO:+$SUDO }pg_createcluster "$PG_MAJOR" "$CLUSTER_NAME" --datadir "$PGDATA" --port "$CLUSTER_PORT"
+    run_cmd pg_createcluster "$PG_MAJOR" "$CLUSTER_NAME" --datadir "$PGDATA" --port "$CLUSTER_PORT"
   else
     log "Cluster already exists; ensuring port $CLUSTER_PORT"
-    ${SUDO:+$SUDO }pg_ctlcluster "$PG_MAJOR" "$CLUSTER_NAME" stop || true
-    ${SUDO:+$SUDO }sed -i "s/^#\s*port = .*/port = $CLUSTER_PORT/" "$PGDATA/postgresql.conf"
+    run_cmd pg_ctlcluster "$PG_MAJOR" "$CLUSTER_NAME" stop || true
+    run_cmd sed -i "s/^#\s*port = .*/port = $CLUSTER_PORT/" "$PGDATA/postgresql.conf"
   fi
 
   log "Starting PostgreSQL cluster"
-  ${SUDO:+$SUDO }pg_ctlcluster "$PG_MAJOR" "$CLUSTER_NAME" start
+  run_cmd pg_ctlcluster "$PG_MAJOR" "$CLUSTER_NAME" start
   ensure_role_and_db
 else
   export PGPORT="${POSTGRES_PORT:-5433}"

@@ -56,10 +56,10 @@ fi
 export PATH="$HOME/.local/bin:$PATH"
 
 if [[ -d "$HOME/.local/bin" ]]; then
-  if [[ -n "$SUDO" || -w /usr/local/bin ]]; then
+  if [[ -w /usr/local/bin ]]; then
     for bin in "$HOME"/.local/bin/uv*; do
       [[ -f "$bin" ]] || continue
-      run_cmd cp "$bin" /usr/local/bin/
+      cp "$bin" /usr/local/bin/
     done
   else
     log "Skipping /usr/local/bin uv shim (no permission)"
@@ -72,8 +72,8 @@ VOLUMES_ROOT="${VOLUMES_ROOT:-/volumes}"
 
 log "Preparing volume directories"
 if [[ ! -d "$VOLUMES_ROOT" ]]; then
-  run_cmd mkdir -p "$VOLUMES_ROOT"
-  run_cmd chown "$(id -u):$(id -g)" "$VOLUMES_ROOT"
+  mkdir -p "$VOLUMES_ROOT"
+  chown "$(id -u):$(id -g)" "$VOLUMES_ROOT"
 fi
 
 for subdir in addons config scripts enterprise data opt; do

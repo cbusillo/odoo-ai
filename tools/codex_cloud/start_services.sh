@@ -2,23 +2,9 @@
 
 set -euo pipefail
 
-if [[ "${TRACE-}" == "1" ]]; then
-  set -x
-fi
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
-log() {
-  printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*"
-}
-
-# Codex Cloud runs setup as root; fail fast if not.
-if [[ "$(id -u)" -ne 0 ]]; then
-  log "start_services requires root privileges"
-  exit 1
-fi
-
-run_cmd() {
-  "$@"
-}
+ensure_root
 
 as_postgres() {
   if command -v runuser >/dev/null 2>&1; then
@@ -26,14 +12,6 @@ as_postgres() {
   else
     su -s /bin/sh postgres -c "$*"
   fi
-}
-
-sql_escape_literal() {
-  printf '%s' "$1" | sed "s/'/''/g"
-}
-
-sql_escape_identifier() {
-  printf '%s' "$1" | sed 's/"/""/g'
 }
 
 VOLUMES_ROOT="${VOLUMES_ROOT:-/volumes}"
@@ -80,17 +58,17 @@ if command -v pg_ctlcluster >/dev/null 2>&1; then
   CLUSTER_NAME="${POSTGRES_CLUSTER_NAME:-codex}"
   CLUSTER_PORT="${POSTGRES_PORT:-5433}"
 
-  if ! run_cmd pg_lsclusters | awk '{print $1" "$2}' | grep -q "^${PG_MAJOR} ${CLUSTER_NAME}$"; then
+  if ! pg_lsclusters | awk '{print $1" "$2}' | grep -q "^${PG_MAJOR} ${CLUSTER_NAME}$"; then
     log "Creating PostgreSQL cluster ${PG_MAJOR}/${CLUSTER_NAME}"
-    run_cmd pg_createcluster "$PG_MAJOR" "$CLUSTER_NAME" --datadir "$PGDATA" --port "$CLUSTER_PORT"
+    pg_createcluster "$PG_MAJOR" "$CLUSTER_NAME" --datadir "$PGDATA" --port "$CLUSTER_PORT"
   else
     log "Cluster already exists; ensuring port $CLUSTER_PORT"
-    run_cmd pg_ctlcluster "$PG_MAJOR" "$CLUSTER_NAME" stop || true
-    run_cmd sed -i "s/^#\s*port = .*/port = $CLUSTER_PORT/" "$PGDATA/postgresql.conf"
+    pg_ctlcluster "$PG_MAJOR" "$CLUSTER_NAME" stop || true
+    sed -i "s/^#\s*port = .*/port = $CLUSTER_PORT/" "$PGDATA/postgresql.conf"
   fi
 
   log "Starting PostgreSQL cluster"
-  run_cmd pg_ctlcluster "$PG_MAJOR" "$CLUSTER_NAME" start
+  pg_ctlcluster "$PG_MAJOR" "$CLUSTER_NAME" start
   ensure_role_and_db
 else
   export PGPORT="${POSTGRES_PORT:-5433}"

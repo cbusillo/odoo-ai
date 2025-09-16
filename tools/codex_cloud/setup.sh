@@ -176,6 +176,7 @@ mkdir -p "$(dirname "$RUNTIME_ENV")"
   printf 'export VIRTUAL_ENV=%q\n' "$VIRTUAL_ENV"
   printf 'export PATH=%q\n' "$VIRTUAL_ENV/bin:$PATH"
   for var in \
+    POSTGRES_PORT \
     ODOO_DB_HOST \
     ODOO_DB_PORT \
     ODOO_DB_HOST \

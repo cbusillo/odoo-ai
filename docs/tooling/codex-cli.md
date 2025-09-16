@@ -22,6 +22,8 @@ Codex Cloud Environment
 - Setup Script: Point the environment Setup Script to `tools/codex_cloud/setup.sh`. It mirrors `docker/Dockerfile` by
   installing apt packages (Chromium, ripgrep, Postgres), bootstrapping `uv`, syncing `/volumes/*`, and installing
   addon requirements.
+- The setup expects to run as root (Codex Cloud executes setup scripts with UID 0); if that default changes, the
+  script aborts early rather than prompting for sudo.
 - Maintenance Script: Point the environment Maintenance Script to `tools/codex_cloud/start_services.sh` to
   restart the local Postgres cluster on demand. The setup script already runs it once during every cold boot, so the
   maintenance hook is only needed if you have to reset the database mid-session.

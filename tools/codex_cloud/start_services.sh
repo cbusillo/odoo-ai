@@ -38,30 +38,44 @@ ensure_role_and_db() {
   local role_name="${ODOO_DB_USER:-odoo}"
   local role_password="${ODOO_DB_PASSWORD:-odoo}"
   local db_name="${ODOO_DB_NAME:-odoo_dev}"
+  local port="${POSTGRES_PORT:-5433}"
 
-  as_postgres psql -v ON_ERROR_STOP=1 -p "${POSTGRES_PORT:-5433}" <<SQL
+  local role_stmt
+  role_stmt=$(cat <<'EOS'
 DO
 $$
+DECLARE
+  target_role text := '%s';
+  target_password text := '%s';
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '$role_name') THEN
-    EXECUTE format('CREATE ROLE %I LOGIN PASSWORD %L', '$role_name', '$role_password');
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = target_role) THEN
+    EXECUTE format('CREATE ROLE %%I LOGIN PASSWORD %%L', target_role, target_password);
   ELSE
-    EXECUTE format('ALTER ROLE %I WITH LOGIN PASSWORD %L', '$role_name', '$role_password');
+    EXECUTE format('ALTER ROLE %%I WITH LOGIN PASSWORD %%L', target_role, target_password);
   END IF;
 END
 $$;
-SQL
+EOS
+)
 
-  as_postgres psql -v ON_ERROR_STOP=1 -p "${POSTGRES_PORT:-5433}" <<SQL
+  local db_stmt
+  db_stmt=$(cat <<'EOS'
 DO
 $$
+DECLARE
+  target_db text := '%s';
+  target_role text := '%s';
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = '$db_name') THEN
-    EXECUTE format('CREATE DATABASE %I OWNER %I', '$db_name', '$role_name');
+  IF NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = target_db) THEN
+    EXECUTE format('CREATE DATABASE %%I OWNER %%I', target_db, target_role);
   END IF;
 END
 $$;
-SQL
+EOS
+)
+
+  as_postgres psql -v ON_ERROR_STOP=1 -p "$port" --command "$(printf "$role_stmt" "$role_name" "$role_password")"
+  as_postgres psql -v ON_ERROR_STOP=1 -p "$port" --command "$(printf "$db_stmt" "$db_name" "$role_name")"
 }
 
 if command -v pg_ctlcluster >/dev/null 2>&1; then

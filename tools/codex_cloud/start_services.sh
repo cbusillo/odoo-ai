@@ -28,6 +28,14 @@ as_postgres() {
   fi
 }
 
+sql_escape_literal() {
+  printf '%s' "$1" | sed "s/'/''/g"
+}
+
+sql_escape_identifier() {
+  printf '%s' "$1" | sed 's/"/""/g'
+}
+
 VOLUMES_ROOT="${VOLUMES_ROOT:-/volumes}"
 PGDATA_ROOT="${PGDATA_ROOT:-$VOLUMES_ROOT/data/postgres}"
 PGDATA="$PGDATA_ROOT/data"
@@ -40,13 +48,18 @@ ensure_role_and_db() {
   local db_name="${ODOO_DB_NAME:-odoo_dev}"
   local port="${POSTGRES_PORT:-5433}"
 
-  as_postgres psql -v ON_ERROR_STOP=1 -p "$port" \
-    --set=role_name="$role_name" \
-    --set=role_password="$role_password" <<'SQL'
-DO $do$
+  local role_literal role_ident password_literal db_literal db_ident
+  role_literal=$(sql_escape_literal "$role_name")
+  role_ident=$(sql_escape_identifier "$role_name")
+  password_literal=$(sql_escape_literal "$role_password")
+  db_literal=$(sql_escape_literal "$db_name")
+  db_ident=$(sql_escape_identifier "$db_name")
+
+  read -r -d '' role_do <<SQL || true
+DO $$
 DECLARE
-  target_role text := :'role_name';
-  target_password text := :'role_password';
+  target_role text := '$role_literal';
+  target_password text := '$password_literal';
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = target_role) THEN
     EXECUTE format('CREATE ROLE %I LOGIN PASSWORD %L', target_role, target_password);
@@ -54,21 +67,17 @@ BEGIN
     EXECUTE format('ALTER ROLE %I WITH LOGIN PASSWORD %L', target_role, target_password);
   END IF;
 END
-$do$;
+$$;
 SQL
 
-  as_postgres psql -v ON_ERROR_STOP=1 -p "$port" \
-    --set=db_name="$db_name" \
-    --set=role_name="$role_name" <<'SQL'
-SELECT 1
-FROM pg_database
-WHERE datname = :'db_name';
-SQL
+  as_postgres psql -v ON_ERROR_STOP=1 -p "$port" --command "$role_do"
 
   local db_exists
-  db_exists=$(as_postgres psql -p "$port" -tAc "SELECT 1 FROM pg_database WHERE datname = '$db_name'")
+  db_exists=$(as_postgres psql -p "$port" -tAc "SELECT 1 FROM pg_database WHERE datname = '$db_literal'")
   if [[ -z "$db_exists" ]]; then
-    as_postgres psql -p "$port" --command "CREATE DATABASE \"$db_name\" OWNER \"$role_name\""
+    local create_db
+    printf -v create_db 'CREATE DATABASE "%s" OWNER "%s";' "$db_ident" "$role_ident"
+    as_postgres psql -p "$port" --command "$create_db"
   fi
 }
 

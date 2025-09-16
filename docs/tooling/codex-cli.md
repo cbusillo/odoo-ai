@@ -45,8 +45,8 @@ Codex Cloud Environment
 - Virtualenv: `10-python.sh` creates `/volumes/.venv` with `uv venv`, writes `.pth` files into that environment’s
   site-packages, exports `VIRTUAL_ENV`, and prepends it to `PATH`, keeping every subsequent `uv pip` call inside the
   same environment.
-- Database Host/Port: Postgres is launched on `127.0.0.1:$POSTGRES_PORT` (default 5433); the setup script exports
-  those variables and persists them to the runtime env file so Odoo connects to the right socket.
+- Database Host/Port: `20-database.sh` forces host `127.0.0.1` (mapped to port `$POSTGRES_PORT`, default 5433) and
+  rewrites `/volumes/config/runtime-env.sh` so Odoo always targets the local service.
 - Smoke Checks: `30-finalize.sh` connects as the Odoo database user, runs a `SELECT 1` probe, tails the Postgres log,
   and executes `uv run --version`; setup fails if any check reports an error.
 - Environment Variables (non-secret): `ODOO_ENTERPRISE_REPOSITORY`, `ODOO_VERSION`, `PYTHON_VERSION`, and any

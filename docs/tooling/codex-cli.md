@@ -47,9 +47,8 @@ Codex Cloud Environment
   same environment.
 - Database Host/Port: Postgres is launched on `127.0.0.1:$POSTGRES_PORT` (default 5433); the setup script exports
   those variables and persists them to the runtime env file so Odoo connects to the right socket.
-- Smoke Checks: `30-finalize.sh` tails the Postgres log and runs `psql \conninfo` plus `uv run --version`; setup fails
-  if
-  either check reports an error.
+- Smoke Checks: `30-finalize.sh` connects as the Odoo database user, runs a `SELECT 1` probe, tails the Postgres log,
+  and executes `uv run --version`; setup fails if any check reports an error.
 - Environment Variables (non-secret): `ODOO_ENTERPRISE_REPOSITORY`, `ODOO_VERSION`, `PYTHON_VERSION`, and any
   integration feature flags that need to be ready before setup executes.
 - Internet Access: Request allowlist entries for `github.com`, `pypi.org`, `files.pythonhosted.org`, `astral.sh`,

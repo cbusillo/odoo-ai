@@ -39,8 +39,9 @@ Codex Cloud Environment
     - `ODOO_ENTERPRISE_REPOSITORY`, `ODOO_VERSION`, `PYTHON_VERSION`, `COMPOSE_BUILD_TARGET`, and any feature flags.
 - Runtime Shell Setup: The setup script writes `/volumes/config/runtime-env.sh` with the exported variables above; have
   tasks source it (e.g., `source /volumes/config/runtime-env.sh`) before running Odoo or tests so credentials survive
-  the
-  setup-only secret window.citeturn1search0
+  the setup-only secret window.citeturn1search0
+- Virtualenv: Setup creates `/volumes/.venv` with `uv venv`, exports `VIRTUAL_ENV`, and prepends it to `PATH`, ensuring
+  every subsequent `uv pip` call runs inside that environment.
 - Environment Variables (non-secret): `ODOO_ENTERPRISE_REPOSITORY`, `ODOO_VERSION`, `PYTHON_VERSION`, and any
   integration feature flags that need to be ready before setup executes.
 - Internet Access: Request allowlist entries for `github.com`, `pypi.org`, `files.pythonhosted.org`, `astral.sh`,

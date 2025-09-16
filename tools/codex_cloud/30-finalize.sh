@@ -9,10 +9,15 @@ ensure_root
 source "$VOLUMES_ROOT/config/runtime-env.sh" 2>/dev/null || true
 
 POSTGRES_PORT="${POSTGRES_PORT:-5433}"
+POSTGRES_HOST="${ODOO_DB_HOST:-127.0.0.1}"
 export PGPASSWORD="${ODOO_DB_PASSWORD:-}"
 
 log "Running Postgres smoke check"
-psql -p "$POSTGRES_PORT" -U postgres -d postgres -c '\conninfo' 2>&1 | tail -n +1 || {
+psql -h "$POSTGRES_HOST" \
+     -p "$POSTGRES_PORT" \
+     -U "${ODOO_DB_USER:-odoo}" \
+     -d "${ODOO_DB_NAME:-odoo_dev}" \
+     -c 'SELECT 1;' >/dev/null 2>&1 || {
   log "Postgres smoke check failed"
   exit 1
 }

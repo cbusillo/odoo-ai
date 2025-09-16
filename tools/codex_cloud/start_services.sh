@@ -67,6 +67,11 @@ if command -v pg_ctlcluster >/dev/null 2>&1; then
     sed -i "s/^#\s*port = .*/port = $CLUSTER_PORT/" "$PGDATA/postgresql.conf"
   fi
 
+  HBA_FILE="$PGDATA/pg_hba.conf"
+  if ! grep -q "127.0.0.1/32" "$HBA_FILE"; then
+    printf '\nhost all all 127.0.0.1/32 scram-sha-256\n' >>"$HBA_FILE"
+  fi
+
   log "Starting PostgreSQL cluster"
   pg_ctlcluster "$PG_MAJOR" "$CLUSTER_NAME" start
   ensure_role_and_db
@@ -90,6 +95,10 @@ else
     cat <<HBA >>"$PGDATA/pg_hba.conf"
 host all all 127.0.0.1/32 scram-sha-256
 HBA
+  else
+    if ! grep -q "127.0.0.1/32" "$PGDATA/pg_hba.conf"; then
+      printf '\nhost all all 127.0.0.1/32 scram-sha-256\n' >>"$PGDATA/pg_hba.conf"
+    fi
   fi
 
   log "Starting PostgreSQL via pg_ctl"

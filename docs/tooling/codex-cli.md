@@ -19,9 +19,9 @@ Notes
 
 Codex Cloud Environment
 
-- Setup Script: Point the environment Setup Script to `tools/codex_cloud/setup.sh`. It mirrors `docker/Dockerfile` by
-  installing apt packages (Chromium, ripgrep, Postgres), bootstrapping `uv`, syncing `/volumes/*`, and installing
-  addon requirements.
+- Setup Script: Point the environment Setup Script to `tools/codex_cloud/setup.sh`. It orchestrates four idempotent
+  stages (`00-system`, `10-python`, `20-database`, `30-finalize`) so rebuilds reuse cached work under
+  `/volumes/cache/setup`.
 - The setup expects to run as root (Codex Cloud executes setup scripts with UID 0); if that default changes, the
   script aborts early rather than prompting for sudo.
 - Maintenance Script: Point the environment Maintenance Script to `tools/codex_cloud/start_services.sh` to
@@ -42,10 +42,14 @@ Codex Cloud Environment
 - Runtime Shell Setup: The setup script writes `/volumes/config/runtime-env.sh` with the exported variables above; have
   tasks source it (e.g., `source /volumes/config/runtime-env.sh`) before running Odoo or tests so credentials survive
   the setup-only secret window.citeturn1search0
-- Virtualenv: Setup creates `/volumes/.venv` with `uv venv`, writes `.pth` files into that environment’s site-packages,
-  exports `VIRTUAL_ENV`, and prepends it to `PATH`, keeping every subsequent `uv pip` call inside the same environment.
+- Virtualenv: `10-python.sh` creates `/volumes/.venv` with `uv venv`, writes `.pth` files into that environment’s
+  site-packages, exports `VIRTUAL_ENV`, and prepends it to `PATH`, keeping every subsequent `uv pip` call inside the
+  same environment.
 - Database Host/Port: Postgres is launched on `127.0.0.1:$POSTGRES_PORT` (default 5433); the setup script exports
   those variables and persists them to the runtime env file so Odoo connects to the right socket.
+- Smoke Checks: `30-finalize.sh` tails the Postgres log and runs `psql \conninfo` plus `uv run --version`; setup fails
+  if
+  either check reports an error.
 - Environment Variables (non-secret): `ODOO_ENTERPRISE_REPOSITORY`, `ODOO_VERSION`, `PYTHON_VERSION`, and any
   integration feature flags that need to be ready before setup executes.
 - Internet Access: Request allowlist entries for `github.com`, `pypi.org`, `files.pythonhosted.org`, `astral.sh`,
@@ -53,3 +57,5 @@ Codex Cloud Environment
   integration requires broader verbs.
 - Maintenance Runs: Re-trigger the environment when requirements change; cache hits reuse the previous virtualenv, so
   bumping dependencies requires rerunning `tools/codex_cloud/setup.sh` via the Codex UI.
+- Force Rebuild: Set `FORCE_SETUP=1` in the environment or maintenance run to clear step markers and re-run all stages
+  (useful after changing apt requirements or enterprise code).

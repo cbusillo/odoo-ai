@@ -23,7 +23,7 @@ if ! OUTPUT=$(psql -h "$POSTGRES_HOST" \
 fi
 
 log "Python environment check"
-uv run --version >/dev/null 2>&1
+python -V >/dev/null 2>&1
 
 if [[ -f /var/log/postgresql/postgresql-16-codex.log ]]; then
   log "Postgres recent log tail"

@@ -14,6 +14,18 @@ as_postgres() {
   fi
 }
 
+ensure_local_hba() {
+  local file="$1"
+  if [[ ! -f "$file" ]]; then
+    log "Creating pg_hba.conf at $file"
+    printf "host all all 127.0.0.1/32 scram-sha-256\n" >"$file"
+    return
+  fi
+  if ! grep -q "127.0.0.1/32" "$file"; then
+    printf '\nhost all all 127.0.0.1/32 scram-sha-256\n' >>"$file"
+  fi
+}
+
 VOLUMES_ROOT="${VOLUMES_ROOT:-/volumes}"
 PGDATA_ROOT="${PGDATA_ROOT:-$VOLUMES_ROOT/data/postgres}"
 PGDATA="$PGDATA_ROOT/data"
@@ -67,10 +79,7 @@ if command -v pg_ctlcluster >/dev/null 2>&1; then
     sed -i "s/^#\s*port = .*/port = $CLUSTER_PORT/" "$PGDATA/postgresql.conf"
   fi
 
-  HBA_FILE="$PGDATA/pg_hba.conf"
-  if ! grep -q "127.0.0.1/32" "$HBA_FILE"; then
-    printf '\nhost all all 127.0.0.1/32 scram-sha-256\n' >>"$HBA_FILE"
-  fi
+  ensure_local_hba "$PGDATA/pg_hba.conf"
 
   log "Starting PostgreSQL cluster"
   pg_ctlcluster "$PG_MAJOR" "$CLUSTER_NAME" start
@@ -92,14 +101,9 @@ else
     "$INITDB" -D "$PGDATA" --auth=scram-sha-256 --encoding=UTF8
     echo "listen_addresses = '127.0.0.1'" >>"$PGDATA/postgresql.conf"
     echo "port = ${POSTGRES_PORT:-5433}" >>"$PGDATA/postgresql.conf"
-    cat <<HBA >>"$PGDATA/pg_hba.conf"
-host all all 127.0.0.1/32 scram-sha-256
-HBA
-  else
-    if ! grep -q "127.0.0.1/32" "$PGDATA/pg_hba.conf"; then
-      printf '\nhost all all 127.0.0.1/32 scram-sha-256\n' >>"$PGDATA/pg_hba.conf"
-    fi
   fi
+
+  ensure_local_hba "$PGDATA/pg_hba.conf"
 
   log "Starting PostgreSQL via pg_ctl"
   "$PG_CTL" -D "$PGDATA" -l "$PGLOG" -w start

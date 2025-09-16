@@ -13,14 +13,14 @@ POSTGRES_HOST="${ODOO_DB_HOST:-127.0.0.1}"
 export PGPASSWORD="${ODOO_DB_PASSWORD:-}"
 
 log "Running Postgres smoke check"
-psql -h "$POSTGRES_HOST" \
-     -p "$POSTGRES_PORT" \
-     -U "${ODOO_DB_USER:-odoo}" \
-     -d "${ODOO_DB_NAME:-odoo_dev}" \
-     -c 'SELECT 1;' >/dev/null 2>&1 || {
-  log "Postgres smoke check failed"
+if ! OUTPUT=$(psql -h "$POSTGRES_HOST" \
+                  -p "$POSTGRES_PORT" \
+                  -U "${ODOO_DB_USER:-odoo}" \
+                  -d "${ODOO_DB_NAME:-odoo_dev}" \
+                  -c 'SELECT 1;' 2>&1); then
+  log "Postgres smoke check failed:\n$OUTPUT"
   exit 1
-}
+fi
 
 log "Python environment check"
 uv run --version >/dev/null 2>&1

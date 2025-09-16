@@ -14,24 +14,14 @@ log() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-# Ensure we can elevate when needed (Codex Cloud runs as non-root by default).
-if command -v sudo >/dev/null 2>&1; then
-  SUDO="sudo"
-else
-  SUDO=""
-fi
-
-if [[ -z "$SUDO" && "$(id -u)" -ne 0 ]]; then
-  log "sudo is required to install system packages"
+# Codex Cloud environments run setup as root. Warn if that ever changes.
+if [[ "$(id -u)" -ne 0 ]]; then
+  log "Setup script expects root privileges; aborting"
   exit 1
 fi
 
 run_cmd() {
-  if [[ -n "$SUDO" ]]; then
-    "$SUDO" "$@"
-  else
-    "$@"
-  fi
+  "$@"
 }
 
 log "Installing system packages"

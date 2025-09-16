@@ -22,7 +22,8 @@ if [[ -z "$SUDO" && "$(id -u)" -ne 0 ]]; then
 fi
 
 VOLUMES_ROOT="${VOLUMES_ROOT:-/volumes}"
-PGDATA="${PGDATA:-$VOLUMES_ROOT/data/postgres}"/data
+PGDATA_ROOT="${PGDATA_ROOT:-$VOLUMES_ROOT/data/postgres}"
+PGDATA="$PGDATA_ROOT/data"
 PGLOG="${PGDATA%/data}/postgres.log"
 mkdir -p "$PGDATA"
 
@@ -31,7 +32,9 @@ ensure_role_and_db() {
   local role_password="${ODOO_DB_PASSWORD:-odoo}"
   local db_name="${ODOO_DB_NAME:-odoo_dev}"
 
-  ${SUDO:+$SUDO }-u postgres psql <<SQL
+  local psql_cmd=( ${SUDO:+$SUDO }psql -v ON_ERROR_STOP=1 -p "${POSTGRES_PORT:-5433}" )
+
+  ${SUDO:+$SUDO }-u postgres "${psql_cmd[@]}" <<SQL
 DO
 $$
 BEGIN
@@ -44,7 +47,7 @@ END
 $$;
 SQL
 
-  ${SUDO:+$SUDO }-u postgres psql <<SQL
+  ${SUDO:+$SUDO }-u postgres "${psql_cmd[@]}" <<SQL
 DO
 $$
 BEGIN
@@ -64,16 +67,22 @@ if command -v pg_ctlcluster >/dev/null 2>&1; then
   fi
 
   CLUSTER_NAME="${POSTGRES_CLUSTER_NAME:-codex}"
+  CLUSTER_PORT="${POSTGRES_PORT:-5433}"
 
   if ! ${SUDO:+$SUDO }pg_lsclusters | awk '{print $1" "$2}' | grep -q "^${PG_MAJOR} ${CLUSTER_NAME}$"; then
     log "Creating PostgreSQL cluster ${PG_MAJOR}/${CLUSTER_NAME}"
-    ${SUDO:+$SUDO }pg_createcluster "$PG_MAJOR" "$CLUSTER_NAME" --datadir "$PGDATA"
+    ${SUDO:+$SUDO }pg_createcluster "$PG_MAJOR" "$CLUSTER_NAME" --datadir "$PGDATA" --port "$CLUSTER_PORT"
+  else
+    log "Cluster already exists; ensuring port $CLUSTER_PORT"
+    ${SUDO:+$SUDO }pg_ctlcluster "$PG_MAJOR" "$CLUSTER_NAME" stop || true
+    ${SUDO:+$SUDO }sed -i "s/^#\s*port = .*/port = $CLUSTER_PORT/" "$PGDATA/postgresql.conf"
   fi
 
   log "Starting PostgreSQL cluster"
   ${SUDO:+$SUDO }pg_ctlcluster "$PG_MAJOR" "$CLUSTER_NAME" start
   ensure_role_and_db
 else
+  export PGPORT="${POSTGRES_PORT:-5433}"
   log "pg_ctlcluster not available; falling back to pg_ctl"
   PG_BINDIR="${POSTGRES_BINDIR:-$(command -v pg_ctl 2>/dev/null | xargs dirname || true)}"
   if [[ -z "$PG_BINDIR" ]]; then
@@ -88,6 +97,7 @@ else
     log "Initializing new PostgreSQL data directory"
     "$INITDB" -D "$PGDATA" --auth=scram-sha-256 --encoding=UTF8
     echo "listen_addresses = '127.0.0.1'" >>"$PGDATA/postgresql.conf"
+    echo "port = ${POSTGRES_PORT:-5433}" >>"$PGDATA/postgresql.conf"
     cat <<HBA >>"$PGDATA/pg_hba.conf"
 host all all 127.0.0.1/32 scram-sha-256
 HBA

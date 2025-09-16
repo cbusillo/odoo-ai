@@ -42,6 +42,8 @@ Codex Cloud Environment
   the setup-only secret window.citeturn1search0
 - Virtualenv: Setup creates `/volumes/.venv` with `uv venv`, writes `.pth` files into that environment’s site-packages,
   exports `VIRTUAL_ENV`, and prepends it to `PATH`, keeping every subsequent `uv pip` call inside the same environment.
+- Database Host/Port: Postgres is launched on `127.0.0.1:$POSTGRES_PORT` (default 5433); the setup script exports
+  those variables and persists them to the runtime env file so Odoo connects to the right socket.
 - Environment Variables (non-secret): `ODOO_ENTERPRISE_REPOSITORY`, `ODOO_VERSION`, `PYTHON_VERSION`, and any
   integration feature flags that need to be ready before setup executes.
 - Internet Access: Request allowlist entries for `github.com`, `pypi.org`, `files.pythonhosted.org`, `astral.sh`,

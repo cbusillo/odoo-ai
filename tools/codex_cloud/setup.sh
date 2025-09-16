@@ -26,24 +26,37 @@ if [[ -z "$SUDO" && "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
-# Detect package manager commands upfront.
-APT_GET="${SUDO:+$SUDO }apt-get"
+run_cmd() {
+  if [[ -n "$SUDO" ]]; then
+    "$SUDO" "$@"
+  else
+    "$@"
+  fi
+}
 
 log "Installing system packages"
-$APT_GET update -y
-$APT_GET install -y git openssh-client rsync software-properties-common curl ripgrep ca-certificates
+run_cmd apt-get update -y
+run_cmd apt-get install -y git openssh-client rsync software-properties-common curl ripgrep ca-certificates
 
-log "Adding chromium PPA"
-"${SUDO:+$SUDO }add-apt-repository" -y ppa:xtradeb/apps
-$APT_GET update -y
-$APT_GET install -y chromium fonts-liberation libu2f-udev
+if command -v add-apt-repository >/dev/null 2>&1; then
+  log "Adding chromium PPA"
+  run_cmd add-apt-repository -y ppa:xtradeb/apps
+  run_cmd apt-get update -y
+else
+  log "add-apt-repository unavailable; installing chromium from default repositories"
+fi
+
+run_cmd apt-get install -y chromium fonts-liberation libu2f-udev || {
+  log "Chromium install via apt failed; attempting to install chromium-browser"
+  run_cmd apt-get install -y chromium-browser || log "Chromium browser package unavailable"
+}
 
 # Basic database tooling for local Postgres usage when desired.
-$APT_GET install -y postgresql postgresql-client
+run_cmd apt-get install -y postgresql postgresql-client
 
 log "Cleaning apt caches"
-$APT_GET clean
-${SUDO:+$SUDO }rm -rf /var/lib/apt/lists/*
+run_cmd apt-get clean
+run_cmd rm -rf /var/lib/apt/lists/*
 
 log "Ensuring uv is available"
 if ! command -v uv >/dev/null 2>&1; then
@@ -56,7 +69,7 @@ if [[ -d "$HOME/.local/bin" ]]; then
   if [[ -n "$SUDO" || -w /usr/local/bin ]]; then
     for bin in "$HOME"/.local/bin/uv*; do
       [[ -f "$bin" ]] || continue
-      ${SUDO:+$SUDO }cp "$bin" /usr/local/bin/
+      run_cmd cp "$bin" /usr/local/bin/
     done
   else
     log "Skipping /usr/local/bin uv shim (no permission)"
@@ -66,8 +79,8 @@ fi
 log "Preparing volume directories"
 VOLUMES_ROOT="${VOLUMES_ROOT:-/volumes}"
 if [[ ! -d "$VOLUMES_ROOT" ]]; then
-  ${SUDO:+$SUDO }mkdir -p "$VOLUMES_ROOT"
-  ${SUDO:+$SUDO }chown "$(id -u):$(id -g)" "$VOLUMES_ROOT"
+  run_cmd mkdir -p "$VOLUMES_ROOT"
+  run_cmd chown "$(id -u):$(id -g)" "$VOLUMES_ROOT"
 fi
 
 for subdir in addons config scripts enterprise data opt; do
@@ -203,7 +216,7 @@ fi
 
 HOOK_SETUP_FILE="$VOLUMES_ROOT/scripts/hook_setup"
 if [[ -f "$HOOK_SETUP_FILE" ]]; then
-  ${SUDO:+$SUDO }cp "$HOOK_SETUP_FILE" /hook_setup
+  run_cmd cp "$HOOK_SETUP_FILE" /hook_setup
 fi
 
 log "Starting PostgreSQL cluster"

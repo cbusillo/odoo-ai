@@ -60,9 +60,16 @@ SQL
   as_postgres psql -v ON_ERROR_STOP=1 -p "$port" \
     --set=db_name="$db_name" \
     --set=role_name="$role_name" <<'SQL'
-SELECT format('CREATE DATABASE %I OWNER %I', :'db_name', :'role_name')
-WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = :'db_name')\gexec
+SELECT 1
+FROM pg_database
+WHERE datname = :'db_name';
 SQL
+
+  local db_exists
+  db_exists=$(as_postgres psql -p "$port" -tAc "SELECT 1 FROM pg_database WHERE datname = '$db_name'")
+  if [[ -z "$db_exists" ]]; then
+    as_postgres psql -p "$port" --command "CREATE DATABASE \"$db_name\" OWNER \"$role_name\""
+  fi
 }
 
 if command -v pg_ctlcluster >/dev/null 2>&1; then

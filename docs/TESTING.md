@@ -1,33 +1,23 @@
 # Testing
 
-Use the unified test CLI via `uv run`. Keep inner loops fast and run the full gate at the end.
+Use the unified test CLI via `uv run`. Keep inner loops fast, then close with the full gate.
 
-Pointers
+## Pointers
 
-- Style/patterns: [style/testing.md](style/testing.md)
-- Advanced testing: [style/testing-advanced.md](style/testing-advanced.md)
-- Workflow: [workflows/testing-workflow.md](workflows/testing-workflow.md)
+- Patterns & fixtures: [style/testing.md](style/testing.md)
+- Advanced scenarios: [style/testing-advanced.md](style/testing-advanced.md)
+- Workflow details: [workflows/testing-workflow.md](workflows/testing-workflow.md)
 
-Commands (recommended)
+## Commands
 
-```bash
-uv run test unit                   # Fast unit tests
-uv run test js                     # JS/hoot tests
-uv run test integration            # Integration tests
-uv run test tour                   # Browser/UI tours
-uv run test run --json             # Full gate (all phases)
-uv run test plan --phase all       # Print sharding plan (JSON)
-uv run test doctor                 # Environment diagnostics
-```
+- The canonical command list (phase entry points, detached mode, JSON output) lives in
+  [docs/tooling/testing-cli.md](tooling/testing-cli.md). Prefer those helpers over ad-hoc invocations.
+- Scoped runs use `--modules` (or per-phase equivalents such as `--unit-modules`); treat `[project.scripts]` in
+  `pyproject.toml` as the source of truth for available shortcuts.
 
-Filters
+## Gate on JSON
 
-- Use `--modules a,b` (and per‑phase equivalents) to scope runs during the loop.
-
-Detached mode
-
-- Add `--detached` for long runs; poll with `uv run test wait --json`.
-
-Gate on JSON
-
-- Read `tmp/test-logs/latest/summary.json` and require `success: true` before merging.
+- Parsing `tmp/test-logs/latest/summary.json` (or phase-specific summaries) is mandatory; wait for `success: true`
+  before declaring a run green.
+- Use detached mode (`uv run test run --detached`, then `uv run test wait --json`) when long tours or integrations risk
+  timeouts.

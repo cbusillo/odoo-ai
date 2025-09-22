@@ -6,9 +6,9 @@ This directory contains all temporary files for the project, keeping the root di
 
 ```
 tmp/
-├── tests/          # Test runner output files
-├── scripts/        # Temporary analysis and utility scripts  
-├── data/           # Temporary data files
+├── test-logs/      # Test runner output (created automatically)
+├── scripts/        # Temporary analysis and utility scripts (create on demand)
+├── data/           # Scratch data extracts (create on demand)
 └── README.md       # This file
 ```
 
@@ -16,23 +16,21 @@ tmp/
 
 The `tmp/` directory is used for:
 
-1. **Test Results** (`tests/`)
-   - Output from `uv run test *` (see docs/testing.md)
-   - Each test run creates a timestamped subdirectory
-   - Contains logs, summaries, and progress tracking files
-   - Example: `tmp/tests/odoo-tests-20250204_143022/`
+1. **Test Results** (`test-logs/`)
+   - Output from `uv run test *` (see `docs/testing.md`)
+   - Testkit keeps the latest JSON summaries under `tmp/test-logs/latest/`
+   - Older runs live in timestamped folders for diffing or provenance
 
 2. **Temporary Scripts** (`scripts/`)
-   - One-off analysis scripts
-   - Testing utilities
-   - GPT integration tests
-   - Any script that doesn't belong in the main codebase
+   - One-off analysis scripts and verification utilities
+   - Long-running experiments that would otherwise require heredocs
+   - Create the directory when you first need it: `mkdir -p tmp/scripts`
+   - Execute with `uv run python tmp/scripts/<name>.py` (respects the sandbox bypass rules)
 
 3. **Temporary Data** (`data/`)
-   - Export files
-   - Import staging
-   - Analysis results
-   - Any data files that shouldn't be committed
+   - Export/import staging
+   - Local analysis results or generated fixtures
+   - Create with `mkdir -p tmp/data` as needed
 
 ## Important Notes
 
@@ -40,6 +38,7 @@ The `tmp/` directory is used for:
 - **Safe for AI agents** - Can read/write without system restrictions
 - **Clean regularly** - Delete old test results to save disk space
 - **No production code** - Only temporary/test files belong here
+- **Local TODOs / longer notes** - Use `docs/todo/` (gitignored) for scratch docs you want to keep between sessions
 
 ## Cleanup
 

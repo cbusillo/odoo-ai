@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
+import json
 import logging
 import os
 import subprocess
+import textwrap
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Annotated
 
 import psycopg2
-
+from passlib.context import CryptContext
 from psycopg2 import sql
 from psycopg2.extensions import connection
 from pydantic import Field, SecretStr, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict, NoDecode
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 logging.basicConfig(level=logging.INFO)
 _logger = logging.getLogger(__name__)
@@ -33,6 +35,66 @@ class SqlCallType(Enum):
     SELECT = "SELECT"
 
 
+@dataclass(frozen=True)
+class ServiceUserConfig:
+    login: str
+    name: str
+    api_key_name: str
+    group_xmlids: tuple[str, ...]
+    password_template: str
+    api_key_template: str
+    inherit_superuser_groups: bool = False
+    inherit_superuser_exclude_xmlids: tuple[str, ...] = ()
+    inherit_superuser_category_exclude_keywords: tuple[str, ...] = ()
+
+
+class OdooConfig:
+    GPT_USER_LOGIN = "gpt"
+    GPT_API_KEY_NAME = "GPT Integration Key"
+    GPT_USER_NAME = "GPT Service User"
+    GPT_ADMIN_LOGIN = "gpt-admin"
+    GPT_ADMIN_API_KEY_NAME = "GPT Admin Key"
+    GPT_ADMIN_USER_NAME = "GPT Admin User"
+    GROUP_INTERNAL = "base.group_user"
+    GROUP_SYSTEM = "base.group_system"
+    API_SCOPE = "rpc"
+    GPT_SERVICE_USERS: tuple[ServiceUserConfig, ...] = (
+        ServiceUserConfig(
+            login=GPT_USER_LOGIN,
+            name=GPT_USER_NAME,
+            api_key_name=GPT_API_KEY_NAME,
+            group_xmlids=(GROUP_INTERNAL,),
+            password_template="{base}",
+            api_key_template="{base}",
+            inherit_superuser_groups=True,
+            inherit_superuser_exclude_xmlids=(
+                GROUP_SYSTEM,
+                "base.group_erp_manager",
+            ),
+            inherit_superuser_category_exclude_keywords=(
+                "administration",
+                "settings",
+                "technical",
+            ),
+        ),
+        ServiceUserConfig(
+            login=GPT_ADMIN_LOGIN,
+            name=GPT_ADMIN_USER_NAME,
+            api_key_name=GPT_ADMIN_API_KEY_NAME,
+            group_xmlids=(GROUP_INTERNAL, GROUP_SYSTEM),
+            password_template="{base}",
+            api_key_template="admin-{base}",
+            inherit_superuser_groups=True,
+            inherit_superuser_exclude_xmlids=(),
+        ),
+    )
+
+
+API_KEY_INDEX_LENGTH = 8
+API_KEY_CRYPT_CONTEXT = CryptContext(
+    ["pbkdf2_sha512"],
+    pbkdf2_sha512__rounds=6000,
+)
 @dataclass
 class KeyValuePair:
     key: str
@@ -62,6 +124,7 @@ class LocalServerSettings(BaseSettings):
     project_name: str = Field("odoo", alias="ODOO_PROJECT_NAME")
     addons_path: str | None = Field(None, alias="ODOO_ADDONS_PATH")
     update_modules: str | None = Field(None, alias="ODOO_UPDATE")
+    odoo_key: SecretStr | None = Field(None, alias="ODOO_KEY")
 
 
 class UpstreamServerSettings(BaseSettings):
@@ -368,6 +431,190 @@ class OdooUpstreamRestorer:
             if cursor.fetchone() is None:
                 raise OdooDatabaseUpdateError("Schema check failed: base.public_user xmlid not found")
 
+    def _odoo_shell_command(self) -> list[str]:
+        base_bin = Path("/odoo/odoo-bin")
+        if base_bin.exists():
+            command = [str(base_bin), "shell"]
+        else:
+            alt_python = Path("/opt/odoo/venv/bin/python")
+            if not alt_python.exists():
+                raise OdooRestorerError("Unable to locate odoo-bin executable for shell operations.")
+            command = [str(alt_python), "/odoo/odoo-bin", "shell"]
+
+        command += ["-d", self.local.db_name, "--no-http"]
+        generated_config_path = Path("/volumes/config/_generated.conf")
+        if generated_config_path.exists():
+            command += ["--config", str(generated_config_path)]
+        return command
+
+    def _run_odoo_shell(self, script: str) -> None:
+        command = self._odoo_shell_command()
+        _logger.info("Executing odoo shell for GPT user provisioning: %s", " ".join(command))
+        try:
+            subprocess.run(
+                command,
+                input=script.encode("utf-8"),
+                env=self.os_env,
+                check=True,
+            )
+        except subprocess.CalledProcessError as error:
+            raise OdooRestorerError("Failed to execute Odoo shell for GPT provisioning.") from error
+
+    def ensure_gpt_users(self) -> None:
+        secret = self.local.odoo_key
+        if secret is None:
+            _logger.info("ODOO_KEY not provided; skipping GPT service user provisioning.")
+            return
+
+        raw_key = secret.get_secret_value().strip()
+        if not raw_key:
+            _logger.info("ODOO_KEY empty; skipping GPT service user provisioning.")
+            return
+        if len(raw_key) < API_KEY_INDEX_LENGTH:
+            raise OdooDatabaseUpdateError(f"ODOO_KEY must be at least {API_KEY_INDEX_LENGTH} characters to derive an API key index.")
+
+        payload = {
+            "db": self.local.db_name,
+            "api_scope": OdooConfig.API_SCOPE,
+            "users": [],
+        }
+
+        for config in OdooConfig.GPT_SERVICE_USERS:
+            password_plain = config.password_template.format(base=raw_key)
+            api_key_plain = config.api_key_template.format(base=raw_key)
+
+            if len(api_key_plain) < API_KEY_INDEX_LENGTH:
+                raise OdooDatabaseUpdateError(
+                    f"Derived API key for {config.login} must be at least {API_KEY_INDEX_LENGTH} characters to derive an index."
+                )
+
+            payload["users"].append(
+                {
+                    "login": config.login,
+                    "name": config.name,
+                    "password": password_plain,
+                    "groups": list(config.group_xmlids),
+                    "inherit_superuser_groups": config.inherit_superuser_groups,
+                    "inherit_superuser_exclude_xmlids": list(config.inherit_superuser_exclude_xmlids),
+                    "inherit_superuser_category_exclude_keywords": list(
+                        config.inherit_superuser_category_exclude_keywords
+                    ),
+                    "api_key_name": config.api_key_name,
+                    "api_key_index": api_key_plain[:API_KEY_INDEX_LENGTH],
+                    "api_key_hash": API_KEY_CRYPT_CONTEXT.hash(api_key_plain),
+                }
+            )
+
+        script = textwrap.dedent("""
+import json
+from odoo import api, SUPERUSER_ID, Command
+from odoo.modules.registry import Registry
+
+payload = json.loads('__PAYLOAD__')
+
+registry = Registry(payload["db"])
+with registry.cursor() as cr:
+    env = api.Environment(cr, SUPERUSER_ID, {})
+    company = env['res.company'].search([], order='id', limit=1)
+    if not company:
+        raise ValueError("Unable to locate a company record for GPT user provisioning.")
+
+    partner_defaults = {
+        "autopost_bills": "ask",
+        "type": "contact",
+        "active": True,
+    }
+
+    for user_data in payload["users"]:
+        partner_vals = dict(partner_defaults, name=user_data["name"], company_id=company.id)
+        partner = env["res.partner"].sudo().search([
+            ("name", "=", user_data["name"]),
+            ("company_id", "=", company.id),
+        ], limit=1)
+        if partner:
+            partner.write(partner_vals)
+        else:
+            partner = env["res.partner"].sudo().create(partner_vals)
+
+        group_ids: list[int]
+        group_ids: list[int] = []
+
+        def add_group(group_id: int) -> None:
+            if group_id not in group_ids:
+                group_ids.append(group_id)
+
+        if user_data.get("inherit_superuser_groups"):
+            superuser = env['res.users'].browse(SUPERUSER_ID)
+            exclude_xmlids = set(user_data.get("inherit_superuser_exclude_xmlids", []))
+            category_keywords = {
+                keyword.lower()
+                for keyword in user_data.get("inherit_superuser_category_exclude_keywords", [])
+                if keyword
+            }
+            for group in superuser.groups_id:
+                xmlid = group.get_external_id().get(group.id)
+                if xmlid and xmlid in exclude_xmlids:
+                    continue
+                if category_keywords and group.category_id:
+                    category_name = (group.category_id.display_name or group.category_id.name or "").lower()
+                    if any(keyword in category_name for keyword in category_keywords):
+                        continue
+                add_group(group.id)
+
+        for xmlid in user_data.get("groups", []):
+            try:
+                add_group(env.ref(xmlid).id)
+            except ValueError as exc:
+                raise ValueError(f"Unable to locate group xmlid '{xmlid}' for GPT user provisioning.") from exc
+
+        ctx = dict(env.context, no_reset_password=True)
+        user_model = env["res.users"].with_context(ctx).sudo()
+        user = user_model.search([("login", "=", user_data["login"] )], limit=1)
+
+        common_vals = {
+            "name": user_data["name"],
+            "partner_id": partner.id,
+            "company_id": company.id,
+            "company_ids": [Command.set([company.id])],
+            "notification_type": "email",
+            "share": False,
+            "active": True,
+            "groups_id": [Command.set(group_ids)],
+        }
+
+        if user:
+            user.write(common_vals)
+            action = "updated"
+        else:
+            create_vals = dict(common_vals, login=user_data["login"])
+            user = user_model.create(create_vals)
+            action = "created"
+
+        user.with_context(no_reset_password=True).sudo().write({'password': user_data['password']})
+
+        env.cr.execute(
+            "SELECT id FROM res_users_apikeys WHERE user_id = %s AND name = %s",
+            (user.id, user_data["api_key_name"]),
+        )
+        row = env.cr.fetchone()
+        if row:
+            env.cr.execute(
+                "UPDATE res_users_apikeys SET key=%s, scope=%s, index=%s, expiration_date=NULL WHERE id=%s",
+                (user_data["api_key_hash"], payload["api_scope"], user_data["api_key_index"], row[0]),
+            )
+        else:
+            env.cr.execute(
+                "INSERT INTO res_users_apikeys (name, user_id, scope, expiration_date, key, index) VALUES (%s, %s, %s, NULL, %s, %s)",
+                (user_data["api_key_name"], user.id, payload["api_scope"], user_data["api_key_hash"], user_data["api_key_index"]),
+            )
+
+        print(f"GPT provisioning: {action} user {user.login} (id={user.id})")
+
+    cr.commit()
+""")
+        script = script.replace("__PAYLOAD__", json.dumps(payload))
+        self._run_odoo_shell(script)
+
     def update_addons(self) -> None:
         mods_env = (self.local.update_modules or "").strip()
         if not mods_env:
@@ -482,6 +729,7 @@ class OdooUpstreamRestorer:
                 raise
 
         self.assert_core_schema_healthy()
+        self.ensure_gpt_users()
 
         _logger.info("Upstream overwrite completed successfully.")
 

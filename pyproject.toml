@@ -38,6 +38,8 @@ test-status = "tools.testkit.shortcuts:test_status"
 test-wait = "tools.testkit.shortcuts:test_wait"
 test-rerun = "tools.testkit.shortcuts:test_rerun_failures"
 test-doctor = "tools.testkit.shortcuts:test_doctor"
+deploy-receiver = "tools.deployer.receiver:main"
+deploy-worker = "tools.deployer.worker:main"
 
 [tool.uv]
 preview = true

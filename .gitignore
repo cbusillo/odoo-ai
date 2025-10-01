@@ -198,7 +198,6 @@ odoo.*.conf
 /tmp/*
 !/tmp/README.md
 
-/docs/todo
 /.claude/.compacted
 !.env.example
 
@@ -207,4 +206,3 @@ odoo.*.conf
 .code/agents/
 
 *.local.*
-

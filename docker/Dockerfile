@@ -55,6 +55,7 @@ COPY /docker/config /volumes/config
 COPY /docker/scripts /volumes/scripts
 COPY /addons /volumes/addons
 COPY /pyproject.toml /volumes/pyproject.toml
+COPY /uv.lock /volumes/uv.lock
 
 RUN mkdir -p /tmp/enterprise_stub/src && \
     printf "[project]\nname = \"odoo18-enterprise\"\nversion = \"18.0.0\"\n" \

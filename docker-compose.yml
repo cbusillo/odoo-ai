@@ -24,9 +24,9 @@ name: ${ODOO_PROJECT_NAME:-odoo}
 services:
   web:
     <<: *odoo-base
-    ports:
-      - "8069:8069"
-      - "8072:8072"
+    expose:
+      - "8069"
+      - "8072"
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -39,8 +39,8 @@ services:
       - POSTGRES_DB=postgres
       - POSTGRES_PASSWORD=${ODOO_DB_PASSWORD}
       - POSTGRES_USER=${ODOO_DB_USER}
-    ports:
-      - "5432:5432"
+    expose:
+      - "5432"
   script-runner:
     <<: *odoo-base
     command: tail -f /dev/null

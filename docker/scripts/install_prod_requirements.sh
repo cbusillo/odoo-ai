@@ -13,6 +13,12 @@ if [ -f "/volumes/enterprise/requirements.txt" ]; then
   uv pip install -r "/volumes/enterprise/requirements.txt"
 fi
 
+# Install shared project dependencies declared in pyproject.toml (production extras only)
+if [ -f "/volumes/pyproject.toml" ]; then
+  echo "Syncing project dependencies (no dev extras)..."
+  (cd /volumes && uv sync --frozen --no-dev)
+fi
+
 # Install addon production dependencies only
 cd /volumes/addons
 for addon in */ ; do

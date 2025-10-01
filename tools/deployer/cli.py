@@ -9,7 +9,7 @@ from .compose_ops import local_compose_command, remote_compose_command
 from .deploy import deploy_stack, render_settings, show_status
 from .docker_ops import build_image, inspect_image_digest, pull_image, push_image
 from .health import HealthcheckError
-from .remote import run_remote
+from .remote import run_remote, sync_remote_repository
 from .settings import StackSettings, load_stack_settings
 
 
@@ -67,15 +67,39 @@ def resolve_remote_flag(settings: StackSettings, remote_flag: bool | None) -> bo
     return settings.remote_host is not None
 
 
-def run_build(settings: StackSettings, remote: bool, no_cache: bool) -> None:
+def sync_repository(settings: StackSettings, repository_url: str | None, commit: str, remote: bool) -> None:
+    if not remote:
+        return
+    if repository_url is None:
+        raise ValueError("remote repository url required")
+    if settings.remote_host is None or settings.remote_stack_path is None:
+        raise ValueError("remote repository configuration incomplete")
+    sync_remote_repository(
+        settings.remote_host,
+        settings.remote_user,
+        settings.remote_port,
+        settings.remote_stack_path,
+        repository_url,
+        commit,
+    )
+
+
+def run_build(
+    settings: StackSettings,
+    remote: bool,
+    no_cache: bool,
+    repository_url: str | None,
+    commit: str,
+) -> None:
     build_args = ["build"]
     if no_cache:
         build_args.append("--no-cache")
 
-    services = [svc for svc in ("web", "script-runner", "shell") if svc in ("web", "script-runner", "shell")]
+    services = [service for service in ("web", "script-runner", "shell") if service in settings.services]
     build_args.extend(services)
 
     if remote:
+        sync_repository(settings, repository_url, commit, remote)
         command = remote_compose_command(settings, build_args)
         run_remote(settings.remote_host, settings.remote_user, settings.remote_port, command, settings.remote_stack_path)
     else:
@@ -167,13 +191,13 @@ def deploy_command(
     overrides: tuple[str, ...],
 ) -> None:
     settings = load_stack_settings(stack_name, env_file)
-    image_reference = resolve_image_reference(settings, tag, image)
     remote = resolve_remote_flag(settings, remote_flag)
-    extra_variables = convert_key_values(overrides)
-    if build_flag:
-        run_build(settings, remote, no_cache)
     commit = get_git_commit(settings.repo_root)
     repository_url = get_git_remote_url(settings.repo_root) if remote else None
+    image_reference = resolve_image_reference(settings, tag, image)
+    extra_variables = convert_key_values(overrides)
+    if build_flag:
+        run_build(settings, remote, no_cache, repository_url, commit)
     try:
         deploy_stack(
             settings,

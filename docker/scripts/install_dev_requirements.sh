@@ -1,6 +1,8 @@
 #!/bin/bash
 set -eux
 
+export UV_PROJECT_ENVIRONMENT=/venv
+
 uv pip install docker
 
 # First, install all production requirements
@@ -29,5 +31,5 @@ cd /volumes/addons
 # Install dev extras for the shared project if defined
 if [ -f "/volumes/pyproject.toml" ]; then
   cd /volumes
-  uv sync --frozen
+  uv sync --frozen --python /venv/bin/python3
 fi

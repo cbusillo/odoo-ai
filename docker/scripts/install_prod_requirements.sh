@@ -1,6 +1,8 @@
 #!/bin/bash
 set -eux
 
+export UV_PROJECT_ENVIRONMENT=/venv
+
 # Install Odoo requirements if present
 if [ -f "/odoo/requirements.txt" ]; then
   echo "Installing Odoo requirements..."
@@ -16,7 +18,7 @@ fi
 # Install shared project dependencies declared in pyproject.toml (production extras only)
 if [ -f "/volumes/pyproject.toml" ]; then
   echo "Syncing project dependencies (no dev extras)..."
-  (cd /volumes && uv sync --frozen --no-dev)
+  (cd /volumes && uv sync --frozen --no-dev --python /venv/bin/python3)
 fi
 
 # Install addon production dependencies only

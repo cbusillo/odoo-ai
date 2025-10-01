@@ -1,0 +1,4 @@
+services:
+  script-runner:
+    volumes:
+      - ${RESTORE_SSH_DIR:-/home/ubuntu/.ssh}:/home/ubuntu/.ssh:ro

@@ -25,3 +25,9 @@ for addon in */ ; do
 done
 
 cd /volumes/addons
+
+# Install dev extras for the shared project if defined
+if [ -f "/volumes/pyproject.toml" ]; then
+  cd /volumes
+  uv sync --frozen
+fi

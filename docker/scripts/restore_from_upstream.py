@@ -309,6 +309,13 @@ class OdooUpstreamRestorer:
                     KeyValuePair("key", "web.base.url"),
                 )
             )
+            sql_calls.append(
+                SqlCall(
+                    "ir.config_parameter",
+                    KeyValuePair("value", "True"),
+                    KeyValuePair("key", "web.base.url.freeze"),
+                )
+            )
 
         _logger.info("Sanitizing database...")
         for sql_call in sql_calls:

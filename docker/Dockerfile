@@ -57,6 +57,8 @@ COPY /addons /volumes/addons
 COPY /pyproject.toml /volumes/pyproject.toml
 COPY /uv.lock /volumes/uv.lock
 
+RUN mkdir -p /opt && ln -sfn /volumes /opt/project
+
 RUN mkdir -p /tmp/enterprise_stub/src && \
     printf "[project]\nname = \"odoo18-enterprise\"\nversion = \"18.0.0\"\n" \
         > /tmp/enterprise_stub/pyproject.toml && \

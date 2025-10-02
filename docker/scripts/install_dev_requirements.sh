@@ -5,8 +5,8 @@ export UV_PROJECT_ENVIRONMENT=/venv
 
 uv pip install docker
 
-# First, install all production requirements
-/volumes/scripts/install_prod_requirements.sh
+# First, install all production requirements (plus tooling extras)
+UV_SYNC_EXTRAS=dev SKIP_VENDOR_INSTALL=1 /volumes/scripts/install_prod_requirements.sh
 
 # Then install dev-specific requirements
 cd /volumes/addons
@@ -28,8 +28,5 @@ done
 
 cd /volumes/addons
 
-# Install dev extras for the shared project if defined
-if [ -f "/volumes/pyproject.toml" ]; then
-  cd /volumes
-  uv sync --frozen --python /venv/bin/python3
-fi
+# Reinstall vendor requirements once all custom packages are in place
+INSTALL_VENDOR_ONLY=1 /volumes/scripts/install_prod_requirements.sh

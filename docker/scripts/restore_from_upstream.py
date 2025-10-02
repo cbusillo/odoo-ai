@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Annotated
+import shlex
 
 import psycopg2
 from passlib.context import CryptContext
@@ -118,6 +119,8 @@ class LocalServerSettings(BaseSettings):
     db_name: str = Field(..., alias="ODOO_DB_NAME")
     db_conn: connection | None = None
     filestore_path: Path = Field(..., alias="ODOO_FILESTORE_PATH")
+    filestore_owner: str | None = Field("ubuntu:ubuntu", alias="ODOO_FILESTORE_OWNER")
+    restore_ssh_key: Path | None = Field(None, alias="RESTORE_SSH_KEY")
     base_url: str | None = Field(None, alias="ODOO_BASE_URL")
     # Script/runtime toggles
     disable_cron: bool = Field(True, alias="SANITIZE_DISABLE_CRON")
@@ -184,15 +187,44 @@ class OdooUpstreamRestorer:
         except subprocess.CalledProcessError as command_error:
             raise OdooRestorerError(f"Command failed: {command}\nError: {command_error}") from command_error
 
-    def overwrite_filestore(self) -> subprocess.Popen:
+    def _resolve_filestore_owner(self) -> str | None:
+        owner = (self.local.filestore_owner or "").strip()
+        return owner or None
+
+    def _build_ssh_command(self) -> list[str]:
+        parts = ["ssh", "-o", "StrictHostKeyChecking=yes"]
+        if self.local.restore_ssh_key:
+            parts.extend(["-i", str(self.local.restore_ssh_key)])
+        return parts
+
+    def overwrite_filestore(self, target_owner: str | None) -> subprocess.Popen:
         _logger.info("Overwriting filestore...")
-        rsync_command = f"rsync -az --delete {self.upstream.user}@{self.upstream.host}:{self.upstream.filestore_path} {self.local.filestore_path}"
+        self.local.filestore_path.mkdir(parents=True, exist_ok=True)
+        remote_path = shlex.quote(f"{self.upstream.user}@{self.upstream.host}:{self.upstream.filestore_path}")
+        local_path = shlex.quote(str(self.local.filestore_path))
+        chown_option = f"--chown={target_owner}" if target_owner else ""
+        ssh_parts = self._build_ssh_command()
+        ssh_command = shlex.join(ssh_parts)
+        rsync_parts = ["rsync", "-az", "--delete"]
+        if chown_option:
+            rsync_parts.append(chown_option)
+        rsync_parts.extend(["-e", shlex.quote(ssh_command), remote_path, local_path])
+        rsync_command = " ".join(rsync_parts)
         return subprocess.Popen(rsync_command, shell=True, env=self.os_env)
+
+    def normalize_filestore_permissions(self, target_owner: str | None) -> None:
+        if not target_owner:
+            return
+        _logger.info("Normalizing filestore ownership to %s", target_owner)
+        chown_command = f"chown -R {target_owner} {shlex.quote(str(self.local.filestore_path))}"
+        self.run_command(chown_command)
 
     def overwrite_database(self) -> None:
         backup_path = "/tmp/upstream_db_backup.sql.gz"
+        ssh_parts = self._build_ssh_command()
+        ssh_command = shlex.join(ssh_parts)
         dump_cmd = (
-            f"ssh {self.upstream.user}@{self.upstream.host} \"cd /tmp && sudo -u '{self.upstream.db_user}' "
+            f"{ssh_command} {self.upstream.user}@{self.upstream.host} \"cd /tmp && sudo -u '{self.upstream.db_user}' "
             f"pg_dump -Fc '{self.upstream.db_name}'\" | gzip > {backup_path}"
         )
         self.run_command(dump_cmd)
@@ -710,12 +742,15 @@ with registry.cursor() as cr:
             raise OdooRestorerError(f"Failed to install/update addons: {update_error}") from update_error
 
     def restore_from_upstream(self, do_sanitize: bool = True) -> None:
-        filestore_proc = self.overwrite_filestore()
+        target_owner = self._resolve_filestore_owner()
+        _logger.info("Resolved filestore owner: %s", target_owner or "<default>")
+        filestore_proc = self.overwrite_filestore(target_owner)
         self.overwrite_database()
         filestore_proc.wait()
         if filestore_proc.returncode != 0:
             raise OdooRestorerError("Filestore rsync failed.")
         _logger.info("Filestore overwrite completed.")
+        self.normalize_filestore_permissions(target_owner)
         if do_sanitize:
             try:
                 self.sanitize_database()

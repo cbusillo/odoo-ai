@@ -41,6 +41,10 @@ if [ -f "/volumes/pyproject.toml" ]; then
   (cd /volumes && uv sync "${UV_SYNC_ARGS[@]}")
 fi
 
+if [ "${SKIP_VENDOR_INSTALL:-0}" != "1" ]; then
+  install_vendor_requirements
+fi
+
 # Install addon production dependencies only
 cd /volumes/addons
 for addon in */ ; do
@@ -59,7 +63,3 @@ for addon in */ ; do
 done
 
 cd /volumes/addons
-
-if [ "${SKIP_VENDOR_INSTALL:-0}" != "1" ]; then
-  install_vendor_requirements
-fi

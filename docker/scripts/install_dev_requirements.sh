@@ -5,8 +5,11 @@ export UV_PROJECT_ENVIRONMENT=/venv
 
 uv pip install docker
 
-# First, install all production requirements (plus tooling extras)
-UV_SYNC_EXTRAS=dev SKIP_VENDOR_INSTALL=1 /volumes/scripts/install_prod_requirements.sh
+# Ensure vendor requirements run even if the environment leaks skip flags
+unset SKIP_VENDOR_INSTALL
+
+# Sync project deps (with dev extras), install vendor requirements, and install addon dependencies
+UV_SYNC_EXTRAS=dev /volumes/scripts/install_prod_requirements.sh
 
 # Then install dev-specific requirements
 cd /volumes/addons
@@ -27,6 +30,3 @@ for addon in */ ; do
 done
 
 cd /volumes/addons
-
-# Reinstall vendor requirements once all custom packages are in place
-INSTALL_VENDOR_ONLY=1 /volumes/scripts/install_prod_requirements.sh

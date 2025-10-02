@@ -9,7 +9,7 @@ description = "AI-powered Odoo 18 Enterprise development framework"
 requires-python = ">=3.12"
 
 dependencies = [
-    "psutil",
+    "psutil==5.9.8",
     "click",
     "pydantic",
     "pydantic_settings",

@@ -53,8 +53,24 @@ def remote_path_exists(host: str, user: str | None, port: int | None, path: Path
     return result.returncode == 0
 
 
-def sync_remote_repository(host: str, user: str | None, port: int | None, path: Path, repository_url: str, commit: str) -> None:
+def sync_remote_repository(
+    host: str,
+    user: str | None,
+    port: int | None,
+    path: Path,
+    repository_url: str,
+    commit: str,
+    github_token: str | None,
+) -> None:
     ensure_remote_directory(host, user, port, path.parent)
+    if github_token:
+        token_url = f"https://x-access-token:{github_token}@github.com/"
+        run_remote(
+            host,
+            user,
+            port,
+            ["git", "config", "--global", f"url.{token_url}.insteadOf", "https://github.com/"],
+        )
     repo_git = path / ".git"
     if not remote_path_exists(host, user, port, repo_git):
         run_remote(host, user, port, ["rm", "-rf", str(path)])
@@ -63,3 +79,12 @@ def sync_remote_repository(host: str, user: str | None, port: int | None, path: 
         run_remote(host, user, port, ["git", "-C", str(path), "remote", "set-url", "origin", repository_url])
     run_remote(host, user, port, ["git", "-C", str(path), "fetch", "--prune", "origin"])
     run_remote(host, user, port, ["git", "-C", str(path), "reset", "--hard", commit])
+    # Ensure submodules are synced to the requested commit so custom addons are available during remote builds.
+    run_remote(host, user, port, ["git", "-C", str(path), "submodule", "sync", "--recursive"])
+    run_remote(host, user, port, ["git", "-C", str(path), "submodule", "update", "--init", "--recursive"])
+    run_remote(
+        host,
+        user,
+        port,
+        ["git", "-C", str(path), "submodule", "foreach", "--recursive", "git reset --hard"],
+    )

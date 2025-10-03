@@ -1,6 +1,8 @@
 #!/bin/bash
 set -eux
 
+export UV_HTTP_TIMEOUT=${UV_HTTP_TIMEOUT:-120}
+
 export UV_PROJECT_ENVIRONMENT=/venv
 
 uv pip install docker

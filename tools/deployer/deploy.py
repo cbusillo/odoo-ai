@@ -166,7 +166,13 @@ def prepare_remote_stack(settings: StackSettings, repository_url: str | None, co
     if repository_url is None or commit is None:
         raise ValueError("repository metadata required for remote deployment")
     sync_remote_repository(
-        settings.remote_host, settings.remote_user, settings.remote_port, settings.remote_stack_path, repository_url, commit
+        settings.remote_host,
+        settings.remote_user,
+        settings.remote_port,
+        settings.remote_stack_path,
+        repository_url,
+        commit,
+        settings.github_token,
     )
     for file_path in settings.compose_files:
         relative = file_path.relative_to(settings.repo_root)

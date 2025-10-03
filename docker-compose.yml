@@ -24,6 +24,7 @@ name: ${ODOO_PROJECT_NAME:-odoo}
 services:
   web:
     <<: *odoo-base
+    command: /odoo/odoo-bin
     expose:
       - "8069"
       - "8072"

@@ -1,3 +1,3 @@
 <component name="DependencyValidationManager">
-  <scope name="Conf" pattern="file:odoo*.conf||file:*/uv.lock||file:.claude/settings.json||file:uv.lock" />
+  <scope name="Conf" pattern="file:*/uv.lock||file:.claude/settings.json||file:uv.lock||file:.env.*" />
 </component>

@@ -81,6 +81,7 @@ def sync_repository(settings: StackSettings, repository_url: str | None, commit:
         settings.remote_stack_path,
         repository_url,
         commit,
+        settings.github_token,
     )
 
 

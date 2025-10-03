@@ -75,6 +75,7 @@ class StackConfig(BaseModel):
     docker_image: str | None = Field(None, alias="DOCKER_IMAGE")
     base_url: str | None = Field(None, alias="ODOO_BASE_URL")
     update_modules_raw: str | None = Field(None, alias="ODOO_UPDATE")
+    github_token: str | None = Field(None, alias="GITHUB_TOKEN")
 
 
 def compute_compose_files(name: str, repo_root: Path, config: StackConfig) -> tuple[Path, ...]:
@@ -197,11 +198,17 @@ def compute_image_variable(config: StackConfig) -> str:
     return "ODOO_IMAGE"
 
 
+def _write_env_file(path: Path, values: dict[str, str]) -> None:
+    lines = [f"{key}={value}" for key, value in sorted(values.items())]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 @dataclass(frozen=True)
 class StackSettings:
     name: str
     repo_root: Path
-    env_file: Path
+    env_file: Path  # merged environment file used for compose operations
+    source_env_file: Path  # stack-specific override file selected by the operator
     environment: dict[str, str]
     compose_command: tuple[str, ...]
     compose_project: str
@@ -219,6 +226,7 @@ class StackSettings:
     remote_port: int | None
     remote_stack_path: Path | None
     remote_env_path: Path | None
+    github_token: str | None
 
     def compose_arguments(self) -> list[str]:
         arguments = list(self.compose_command)
@@ -237,6 +245,8 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
     if base_env_path.exists() and base_env_path.resolve() != env_path.resolve():
         raw_environment.update(parse_env_file(base_env_path))
     raw_environment.update(parse_env_file(env_path))
+    merged_env_path = repo_root / f".env.{name}.merged"
+    _write_env_file(merged_env_path, raw_environment)
     config = StackConfig.model_validate(raw_environment)
     compose_command = compute_compose_command(config)
     compose_files = compute_compose_files(name, repo_root, config)
@@ -254,10 +264,12 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
     remote_port = config.remote_port
     remote_stack_path = compute_remote_stack_path(name, config, remote_host)
     remote_env_path = compute_remote_env_path(config, remote_stack_path)
+    github_token = config.github_token
     return StackSettings(
         name=name,
         repo_root=repo_root,
-        env_file=env_path,
+        env_file=merged_env_path,
+        source_env_file=env_path,
         environment=raw_environment,
         compose_command=compose_command,
         compose_project=compose_project,
@@ -275,6 +287,7 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
         remote_port=remote_port,
         remote_stack_path=remote_stack_path,
         remote_env_path=remote_env_path,
+        github_token=github_token,
     )
 
 

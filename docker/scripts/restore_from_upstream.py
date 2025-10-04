@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import json
 import logging
 import os
@@ -109,9 +110,20 @@ class SqlCall:
     where: KeyValuePair | None = None
 
 
+def _blank_to_none(value: object) -> object:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        return stripped
+    return value
+
+
 class LocalServerSettings(BaseSettings):
     # noinspection Pydantic
-    model_config = SettingsConfigDict(case_sensitive=False, env_file=".env")
+    model_config = SettingsConfigDict(case_sensitive=False)
     host: str = Field(..., alias="ODOO_DB_HOST")
     port: int = Field(5432, alias="ODOO_DB_PORT")
     db_user: str = Field(..., alias="ODOO_DB_USER")
@@ -119,7 +131,7 @@ class LocalServerSettings(BaseSettings):
     db_name: str = Field(..., alias="ODOO_DB_NAME")
     db_conn: connection | None = None
     filestore_path: Path = Field(..., alias="ODOO_FILESTORE_PATH")
-    filestore_owner: str | None = Field("ubuntu:ubuntu", alias="ODOO_FILESTORE_OWNER")
+    filestore_owner: str | None = Field(None, alias="ODOO_FILESTORE_OWNER")
     restore_ssh_key: Path | None = Field(None, alias="RESTORE_SSH_KEY")
     base_url: str | None = Field(None, alias="ODOO_BASE_URL")
     # Script/runtime toggles
@@ -129,10 +141,37 @@ class LocalServerSettings(BaseSettings):
     update_modules: str | None = Field(None, alias="ODOO_UPDATE")
     odoo_key: SecretStr | None = Field(None, alias="ODOO_KEY")
 
+    @field_validator("filestore_owner", "base_url", "addons_path", "update_modules", mode="before")
+    @classmethod
+    def _optional_str(cls, value: object) -> object:
+        return _blank_to_none(value)
+
+    @field_validator("restore_ssh_key", mode="before")
+    @classmethod
+    def _normalize_restore_key(cls, value: object) -> object:
+        value = _blank_to_none(value)
+        if value is None:
+            return None
+        raw = str(value).strip()
+        if raw.startswith(("'", '"')) and raw.endswith(("'", '"')) and len(raw) >= 2:
+            raw = raw[1:-1]
+        return os.path.expanduser(os.path.expandvars(raw))
+
+    @field_validator("filestore_path", mode="before")
+    @classmethod
+    def _normalize_filestore_path(cls, value: object) -> object:
+        if value is None:
+            return value
+        raw = str(value).strip()
+        if raw.startswith(("'", '"')) and raw.endswith(("'", '"')) and len(raw) >= 2:
+            raw = raw[1:-1]
+        expanded = os.path.expanduser(os.path.expandvars(raw))
+        return expanded
+
 
 class UpstreamServerSettings(BaseSettings):
     # noinspection Pydantic
-    model_config = SettingsConfigDict(case_sensitive=False, env_file=".env")
+    model_config = SettingsConfigDict(case_sensitive=False)
     host: str = Field(..., alias="ODOO_UPSTREAM_HOST")
     user: str = Field(..., alias="ODOO_UPSTREAM_USER")
     db_name: str = Field(..., alias="ODOO_UPSTREAM_DB_NAME")
@@ -142,7 +181,7 @@ class UpstreamServerSettings(BaseSettings):
 
 class ShopifySettings(BaseSettings):
     # noinspection Pydantic
-    model_config = SettingsConfigDict(case_sensitive=False, env_file=".env")
+    model_config = SettingsConfigDict(case_sensitive=False)
     shop_url_key: str = Field(..., alias="SHOPIFY_STORE_URL_KEY")
     api_token: SecretStr = Field(..., alias="SHOPIFY_API_TOKEN")
     api_version: str = Field(..., alias="SHOPIFY_API_VERSION")
@@ -174,11 +213,27 @@ class ShopifySettings(BaseSettings):
 
 
 class OdooUpstreamRestorer:
-    def __init__(self, local: LocalServerSettings, upstream: UpstreamServerSettings) -> None:
+    def __init__(
+        self,
+        local: LocalServerSettings,
+        upstream: UpstreamServerSettings,
+        env_file: Path | None,
+    ) -> None:
         self.local = local
         self.upstream = upstream
+        self.env_file = env_file
         self.os_env = os.environ.copy()
         self.os_env["PGPASSWORD"] = self.local.db_password.get_secret_value()
+        resolved_key = self._resolve_restore_ssh_key()
+        self._ssh_identity = resolved_key
+        if resolved_key is not None:
+            self.os_env["RESTORE_SSH_KEY"] = str(resolved_key)
+            _logger.info("Using SSH identity %s", resolved_key)
+        elif self.local.restore_ssh_key:
+            _logger.info(
+                "SSH identity %s not found inside container; relying on default ssh-agent/keys.",
+                self.local.restore_ssh_key,
+            )
 
     def run_command(self, command: str) -> None:
         _logger.info(f"Running command: {command}")
@@ -188,13 +243,50 @@ class OdooUpstreamRestorer:
             raise OdooRestorerError(f"Command failed: {command}\nError: {command_error}") from command_error
 
     def _resolve_filestore_owner(self) -> str | None:
-        owner = (self.local.filestore_owner or "").strip()
-        return owner or None
+        raw_owner = (self.os_env.get("ODOO_FILESTORE_OWNER") or "").strip()
+        if raw_owner:
+            return raw_owner
+
+        owner = _blank_to_none(self.local.filestore_owner)
+        if isinstance(owner, str) and owner.strip():
+            return owner.strip()
+
+        return None
+
+    def _resolve_restore_ssh_key(self) -> Path | None:
+        key = self.local.restore_ssh_key
+        if not key:
+            return None
+
+        base_path = Path(str(key))
+        candidates: list[Path] = [base_path]
+
+        env_dir = self.os_env.get("RESTORE_SSH_DIR") or os.environ.get("RESTORE_SSH_DIR")
+        if env_dir:
+            candidates.append(Path(env_dir) / base_path.name)
+
+        candidates.extend([Path("/root/.ssh") / base_path.name, Path("/home/ubuntu/.ssh") / base_path.name])
+
+        for candidate in candidates:
+            expanded = Path(os.path.expanduser(os.path.expandvars(str(candidate))))
+            if expanded.exists():
+                return expanded
+
+        fallback = Path(os.path.expanduser(os.path.expandvars(str(base_path))))
+        if fallback.exists():
+            return fallback
+
+        return None
 
     def _build_ssh_command(self) -> list[str]:
         parts = ["ssh", "-o", "StrictHostKeyChecking=yes"]
-        if self.local.restore_ssh_key:
-            parts.extend(["-i", str(self.local.restore_ssh_key)])
+        if self._ssh_identity:
+            parts.extend(["-i", str(self._ssh_identity)])
+        elif self.local.restore_ssh_key:
+            _logger.warning(
+                "RESTORE_SSH_KEY=%s not found inside container; continuing without explicit identity file.",
+                self.local.restore_ssh_key,
+            )
         return parts
 
     def overwrite_filestore(self, target_owner: str | None) -> subprocess.Popen:
@@ -362,38 +454,55 @@ class OdooUpstreamRestorer:
                 raise OdooDatabaseUpdateError(f"Error: The following cron jobs are still active after sanitization:\n{errors}")
 
     def update_shopify_config(self) -> None:
-        # noinspection PyArgumentList
-        settings = ShopifySettings()
+        if self.env_file and self.env_file.exists():
+            # noinspection PyArgumentList
+            settings = ShopifySettings(_env_file=self.env_file)
+        else:
+            # noinspection PyArgumentList
+            settings = ShopifySettings()
+
+        shop_url_key = (settings.shop_url_key or "").strip()
+        api_token = settings.api_token.get_secret_value().strip()
+        webhook_key = (settings.webhook_key or "").strip()
+        api_version = (settings.api_version or "").strip()
 
         # Safety check: prevent setting production values, allow replacing production with development
+        settings.shop_url_key = shop_url_key
         settings.validate_safe_environment()
+        production_indicators = settings.production_indicators
 
         # Log what we're doing for transparency
-        current_shop_url = self.call_odoo_sql(
-            SqlCall("ir.config_parameter", KeyValuePair("value"), KeyValuePair("key", "shopify.shop_url_key")), SqlCallType.SELECT
+        current_shop_url_key = self.call_odoo_sql(
+            SqlCall("ir.config_parameter", KeyValuePair("value"), KeyValuePair("key", "shopify.shop_url_key")),
+            SqlCallType.SELECT,
         )
 
-        if current_shop_url and current_shop_url[0]:
-            current_value = current_shop_url[0][0]
-            _logger.info(f"Replacing shop_url_key: '{current_value}' → '{settings.shop_url_key}'")
+        if current_shop_url_key and current_shop_url_key[0]:
+            current_value = current_shop_url_key[0][0]
+            _logger.info(f"Replacing shop_url_key: '{current_value}' → '{shop_url_key}'")
         else:
-            _logger.info(f"Setting shop_url_key to: '{settings.shop_url_key}'")
+            _logger.info(f"Setting shop_url_key to: '{shop_url_key}'")
 
         sql_calls: list[SqlCall] = [
             SqlCall(
                 "ir.config_parameter",
-                KeyValuePair("value", settings.shop_url_key),
+                KeyValuePair("value", shop_url_key),
                 KeyValuePair("key", "shopify.shop_url_key"),
             ),
             SqlCall(
                 "ir.config_parameter",
-                KeyValuePair("value", settings.api_token.get_secret_value()),
+                KeyValuePair("value", api_token),
                 KeyValuePair("key", "shopify.api_token"),
             ),
             SqlCall(
                 "ir.config_parameter",
-                KeyValuePair("value", settings.webhook_key),
+                KeyValuePair("value", webhook_key),
                 KeyValuePair("key", "shopify.webhook_key"),
+            ),
+            SqlCall(
+                "ir.config_parameter",
+                KeyValuePair("value", api_version),
+                KeyValuePair("key", "shopify.api_version"),
             ),
             SqlCall(
                 "ir.config_parameter",
@@ -408,6 +517,36 @@ class OdooUpstreamRestorer:
                 self.call_odoo_sql(sql_call, SqlCallType.UPDATE)
             except psycopg2.Error as error:
                 raise OdooDatabaseUpdateError(f"Failed to update Shopify configuration: {error}") from error
+
+        legacy_keys = ("shopify.shop_url", "shopify.store_url")
+        for key in legacy_keys:
+            result = self.call_odoo_sql(
+                SqlCall("ir.config_parameter", KeyValuePair("value"), KeyValuePair("key", key)),
+                SqlCallType.SELECT,
+            )
+            if result and result[0]:
+                value = (result[0][0] or "").strip().lower()
+                for indicator in production_indicators:
+                    if indicator and indicator in value:
+                        raise OdooDatabaseUpdateError(
+                            f"Safety check failed: {key} still contains production indicator '{indicator}'."
+                        )
+                with self.local.db_conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM ir_config_parameter WHERE key = %s", (key,))
+                _logger.info("Removed legacy Shopify config key %s", key)
+
+        sanitized_keys = ["shopify.shop_url_key"]
+        for key in sanitized_keys:
+            result = self.call_odoo_sql(
+                SqlCall("ir.config_parameter", KeyValuePair("value"), KeyValuePair("key", key)),
+                SqlCallType.SELECT,
+            )
+            value = (result[0][0].strip() if result and result[0] else "").lower()
+            for indicator in production_indicators:
+                if indicator and indicator in value:
+                    raise OdooDatabaseUpdateError(
+                        f"Safety check failed: {key} still contains production indicator '{indicator}'."
+                    )
 
     def clear_shopify_ids(self) -> None:
         with self.local.db_conn.cursor() as cursor:
@@ -777,9 +916,26 @@ with registry.cursor() as cr:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Restore Odoo database/filestore from upstream backups")
+    parser.add_argument("--env-file", type=Path, default=None, help="Optional env file to load settings from")
+    args = parser.parse_args()
+
+    env_file: Path | None = args.env_file
+    if env_file is None:
+        candidate = Path(".env")
+        if candidate.exists():
+            env_file = candidate
+
+    settings_kwargs: dict[str, object] = {}
+    if env_file and env_file.exists():
+        settings_kwargs["_env_file"] = env_file
+    elif env_file is not None:
+        _logger.warning("Env file %s not found; falling back to process environment", env_file)
+        env_file = None
+
     # noinspection PyArgumentList
-    local_settings = LocalServerSettings()
+    local_settings = LocalServerSettings(**settings_kwargs)
     # noinspection PyArgumentList
-    upstream_settings = UpstreamServerSettings()
-    restore_upstream_to_local = OdooUpstreamRestorer(local_settings, upstream_settings)
+    upstream_settings = UpstreamServerSettings(**settings_kwargs)
+    restore_upstream_to_local = OdooUpstreamRestorer(local_settings, upstream_settings, env_file)
     restore_upstream_to_local.restore_from_upstream()

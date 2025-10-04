@@ -31,13 +31,16 @@ Odoo Plugin “Magic Types” (PyCharm)
 
 ```python
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from odoo.model import product_template as ProductTemplate
     from odoo.values import product_templates as ProductTemplatesVals
 
+
 def ensure_product_defaults(product: 'ProductTemplate') -> None:
     if not product.default_code:
         product.default_code = f"SKU-{product.id}"
+
 
 def bulk_create(vals: 'ProductTemplatesVals') -> None:
     self.env['product.template'].create(vals)
@@ -61,13 +64,16 @@ Typing Patterns (Recordsets & Domains)
 ```python
 from typing import Iterable, TypedDict
 
+
 class PartnerVals(TypedDict, total=False):
     name: str
     email: str
     company_id: int
 
+
 def find_partners(self, domain: list[tuple]) -> 'odoo.model.res_partner':
     return self.env['res.partner'].search(domain)
+
 
 def create_partners(self, vals_list: Iterable[PartnerVals]) -> 'odoo.model.res_partner':
     return self.env['res.partner'].create(list(vals_list))
@@ -96,3 +102,11 @@ Anti‑Patterns
 - Silent pass in `except` blocks.
 - Untyped public functions or method parameters.
 - Blanket JetBrains suppressions.
+
+### Structured Settings
+
+- When you need structured configuration outside of Odoo models, prefer Pydantic v2 `BaseModel` classes over manual
+  `os.environ` parsing. They provide typing, validation, and consistent alias handling.
+- Use the existing deploy helpers (see `tools/deployer/settings.py`) to merge `.env` files rather than rolling a custom
+  parser; this ensures stack settings inherit defaults like `ODOO_STATE_ROOT` and keeps behavior consistent across
+  tools.

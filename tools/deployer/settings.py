@@ -1,5 +1,6 @@
 import shlex
 from dataclasses import dataclass
+import os
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -76,11 +77,16 @@ class StackConfig(BaseModel):
     base_url: str | None = Field(None, alias="ODOO_BASE_URL")
     update_modules_raw: str | None = Field(None, alias="ODOO_UPDATE")
     github_token: str | None = Field(None, alias="GITHUB_TOKEN")
+    odoo_data_dir: str | None = Field(None, alias="ODOO_DATA_DIR")
+    odoo_db_dir: str | None = Field(None, alias="ODOO_DB_DIR")
+    odoo_log_dir: str | None = Field(None, alias="ODOO_LOG_DIR")
+    odoo_state_root: str | None = Field(None, alias="ODOO_STATE_ROOT")
 
 
 def compute_compose_files(name: str, repo_root: Path, config: StackConfig) -> tuple[Path, ...]:
     files: list[Path] = []
     base_file = repo_root / "docker-compose.yml"
+    override_file = repo_root / "docker-compose.override.yml"
     if config.compose_files_raw:
         for item in split_values(config.compose_files_raw):
             path = Path(item)
@@ -93,8 +99,13 @@ def compute_compose_files(name: str, repo_root: Path, config: StackConfig) -> tu
             files.append(secondary.resolve())
     # Always include the base docker-compose file first
     resolved_files: list[Path] = []
+    extras_resolved = {path.resolve() for path in files}
     if base_file.exists():
         resolved_files.append(base_file.resolve())
+    if override_file.exists():
+        override_resolved = override_file.resolve()
+        if override_resolved not in extras_resolved:
+            resolved_files.append(override_resolved)
     if files:
         resolved_files.extend(files)
     if not resolved_files:
@@ -180,7 +191,7 @@ def compute_remote_stack_path(name: str, config: StackConfig, remote_host: str |
     if config.remote_stack_path_raw:
         return Path(config.remote_stack_path_raw)
     if remote_host:
-        return Path("/opt") / name
+        return Path("/opt/odoo-ai/repos") / name
     return None
 
 
@@ -210,6 +221,10 @@ class StackSettings:
     env_file: Path  # merged environment file used for compose operations
     source_env_file: Path  # stack-specific override file selected by the operator
     environment: dict[str, str]
+    state_root: Path
+    data_dir: Path
+    db_dir: Path
+    log_dir: Path
     compose_command: tuple[str, ...]
     compose_project: str
     compose_files: tuple[Path, ...]
@@ -245,9 +260,21 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
     if base_env_path.exists() and base_env_path.resolve() != env_path.resolve():
         raw_environment.update(parse_env_file(base_env_path))
     raw_environment.update(parse_env_file(env_path))
-    merged_env_path = repo_root / f".env.{name}.merged"
-    _write_env_file(merged_env_path, raw_environment)
     config = StackConfig.model_validate(raw_environment)
+
+    def _expand_path(raw: str | Path) -> Path:
+        text = str(raw)
+        expanded = os.path.expandvars(os.path.expanduser(text))
+        return Path(expanded).resolve()
+
+    default_state_root = Path.home() / "odoo-ai" / (config.project_name or name)
+    state_root_path = _expand_path(config.odoo_state_root or default_state_root)
+    data_dir = _expand_path(config.odoo_data_dir or state_root_path / "filestore")
+    db_dir = _expand_path(config.odoo_db_dir or state_root_path / "postgres")
+    log_dir = _expand_path(config.odoo_log_dir or state_root_path / "logs")
+    tmp_env_dir = repo_root / "tmp" / "stack-env"
+    tmp_env_dir.mkdir(parents=True, exist_ok=True)
+    merged_env_path = tmp_env_dir / f"{name}.env"
     compose_command = compute_compose_command(config)
     compose_files = compute_compose_files(name, repo_root, config)
     compose_project = compute_compose_project(name, config)
@@ -265,12 +292,23 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
     remote_stack_path = compute_remote_stack_path(name, config, remote_host)
     remote_env_path = compute_remote_env_path(config, remote_stack_path)
     github_token = config.github_token
+    # Persist bind-mount paths back into the environment so downstream compose calls pick up overrides.
+    final_environment = dict(raw_environment)
+    final_environment["ODOO_STATE_ROOT"] = str(state_root_path)
+    final_environment["ODOO_DATA_DIR"] = str(data_dir)
+    final_environment["ODOO_DB_DIR"] = str(db_dir)
+    final_environment["ODOO_LOG_DIR"] = str(log_dir)
+    _write_env_file(merged_env_path, final_environment)
     return StackSettings(
         name=name,
         repo_root=repo_root,
         env_file=merged_env_path,
         source_env_file=env_path,
-        environment=raw_environment,
+        environment=final_environment,
+        state_root=state_root_path,
+        data_dir=data_dir,
+        db_dir=db_dir,
+        log_dir=log_dir,
         compose_command=compose_command,
         compose_project=compose_project,
         compose_files=compose_files,
@@ -295,8 +333,8 @@ def select_env_file(name: str, repo_root: Path, explicit: Path | None) -> Path:
     if explicit is not None:
         return explicit.resolve()
     candidates = [
-        repo_root / f".env.{name}",
-        repo_root / "volumes" / name / ".env",
+        repo_root / "docker" / "config" / f"{name}.env",
+        repo_root / "docker" / "config" / ".env.{name}",
         repo_root / ".env",
     ]
     for candidate in candidates:

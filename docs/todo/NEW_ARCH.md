@@ -47,20 +47,30 @@ No `.env` files are committed; they are generated from secrets during deploy.
 ## docker.shiny Layout
 
 ```
-/opt/odoo/
-├── docker-compose.yml          # tracked clone is optional but helpful
-├── environments/
-│   ├── dev.yaml
-│   └── testing.yaml
-├── volumes/
+/opt/odoo-ai/
+├── repos/
+│   ├── opw-dev/                # git clone synced to the requested commit
+│   └── opw-testing/
+├── data/
 │   ├── opw-dev/
 │   │   ├── .env                # rendered from secrets (chmod 600)
 │   │   ├── filestore/
 │   │   ├── postgres/
+│   │   ├── logs/
 │   │   └── cache/
 │   └── opw-testing/...
+├── environments/
+│   ├── dev.yaml
+│   └── testing.yaml
 └── releases.log                # append-only deploy history (optional)
 ```
+
+Each stack’s env lives in `docker/config/<env>.env` (kept out of version control) and should set
+`ODOO_STATE_ROOT=/opt/odoo-ai/data/<env>` so the deploy tooling expands it to `ODOO_DATA_DIR`, `ODOO_DB_DIR`, and
+`ODOO_LOG_DIR` (`filestore/`, `postgres/`, `logs/`). `ODOO_LOGFILE` should point to `/volumes/logs/odoo.log` (or another
+filename under that directory). If `ODOO_STATE_ROOT` is omitted (local dev), the CLI defaults to
+`${HOME}/odoo-ai/${ODOO_PROJECT_NAME}/...`; remote stacks should always set explicit `/opt/odoo-ai/data/<env>/...`
+paths.
 
 The host may keep a read-only clone of the repo for reference, but automation
 does not rely on it. Ingress can continue to flow through Nginx Proxy Manager
@@ -71,13 +81,13 @@ with simple port mappings mirroring the compose overrides.
 ## Secrets & Enterprise Handling
 
 - GitHub Actions **environment secrets** per stage store:
-  - `ODOO_ENTERPRISE_SSH_KEY` (or a signed URL for tarball download).
-  - Runtime values (`ODOO_MASTER_PASSWORD`, `SHOPIFY_API_TOKEN`, DB creds,
-    etc.).
-  - `DOCKER_SHINY_SSH_KEY` (deploy key).
+    - `ODOO_ENTERPRISE_SSH_KEY` (or a signed URL for tarball download).
+    - Runtime values (`ODOO_MASTER_PASSWORD`, `SHOPIFY_API_TOKEN`, DB creds,
+      etc.).
+    - `DOCKER_SHINY_SSH_KEY` (deploy key).
 - Build uses Docker BuildKit secrets (`--secret id=enterprise_key,...`) so
   credentials never end up in image layers.
-- Deploy job renders `/opt/odoo/volumes/opw-<env>/.env` from secrets just
+- Deploy job renders `/opt/odoo-ai/opw-<env>/.env` from secrets just
   before `docker compose up`; permissions locked to `600`.
 - Secrets are not persisted elsewhere; GitHub workflow deletes temporary files
   post-deploy.
@@ -102,7 +112,7 @@ rollback/promotion).
 
 1. Needs `build`; runs on the same self-hosted runner.
 2. SSH into `docker.shiny` using deploy key.
-3. Write `.env` from secrets into `/opt/odoo/volumes/opw-<env>/.env`.
+3. Write `.env` from secrets into `/opt/odoo-ai/data/opw-<env>/.env`.
 4. `IMAGE_TAG=<digest> docker compose -f docker-compose.yml -f environments/<env>.yaml pull web script-runner`.
 5. `docker compose ... up -d --remove-orphans`.
 6. `docker compose exec script-runner /odoo/odoo-bin -u $ODOO_UPDATE -d $ODOO_DB_NAME --stop-after-init`.
@@ -141,4 +151,3 @@ Manual reruns or `workflow_dispatch` with a specific tag enable rollbacks.
 This plan keeps the deployment loop simple, auditable, and free of bespoke
 runtime daemons while respecting the licensing and security requirements of
 Odoo Enterprise.
-

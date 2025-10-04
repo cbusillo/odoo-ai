@@ -199,10 +199,11 @@ odoo.*.conf
 !/tmp/README.md
 
 /.claude/.compacted
-!.env.example
+ !*.env.example
 
 # Claude Code agent stack files (recursion prevention)
 .claude/agent-stack/
 .code/agents/
 
 *.local.*
+*.env*

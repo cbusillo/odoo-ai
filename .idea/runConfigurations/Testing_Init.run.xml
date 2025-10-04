@@ -1,8 +1,8 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Testing Init" type="ShConfigurationType">
-    <option name="SCRIPT_TEXT" value="ssh opw-testing init-odoo.sh" />
+    <option name="SCRIPT_TEXT" value="uv run deploy deploy --stack opw-testing &amp;&amp; uv run restore-from-upstream --stack opw-testing" />
     <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
-    <option name="SCRIPT_PATH" value="ssh opw-testing init-odoo.sh" />
+    <option name="SCRIPT_PATH" value="" />
     <option name="SCRIPT_OPTIONS" value="" />
     <option name="INDEPENDENT_SCRIPT_WORKING_DIRECTORY" value="true" />
     <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$" />

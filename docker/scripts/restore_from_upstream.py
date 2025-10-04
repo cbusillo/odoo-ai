@@ -132,6 +132,7 @@ class LocalServerSettings(BaseSettings):
     db_conn: connection | None = None
     filestore_path: Path = Field(..., alias="ODOO_FILESTORE_PATH")
     filestore_owner: str | None = Field(None, alias="ODOO_FILESTORE_OWNER")
+    restore_ssh_dir: Path | None = Field(None, alias="RESTORE_SSH_DIR")
     restore_ssh_key: Path | None = Field(None, alias="RESTORE_SSH_KEY")
     base_url: str | None = Field(None, alias="ODOO_BASE_URL")
     # Script/runtime toggles
@@ -146,16 +147,17 @@ class LocalServerSettings(BaseSettings):
     def _optional_str(cls, value: object) -> object:
         return _blank_to_none(value)
 
-    @field_validator("restore_ssh_key", mode="before")
+    @field_validator("restore_ssh_dir", "restore_ssh_key", mode="before")
     @classmethod
-    def _normalize_restore_key(cls, value: object) -> object:
+    def _normalize_restore_paths(cls, value: object) -> object:
         value = _blank_to_none(value)
         if value is None:
             return None
         raw = str(value).strip()
         if raw.startswith(("'", '"')) and raw.endswith(("'", '"')) and len(raw) >= 2:
             raw = raw[1:-1]
-        return os.path.expanduser(os.path.expandvars(raw))
+        expanded = os.path.expanduser(os.path.expandvars(raw))
+        return Path(expanded)
 
     @field_validator("filestore_path", mode="before")
     @classmethod
@@ -166,7 +168,7 @@ class LocalServerSettings(BaseSettings):
         if raw.startswith(("'", '"')) and raw.endswith(("'", '"')) and len(raw) >= 2:
             raw = raw[1:-1]
         expanded = os.path.expanduser(os.path.expandvars(raw))
-        return expanded
+        return Path(expanded)
 
 
 class UpstreamServerSettings(BaseSettings):
@@ -224,6 +226,8 @@ class OdooUpstreamRestorer:
         self.env_file = env_file
         self.os_env = os.environ.copy()
         self.os_env["PGPASSWORD"] = self.local.db_password.get_secret_value()
+        if self.local.restore_ssh_dir:
+            self.os_env["RESTORE_SSH_DIR"] = str(self.local.restore_ssh_dir)
         resolved_key = self._resolve_restore_ssh_key()
         self._ssh_identity = resolved_key
         if resolved_key is not None:
@@ -243,14 +247,9 @@ class OdooUpstreamRestorer:
             raise OdooRestorerError(f"Command failed: {command}\nError: {command_error}") from command_error
 
     def _resolve_filestore_owner(self) -> str | None:
-        raw_owner = (self.os_env.get("ODOO_FILESTORE_OWNER") or "").strip()
-        if raw_owner:
-            return raw_owner
-
         owner = _blank_to_none(self.local.filestore_owner)
         if isinstance(owner, str) and owner.strip():
             return owner.strip()
-
         return None
 
     def _resolve_restore_ssh_key(self) -> Path | None:
@@ -261,7 +260,7 @@ class OdooUpstreamRestorer:
         base_path = Path(str(key))
         candidates: list[Path] = [base_path]
 
-        env_dir = self.os_env.get("RESTORE_SSH_DIR") or os.environ.get("RESTORE_SSH_DIR")
+        env_dir = self.local.restore_ssh_dir
         if env_dir:
             candidates.append(Path(env_dir) / base_path.name)
 

@@ -69,14 +69,14 @@ jobs:
       - ssh docker.shiny "... up -d --remove-orphans"
       - ssh docker.shiny "docker compose exec script-runner /odoo/odoo-bin -u $ODOO_UPDATE -d $ODOO_DB_NAME --stop-after-init"
       - ssh docker.shiny "curl -sf http://localhost:<port>/web/health"
-      - ssh docker.shiny "echo '<timestamp>|<env>|<tag>|<sha>' >> /opt/odoo/releases.log"
+      - ssh docker.shiny "echo '<timestamp>|<env>|<tag>|<sha>' >> /opt/odoo-ai/releases.log"
 ```
 
 ### docker.shiny prerequisites
 
 - Docker Engine + Compose plugin installed.
 - Self-hosted GitHub runner registered (with Docker socket access) to execute the workflow.
-- `/opt/odoo/` directory structured per @docs/todo/NEW_ARCH.md, including `environments/dev.yaml` etc.
+- `/opt/odoo-ai/` directory structured per @docs/todo/NEW_ARCH.md, including `environments/dev.yaml` etc.
 - Pre-login to GHCR (or chosen registry) using a PAT with `write:packages` and `read:packages` scopes.
 
 ---
@@ -124,4 +124,3 @@ jobs:
 
 This spec supersedes the legacy webhook receiver/worker plan and aligns with the
 clean-sheet architecture in @docs/todo/NEW_ARCH.md.
-

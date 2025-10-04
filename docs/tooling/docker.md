@@ -26,3 +26,16 @@ Note
 
 - Using the Docker MCP tools? See docs/tooling/docker-mcp.md for parameter shapes and examples (JSON for environment,
   ports, volumes).
+
+## Bind-Mount Conventions
+
+- Always set `ODOO_STATE_ROOT` for each stack. The deploy tooling derives `ODOO_DATA_DIR`, `ODOO_DB_DIR`, and
+  `ODOO_LOG_DIR`
+  from that root (`filestore/`, `postgres/`, `logs/` subdirectories) before writing the merged `.env` that Compose and
+  Pydantic consume. Stack env sources live in `docker/config/<stack>.env` (create them locally; they’re git-ignored). If
+  `ODOO_STATE_ROOT` is omitted (e.g., local dev), the CLI defaults to `${HOME}/odoo-ai/${ODOO_PROJECT_NAME}/...`.
+- Keep `ODOO_LOGFILE` pointed inside `/volumes/logs/` (e.g. `/volumes/logs/odoo.log`) so log rotation targets the
+  bind-mounted directory.
+- Remote hosts should pair `ODOO_STATE_ROOT=/opt/odoo-ai/data/<stack>` with
+  `DEPLOY_REMOTE_STACK_PATH=/opt/odoo-ai/repos/<stack>`
+  to mirror the documented layout; don’t drop persistent data into the git checkout.

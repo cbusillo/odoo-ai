@@ -30,6 +30,18 @@ def write_env_file(path: Path, values: Mapping[str, str]) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def ensure_local_bind_mounts(settings: StackSettings) -> None:
+    for path in (settings.data_dir, settings.db_dir, settings.log_dir):
+        path.mkdir(parents=True, exist_ok=True)
+
+
+def ensure_remote_bind_mounts(settings: StackSettings) -> None:
+    if settings.remote_host is None:
+        return
+    for path in (settings.data_dir, settings.db_dir, settings.log_dir):
+        ensure_remote_directory(settings.remote_host, settings.remote_user, settings.remote_port, path)
+
+
 def push_env_to_remote(settings: StackSettings, env_values: Mapping[str, str]) -> None:
     if settings.remote_host is None:
         raise ValueError("remote host missing")
@@ -118,8 +130,10 @@ def deploy_stack(
     env_values = build_updated_environment(settings, image_reference, extra_env)
     if remote:
         prepare_remote_stack(settings, repository_url, commit)
+        ensure_remote_bind_mounts(settings)
         push_env_to_remote(settings, env_values)
     else:
+        ensure_local_bind_mounts(settings)
         write_env_file(settings.env_file, env_values)
     execute_compose_pull(settings, remote)
     execute_compose_up(settings, remote)

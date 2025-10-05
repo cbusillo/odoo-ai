@@ -18,8 +18,8 @@ x-odoo-base: &odoo-base
     - .env
   volumes:
     - ~/.ssh:/home/ubuntu/.ssh:ro
-    - ${ODOO_DATA_DIR:-${ODOO_STATE_ROOT}/filestore}:/volumes/data
-    - ${ODOO_LOG_DIR:-${ODOO_STATE_ROOT}/logs}:/volumes/logs
+    - ${ODOO_DATA_HOST_DIR:-${ODOO_STATE_ROOT}/filestore}:/volumes/data
+    - ${ODOO_LOG_HOST_DIR:-${ODOO_STATE_ROOT}/logs}:/volumes/logs
 
 name: ${ODOO_PROJECT_NAME:-odoo}
 services:
@@ -36,13 +36,17 @@ services:
     image: postgres:17
     restart: unless-stopped
     volumes:
-      - ${ODOO_DB_DIR:-${ODOO_STATE_ROOT}/postgres}:/var/lib/postgresql/data
+      - ${ODOO_DB_HOST_DIR:-${ODOO_STATE_ROOT}/postgres}:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=postgres
       - POSTGRES_PASSWORD=${ODOO_DB_PASSWORD}
       - POSTGRES_USER=${ODOO_DB_USER}
     expose:
       - "5432"
+    ulimits:
+      nofile:
+        soft: 524288
+        hard: 1048576
   script-runner:
     <<: *odoo-base
     command: tail -f /dev/null

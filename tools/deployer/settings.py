@@ -81,6 +81,9 @@ class StackConfig(BaseModel):
     odoo_db_dir: str | None = Field(None, alias="ODOO_DB_DIR")
     odoo_log_dir: str | None = Field(None, alias="ODOO_LOG_DIR")
     odoo_state_root: str | None = Field(None, alias="ODOO_STATE_ROOT")
+    odoo_data_host_dir: str | None = Field(None, alias="ODOO_DATA_HOST_DIR")
+    odoo_log_host_dir: str | None = Field(None, alias="ODOO_LOG_HOST_DIR")
+    odoo_db_host_dir: str | None = Field(None, alias="ODOO_DB_HOST_DIR")
 
 
 def compute_compose_files(name: str, repo_root: Path, config: StackConfig) -> tuple[Path, ...]:
@@ -269,9 +272,9 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
 
     default_state_root = Path.home() / "odoo-ai" / (config.project_name or name)
     state_root_path = _expand_path(config.odoo_state_root or default_state_root)
-    data_dir = _expand_path(config.odoo_data_dir or state_root_path / "filestore")
-    db_dir = _expand_path(config.odoo_db_dir or state_root_path / "postgres")
-    log_dir = _expand_path(config.odoo_log_dir or state_root_path / "logs")
+    data_dir_host = _expand_path(config.odoo_data_host_dir or state_root_path / "filestore")
+    db_dir_host = _expand_path(config.odoo_db_host_dir or state_root_path / "postgres")
+    log_dir_host = _expand_path(config.odoo_log_host_dir or state_root_path / "logs")
     tmp_env_dir = repo_root / "tmp" / "stack-env"
     tmp_env_dir.mkdir(parents=True, exist_ok=True)
     merged_env_path = tmp_env_dir / f"{name}.env"
@@ -295,9 +298,13 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
     # Persist bind-mount paths back into the environment so downstream compose calls pick up overrides.
     final_environment = dict(raw_environment)
     final_environment["ODOO_STATE_ROOT"] = str(state_root_path)
-    final_environment["ODOO_DATA_DIR"] = str(data_dir)
-    final_environment["ODOO_DB_DIR"] = str(db_dir)
-    final_environment["ODOO_LOG_DIR"] = str(log_dir)
+    final_environment["ODOO_DATA_HOST_DIR"] = str(data_dir_host)
+    final_environment["ODOO_LOG_HOST_DIR"] = str(log_dir_host)
+    final_environment["ODOO_DB_HOST_DIR"] = str(db_dir_host)
+    final_environment["ODOO_DATA_DIR"] = "/volumes/data"
+    final_environment["ODOO_LOG_DIR"] = "/volumes/logs"
+    final_environment["ODOO_DB_DIR"] = "/var/lib/postgresql/data"
+    final_environment["ODOO_SESSION_DIR"] = "/volumes/logs/sessions"
     _write_env_file(merged_env_path, final_environment)
     return StackSettings(
         name=name,
@@ -306,9 +313,9 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
         source_env_file=env_path,
         environment=final_environment,
         state_root=state_root_path,
-        data_dir=data_dir,
-        db_dir=db_dir,
-        log_dir=log_dir,
+        data_dir=data_dir_host,
+        db_dir=db_dir_host,
+        log_dir=log_dir_host,
         compose_command=compose_command,
         compose_project=compose_project,
         compose_files=compose_files,

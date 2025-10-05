@@ -33,6 +33,8 @@ def write_env_file(path: Path, values: Mapping[str, str]) -> None:
 def ensure_local_bind_mounts(settings: StackSettings) -> None:
     for path in (settings.data_dir, settings.db_dir, settings.log_dir):
         path.mkdir(parents=True, exist_ok=True)
+    session_dir = settings.log_dir / "sessions"
+    session_dir.mkdir(parents=True, exist_ok=True)
 
 
 def ensure_remote_bind_mounts(settings: StackSettings) -> None:
@@ -40,6 +42,8 @@ def ensure_remote_bind_mounts(settings: StackSettings) -> None:
         return
     for path in (settings.data_dir, settings.db_dir, settings.log_dir):
         ensure_remote_directory(settings.remote_host, settings.remote_user, settings.remote_port, path)
+    session_dir = settings.log_dir / "sessions"
+    ensure_remote_directory(settings.remote_host, settings.remote_user, settings.remote_port, session_dir)
 
 
 def push_env_to_remote(settings: StackSettings, env_values: Mapping[str, str]) -> None:
@@ -47,12 +51,37 @@ def push_env_to_remote(settings: StackSettings, env_values: Mapping[str, str]) -
         raise ValueError("remote host missing")
     if settings.remote_env_path is None:
         raise ValueError("remote env path missing")
+    logging.getLogger("deploy.remote").info(
+        "uploading env to %s", settings.remote_env_path
+    )
     ensure_remote_directory(settings.remote_host, settings.remote_user, settings.remote_port, settings.remote_env_path.parent)
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
         temp_path = Path(handle.name)
         handle.write(render_env_content(env_values))
     try:
         upload_file(settings.remote_host, settings.remote_user, settings.remote_port, temp_path, settings.remote_env_path)
+        if settings.remote_stack_path is not None:
+            default_env_path = settings.remote_stack_path / ".env"
+            if default_env_path != settings.remote_env_path:
+                logging.getLogger("deploy.remote").info(
+                    "copying env to %s", default_env_path
+                )
+                ensure_remote_directory(
+                    settings.remote_host,
+                    settings.remote_user,
+                    settings.remote_port,
+                    default_env_path.parent,
+                )
+                run_remote(
+                    settings.remote_host,
+                    settings.remote_user,
+                    settings.remote_port,
+                    [
+                        "cp",
+                        str(settings.remote_env_path),
+                        str(default_env_path),
+                    ],
+                )
     finally:
         temp_path.unlink(missing_ok=True)
 

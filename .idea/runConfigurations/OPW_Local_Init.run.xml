@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Local Init" type="ShConfigurationType">
-    <option name="SCRIPT_TEXT" value="uv run deploy deploy --stack local &amp;&amp; uv run restore-from-upstream --stack local" />
+  <configuration default="false" name="OPW Local Init" type="ShConfigurationType">
+    <option name="SCRIPT_TEXT" value="uv run deploy deploy --stack opw-local --skip-upgrade &amp;&amp; uv run restore-from-upstream --stack opw-local" />
     <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
     <option name="SCRIPT_PATH" value="" />
     <option name="SCRIPT_OPTIONS" value="" />

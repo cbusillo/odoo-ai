@@ -1,0 +1,17 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="CM Local Init" type="ShConfigurationType">
+    <option name="SCRIPT_TEXT" value="export ODOO_DB_HOST_PORT=9432 ODOO_WEB_HOST_PORT=9069 ODOO_LONGPOLL_HOST_PORT=9072 ADDON_UPDATE_LIST=cm_custom,external_ids,hr_employee_name_extended,disable_odoo_online,discuss_record_links STATE_ROOT=${HOME}/odoo-ai/cm-local &amp;&amp; if [ -f tmp/stack-env/cm-local.env ]; then docker compose -p odoo-cm --env-file tmp/stack-env/cm-local.env -f docker-compose.yml -f docker-compose.override.yml -f docker/config/_restore_ssh_volume.yaml -f docker/config/cm-local.yaml down --remove-orphans; fi &amp;&amp; rm -rf &quot;$STATE_ROOT&quot; &amp;&amp; uv run deploy deploy --stack cm-local --skip-upgrade --skip-health &amp;&amp; until docker compose -p odoo-cm --env-file tmp/stack-env/cm-local.env -f docker-compose.yml -f docker-compose.override.yml -f docker/config/_restore_ssh_volume.yaml -f docker/config/cm-local.yaml exec -T database pg_isready -h localhost -U odoo &gt;/dev/null 2&gt;&amp;1; do sleep 1; done &amp;&amp; docker compose -p odoo-cm --env-file tmp/stack-env/cm-local.env -f docker-compose.yml -f docker-compose.override.yml -f docker/config/_restore_ssh_volume.yaml -f docker/config/cm-local.yaml run --rm web /odoo/odoo-bin --stop-after-init -d cm --without-demo=all -i base &amp;&amp; docker compose -p odoo-cm --env-file tmp/stack-env/cm-local.env -f docker-compose.yml -f docker-compose.override.yml -f docker/config/_restore_ssh_volume.yaml -f docker/config/cm-local.yaml run --rm script-runner /odoo/odoo-bin -u &quot;$ADDON_UPDATE_LIST&quot; --stop-after-init -d cm &amp;&amp; docker compose -p odoo-cm --env-file tmp/stack-env/cm-local.env -f docker-compose.yml -f docker-compose.override.yml -f docker/config/_restore_ssh_volume.yaml -f docker/config/cm-local.yaml up -d database script-runner web" />
+    <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
+    <option name="SCRIPT_PATH" value="" />
+    <option name="SCRIPT_OPTIONS" value="" />
+    <option name="INDEPENDENT_SCRIPT_WORKING_DIRECTORY" value="true" />
+    <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <option name="INDEPENDENT_INTERPRETER_PATH" value="true" />
+    <option name="INTERPRETER_PATH" value="/bin/zsh" />
+    <option name="INTERPRETER_OPTIONS" value="" />
+    <option name="EXECUTE_IN_TERMINAL" value="true" />
+    <option name="EXECUTE_SCRIPT_FILE" value="false" />
+    <envs />
+    <method v="2" />
+  </configuration>
+</component>

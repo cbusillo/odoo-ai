@@ -55,6 +55,8 @@ Use path+anchor “handles” when sharing docs between sessions, for example:
     - docs/integrations/graphql.md — GraphQL patterns (Shopify)
     - docs/integrations/webhooks.md — Webhook patterns
     - docs/integrations/shopify-sync.md — Shopify sync patterns
+- Recipes
+    - docs/recipes/cell-mechanic-db.md — run the Cell Mechanic addon against its own database
 - Style
     - docs/style/index.md — style index (start here)
     - docs/style/python.md — type hints, f‑strings, line length

@@ -14,6 +14,8 @@ Treat this file as the launch checklist for every Codex session. Skim it, open t
 - Custom addons live under `./addons/`; host `./` maps to container `/volumes/`.
 - We target Odoo 18 Enterprise. Never edit generated GraphQL artifacts (`services/shopify/gql/*`, `graphql/schema/*`).
 - Always go through `uv run ...`; the Odoo environment must bootstrap every command (tests, scripts, shell helpers).
+- Never call the system Python directly; use `uv run python ...` (or the scripted helpers) so the managed env stays in
+  sync.
 - Common helper entry points are defined in `[project.scripts]` inside `pyproject.toml` (examples: `test`, `test-plan`,
   `restore-from-upstream`). Prefer them over ad-hoc commands and suggest additions when a useful script is missing.
 - GPT service users seed automatically during restores when `.env` defines `ODOO_KEY`; see
@@ -51,6 +53,8 @@ Treat this file as the launch checklist for every Codex session. Skim it, open t
 
 - Prefer Odoo Intelligence MCP calls for model/field discovery, code search, or module updates before falling back to
   ad-hoc shell commands (`docs/tooling/odoo-intelligence.md`).
+- Mirror the design style and patterns already established in `addons/product_connect/`; align new modules and views
+  with that reference before inventing new approaches.
 - Run JetBrains inspections on changed scope and then git scope before the gate (`docs/tooling/inspection.md`).
 - Use Codex built-ins for routine file reads/searches and `apply_patch`; reserve JetBrains automation for IDE-only
   tasks.

@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Odoo" type="Odoo" factoryName="Odoo" nameIsGenerated="true">
+  <configuration default="false" name="Odoo OPW" type="Odoo" factoryName="Odoo">
     <module name="odoo-ai" />
     <option name="ENV_FILES" value="$PROJECT_DIR$/.env" />
     <option name="INTERPRETER_OPTIONS" value="" />

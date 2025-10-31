@@ -4,6 +4,7 @@ import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 
+from .command import CommandError
 from .compose_ops import local_compose, remote_compose_command
 from .health import HealthcheckError, wait_for_health
 from .remote import ensure_remote_directory, run_remote, sync_remote_repository, upload_file
@@ -44,6 +45,24 @@ def ensure_remote_bind_mounts(settings: StackSettings) -> None:
         ensure_remote_directory(settings.remote_host, settings.remote_user, settings.remote_port, path)
     session_dir = settings.log_dir / "sessions"
     ensure_remote_directory(settings.remote_host, settings.remote_user, settings.remote_port, session_dir)
+    # Align permissions so the container user can write to bind mounts.
+    state_root = settings.state_root
+    if state_root:
+        owner_uid = settings.environment.get("ODOO_DATA_UID") or settings.environment.get("DATA_UID") or "1000"
+        owner_gid = settings.environment.get("ODOO_DATA_GID") or settings.environment.get("DATA_GID") or owner_uid
+        try:
+            run_remote(
+                settings.remote_host,
+                settings.remote_user,
+                settings.remote_port,
+                ["chown", "-R", f"{owner_uid}:{owner_gid}", str(state_root)],
+            )
+        except CommandError as error:  # noqa: BLE001  # type: ignore[name-defined]
+            logging.getLogger("deploy.remote").warning(
+                "unable to chown remote state root %s: %s",
+                state_root,
+                error,
+            )
 
 
 def push_env_to_remote(settings: StackSettings, env_values: Mapping[str, str]) -> None:

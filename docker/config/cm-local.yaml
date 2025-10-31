@@ -4,6 +4,7 @@ name: ${COMPOSE_PROJECT_NAME:-cm-local}
 
 services:
   web:
+    command: /odoo/odoo-bin --dev=all
     ports:
       - "9069:8069"
       - "9072:8072"

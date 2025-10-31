@@ -2,6 +2,7 @@
 
 services:
   web:
+    command: /odoo/odoo-bin --dev=all
     ports:
       - "8069:8069"
       - "8072:8072"

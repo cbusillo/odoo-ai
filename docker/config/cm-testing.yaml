@@ -1,0 +1,30 @@
+# Variant-specific overrides for the CM testing stack.
+
+services:
+  web:
+    env_file:
+      - .env
+      - docker/config/base.env
+      - docker/config/cm.env
+      - docker/config/cm-testing.env
+    ports:
+      - "${ODOO_WEB_HOST_PORT:-8069}:8069"
+      - "${ODOO_LONGPOLL_HOST_PORT:-8072}:8072"
+  database:
+    env_file:
+      - .env
+      - docker/config/base.env
+      - docker/config/cm.env
+      - docker/config/cm-testing.env
+    ports:
+      - "${ODOO_DB_HOST_PORT:-25432}:5432"
+    ulimits:
+      nofile:
+        soft: ${POSTGRES_HOST_NOFILE_SOFT:-1024}
+        hard: ${POSTGRES_HOST_NOFILE_HARD:-1024}
+  script-runner:
+    env_file:
+      - .env
+      - docker/config/base.env
+      - docker/config/cm.env
+      - docker/config/cm-testing.env

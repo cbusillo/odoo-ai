@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="OPW Local Init" type="ShConfigurationType">
-    <option name="SCRIPT_TEXT" value="uv run python tools/docker_runner.py --stack opw-local" />
+  <configuration default="false" name="CM Local Up" type="ShConfigurationType">
+    <option name="SCRIPT_TEXT" value="uv run python tools/docker_runner.py --stack cm-local" />
     <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
     <option name="SCRIPT_PATH" value="" />
     <option name="SCRIPT_OPTIONS" value="" />

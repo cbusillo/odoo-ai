@@ -1,13 +1,10 @@
+# Variant-specific overrides for the OPW testing stack.
+
 services:
   web:
-    depends_on:
-      - database
     ports:
       - "18069:8069"
       - "18072:8072"
   database:
     ports:
       - "15432:5432"
-  script-runner:
-    depends_on:
-      - database

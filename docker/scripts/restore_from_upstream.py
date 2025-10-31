@@ -1,21 +1,25 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import time
 import logging
 import os
+import re
+import sys
+import shlex
+import shutil
 import subprocess
 import textwrap
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, IntEnum
 from pathlib import Path
-from typing import Annotated
-import shlex
+from typing import Annotated, Optional, Sequence
 
 import psycopg2
 from passlib.context import CryptContext
 from psycopg2 import sql
 from psycopg2.extensions import connection
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, ValidationError, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 logging.basicConfig(level=logging.INFO)
@@ -35,6 +39,88 @@ class SqlCallType(Enum):
     INSERT = "INSERT"
     DELETE = "DELETE"
     SELECT = "SELECT"
+
+
+class ExitCode(IntEnum):
+    SUCCESS = 0
+    RESTORE_FAILED_BOOTSTRAP_SUCCESS = 10
+    BOOTSTRAP_FAILED = 20
+    INVALID_ARGS = 30
+
+
+def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Restore or bootstrap an Odoo database/filestore")
+    parser.add_argument("--env-file", type=Path, default=None, help="Optional env file to load settings from")
+    parser.add_argument(
+        "--bootstrap-only",
+        action="store_true",
+        help="Force bootstrap mode (skip upstream restore)",
+    )
+    parser.add_argument(
+        "--no-sanitize",
+        action="store_true",
+        help="Skip sanitization steps (mail/cron/base URL adjustments)",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    args = parse_args(argv)
+
+    env_file: Optional[Path] = args.env_file
+    if env_file is None:
+        candidate = Path(".env")
+        if candidate.exists():
+            env_file = candidate
+
+    settings_kwargs: dict[str, object] = {}
+    if env_file and env_file.exists():
+        settings_kwargs["_env_file"] = env_file
+    elif env_file is not None:
+        _logger.warning("Env file %s not found; falling back to process environment", env_file)
+        env_file = None
+
+    try:
+        local_settings = LocalServerSettings(**settings_kwargs)
+    except ValidationError as exc:
+        _logger.error("Invalid local configuration: %s", exc)
+        return ExitCode.INVALID_ARGS
+
+    bootstrap_only = args.bootstrap_only or local_settings.bootstrap_only
+    no_sanitize = args.no_sanitize or local_settings.no_sanitize
+
+    try:
+        upstream_settings = UpstreamServerSettings(**settings_kwargs)
+    except ValidationError as exc:
+        upstream_settings = None
+        _logger.info("Upstream settings incomplete: %s", exc)
+
+    restorer = OdooUpstreamRestorer(local_settings, upstream_settings, env_file)
+
+    try:
+        if bootstrap_only:
+            restorer.bootstrap_database(do_sanitize=not no_sanitize)
+            return ExitCode.SUCCESS
+
+        if upstream_settings is None:
+            _logger.warning("Upstream settings unavailable; running bootstrap instead.")
+            restorer.bootstrap_database(do_sanitize=not no_sanitize)
+            return ExitCode.SUCCESS
+
+        try:
+            restorer.restore_from_upstream(do_sanitize=not no_sanitize)
+            return ExitCode.SUCCESS
+        except (OdooRestorerError, OdooDatabaseUpdateError) as restore_error:
+            _logger.warning("Upstream restore failed (%s). Falling back to bootstrap.", restore_error)
+            restorer.bootstrap_database(do_sanitize=not no_sanitize)
+            return ExitCode.RESTORE_FAILED_BOOTSTRAP_SUCCESS
+    except (OdooRestorerError, OdooDatabaseUpdateError) as bootstrap_error:
+        _logger.error("Bootstrap failed: %s", bootstrap_error)
+        return ExitCode.BOOTSTRAP_FAILED
+
+
+def restore_from_upstream() -> int:  # Entry point for pyproject scripts
+    return main()
 
 
 @dataclass(frozen=True)
@@ -140,9 +226,22 @@ class LocalServerSettings(BaseSettings):
     project_name: str = Field("odoo", alias="ODOO_PROJECT_NAME")
     addons_path: str | None = Field(None, alias="ODOO_ADDONS_PATH")
     update_modules: str | None = Field(None, alias="ODOO_UPDATE")
+    local_addons_dirs: str | None = Field(None, alias="LOCAL_ADDONS_DIRS")
+    auto_modules_raw: str | None = Field(None, alias="ODOO_AUTO_MODULES")
     odoo_key: SecretStr | None = Field(None, alias="ODOO_KEY")
+    bootstrap_only: bool = Field(False, alias="BOOTSTRAP_ONLY")
+    no_sanitize: bool = Field(False, alias="NO_SANITIZE")
+    admin_password: SecretStr | None = Field(None, alias="ODOO_ADMIN_PASSWORD")
 
-    @field_validator("filestore_owner", "base_url", "addons_path", "update_modules", mode="before")
+    @field_validator(
+        "filestore_owner",
+        "base_url",
+        "addons_path",
+        "update_modules",
+        "local_addons_dirs",
+        "auto_modules_raw",
+        mode="before",
+    )
     @classmethod
     def _optional_str(cls, value: object) -> object:
         return _blank_to_none(value)
@@ -169,6 +268,14 @@ class LocalServerSettings(BaseSettings):
             raw = raw[1:-1]
         expanded = os.path.expanduser(os.path.expandvars(raw))
         return Path(expanded)
+
+    @field_validator("admin_password", mode="before")
+    @classmethod
+    def _optional_secret(cls, value: object) -> object:
+        value = _blank_to_none(value)
+        if value is None:
+            return None
+        return value
 
 
 class UpstreamServerSettings(BaseSettings):
@@ -218,7 +325,7 @@ class OdooUpstreamRestorer:
     def __init__(
         self,
         local: LocalServerSettings,
-        upstream: UpstreamServerSettings,
+        upstream: Optional[UpstreamServerSettings],
         env_file: Path | None,
     ) -> None:
         self.local = local
@@ -228,16 +335,19 @@ class OdooUpstreamRestorer:
         self.os_env["PGPASSWORD"] = self.local.db_password.get_secret_value()
         if self.local.restore_ssh_dir:
             self.os_env["RESTORE_SSH_DIR"] = str(self.local.restore_ssh_dir)
-        resolved_key = self._resolve_restore_ssh_key()
-        self._ssh_identity = resolved_key
-        if resolved_key is not None:
-            self.os_env["RESTORE_SSH_KEY"] = str(resolved_key)
-            _logger.info("Using SSH identity %s", resolved_key)
-        elif self.local.restore_ssh_key:
-            _logger.info(
-                "SSH identity %s not found inside container; relying on default ssh-agent/keys.",
-                self.local.restore_ssh_key,
-            )
+        self._ssh_identity: Optional[Path] = None
+        if self.upstream:
+            resolved_key = self._resolve_restore_ssh_key()
+            self._ssh_identity = resolved_key
+            if resolved_key is not None:
+                self.os_env["RESTORE_SSH_KEY"] = str(resolved_key)
+                _logger.info("Using SSH identity %s", resolved_key)
+            elif self.local.restore_ssh_key:
+                _logger.info(
+                    "SSH identity %s not found inside container; relying on default ssh-agent/keys.",
+                    self.local.restore_ssh_key,
+                )
+        self._auto_addon_dirs: list[Path] = []
 
     def run_command(self, command: str) -> None:
         _logger.info(f"Running command: {command}")
@@ -277,6 +387,11 @@ class OdooUpstreamRestorer:
 
         return None
 
+    def _require_upstream(self) -> UpstreamServerSettings:
+        if not self.upstream:
+            raise OdooRestorerError("Upstream settings are not configured; cannot perform restore.")
+        return self.upstream
+
     def _build_ssh_command(self) -> list[str]:
         parts = ["ssh", "-o", "StrictHostKeyChecking=yes"]
         if self._ssh_identity:
@@ -289,9 +404,10 @@ class OdooUpstreamRestorer:
         return parts
 
     def overwrite_filestore(self, target_owner: str | None) -> subprocess.Popen:
+        upstream = self._require_upstream()
         _logger.info("Overwriting filestore...")
         self.local.filestore_path.mkdir(parents=True, exist_ok=True)
-        remote_path = shlex.quote(f"{self.upstream.user}@{self.upstream.host}:{self.upstream.filestore_path}")
+        remote_path = shlex.quote(f"{upstream.user}@{upstream.host}:{upstream.filestore_path}")
         local_path = shlex.quote(str(self.local.filestore_path))
         chown_option = f"--chown={target_owner}" if target_owner else ""
         ssh_parts = self._build_ssh_command()
@@ -311,12 +427,13 @@ class OdooUpstreamRestorer:
         self.run_command(chown_command)
 
     def overwrite_database(self) -> None:
+        upstream = self._require_upstream()
         backup_path = "/tmp/upstream_db_backup.sql.gz"
         ssh_parts = self._build_ssh_command()
         ssh_command = shlex.join(ssh_parts)
         dump_cmd = (
-            f"{ssh_command} {self.upstream.user}@{self.upstream.host} \"cd /tmp && sudo -u '{self.upstream.db_user}' "
-            f"pg_dump -Fc '{self.upstream.db_name}'\" | gzip > {backup_path}"
+            f"{ssh_command} {upstream.user}@{upstream.host} \"cd /tmp && sudo -u '{upstream.db_user}' "
+            f"pg_dump -Fc '{upstream.db_name}'\" | gzip > {backup_path}"
         )
         self.run_command(dump_cmd)
         self.terminate_all_db_connections()
@@ -331,23 +448,30 @@ class OdooUpstreamRestorer:
 
     def connect_to_db(self) -> connection:
         if not self.local.db_conn:
-            self.local.db_conn = psycopg2.connect(
-                dbname=self.local.db_name,
-                user=self.local.db_user,
-                password=self.local.db_password.get_secret_value(),
-                host=self.local.host,
-                port=self.local.port,
-            )
+            self.local.db_conn = self._connect_with_retry(self.local.db_name)
         return self.local.db_conn
 
+    def _connect_with_retry(self, dbname: str, attempts: int = 10, delay: float = 1.0) -> connection:
+        last_error: psycopg2.Error | None = None
+        for attempt in range(1, attempts + 1):
+            try:
+                return psycopg2.connect(
+                    dbname=dbname,
+                    user=self.local.db_user,
+                    password=self.local.db_password.get_secret_value(),
+                    host=self.local.host,
+                    port=self.local.port,
+                )
+            except psycopg2.Error as error:
+                last_error = error
+                if attempt < attempts:
+                    time.sleep(delay)
+                else:
+                    raise
+        raise last_error  # defensive: should never reach here
+
     def terminate_all_db_connections(self) -> None:
-        with psycopg2.connect(
-            dbname="postgres",
-            user=self.local.db_user,
-            password=self.local.db_password.get_secret_value(),
-            host=self.local.host,
-            port=self.local.port,
-        ) as conn:
+        with self._connect_with_retry("postgres") as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
                     f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='{self.local.db_name}' "
@@ -355,6 +479,72 @@ class OdooUpstreamRestorer:
                 )
                 conn.commit()
         _logger.info("All database connections terminated.")
+
+    def _reset_db_connection(self) -> None:
+        if self.local.db_conn:
+            try:
+                self.local.db_conn.close()
+            except Exception:
+                pass
+            self.local.db_conn = None
+
+    def database_exists(self) -> bool:
+        try:
+            with self._connect_with_retry("postgres") as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT 1 FROM pg_database WHERE datname = %s", (self.local.db_name,))
+                    return cursor.fetchone() is not None
+        except psycopg2.Error as error:
+            raise OdooRestorerError(f"Failed to check database existence: {error}") from error
+
+    def create_database(self) -> None:
+        self.run_command(f"createdb -h {self.local.host} -U {self.local.db_user} {self.local.db_name}")
+
+    def needs_base_install(self) -> bool:
+        try:
+            conn = self.connect_to_db()
+        except psycopg2.Error:
+            return True
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT 1 FROM information_schema.tables WHERE table_name = 'ir_module_module' LIMIT 1"
+            )
+            table_present = cursor.fetchone() is not None
+            if not table_present:
+                return True
+            cursor.execute("SELECT COUNT(*) FROM ir_module_module")
+            count = cursor.fetchone()[0]
+            return count == 0
+
+    def install_base_schema(self) -> None:
+        odoo_bin = "/odoo/odoo-bin"
+        if not Path(odoo_bin).exists():
+            odoo_bin = f"{Path('/opt/odoo/venv/bin/python')} /odoo/odoo-bin"
+
+        cmd_parts = [
+            odoo_bin,
+            "--stop-after-init",
+            "-d",
+            self.local.db_name,
+            "--no-http",
+            "--without-demo=all",
+            "-i",
+            "base",
+        ]
+        generated_config_path = "/volumes/config/_generated.conf"
+        if Path(generated_config_path).exists():
+            cmd_parts += ["--config", generated_config_path]
+        command = " ".join(cmd_parts)
+        _logger.info("Initializing base schema...")
+        self.run_command(command)
+        self._reset_db_connection()
+
+    def _clean_filestore(self) -> None:
+        filestore = self.local.filestore_path
+        if filestore.exists():
+            _logger.info("Clearing filestore at %s", filestore)
+            shutil.rmtree(filestore, ignore_errors=True)
+        filestore.mkdir(parents=True, exist_ok=True)
 
     def call_odoo_sql(self, sql_call: SqlCall, call_type: SqlCallType) -> list[tuple] | None:
         self.connect_to_db()
@@ -791,17 +981,218 @@ with registry.cursor() as cr:
 """)
         script = script.replace("__PAYLOAD__", json.dumps(payload))
         self._run_odoo_shell(script)
+        self._reset_db_connection()
+
+    def ensure_admin_user(self, *, do_sanitize: bool) -> None:
+        """Ensure the admin user has safe credentials."""
+        self.connect_to_db()
+        with self.local.db_conn.cursor() as cursor:
+            cursor.execute("SELECT id, partner_id FROM res_users WHERE login=%s LIMIT 1", ("admin",))
+            row = cursor.fetchone()
+        if not row:
+            _logger.warning("Admin user not found; skipping admin hardening.")
+            return
+        _, partner_id = row
+
+        set_password = False
+        password_plain: Optional[str] = None
+        if self.local.admin_password:
+            candidate = self.local.admin_password.get_secret_value().strip()
+            if candidate:
+                set_password = True
+                password_plain = candidate
+
+        set_email = False
+        target_email = "admin@localhost"
+        if partner_id:
+            with self.local.db_conn.cursor() as cursor:
+                cursor.execute("SELECT email FROM res_partner WHERE id=%s", (partner_id,))
+                email_row = cursor.fetchone()
+            current_email = (email_row[0] or "").strip() if email_row else ""
+            if current_email:
+                email_lower = current_email.lower()
+                allowed_suffixes = (".local", ".test", ".example", ".invalid")
+                domain = email_lower.split("@", 1)[-1]
+                if "@" not in email_lower or (
+                    not domain.endswith(allowed_suffixes)
+                    and domain != "localhost"
+                ):
+                    set_email = True
+            else:
+                set_email = True
+        else:
+            _logger.warning("Admin user has no linked partner; skipping email normalization.")
+
+        if not set_password and not set_email:
+            _logger.info("Admin credentials already satisfy safety requirements; no changes needed.")
+            return
+
+        payload = {
+            "db": self.local.db_name,
+            "set_password": set_password,
+            "password": password_plain or "",
+            "set_email": bool(partner_id and set_email),
+            "email": target_email,
+        }
+
+        script = textwrap.dedent("""
+import json
+from odoo import api, SUPERUSER_ID
+from odoo.modules.registry import Registry
+
+payload = json.loads('__PAYLOAD__')
+registry = Registry(payload['db'])
+with registry.cursor() as cr:
+    env = api.Environment(cr, SUPERUSER_ID, {})
+    admin = env['res.users'].sudo().search([('login', '=', 'admin')], limit=1)
+    if admin:
+        if payload['set_password']:
+            admin.with_context(no_reset_password=True).sudo().password = payload['password']
+        if payload['set_email'] and admin.partner_id:
+            admin.partner_id.sudo().write({'email': payload['email']})
+    cr.commit()
+""").replace("__PAYLOAD__", json.dumps(payload))
+
+        _logger.info("Hardening admin credentials (password=%s, email=%s)", set_password, set_email)
+        self._run_odoo_shell(script)
+        self._reset_db_connection()
+
+    def bootstrap_database(self, *, do_sanitize: bool) -> None:
+        _logger.info("Starting bootstrap for database '%s'", self.local.db_name)
+        try:
+            if self.database_exists():
+                _logger.info("Existing database detected; dropping before bootstrap.")
+                self._reset_db_connection()
+                self.drop_database()
+        except OdooRestorerError as error:
+            _logger.warning("Unable to verify database existence (%s); forcing drop.", error)
+            self._reset_db_connection()
+            self.drop_database()
+
+        self._clean_filestore()
+        self.create_database()
+        self._reset_db_connection()
+        self.connect_to_db()
+
+        if self.needs_base_install():
+            self.install_base_schema()
+            self.connect_to_db()
+        else:
+            _logger.info("Base schema already present; skipping base install step.")
+
+        self.update_addons()
+        self._reset_db_connection()
+        self.connect_to_db()
+
+        if do_sanitize:
+            self.sanitize_database()
+            self.local.db_conn.commit()
+        else:
+            _logger.info("Skipping sanitization per --no-sanitize flag.")
+
+        self.ensure_admin_user(do_sanitize=do_sanitize)
+        self.connect_to_db()
+        self.assert_core_schema_healthy()
+        self.ensure_gpt_users()
+        _logger.info("Bootstrap completed successfully.")
+
+    def compute_update_module_list(self) -> list[str]:
+        """Return sorted addon names discovered from local addon directories."""
+
+        def _extend_from_raw(raw: str | None) -> None:
+            if not raw:
+                return
+            separator = "," if "," in raw else ":"
+            for token in raw.split(separator):
+                stripped = token.strip()
+                if stripped:
+                    candidate_dirs.append(stripped)
+
+        candidate_dirs: list[str] = []
+        _extend_from_raw(self.local.local_addons_dirs)
+        _extend_from_raw(self.local.addons_path)
+
+        if not candidate_dirs:
+            generated_conf = Path("/volumes/config/_generated.conf")
+            if generated_conf.exists():
+                try:
+                    conf_text = generated_conf.read_text(encoding="utf-8", errors="ignore")
+                except OSError:
+                    conf_text = ""
+                match = re.search(r"^\s*addons_path\s*=\s*(.+)$", conf_text, re.MULTILINE)
+                if match:
+                    _extend_from_raw(match.group(1).strip())
+
+        if not candidate_dirs:
+            candidate_dirs = [
+                "/volumes/addons",
+                "/opt/project/addons",
+            ]
+
+        discovered: set[str] = set()
+        resolved_dirs: list[Path] = []
+        for raw_dir in candidate_dirs:
+            try:
+                base = Path(raw_dir).expanduser()
+                base = base.resolve(strict=False)
+            except OSError:
+                base = Path(raw_dir)
+
+            normalized = str(base)
+            if "/odoo/addons" in normalized or "/odoo/odoo/addons" in normalized:
+                continue
+            if "/enterprise" in normalized:
+                continue
+            if not base.is_dir():
+                continue
+            if base not in resolved_dirs:
+                resolved_dirs.append(base)
+
+            for child in base.iterdir():
+                if not child.is_dir():
+                    continue
+                if (child / "__manifest__.py").exists() or (child / "__openerp__.py").exists():
+                    discovered.add(child.name)
+
+        self._auto_addon_dirs = resolved_dirs
+        return sorted(discovered)
+
+    def _default_modules_for_project(self) -> list[str]:
+        raw = (self.local.auto_modules_raw or "").strip()
+        if not raw:
+            return []
+        separator = "," if "," in raw else ":"
+        modules = [item.strip() for item in raw.split(separator) if item.strip()]
+        return modules
 
     def update_addons(self) -> None:
         mods_env = (self.local.update_modules or "").strip()
-        if not mods_env:
-            _logger.info("ODOO_UPDATE not set; skipping addon install/update.")
-            return
-
-        desired = [m.strip() for m in mods_env.split(",") if m.strip()]
-        if not desired:
-            _logger.info("ODOO_UPDATE is empty after parsing; skipping.")
-            return
+        desired: list[str]
+        if not mods_env or mods_env.upper() == "AUTO":
+            project_defaults = self._default_modules_for_project()
+            if project_defaults:
+                desired = project_defaults
+                _logger.info(
+                    "ODOO_UPDATE=%s; using project defaults: %s",
+                    mods_env.upper() if mods_env else "AUTO",
+                    ", ".join(desired),
+                )
+            else:
+                desired = self.compute_update_module_list()
+                if not desired:
+                    _logger.info("ODOO_UPDATE unset/AUTO and no modules detected; skipping addon update.")
+                    return
+                mode_label = mods_env.upper() if mods_env else "AUTO"
+                _logger.info(
+                    "ODOO_UPDATE=%s; auto-detected modules: %s",
+                    mode_label,
+                    ", ".join(desired),
+                )
+        else:
+            desired = [m.strip() for m in mods_env.split(",") if m.strip()]
+            if not desired:
+                _logger.info("ODOO_UPDATE is empty after parsing; skipping.")
+                return
 
         addons_env = (self.local.addons_path or "").strip()
         addons_paths: list[Path] = []
@@ -809,13 +1200,17 @@ with registry.cursor() as cr:
             sep = "," if "," in addons_env else ":"
             for raw in [p.strip() for p in addons_env.split(sep) if p.strip()]:
                 addons_paths.append(Path(raw))
-        else:
+        if not addons_paths:
             addons_paths = [
                 Path("/volumes/addons"),
                 Path("/opt/project/addons"),
                 Path("/odoo/addons"),
                 Path("/volumes/enterprise"),
             ]
+        if getattr(self, "_auto_addon_dirs", None):
+            for auto_dir in self._auto_addon_dirs:
+                if auto_dir not in addons_paths:
+                    addons_paths.append(auto_dir)
         _logger.info(
             "Using addons search paths: %s",
             ", ".join(str(p) for p in addons_paths),
@@ -878,8 +1273,11 @@ with registry.cursor() as cr:
             self.run_command(command)
         except subprocess.CalledProcessError as update_error:
             raise OdooRestorerError(f"Failed to install/update addons: {update_error}") from update_error
+        finally:
+            self._reset_db_connection()
 
     def restore_from_upstream(self, do_sanitize: bool = True) -> None:
+        upstream = self._require_upstream()
         target_owner = self._resolve_filestore_owner()
         _logger.info("Resolved filestore owner: %s", target_owner or "<default>")
         filestore_proc = self.overwrite_filestore(target_owner)
@@ -898,6 +1296,7 @@ with registry.cursor() as cr:
                 raise
 
         self.update_addons()
+        self.connect_to_db()
 
         if do_sanitize:
             try:
@@ -914,27 +1313,5 @@ with registry.cursor() as cr:
         _logger.info("Upstream overwrite completed successfully.")
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Restore Odoo database/filestore from upstream backups")
-    parser.add_argument("--env-file", type=Path, default=None, help="Optional env file to load settings from")
-    args = parser.parse_args()
-
-    env_file: Path | None = args.env_file
-    if env_file is None:
-        candidate = Path(".env")
-        if candidate.exists():
-            env_file = candidate
-
-    settings_kwargs: dict[str, object] = {}
-    if env_file and env_file.exists():
-        settings_kwargs["_env_file"] = env_file
-    elif env_file is not None:
-        _logger.warning("Env file %s not found; falling back to process environment", env_file)
-        env_file = None
-
-    # noinspection PyArgumentList
-    local_settings = LocalServerSettings(**settings_kwargs)
-    # noinspection PyArgumentList
-    upstream_settings = UpstreamServerSettings(**settings_kwargs)
-    restore_upstream_to_local = OdooUpstreamRestorer(local_settings, upstream_settings, env_file)
-    restore_upstream_to_local.restore_from_upstream()
+if __name__ == "__main__":  # pragma: no cover
+    sys.exit(int(main()))

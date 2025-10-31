@@ -1059,6 +1059,9 @@ with registry.cursor() as cr:
 
     def bootstrap_database(self, *, do_sanitize: bool) -> None:
         _logger.info("Starting bootstrap for database '%s'", self.local.db_name)
+        target_owner = self._resolve_filestore_owner()
+        if target_owner:
+            _logger.info("Resolved filestore owner: %s", target_owner)
         try:
             if self.database_exists():
                 _logger.info("Existing database detected; dropping before bootstrap.")
@@ -1070,6 +1073,7 @@ with registry.cursor() as cr:
             self.drop_database()
 
         self._clean_filestore()
+        self.normalize_filestore_permissions(target_owner)
         self.create_database()
         self._reset_db_connection()
         self.connect_to_db()

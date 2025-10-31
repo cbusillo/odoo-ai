@@ -1,0 +1,16 @@
+# Shared compose fragments applied to every stack.
+# This file sits between docker-compose.override.yml and project-specific overlays.
+
+services:
+  web:
+    env_file:
+      - .env
+      - docker/config/base.env
+  script-runner:
+    env_file:
+      - .env
+      - docker/config/base.env
+  database:
+    env_file:
+      - .env
+      - docker/config/base.env

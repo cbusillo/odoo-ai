@@ -1,24 +1,12 @@
 name: ${COMPOSE_PROJECT_NAME:-cm-local}
 
+# Variant-specific overrides for the CM local stack.
+
 services:
   web:
-    env_file:
-      - .env
-      - docker/config/cm-local.env
-    depends_on:
-      - database
     ports:
       - "9069:8069"
       - "9072:8072"
   database:
-    env_file:
-      - .env
-      - docker/config/cm-local.env
     ports:
       - "9432:5432"
-  script-runner:
-    env_file:
-      - .env
-      - docker/config/cm-local.env
-    depends_on:
-      - database

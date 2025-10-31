@@ -1,0 +1,19 @@
+# OPW project-level compose overlay.
+# Applied after docker/config/base.yaml and before variant overlays.
+
+services:
+  web:
+    env_file:
+      - .env
+      - docker/config/base.env
+      - docker/config/opw.env
+  script-runner:
+    env_file:
+      - .env
+      - docker/config/base.env
+      - docker/config/opw.env
+  database:
+    env_file:
+      - .env
+      - docker/config/base.env
+      - docker/config/opw.env

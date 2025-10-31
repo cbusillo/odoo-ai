@@ -5,11 +5,12 @@ also highlights the remaining work for the upcoming GitHub Actions flow.
 
 ## Runtime Topology
 
-| Environment                                         | Location                            | Compose Project | Entry Commands                                                                                                         |
-|-----------------------------------------------------|-------------------------------------|-----------------|------------------------------------------------------------------------------------------------------------------------|
-| Local dev (`local.odoo.outboardpartswarehouse.com`) | developer laptops                   | `odoo`          | `uv run deploy deploy --stack local --build --no-cache` (optional build); `uv run restore-from-upstream --stack local` |
-| Testing (`testing.odoo.outboardpartswarehouse.com`) | `docker.shiny` (`/opt/opw-testing`) | `opw-testing`   | `uv run deploy deploy --stack opw-testing --build --no-cache`; `uv run restore-from-upstream --stack opw-testing`      |
-| Dev (`dev.odoo.outboardpartswarehouse.com`)         | `docker.shiny` (`/opt/opw-dev`)     | `opw-dev`       | same commands with `opw-dev`                                                                                           |
+| Environment                                         | Location                            | Compose Project | Entry Commands                                                                                                                 |
+|-----------------------------------------------------|-------------------------------------|-----------------|--------------------------------------------------------------------------------------------------------------------------------|
+| Local dev (`local.odoo.outboardpartswarehouse.com`) | developer laptops                   | `odoo`          | `uv run deploy deploy --stack opw-local --build --no-cache` (optional build); `uv run restore-from-upstream --stack opw-local` |
+| Testing (`testing.odoo.outboardpartswarehouse.com`) | `docker.shiny` (`/opt/opw-testing`) | `opw-testing`   | `uv run deploy deploy --stack opw-testing --build --no-cache`; `uv run restore-from-upstream --stack opw-testing`              |
+| Dev (`dev.odoo.outboardpartswarehouse.com`)         | `docker.shiny` (`/opt/opw-dev`)     | `opw-dev`       | `uv run deploy deploy --stack opw-dev --build --no-cache`; `uv run restore-from-upstream --stack opw-dev`                      |
+| Cell Mechanic local (isolated)                      | developer laptops                   | `cm-local`      | `uv run deploy deploy --stack cm-local --build --no-cache`; `uv run restore-from-upstream --stack cm-local`                    |
 
 Key points:
 
@@ -55,6 +56,8 @@ Key points:
 ## References
 
 - Runtime commands – `docs/tooling/docker.md`
-- Restore CLI – `tools/docker_runner.py`
-- Deploy CLI – `tools/deployer/cli.py`
+- Multi-project configuration – `docs/workflows/multi-project.md`
+- Restore entry point – `uv run restore-from-upstream` (defined in `pyproject.toml`, implemented in
+  `tools/docker_runner.py`)
+- Deploy CLI – `uv run deploy` (implemented in `tools/deployer/cli.py`)
 - Odoo internals – `docs/odoo/workflow.md`, `docs/odoo/orm.md`

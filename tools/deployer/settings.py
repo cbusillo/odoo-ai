@@ -1,9 +1,13 @@
 import shlex
+import logging
 from dataclasses import dataclass
 import os
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+_logger = logging.getLogger(__name__)
 
 
 def discover_repo_root(start_directory: Path) -> Path:
@@ -54,6 +58,18 @@ def split_modules(raw_value: str | None) -> tuple[str, ...]:
     return tuple(modules)
 
 
+def infer_project_slug(stack_name: str) -> str | None:
+    """Best-effort project slug inference from stack naming conventions or env values."""
+
+    lowered = stack_name.lower()
+    for prefix in ("opw-", "cm-"):
+        if lowered.startswith(prefix):
+            return prefix[:-1]
+    if "-" in stack_name:
+        return stack_name.split("-", 1)[0]
+    return None
+
+
 class StackConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -87,33 +103,72 @@ class StackConfig(BaseModel):
 
 
 def compute_compose_files(name: str, repo_root: Path, config: StackConfig) -> tuple[Path, ...]:
-    files: list[Path] = []
+    """Resolve compose files with layering and delimiter normalization."""
+
     base_file = repo_root / "docker-compose.yml"
     override_file = repo_root / "docker-compose.override.yml"
+
+    # Normalize and collect any explicitly provided compose files from the environment
+    variant_files: list[Path] = []
     if config.compose_files_raw:
-        for item in split_values(config.compose_files_raw):
+        for item in split_values(config.compose_files_raw):  # supports comma or colon
             path = Path(item)
             if not path.is_absolute():
                 path = (repo_root / path).resolve()
-            files.append(path)
+            variant_files.append(path)
     else:
-        secondary = repo_root / "docker" / "config" / f"{name}.yaml"
-        if secondary.exists():
-            files.append(secondary.resolve())
-    # Always include the base docker-compose file first
-    resolved_files: list[Path] = []
-    extras_resolved = {path.resolve() for path in files}
+        # Fallback to a stack-specific config if it exists
+        candidate = repo_root / "docker" / "config" / f"{name}.yaml"
+        if candidate.exists():
+            variant_files.append(candidate.resolve())
+
+    project_slug = infer_project_slug(name)
+    if project_slug is None and config.project_name:
+        normalized = config.project_name.strip().lower()
+        if normalized:
+            project_slug = normalized.split("-", 1)[0]
+
+    config_dir = repo_root / "docker" / "config"
+    layered_files: list[Path] = []
+    base_layer = config_dir / "base.yaml"
+    project_layer = config_dir / f"{project_slug}.yaml" if project_slug else None
+
+    # Always start with the primary compose file(s)
+    ordered_candidates: list[Path] = []
     if base_file.exists():
-        resolved_files.append(base_file.resolve())
+        ordered_candidates.append(base_file.resolve())
     if override_file.exists():
-        override_resolved = override_file.resolve()
-        if override_resolved not in extras_resolved:
-            resolved_files.append(override_resolved)
-    if files:
-        resolved_files.extend(files)
-    if not resolved_files:
+        ordered_candidates.append(override_file.resolve())
+    if base_layer.exists():
+        ordered_candidates.append(base_layer.resolve())
+    if project_layer and project_layer.exists():
+        ordered_candidates.append(project_layer.resolve())
+    ordered_candidates.extend(variant_files)
+
+    # De-duplicate while preserving order
+    seen: set[Path] = set()
+    for p in ordered_candidates:
+        rp = p.resolve()
+        if rp not in seen:
+            layered_files.append(rp)
+            seen.add(rp)
+
+    if not layered_files:
         raise ValueError(f"no compose files resolved for {name}")
-    return tuple(resolved_files)
+
+    # Log the resolved compose files relative to repo root for readability
+    try:
+        pretty = [str(p.relative_to(repo_root)) if p.is_relative_to(repo_root) else str(p) for p in layered_files]
+    except AttributeError:
+        pretty = []
+        for p in layered_files:
+            try:
+                pretty.append(str(p.relative_to(repo_root)))
+            except Exception:
+                pretty.append(str(p))
+    _logger.info("Compose files resolved: %s", ", ".join(pretty))
+
+    return tuple(layered_files)
 
 
 def compute_compose_command(config: StackConfig) -> tuple[str, ...]:
@@ -257,12 +312,41 @@ class StackSettings:
 def load_stack_settings(name: str, env_file: Path | None = None, base_directory: Path | None = None) -> StackSettings:
     base = base_directory if base_directory is not None else Path.cwd()
     repo_root = discover_repo_root(base)
-    env_path = select_env_file(name, repo_root, env_file)
+    env_path = select_env_file(name, repo_root, env_file).resolve()
+    stack_env_preview = parse_env_file(env_path)
+
+    project_slug = infer_project_slug(name)
+    if project_slug is None:
+        project_candidate = stack_env_preview.get("ODOO_PROJECT_NAME")
+        if project_candidate:
+            normalized = project_candidate.strip().lower()
+            if normalized:
+                project_slug = normalized.split("-", 1)[0]
+
+    env_files_in_order: list[Path] = []
+    seen_env_paths: set[Path] = set()
+
+    def _register_env(path: Path) -> None:
+        if not path.exists():
+            return
+        resolved = path.resolve()
+        if resolved in seen_env_paths:
+            return
+        env_files_in_order.append(resolved)
+        seen_env_paths.add(resolved)
+
+    _register_env(repo_root / ".env")
+    _register_env(repo_root / "docker" / "config" / "base.env")
+    if project_slug:
+        _register_env(repo_root / "docker" / "config" / f"{project_slug}.env")
+    _register_env(env_path)
+
     raw_environment: dict[str, str] = {}
-    base_env_path = repo_root / ".env"
-    if base_env_path.exists() and base_env_path.resolve() != env_path.resolve():
-        raw_environment.update(parse_env_file(base_env_path))
-    raw_environment.update(parse_env_file(env_path))
+    resolved_env_chain: list[Path] = []
+    for env_file_path in env_files_in_order:
+        raw_environment.update(parse_env_file(env_file_path))
+        resolved_env_chain.append(env_file_path)
+
     config = StackConfig.model_validate(raw_environment)
 
     def _expand_path(raw: str | Path) -> Path:
@@ -306,6 +390,22 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
     final_environment["ODOO_DB_DIR"] = "/var/lib/postgresql/data"
     final_environment["ODOO_SESSION_DIR"] = "/volumes/logs/sessions"
     _write_env_file(merged_env_path, final_environment)
+
+    # Log the resolved environment layering and important derived values
+    try:
+        chain_pretty = [str(p.relative_to(repo_root)) if p.is_relative_to(repo_root) else str(p) for p in resolved_env_chain]
+    except AttributeError:
+        chain_pretty = []
+        for p in resolved_env_chain:
+            try:
+                chain_pretty.append(str(p.relative_to(repo_root)))
+            except Exception:
+                chain_pretty.append(str(p))
+    _logger.info(
+        "Env layering: %s -> merged at %s",
+        " -> ".join(chain_pretty) if chain_pretty else "<none>",
+        str(merged_env_path.relative_to(repo_root)) if merged_env_path.is_relative_to(repo_root) else str(merged_env_path),
+    )
     return StackSettings(
         name=name,
         repo_root=repo_root,

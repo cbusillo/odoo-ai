@@ -10,7 +10,7 @@ from pathlib import Path
 
 # Reuse the Git helpers defined for the deploy CLI
 from tools.deployer.cli import get_git_commit, get_git_remote_url
-from tools.deployer.command import run_process
+from tools.deployer.command import CommandError, run_process
 from tools.deployer.compose_ops import local_compose_command, remote_compose_command
 from tools.deployer.deploy import (
     build_updated_environment,
@@ -43,6 +43,15 @@ _logger = logging.getLogger(__name__)
 RESTORE_SCRIPT = "/volumes/scripts/restore_from_upstream.py"
 
 
+def _handle_restore_exit(error: CommandError) -> None:
+    if error.returncode == 10:
+        _logger.warning(
+            "restore_from_upstream exited with code 10; continuing because bootstrap completed successfully"
+        )
+        return
+    raise error
+
+
 def _run_local_compose(settings, extra: Sequence[str], *, check: bool = True) -> None:
     command = local_compose_command(settings, extra)
     run_process(command, cwd=settings.repo_root, check=check)
@@ -59,7 +68,7 @@ def _current_image_reference(settings) -> str:
     return settings.environment.get(settings.image_variable_name) or settings.registry_image
 
 
-def restore_stack(stack_name: str) -> int:
+def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize: bool = False) -> int:
     settings = load_stack_settings(stack_name)
     env_file_path = _ensure_stack_env(settings, stack_name)
     image_reference = _current_image_reference(settings)
@@ -123,18 +132,34 @@ def restore_stack(stack_name: str) -> int:
 
         _run_remote_compose(settings, ["up", "-d", "--remove-orphans", settings.script_runner_service])
         _run_remote_compose(settings, ["stop", "web"])
-        _run_remote_compose(
-            settings,
+
+        remote_exec: list[str] = [
+            "exec",
+            "-T",
+            "--user",
+            "root",
+        ]
+        if bootstrap_only:
+            remote_exec.extend(["-e", "BOOTSTRAP_ONLY=1"])
+        if no_sanitize:
+            remote_exec.extend(["-e", "NO_SANITIZE=1"])
+
+        remote_exec.extend(
             [
-                "exec",
-                "-T",
-                "--user",
-                "root",
                 settings.script_runner_service,
                 "python3",
                 RESTORE_SCRIPT,
-            ],
+            ]
         )
+        if bootstrap_only:
+            remote_exec.append("--bootstrap-only")
+        if no_sanitize:
+            remote_exec.append("--no-sanitize")
+
+        try:
+            _run_remote_compose(settings, remote_exec)
+        except CommandError as error:
+            _handle_restore_exit(error)
         _run_remote_compose(settings, ["up", "-d", "--remove-orphans", "web"])
     else:
         write_env_file(env_file_path, env_values)
@@ -152,6 +177,10 @@ def restore_stack(stack_name: str) -> int:
         ]
         for key, value in env_values.items():
             exec_extra.extend(["-e", f"{key}={value}"])
+        if bootstrap_only:
+            exec_extra.extend(["-e", "BOOTSTRAP_ONLY=1"])
+        if no_sanitize:
+            exec_extra.extend(["-e", "NO_SANITIZE=1"])
         exec_extra.extend(
             [
                 settings.script_runner_service,
@@ -159,11 +188,18 @@ def restore_stack(stack_name: str) -> int:
                 RESTORE_SCRIPT,
             ]
         )
+        if bootstrap_only:
+            exec_extra.append("--bootstrap-only")
+        if no_sanitize:
+            exec_extra.append("--no-sanitize")
 
-        run_process(
-            local_compose_command(settings, exec_extra),
-            cwd=settings.repo_root,
-        )
+        try:
+            run_process(
+                local_compose_command(settings, exec_extra),
+                cwd=settings.repo_root,
+            )
+        except CommandError as error:
+            _handle_restore_exit(error)
         _run_local_compose(settings, ["up", "-d", "--remove-orphans", "web"], check=False)
 
     _logger.info("Restore completed for stack %s", stack_name)
@@ -177,12 +213,22 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default="local",
         help="Stack name to restore (default: local)",
     )
+    parser.add_argument(
+        "--bootstrap-only",
+        action="store_true",
+        help="Only bootstrap the stack (skip full upstream restore)",
+    )
+    parser.add_argument(
+        "--no-sanitize",
+        action="store_true",
+        help="Skip sanitize steps during restore",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
-    return restore_stack(args.stack)
+    return restore_stack(args.stack, bootstrap_only=args.bootstrap_only, no_sanitize=args.no_sanitize)
 
 
 def restore_from_upstream() -> int:  # Entry point for pyproject scripts

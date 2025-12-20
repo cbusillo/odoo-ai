@@ -5,7 +5,7 @@ handle.
 
 Use path+anchor “handles” when sharing docs between sessions, for example:
 
-- @docs/style/python.md#type-hints
+- @docs/style/PYTHON.md#type-hints
 - @docs/odoo/orm.md#batch-writes
 - @docs/workflows/codex-workflow.md#working-loop
 
@@ -35,12 +35,13 @@ Use path+anchor “handles” when sharing docs between sessions, for example:
     - docs/workflows/bulk-operations.md — mass data processing
 - Tooling
     - docs/tooling/codex-cli.md — sessions, profiles, sandbox/approval
-    - docs/tooling/inspection.md — changed/git/full scopes, result schema
-    - docs/tooling/odoo-intelligence.md — model/field queries, module updates
-    - docs/tooling/testing-cli.md — uv test phases and flags
-    - docs/tooling/docker.md — container operations
-    - docs/tooling/docker-mcp.md — Docker MCP usage and JSON param shapes
-        - docs/testing.md — testing overview and pointers
+    - docs/tooling/runtime-baselines.md — where Python/runtime versions live
+        - docs/tooling/inspection.md — changed/git/full scopes, result schema
+        - docs/tooling/odoo-intelligence.md — model/field queries, module updates
+        - docs/tooling/testing-cli.md — uv test phases and flags
+        - docs/tooling/docker.md — container operations
+        - docs/tooling/docker-mcp.md — Docker MCP usage and JSON param shapes
+            - docs/testing.md — testing overview and pointers
 - Odoo Canon
     - docs/odoo/orm.md — recordsets, batching, computed fields
     - docs/odoo/security.md — ACLs, access rules, safe defaults
@@ -59,18 +60,18 @@ Use path+anchor “handles” when sharing docs between sessions, for example:
     - docs/recipes/cell-mechanic-db.md — run the Cell Mechanic addon against its own database
 - Style
     - docs/style/index.md — style index (start here)
-    - docs/style/python.md — type hints, f‑strings, line length
-    - docs/style/javascript.md — ES modules, Owl patterns
-    - docs/style/testing.md — base classes, fixtures, tours
-    - docs/style/hoot-testing.md — Hoot testing
-    - docs/style/owl-components.md — Owl components
-    - docs/style/owl-troubleshooting.md — Owl troubleshooting
-    - docs/style/playwright-patterns.md — Playwright patterns
-    - docs/style/playwright-selectors.md — Playwright selectors
-    - docs/style/tour-debugging.md — Tour debugging
-    - docs/style/tour-patterns.md — Tour patterns
-    - docs/style/test-scenarios.md — Common test scenarios
-    - docs/style/testing-advanced.md — Advanced Odoo testing
+    - docs/style/PYTHON.md — type hints, f‑strings, line length
+    - docs/style/JAVASCRIPT.md — ES modules, Owl patterns
+        - docs/style/testing.md — base classes, fixtures, tours
+        - docs/style/hoot-testing.md — Hoot testing
+        - docs/style/owl-components.md — Owl components
+        - docs/style/owl-troubleshooting.md — Owl troubleshooting
+        - docs/style/playwright-patterns.md — Playwright patterns
+        - docs/style/playwright-selectors.md — Playwright selectors
+        - docs/style/tour-debugging.md — Tour debugging
+        - docs/style/tour-patterns.md — Tour patterns
+        - docs/style/test-scenarios.md — Common test scenarios
+        - docs/style/testing-advanced.md — Advanced Odoo testing
 
 Notes
 

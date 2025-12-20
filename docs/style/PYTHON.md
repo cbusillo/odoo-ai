@@ -1,4 +1,4 @@
-# Python Style (3.12, Odoo 18)
+# Python Style
 
 Purpose
 
@@ -6,13 +6,21 @@ Purpose
 
 Targets & Tooling
 
-- Python 3.12 features are allowed (pattern matching, `typing.Self`, improved `|` unions, `dataclass(slots=True)`).
+- Python version and runtime baselines come from repo config (not this doc);
+  see @docs/tooling/runtime-baselines.md.
 - Lint/format with Ruff: run `uv run ruff format .` then `uv run ruff check --fix`.
 - Line length: 133 chars max (to match AGENTS.md).
 
 Core Rules
 
-- Type hints everywhere, including `-> None` for procedures.
+- Type hints are required at API boundaries:
+    - All function/method signatures (parameters + return types, including `-> None` for procedures).
+    - Public data shapes (`TypedDict`, dataclasses, Pydantic models) and other
+      “external contract” objects.
+- Prefer type inference for local variables when the type is obvious.
+- Add local annotations only when they materially improve clarity/tooling (e.g.
+  complex unions, containers, third-party `Any` leaks, or ORM/SQL rows where the
+  IDE cannot infer types correctly).
 - f‑strings only; no `%` or `str.format()`.
 - Early returns encouraged to reduce nesting.
 - Prefer small, single‑purpose functions and modules.

@@ -17,9 +17,9 @@ Use these guidelines to keep documentation accurate, concise, and discoverable.
 ### Style Guidelines Structure
 
 - `docs/policies/coding-standards.md` - Universal code quality principles
-- `docs/style/python.md` - Python-specific standards
+- `docs/style/PYTHON.md` - Python-specific standards
 - `docs/odoo/workflow.md` - Odoo workflow and conventions
-- `docs/style/javascript.md` - JavaScript/Owl.js standards
+- `docs/style/JAVASCRIPT.md` - JavaScript/Owl.js standards
 - `docs/style/testing.md` - Test quality requirements
 
 ### Reference Documentation

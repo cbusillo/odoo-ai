@@ -6,11 +6,11 @@ Core
 
 Python
 
-- @docs/style/python.md — 3.12 style, type hints, Magic Types, noinspection policy
+- @docs/style/PYTHON.md — type hints, Magic Types, noinspection policy
 
 JavaScript / Owl
 
-- @docs/style/javascript.md — ESM only, Owl 2, selectors/naming
+- @docs/style/JAVASCRIPT.md — ESM only, Owl 2, selectors/naming
 - @docs/style/owl-components.md — component patterns
 - @docs/style/owl-troubleshooting.md — troubleshooting guide
 

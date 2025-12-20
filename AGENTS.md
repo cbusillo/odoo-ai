@@ -5,7 +5,7 @@ Treat this file as the launch checklist for every Codex session. Skim it, open t
 ## Start Here
 
 - Use the documentation table of contents (`docs/README.md`) to grab handles instead of copying long excerpts.
-- Before changing code, open the matching style page (`docs/style/python.md`, `docs/style/javascript.md`,
+- Before changing code, open the matching style page (`docs/style/PYTHON.md`, `docs/style/JAVASCRIPT.md`,
   `docs/style/testing.md`).
 - Clarify your role expectations with the guides under `docs/roles/` (analyst, engineer, tester, reviewer, maintainer).
 
@@ -46,8 +46,8 @@ Treat this file as the launch checklist for every Codex session. Skim it, open t
   `uv run test plan --phase all`).
 - `docs/testing.md` summarizes the recommended commands and filtering flags; `docs/tooling/testing-cli.md` documents
   detached mode, sharding, and JSON outputs.
-- Python formatting and linting commands live in `docs/style/python.md`; JS/Owl specifics live in
-  `docs/style/javascript.md` and `docs/style/hoot-testing.md`.
+- Python formatting and linting commands live in `docs/style/PYTHON.md`; JS/Owl specifics live in
+  `docs/style/JAVASCRIPT.md` and `docs/style/hoot-testing.md`.
 
 ## Tooling Order
 

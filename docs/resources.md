@@ -58,7 +58,8 @@ Use the local schema file for complete type definitions and the online docs for 
 grep -r "from pydantic" addons/product_connect/
 grep -r "import httpx" addons/product_connect/
 
-# Check Python 3.12+ features in use
+# Check modern Python features in use
+# (See `pyproject.toml` → `requires-python` for the baseline.)
 grep -r "type \|match \|case " addons/product_connect/
 
 # Check PostgreSQL version

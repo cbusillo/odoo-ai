@@ -5,8 +5,11 @@ Core Rules
 - Prefer MCP tools when available in this repo (Inspection, Odoo, Docker).
 - Use `uv run` for all tests; never run Python directly.
 - Container paths: host `./` maps to container `/volumes/`.
-- Target Python 3.12; JS follows Owl.js style with no semicolons.
-- Zero‑warning acceptance gate; use JetBrains `noinspection` only when narrowly justified (see @docs/style/python.md).
+- Runtime baselines (Python/etc.) are defined by repo config, not docs; see
+  @docs/tooling/runtime-baselines.md.
+- Type hints are required at API boundaries (function signatures + public data
+  shapes). Prefer local inference when clear.
+- Zero‑warning acceptance gate; use JetBrains `noinspection` only when narrowly justified (see @docs/style/PYTHON.md).
 - Docs-as-code: keep docs accurate. When code behavior changes, update affected pages and cross‑references in the same
   PR.
 
@@ -32,8 +35,8 @@ Project Deviation: Relational Field Naming
 
 Style Pages
 
-- @docs/style/python.md — Python
-- @docs/style/javascript.md — JavaScript
+- @docs/style/PYTHON.md — Python
+- @docs/style/JAVASCRIPT.md — JavaScript
 - @docs/style/testing.md — Testing
 
 Odoo Canon

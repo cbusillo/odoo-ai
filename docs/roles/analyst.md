@@ -14,7 +14,7 @@ Inputs → Outputs
 Doc handles (typical)
 
 - @docs/odoo/orm.md, @docs/odoo/security.md, @docs/odoo/performance.md
-- @docs/style/python.md, @docs/style/testing.md, @docs/workflows/odoo-development.md
+- @docs/style/PYTHON.md, @docs/style/testing.md, @docs/workflows/odoo-development.md
 
 Notes
 

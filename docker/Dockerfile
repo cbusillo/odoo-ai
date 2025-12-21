@@ -14,7 +14,7 @@ RUN echo "Cloning Enterprise Addons from ${ODOO_ENTERPRISE_REPOSITORY} branch ${
       mkdir -p /enterprise; \
     fi
 
-FROM ghcr.io/adomi-io/odoo:18.0 as base
+FROM ghcr.io/adomi-io/odoo:19.0 as base
 USER root
 # bring in PostgreSQL 17 client tools
 COPY --from=pg17 /usr/lib/postgresql/17/bin/pg_restore /usr/local/bin/pg_restore

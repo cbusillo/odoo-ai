@@ -8,7 +8,7 @@ from .command import CommandError
 from .compose_ops import local_compose, remote_compose_command
 from .health import HealthcheckError, wait_for_health
 from .remote import ensure_remote_directory, run_remote, sync_remote_repository, upload_file
-from .settings import StackSettings
+from .settings import StackSettings, infer_project_slug
 
 
 def build_updated_environment(
@@ -241,3 +241,27 @@ def prepare_remote_stack(settings: StackSettings, repository_url: str | None, co
         target = settings.remote_stack_path / relative
         ensure_remote_directory(settings.remote_host, settings.remote_user, settings.remote_port, target.parent)
         upload_file(settings.remote_host, settings.remote_user, settings.remote_port, file_path, target)
+    upload_env_files(settings)
+
+
+def upload_env_files(settings: StackSettings) -> None:
+    if settings.remote_host is None or settings.remote_stack_path is None:
+        return
+    project_slug = infer_project_slug(settings.name)
+    if project_slug is None:
+        project_name = settings.environment.get("ODOO_PROJECT_NAME")
+        if project_name:
+            project_slug = project_name.split("-", 1)[0].strip().lower()
+    candidates = [settings.repo_root / "docker" / "config" / "base.env"]
+    if project_slug:
+        candidates.append(settings.repo_root / "docker" / "config" / f"{project_slug}.env")
+    for path in candidates:
+        if not path.exists():
+            continue
+        try:
+            relative = path.relative_to(settings.repo_root)
+        except ValueError:
+            continue
+        target = settings.remote_stack_path / relative
+        ensure_remote_directory(settings.remote_host, settings.remote_user, settings.remote_port, target.parent)
+        upload_file(settings.remote_host, settings.remote_user, settings.remote_port, path, target)

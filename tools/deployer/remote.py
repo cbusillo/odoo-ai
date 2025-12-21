@@ -2,7 +2,7 @@ import shlex
 from collections.abc import Sequence
 from pathlib import Path
 
-from .command import run_process
+from .command import CommandError, run_process
 
 
 def build_ssh_target(user: str | None, host: str) -> str:
@@ -78,6 +78,14 @@ def sync_remote_repository(
     else:
         run_remote(host, user, port, ["git", "-C", str(path), "remote", "set-url", "origin", repository_url])
     run_remote(host, user, port, ["git", "-C", str(path), "fetch", "--prune", "origin"])
+    try:
+        run_remote(host, user, port, ["git", "-C", str(path), "cat-file", "-e", f"{commit}^{{commit}}"])
+    except CommandError as error:
+        message = (
+            "Remote repository is missing the requested commit. "
+            "Push your branch or deploy from a commit reachable on origin."
+        )
+        raise RuntimeError(message) from error
     run_remote(host, user, port, ["git", "-C", str(path), "reset", "--hard", commit])
     # Ensure submodules are synced to the requested commit so custom addons are available during remote builds.
     run_remote(host, user, port, ["git", "-C", str(path), "submodule", "sync", "--recursive"])

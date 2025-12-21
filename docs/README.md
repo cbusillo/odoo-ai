@@ -5,7 +5,7 @@ handle.
 
 Use path+anchor “handles” when sharing docs between sessions, for example:
 
-- @docs/style/PYTHON.md#type-hints
+- @docs/style/python.md#type-hints
 - @docs/odoo/orm.md#batch-writes
 - @docs/workflows/codex-workflow.md#working-loop
 
@@ -60,18 +60,18 @@ Use path+anchor “handles” when sharing docs between sessions, for example:
     - docs/recipes/cell-mechanic-db.md — run the Cell Mechanic addon against its own database
 - Style
     - docs/style/index.md — style index (start here)
-    - docs/style/PYTHON.md — type hints, f‑strings, line length
-    - docs/style/JAVASCRIPT.md — ES modules, Owl patterns
-        - docs/style/testing.md — base classes, fixtures, tours
-        - docs/style/hoot-testing.md — Hoot testing
-        - docs/style/owl-components.md — Owl components
-        - docs/style/owl-troubleshooting.md — Owl troubleshooting
-        - docs/style/playwright-patterns.md — Playwright patterns
-        - docs/style/playwright-selectors.md — Playwright selectors
-        - docs/style/tour-debugging.md — Tour debugging
-        - docs/style/tour-patterns.md — Tour patterns
-        - docs/style/test-scenarios.md — Common test scenarios
-        - docs/style/testing-advanced.md — Advanced Odoo testing
+    - docs/style/python.md — type hints, f‑strings, line length
+    - docs/style/javascript.md — ES modules, Owl patterns
+      - docs/style/testing.md — base classes, fixtures, tours
+      - docs/style/hoot-testing.md — Hoot testing
+      - docs/style/owl-components.md — Owl components
+      - docs/style/owl-troubleshooting.md — Owl troubleshooting
+      - docs/style/playwright-patterns.md — Playwright patterns
+      - docs/style/playwright-selectors.md — Playwright selectors
+      - docs/style/tour-debugging.md — Tour debugging
+      - docs/style/tour-patterns.md — Tour patterns
+      - docs/style/test-scenarios.md — Common test scenarios
+      - docs/style/testing-advanced.md — Advanced Odoo testing
 
 Notes
 

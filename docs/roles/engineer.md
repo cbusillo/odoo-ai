@@ -14,7 +14,7 @@ Inputs → Outputs
 Doc handles (typical)
 
 - @docs/workflows/codex-workflow.md#working-loop
-- @docs/style/PYTHON.md, @docs/style/JAVASCRIPT.md
+- @docs/style/python.md, @docs/style/javascript.md
 - @docs/odoo/orm.md, @docs/odoo/workflow.md
 
 Notes

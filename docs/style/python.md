@@ -61,6 +61,9 @@ JetBrains `noinspection` Policy
     - Scope narrowly (single line or the smallest block possible).
     - Include a one‑line justification and a reference link if helpful.
     - Never add broad or file‑level blanket suppressions.
+    - If it might be an IDE/profile configuration issue rather than a real code
+      problem, confirm with the operator before suppressing or adding typing
+      workarounds.
 
 ```python
 # noinspection PyTypeChecker  # False positive: Odoo plugin types refine recordset at runtime.

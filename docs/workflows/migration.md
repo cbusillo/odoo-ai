@@ -17,4 +17,4 @@ Process
 
 References
 
-- docs/odoo/workflow.md, docs/style/JAVASCRIPT.md
+- docs/odoo/workflow.md, docs/style/javascript.md

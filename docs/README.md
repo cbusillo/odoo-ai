@@ -62,18 +62,21 @@ Use path+anchor “handles” when sharing docs between sessions, for example:
     - docs/style/index.md — style index (start here)
     - docs/style/python.md — type hints, f‑strings, line length
     - docs/style/javascript.md — ES modules, Owl patterns
-      - docs/style/testing.md — base classes, fixtures, tours
-      - docs/style/hoot-testing.md — Hoot testing
-      - docs/style/owl-components.md — Owl components
-      - docs/style/owl-troubleshooting.md — Owl troubleshooting
-      - docs/style/playwright-patterns.md — Playwright patterns
-      - docs/style/playwright-selectors.md — Playwright selectors
-      - docs/style/tour-debugging.md — Tour debugging
-      - docs/style/tour-patterns.md — Tour patterns
-      - docs/style/test-scenarios.md — Common test scenarios
-      - docs/style/testing-advanced.md — Advanced Odoo testing
+        - docs/style/testing.md — base classes, fixtures, tours
+        - docs/style/hoot-testing.md — Hoot testing
+        - docs/style/owl-components.md — Owl components
+        - docs/style/owl-troubleshooting.md — Owl troubleshooting
+        - docs/style/playwright-patterns.md — Playwright patterns
+        - docs/style/playwright-selectors.md — Playwright selectors
+        - docs/style/tour-debugging.md — Tour debugging
+        - docs/style/tour-patterns.md — Tour patterns
+        - docs/style/test-scenarios.md — Common test scenarios
+        - docs/style/testing-advanced.md — Advanced Odoo testing
 
 Notes
 
 - Keep docs small; prefer linking by handle to larger guides when needed.
-- docs/todo/* is intentionally git‑ignored for transient work items.
+- `docs/todo/` holds tracked, living work-in-progress docs.
+  Use `*.local.md` for personal scratch notes (git-ignored).
+- Living migration doc (tracked): `docs/todo/NEW_ARCH.md` (active OPW/CM stack
+    + addons plan).

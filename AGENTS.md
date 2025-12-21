@@ -8,6 +8,8 @@ Treat this file as the launch checklist for every Codex session. Skim it, open t
 - Before changing code, open the matching style page (`docs/style/python.md`, `docs/style/javascript.md`,
   `docs/style/testing.md`).
 - Clarify your role expectations with the guides under `docs/roles/` (analyst, engineer, tester, reviewer, maintainer).
+- Active migration doc: `docs/todo/NEW_ARCH.md` (living OPW/CM stack + addons
+  plan).
 
 ## Project Snapshot
 

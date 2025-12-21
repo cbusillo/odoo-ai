@@ -43,7 +43,7 @@ Key points:
 
 ## Application Layers
 
-- **Base Odoo**: provided by `ghcr.io/adomi-io/odoo:18.0` (11ty-based image).
+- **Base Odoo**: provided by `ghcr.io/adomi-io/odoo:19.0` (11ty-based image).
 - **Custom addons**: `/volumes/addons` (repo), `/volumes/enterprise` (private mirror). Docker build stage copies both.
 - **Integrations**: Shopify active. Planned flows (eBay, etc.) reuse same deploy/restore path.
 

@@ -24,6 +24,7 @@ customization.
 | `opw-dev`     | Remote OPW dev environment | 28069/28072/... | `opw-dev`       | `opw-dev.yaml`     |
 | `opw-testing` | Remote OPW testing         | 18069/18072/... | `opw-testing`   | `opw-testing.yaml` |
 | `cm-local`    | Cell Mechanic isolation    | 9069/9072/9432  | `cm-local`      | `cm-local.yaml`    |
+| `cm-testing`  | Remote CM testing          | 8069/8072/35432 | `cm-testing`    | `cm-testing.yaml`  |
 
 ## Configuration Flow
 
@@ -160,7 +161,8 @@ ${ODOO_STATE_ROOT}/
 
 Default (if unset): `${HOME}/odoo-ai/${ODOO_PROJECT_NAME}/...`
 
-Remote stacks should explicitly set `/opt/odoo-ai/data/<stack>`.
+Remote stacks should explicitly set `/opt/odoo-ai/data/<stack>` (today we point dev/testing at
+`docker-testing.shiny`).
 
 ## Common Patterns
 

@@ -45,8 +45,8 @@ services:
       - "5432"
     ulimits:
       nofile:
-        soft: 524288
-        hard: 1048576
+        soft: ${POSTGRES_HOST_NOFILE_SOFT:-524288}
+        hard: ${POSTGRES_HOST_NOFILE_HARD:-1048576}
   script-runner:
     <<: *odoo-base
     command: tail -f /dev/null

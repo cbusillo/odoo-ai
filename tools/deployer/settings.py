@@ -1,6 +1,8 @@
 import shlex
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass
+import re
 import os
 from pathlib import Path
 
@@ -272,6 +274,28 @@ def _write_env_file(path: Path, values: dict[str, str]) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+_ENV_VAR_PATTERN = re.compile(r"\$(?:{(?P<brace>[A-Za-z_][A-Za-z0-9_]*)}|(?P<plain>[A-Za-z_][A-Za-z0-9_]*))")
+
+
+def _expand_env_vars(value: str, env: Mapping[str, str]) -> str:
+    def replace(match: re.Match[str]) -> str:
+        key = match.group("brace") or match.group("plain")
+        if key in env:
+            return env[key]
+        return match.group(0)
+
+    return _ENV_VAR_PATTERN.sub(replace, value)
+
+
+def _expand_user(value: str, env: Mapping[str, str]) -> str:
+    if value == "~":
+        return env.get("HOME") or os.path.expanduser("~")
+    if value.startswith("~/"):
+        base = env.get("HOME") or os.path.expanduser("~")
+        return f"{base}{value[1:]}"
+    return value
+
+
 @dataclass(frozen=True)
 class StackSettings:
     name: str
@@ -389,10 +413,13 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
     final_environment["ODOO_LOG_DIR"] = "/volumes/logs"
     final_environment["ODOO_DB_DIR"] = "/var/lib/postgresql/data"
     final_environment["ODOO_SESSION_DIR"] = "/volumes/logs/sessions"
+    env_for_expand = dict(os.environ)
+    env_for_expand.update(final_environment)
     for key in ("RESTORE_SSH_DIR", "RESTORE_SSH_KEY"):
         raw = final_environment.get(key)
         if raw:
-            final_environment[key] = str(_expand_path(raw))
+            expanded = _expand_env_vars(_expand_user(raw, env_for_expand), env_for_expand)
+            final_environment[key] = str(Path(expanded).expanduser().resolve())
     _write_env_file(merged_env_path, final_environment)
 
     # Log the resolved environment layering and important derived values

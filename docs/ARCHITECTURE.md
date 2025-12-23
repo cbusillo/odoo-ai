@@ -57,7 +57,6 @@ Key points:
 
 - Runtime commands – `docs/tooling/docker.md`
 - Multi-project configuration – `docs/workflows/multi-project.md`
-- Restore entry point – `uv run restore-from-upstream` (defined in `pyproject.toml`, implemented in
-  `tools/docker_runner.py`)
+- Restore entry point – `uv run restore-from-upstream` (defined in `pyproject.toml`)
 - Deploy CLI – `uv run deploy` (implemented in `tools/deployer/cli.py`)
 - Odoo internals – `docs/odoo/workflow.md`, `docs/odoo/orm.md`

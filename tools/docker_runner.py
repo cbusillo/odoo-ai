@@ -68,8 +68,22 @@ def _current_image_reference(settings) -> str:
     return settings.environment.get(settings.image_variable_name) or settings.registry_image
 
 
+def _is_truthy(raw: str | None) -> bool:
+    if raw is None:
+        return False
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _maybe_verify_stack(settings, stack_name: str) -> None:
+    verify_raw = settings.environment.get("STACK_VERIFY") or settings.environment.get("DEPLOY_STACK_VERIFY")
+    if not _is_truthy(verify_raw):
+        return
+    run_process(["uv", "run", "stack", "verify", "--stack", stack_name], cwd=settings.repo_root)
+
+
 def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize: bool = False) -> int:
     settings = load_stack_settings(stack_name)
+    _maybe_verify_stack(settings, stack_name)
     env_file_path = _ensure_stack_env(settings, stack_name)
     image_reference = _current_image_reference(settings)
     env_values_raw = build_updated_environment(settings, image_reference)

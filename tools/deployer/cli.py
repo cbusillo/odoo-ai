@@ -28,6 +28,19 @@ def convert_key_values(values: Iterable[str]) -> dict[str, str]:
     return result
 
 
+def _is_truthy(raw: str | None) -> bool:
+    if raw is None:
+        return False
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _maybe_verify_stack(settings: StackSettings, stack_name: str) -> None:
+    verify_raw = settings.environment.get("STACK_VERIFY") or settings.environment.get("DEPLOY_STACK_VERIFY")
+    if not _is_truthy(verify_raw):
+        return
+    run_process(["uv", "run", "stack", "verify", "--stack", stack_name], cwd=settings.repo_root)
+
+
 def get_git_commit(repo_root: Path) -> str:
     result = run_process(["git", "rev-parse", "HEAD"], cwd=repo_root, capture_output=True)
     output = (result.stdout or "").strip()
@@ -197,6 +210,7 @@ def deploy_command(
     repository_url = get_git_remote_url(settings.repo_root) if remote else None
     image_reference = resolve_image_reference(settings, tag, image)
     extra_variables = convert_key_values(overrides)
+    _maybe_verify_stack(settings, stack_name)
     if build_flag:
         run_build(settings, remote, no_cache, repository_url, commit)
     try:

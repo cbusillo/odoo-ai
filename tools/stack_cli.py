@@ -278,8 +278,12 @@ def sync_command(stack_name: str, manifest_path: Path | None) -> None:
         if info.head and pin.ref != info.head:
             pin.ref = info.head
             updated += 1
-        if info.branch and pin.branch != info.branch:
-            pin.branch = info.branch
+        if info.branch:
+            if pin.branch != info.branch:
+                pin.branch = info.branch
+                updated += 1
+        elif pin.branch is not None:
+            pin.branch = None
             updated += 1
     _write_manifest(manifest_file, manifest)
     click.echo(f"Synced {len(manifest.addons)} addons ({updated} updates) to {manifest_file}")

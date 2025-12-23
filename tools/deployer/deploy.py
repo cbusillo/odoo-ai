@@ -166,12 +166,17 @@ def execute_upgrade(settings: StackSettings, modules: tuple[str, ...], remote: b
         local_compose(settings, upgrade_subcommand)
 
 
-def wait_for_database(settings: StackSettings, remote: bool, timeout_seconds: int = 60) -> None:
+def wait_for_database(
+    settings: StackSettings,
+    remote: bool,
+    env_values: Mapping[str, str],
+    timeout_seconds: int = 60,
+) -> None:
     if "database" not in settings.services:
         return
-    db_user = settings.environment.get("ODOO_DB_USER") or "odoo"
-    db_name = settings.environment.get("ODOO_DB_NAME")
-    exec_subcommand = ["exec", "-T", "database", "pg_isready", "-U", db_user]
+    db_user = env_values.get("ODOO_DB_USER") or settings.environment.get("ODOO_DB_USER") or "odoo"
+    db_name = env_values.get("ODOO_DB_NAME") or settings.environment.get("ODOO_DB_NAME")
+    exec_subcommand = ["exec", "-T", "database", "pg_isready", "-q", "-U", db_user]
     if db_name:
         exec_subcommand += ["-d", db_name]
     deadline = time.monotonic() + timeout_seconds
@@ -237,7 +242,7 @@ def deploy_stack(
     execute_compose_pull(settings, remote)
     execute_compose_up(settings, remote)
     if not skip_upgrade:
-        wait_for_database(settings, remote)
+        wait_for_database(settings, remote, env_values)
         execute_upgrade(settings, settings.update_modules, remote)
     if skip_health_check:
         return

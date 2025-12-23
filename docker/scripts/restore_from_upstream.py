@@ -217,6 +217,7 @@ class LocalServerSettings(BaseSettings):
     db_name: str = Field(..., alias="ODOO_DB_NAME")
     db_conn: connection | None = None
     filestore_path: Path = Field(..., alias="ODOO_FILESTORE_PATH")
+    data_dir: Path | None = Field(None, alias="ODOO_DATA_DIR")
     filestore_owner: str | None = Field(None, alias="ODOO_FILESTORE_OWNER")
     restore_ssh_dir: Path | None = Field(None, alias="RESTORE_SSH_DIR")
     restore_ssh_key: Path | None = Field(None, alias="RESTORE_SSH_KEY")
@@ -362,6 +363,13 @@ class OdooUpstreamRestorer:
             return owner.strip()
         return None
 
+    def _effective_filestore_root(self) -> Path:
+        filestore = self.local.filestore_path
+        data_dir = self.local.data_dir
+        if data_dir and filestore == data_dir and filestore.name != "filestore":
+            return filestore / "filestore"
+        return filestore
+
     def _resolve_restore_ssh_key(self) -> Path | None:
         key = self.local.restore_ssh_key
         if not key:
@@ -405,10 +413,11 @@ class OdooUpstreamRestorer:
 
     def overwrite_filestore(self, target_owner: str | None) -> subprocess.Popen:
         upstream = self._require_upstream()
-        _logger.info("Overwriting filestore...")
-        self.local.filestore_path.mkdir(parents=True, exist_ok=True)
+        filestore_root = self._effective_filestore_root()
+        _logger.info("Overwriting filestore at %s", filestore_root)
+        filestore_root.mkdir(parents=True, exist_ok=True)
         remote_path = shlex.quote(f"{upstream.user}@{upstream.host}:{upstream.filestore_path}")
-        local_path = shlex.quote(str(self.local.filestore_path))
+        local_path = shlex.quote(str(filestore_root))
         chown_option = f"--chown={target_owner}" if target_owner else ""
         ssh_parts = self._build_ssh_command()
         ssh_command = shlex.join(ssh_parts)
@@ -422,8 +431,9 @@ class OdooUpstreamRestorer:
     def normalize_filestore_permissions(self, target_owner: str | None) -> None:
         if not target_owner:
             return
+        filestore_root = self._effective_filestore_root()
         _logger.info("Normalizing filestore ownership to %s", target_owner)
-        chown_command = f"chown -R {target_owner} {shlex.quote(str(self.local.filestore_path))}"
+        chown_command = f"chown -R {target_owner} {shlex.quote(str(filestore_root))}"
         self.run_command(chown_command)
 
     def overwrite_database(self) -> None:
@@ -540,7 +550,7 @@ class OdooUpstreamRestorer:
         self._reset_db_connection()
 
     def _clean_filestore(self) -> None:
-        filestore = self.local.filestore_path
+        filestore = self._effective_filestore_root()
         if filestore.exists():
             _logger.info("Clearing filestore at %s", filestore)
             shutil.rmtree(filestore, ignore_errors=True)

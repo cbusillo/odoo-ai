@@ -131,13 +131,23 @@ def status_command(stack_name: str, manifest_path: Path | None) -> None:
     repo_root = discover_repo_root(Path.cwd())
     settings = load_stack_settings(stack_name)
     manifest_file = manifest_path or _default_manifest_path(repo_root, stack_name)
-    manifest = _load_manifest(manifest_file)
+    manifest: AddonManifest | None = None
+    manifest_error: str | None = None
+    if manifest_file.exists():
+        try:
+            manifest = _load_manifest(manifest_file)
+        except (json.JSONDecodeError, ValidationError) as exc:
+            manifest_error = str(exc)
     _echo_kv("stack", stack_name)
     _echo_kv("env source", str(settings.source_env_file))
     _echo_kv("env merged", str(settings.env_file))
     _echo_kv("compose project", settings.compose_project)
     _echo_kv("compose files", ", ".join(str(path) for path in settings.compose_files))
-    _echo_kv("manifest", str(manifest_file if manifest_file.exists() else "(missing)"))
+    if manifest_error:
+        _echo_kv("manifest", f"invalid ({manifest_file})")
+        _echo_kv("manifest error", manifest_error)
+    else:
+        _echo_kv("manifest", str(manifest_file if manifest_file.exists() else "(missing)"))
     click.echo("\nSubmodules:")
     submodules = [_submodule_info(repo_root, path) for path in _submodule_paths(repo_root)]
     manifest_paths = _manifest_by_path(repo_root, manifest) if manifest else {}
@@ -196,7 +206,14 @@ def verify_command(stack_name: str, manifest_path: Path | None) -> None:
         raise click.ClickException(f"manifest not found: {manifest_file}")
     manifest_paths = _manifest_by_path(repo_root, manifest)
     errors: list[str] = []
-    for path in _submodule_paths(repo_root):
+    submodule_paths = _submodule_paths(repo_root)
+    if not submodule_paths:
+        errors.append("no submodules discovered; cannot verify manifest")
+    known_paths = {path.resolve() for path in submodule_paths}
+    unknown_manifest = [name for path, (name, _) in manifest_paths.items() if path not in known_paths]
+    for name in unknown_manifest:
+        errors.append(f"manifest entry {name} not found in .gitmodules")
+    for path in submodule_paths:
         info = _submodule_info(repo_root, path)
         entry = manifest_paths.get(info.path.resolve())
         if entry is None:

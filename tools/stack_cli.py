@@ -105,6 +105,22 @@ def _write_manifest(path: Path, manifest: AddonManifest) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def _require_manifest(path: Path) -> AddonManifest:
+    if not path.exists():
+        raise click.ClickException(f"manifest not found: {path}")
+    try:
+        manifest = _load_manifest(path)
+    except (json.JSONDecodeError, ValidationError) as exc:
+        raise click.ClickException(f"invalid manifest: {exc}") from exc
+    if manifest is None:
+        raise click.ClickException(f"manifest not found: {path}")
+    return manifest
+
+
+def _submodule_info_map(repo_root: Path) -> dict[Path, SubmoduleInfo]:
+    return {path.resolve(): _submodule_info(repo_root, path) for path in _submodule_paths(repo_root)}
+
+
 def _format_head(head: str | None) -> str:
     if not head:
         return "(none)"
@@ -232,3 +248,53 @@ def verify_command(stack_name: str, manifest_path: Path | None) -> None:
             click.echo(f"- {message}")
         raise click.ClickException("stack verification failed")
     click.echo("stack verification passed")
+
+
+@main.command("sync")
+@click.option("--stack", "stack_name", required=True)
+@click.option("--manifest", "manifest_path", type=click.Path(path_type=Path))
+def sync_command(stack_name: str, manifest_path: Path | None) -> None:
+    repo_root = discover_repo_root(Path.cwd())
+    manifest_file = manifest_path or _default_manifest_path(repo_root, stack_name)
+    manifest = _require_manifest(manifest_file)
+    submodules = _submodule_info_map(repo_root)
+    errors: list[str] = []
+    for name, pin in manifest.addons.items():
+        pin_path = (repo_root / pin.path).resolve()
+        info = submodules.get(pin_path)
+        if info is None:
+            errors.append(f"{name} not found in submodules")
+            continue
+        if not info.initialized:
+            errors.append(f"{name} is not initialized")
+    if errors:
+        for message in errors:
+            click.echo(f"- {message}")
+        raise click.ClickException("stack sync failed")
+    updated = 0
+    for name, pin in manifest.addons.items():
+        pin_path = (repo_root / pin.path).resolve()
+        info = submodules[pin_path]
+        if info.head and pin.ref != info.head:
+            pin.ref = info.head
+            updated += 1
+        if info.branch and pin.branch != info.branch:
+            pin.branch = info.branch
+            updated += 1
+    _write_manifest(manifest_file, manifest)
+    click.echo(f"Synced {len(manifest.addons)} addons ({updated} updates) to {manifest_file}")
+
+
+@main.command("promote")
+@click.option("--from", "from_stack", required=True)
+@click.option("--to", "to_stack", required=True)
+@click.option("--from-manifest", "from_manifest", type=click.Path(path_type=Path))
+@click.option("--to-manifest", "to_manifest", type=click.Path(path_type=Path))
+def promote_command(from_stack: str, to_stack: str, from_manifest: Path | None, to_manifest: Path | None) -> None:
+    repo_root = discover_repo_root(Path.cwd())
+    source = from_manifest or _default_manifest_path(repo_root, from_stack)
+    target = to_manifest or _default_manifest_path(repo_root, to_stack)
+    manifest = _require_manifest(source)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    _write_manifest(target, manifest)
+    click.echo(f"Promoted manifest from {source} to {target}")

@@ -48,3 +48,12 @@ Preflight Verification
 - `stack verify` runs by default for `deploy` and `restore-from-upstream`.
 - Set `STACK_VERIFY=0` (or `DEPLOY_STACK_VERIFY=0`) in a stack env file to skip
   verification for that stack.
+
+Helper Commands
+
+- `uv run stack pin --stack <name>`: create/overwrite the stack manifest with
+  current submodule refs.
+- `uv run stack sync --stack <name>`: update manifest refs from current
+  submodule HEADs.
+- `uv run stack promote --from <src> --to <dest>`: copy one manifest to another
+  stack.

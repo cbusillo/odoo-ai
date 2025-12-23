@@ -28,7 +28,7 @@
     "product_connect": {
       "branch": "testing",
       "path": "addons/product_connect",
-      "ref": "dd28e97b914270181c292d2a2110ca2d9aa8526b"
+      "ref": "7a10b1e0f8f6d4310b026702a80c9c452f657bb1"
     }
   },
   "schema_version": "1.0"

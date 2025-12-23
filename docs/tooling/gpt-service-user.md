@@ -27,11 +27,11 @@ The admin API key intentionally starts with `admin-` to ensure a unique key inde
 ## Operational Notes
 
 - Provisioning is skipped if `ODOO_KEY` is blank or unset.
-- To rotate credentials, update `ODOO_KEY` and rerun `uv run tools/docker_runner.py restore-from-upstream` (or the Codex
+- To rotate credentials, update `ODOO_KEY` and rerun `uv run restore-from-upstream --stack <stack>` (or the Codex
   restore task). The script regenerates both passwords and API keys.
 - Remove access by clearing `ODOO_KEY` and running the restore task again or deleting the users/keys in Odoo Settings.
 
 ## Related Commands
 
-- `uv run tools/docker_runner.py restore-from-upstream`
+- `uv run restore-from-upstream --stack <stack>`
 - `docker/scripts/restore_from_upstream.py`

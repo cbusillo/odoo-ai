@@ -93,7 +93,7 @@ docker compose \
 Or use the deploy tooling:
 
 ```bash
-uv run deploy deploy --stack cm-local --down
+uv run deploy down --stack cm-local
 ```
 
 Then launch your normal stack as usual (`uv run deploy deploy --stack opw-local` or `docker compose up -d web`).

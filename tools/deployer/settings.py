@@ -419,7 +419,9 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
         raw = final_environment.get(key)
         if raw:
             expanded = _expand_env_vars(_expand_user(raw, env_for_expand), env_for_expand)
-            final_environment[key] = str(Path(expanded).expanduser().resolve())
+            resolved = str(Path(expanded).expanduser().resolve())
+            final_environment[key] = resolved
+            env_for_expand[key] = resolved
     _write_env_file(merged_env_path, final_environment)
 
     # Log the resolved environment layering and important derived values

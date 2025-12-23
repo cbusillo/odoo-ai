@@ -66,6 +66,11 @@ def _submodule_info(repo_root: Path, path: Path) -> SubmoduleInfo:
     name = path.name
     if not path.exists():
         return SubmoduleInfo(name=name, path=path, head=None, branch=None, dirty=False, initialized=False)
+    inside = _git_output(
+        ["git", "-C", str(path), "rev-parse", "--is-inside-work-tree"], check=False
+    ).lower() == "true"
+    if not inside:
+        return SubmoduleInfo(name=name, path=path, head=None, branch=None, dirty=False, initialized=False)
     head: str | None = _git_output(["git", "-C", str(path), "rev-parse", "HEAD"], check=False)
     if not head:
         head = None
@@ -138,9 +143,10 @@ def status_command(stack_name: str, manifest_path: Path | None) -> None:
     manifest_paths = _manifest_by_path(repo_root, manifest) if manifest else {}
     for info in submodules:
         manifest_entry = manifest_paths.get(info.path.resolve())
+        initialized = "true" if info.initialized else "false"
         click.echo(
             f"- {info.name}: head={_format_head(info.head)} branch={_format_branch(info.branch)}"
-            f" dirty={str(info.dirty).lower()}"
+            f" dirty={str(info.dirty).lower()} initialized={initialized}"
         )
         if manifest_entry:
             _, pin = manifest_entry
@@ -195,6 +201,9 @@ def verify_command(stack_name: str, manifest_path: Path | None) -> None:
         entry = manifest_paths.get(info.path.resolve())
         if entry is None:
             errors.append(f"missing manifest entry for {info.name}")
+            continue
+        if not info.initialized:
+            errors.append(f"{info.name} is not initialized")
             continue
         _, pin = entry
         if pin.ref and info.head and pin.ref != info.head:

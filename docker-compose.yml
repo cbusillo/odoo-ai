@@ -9,7 +9,6 @@ x-odoo-base: &odoo-base
   build:
     dockerfile: docker/Dockerfile
     args:
-      PYTHON_VERSION: ${PYTHON_VERSION:?error}
       ODOO_VERSION: ${ODOO_VERSION:?error}
       ODOO_ENTERPRISE_REPOSITORY: ${ODOO_ENTERPRISE_REPOSITORY:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}

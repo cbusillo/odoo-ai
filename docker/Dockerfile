@@ -41,7 +41,7 @@ RUN cp /root/.local/bin/uv* /usr/local/bin/
 ENV CHROME_BIN=/usr/bin/chromium
 
 # Use uv for faster package installations
-RUN uv pip install --no-deps --target=/opt/odoo-cleanup odoo-addon-database-cleanup --extra-index-url https://wheelhouse.odoo-community.org/oca-simple/
+RUN uv pip install --no-deps --target=/opt/odoo-cleanup odoo-addon-database-cleanup==18.0.1.0.2.3 --extra-index-url https://wheelhouse.odoo-community.org/oca-simple/
 RUN uv pip install --target=/opt/odoo-upgrade git+https://github.com/odoo/upgrade-util
 RUN uv pip install --target=/opt/odoo-stubs git+https://github.com/odoo-ide/odoo-stubs@18.0
 

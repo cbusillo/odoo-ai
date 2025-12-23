@@ -389,6 +389,10 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
     final_environment["ODOO_LOG_DIR"] = "/volumes/logs"
     final_environment["ODOO_DB_DIR"] = "/var/lib/postgresql/data"
     final_environment["ODOO_SESSION_DIR"] = "/volumes/logs/sessions"
+    for key in ("RESTORE_SSH_DIR", "RESTORE_SSH_KEY"):
+        raw = final_environment.get(key)
+        if raw:
+            final_environment[key] = str(_expand_path(raw))
     _write_env_file(merged_env_path, final_environment)
 
     # Log the resolved environment layering and important derived values

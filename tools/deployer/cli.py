@@ -5,7 +5,7 @@ from pathlib import Path
 import click
 
 from .command import run_process
-from .compose_ops import local_compose_command, remote_compose_command
+from .compose_ops import local_compose_command, local_compose_env, remote_compose_command
 from .deploy import deploy_stack, render_settings, show_status
 from .docker_ops import build_image, inspect_image_digest, pull_image, push_image
 from .health import HealthcheckError
@@ -105,7 +105,7 @@ def run_build(
         run_remote(settings.remote_host, settings.remote_user, settings.remote_port, command, settings.remote_stack_path)
     else:
         command = local_compose_command(settings, build_args)
-        run_process(command, cwd=settings.repo_root)
+        run_process(command, cwd=settings.repo_root, env=local_compose_env(settings))
 
 
 @click.group()

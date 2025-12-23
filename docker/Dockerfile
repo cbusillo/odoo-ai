@@ -1,3 +1,5 @@
+ARG ODOO_VERSION=18.0
+
 FROM postgres:17-bullseye AS pg17
 
 FROM alpine/git as enterprise
@@ -14,14 +16,13 @@ RUN echo "Cloning Enterprise Addons from ${ODOO_ENTERPRISE_REPOSITORY} branch ${
       mkdir -p /enterprise; \
     fi
 
-FROM ghcr.io/adomi-io/odoo:19.0 as base
+ARG ODOO_VERSION
+FROM ghcr.io/adomi-io/odoo:${ODOO_VERSION} as base
 USER root
 # bring in PostgreSQL 17 client tools
 COPY --from=pg17 /usr/lib/postgresql/17/bin/pg_restore /usr/local/bin/pg_restore
 COPY --from=pg17 /usr/lib/postgresql/17/bin/psql       /usr/local/bin/psql
 COPY --from=pg17 /usr/lib/postgresql/17/bin/pg_dump      /usr/local/bin/pg_dump
-
-ARG PYTHON_VERSION
 
 RUN apt-get update && \
     apt-get install -y git openssh-client rsync software-properties-common curl ripgrep && \
@@ -44,11 +45,13 @@ RUN uv pip install --no-deps --target=/opt/odoo-cleanup odoo-addon-database-clea
 RUN uv pip install --target=/opt/odoo-upgrade git+https://github.com/odoo/upgrade-util
 RUN uv pip install --target=/opt/odoo-stubs git+https://github.com/odoo-ide/odoo-stubs@18.0
 
-RUN echo "/odoo" > /venv/lib/python${PYTHON_VERSION}/site-packages/odoo_local.pth \
-    && echo "/volumes/enterprise" > /venv/lib/python${PYTHON_VERSION}/site-packages/odoo_enterprise.pth \
-    && echo "/opt/odoo-upgrade" > /venv/lib/python${PYTHON_VERSION}/site-packages/upgrade_utils.pth \
-    && echo "/opt/odoo-cleanup" > /venv/lib/python${PYTHON_VERSION}/site-packages/database_cleanup.pth \
-    && echo "/opt/odoo-stubs" > /venv/lib/python${PYTHON_VERSION}/site-packages/odoostubs.pth
+RUN PY_SITE="$(/venv/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')" \
+    && mkdir -p "$PY_SITE" \
+    && echo "/odoo" > "$PY_SITE/odoo_local.pth" \
+    && echo "/volumes/enterprise" > "$PY_SITE/odoo_enterprise.pth" \
+    && echo "/opt/odoo-upgrade" > "$PY_SITE/upgrade_utils.pth" \
+    && echo "/opt/odoo-cleanup" > "$PY_SITE/database_cleanup.pth" \
+    && echo "/opt/odoo-stubs" > "$PY_SITE/odoostubs.pth"
 
 COPY --from=enterprise /enterprise /volumes/enterprise
 COPY /docker/config /volumes/config
@@ -58,6 +61,8 @@ COPY /pyproject.toml /volumes/pyproject.toml
 COPY /uv.lock /volumes/uv.lock
 
 RUN mkdir -p /opt && ln -sfn /volumes /opt/project
+
+RUN /venv/bin/python -m pip install --no-cache-dir setuptools
 
 RUN mkdir -p /tmp/enterprise_stub/src && \
     printf "[project]\nname = \"odoo18-enterprise\"\nversion = \"18.0.0\"\n" \

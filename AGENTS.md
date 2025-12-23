@@ -92,6 +92,7 @@ Treat this file as the launch checklist for every Codex session. Skim it, open t
   `docs/references/test-templates.md`
 - Performance & bulk operations: `docs/workflows/performance-review.md`, `docs/workflows/bulk-operations.md`
 - Planning & estimation: `docs/workflows/planning.md`
+- Stack matrix (WIP): `docs/todo/stack-matrix.md`
 - Environment utilities: `docker/scripts/restore_from_upstream.py`, `tools/codex_cloud/setup.sh`
 
 Keep AGENTS.md thin: route deeper guidance to the linked pages so we maintain a single, accurate source of truth.

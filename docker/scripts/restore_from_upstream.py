@@ -377,6 +377,14 @@ class OdooUpstreamRestorer:
         local_dir = filestore_root / self.local.db_name
         upstream_dir = filestore_root / self.upstream.db_name
         if local_dir.exists():
+            if upstream_dir.exists():
+                try:
+                    if not any(local_dir.iterdir()):
+                        shutil.rmtree(local_dir)
+                        upstream_dir.rename(local_dir)
+                        _logger.info("Renamed filestore %s -> %s", upstream_dir.name, local_dir.name)
+                except OSError as error:
+                    _logger.warning("Unable to inspect filestore %s: %s", local_dir, error)
             return
         if upstream_dir.exists():
             upstream_dir.rename(local_dir)

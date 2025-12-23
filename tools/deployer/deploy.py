@@ -312,6 +312,7 @@ def upload_env_files(settings: StackSettings) -> None:
     candidates = [settings.repo_root / "docker" / "config" / "base.env"]
     if project_slug:
         candidates.append(settings.repo_root / "docker" / "config" / f"{project_slug}.env")
+    candidates.append(settings.source_env_file)
     for path in candidates:
         if not path.exists():
             continue

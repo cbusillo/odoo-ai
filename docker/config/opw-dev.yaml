@@ -1,10 +1,21 @@
 # Variant-specific overrides for the OPW dev stack.
 
+x-opw-env: &opw-env
+  env_file:
+    - .env
+    - docker/config/base.env
+    - docker/config/opw.env
+    - docker/config/opw-dev.env
+
 services:
   web:
+    <<: *opw-env
     ports:
       - "28069:8069"
       - "28072:8072"
   database:
+    <<: *opw-env
     ports:
       - "25432:5432"
+  script-runner:
+    <<: *opw-env

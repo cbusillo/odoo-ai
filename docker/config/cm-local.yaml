@@ -2,12 +2,23 @@ name: ${COMPOSE_PROJECT_NAME:-cm-local}
 
 # Variant-specific overrides for the CM local stack.
 
+x-cm-env: &cm-env
+  env_file:
+    - .env
+    - docker/config/base.env
+    - docker/config/cm.env
+    - docker/config/cm-local.env
+
 services:
   web:
+    <<: *cm-env
     command: /odoo/odoo-bin --dev=all
     ports:
       - "9069:8069"
       - "9072:8072"
   database:
+    <<: *cm-env
     ports:
       - "9432:5432"
+  script-runner:
+    <<: *cm-env

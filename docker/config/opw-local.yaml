@@ -1,11 +1,22 @@
 # Variant-specific overrides for the OPW local stack.
 
+x-opw-env: &opw-env
+  env_file:
+    - .env
+    - docker/config/base.env
+    - docker/config/opw.env
+    - docker/config/opw-local.env
+
 services:
   web:
+    <<: *opw-env
     command: /odoo/odoo-bin --dev=all
     ports:
       - "8069:8069"
       - "8072:8072"
   database:
+    <<: *opw-env
     ports:
       - "15432:5432"
+  script-runner:
+    <<: *opw-env

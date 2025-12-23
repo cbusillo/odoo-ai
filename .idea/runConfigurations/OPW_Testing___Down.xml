@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="CM Testing - Restore" type="ShConfigurationType">
-    <option name="SCRIPT_TEXT" value="uv run restore-from-upstream --stack cm-testing" />
+  <configuration default="false" name="OPW Testing - Down" type="ShConfigurationType">
+    <option name="SCRIPT_TEXT" value="uv run deploy down --stack opw-testing" />
     <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
     <option name="SCRIPT_PATH" value="" />
     <option name="SCRIPT_OPTIONS" value="" />

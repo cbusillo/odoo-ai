@@ -37,8 +37,10 @@ def _is_truthy(raw: str | None) -> bool:
 def _maybe_verify_stack(settings: StackSettings, stack_name: str) -> None:
     if "STACK_VERIFY" in settings.environment:
         verify_raw = settings.environment.get("STACK_VERIFY")
-    else:
+    elif "DEPLOY_STACK_VERIFY" in settings.environment:
         verify_raw = settings.environment.get("DEPLOY_STACK_VERIFY")
+    else:
+        verify_raw = "1"
     if not _is_truthy(verify_raw):
         return
     run_process(["uv", "run", "stack", "verify", "--stack", stack_name], cwd=settings.repo_root)

@@ -45,5 +45,6 @@ Example (`docker/config/opw-local.addons.json`)
 
 Preflight Verification
 
-- Set `STACK_VERIFY=1` (or `DEPLOY_STACK_VERIFY=1`) in a stack env file to make
-  `deploy` and `restore-from-upstream` run `stack verify` before doing anything.
+- `stack verify` runs by default for `deploy` and `restore-from-upstream`.
+- Set `STACK_VERIFY=0` (or `DEPLOY_STACK_VERIFY=0`) in a stack env file to skip
+  verification for that stack.

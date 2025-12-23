@@ -8,16 +8,16 @@ also highlights the remaining work for the upcoming GitHub Actions flow.
 | Environment                                         | Location                            | Compose Project | Entry Commands                                                                                                                 |
 |-----------------------------------------------------|-------------------------------------|-----------------|--------------------------------------------------------------------------------------------------------------------------------|
 | Local dev (`local.odoo.outboardpartswarehouse.com`) | developer laptops                   | `odoo`          | `uv run deploy deploy --stack opw-local --build --no-cache` (optional build); `uv run restore-from-upstream --stack opw-local` |
-| Testing (`testing.odoo.outboardpartswarehouse.com`) | `docker.shiny` (`/opt/opw-testing`) | `opw-testing`   | `uv run deploy deploy --stack opw-testing --build --no-cache`; `uv run restore-from-upstream --stack opw-testing`              |
-| Dev (`dev.odoo.outboardpartswarehouse.com`)         | `docker.shiny` (`/opt/opw-dev`)     | `opw-dev`       | `uv run deploy deploy --stack opw-dev --build --no-cache`; `uv run restore-from-upstream --stack opw-dev`                      |
+| Testing (`testing.odoo.outboardpartswarehouse.com`) | `docker-testing.shiny` (`/opt/odoo-ai/repos/opw-testing`) | `opw-testing`   | `uv run deploy deploy --stack opw-testing --build --no-cache`; `uv run restore-from-upstream --stack opw-testing`              |
+| Dev (`dev.odoo.outboardpartswarehouse.com`)         | `docker-testing.shiny` (`/opt/odoo-ai/repos/opw-dev`)     | `opw-dev`       | `uv run deploy deploy --stack opw-dev --build --no-cache`; `uv run restore-from-upstream --stack opw-dev`                      |
 | Cell Mechanic local (isolated)                      | developer laptops                   | `cm-local`      | `uv run deploy deploy --stack cm-local --build --no-cache`; `uv run restore-from-upstream --stack cm-local`                    |
+| Cell Mechanic testing                               | `docker-testing.shiny` (`/opt/odoo-ai/repos/cm-testing`)  | `cm-testing`    | `uv run deploy deploy --stack cm-testing --build --no-cache`; `uv run restore-from-upstream --stack cm-testing`                |
 
 Key points:
 
 - Stack-specific env files live under `docker/config/<stack>.env` (not tracked); they set `ODOO_PROJECT_NAME`, database
   name, base URL, and include `DEPLOY_COMPOSE_FILES` so the stack loads `docker/config/_restore_ssh_volume.yaml` plus
-  the overlay (`opw-testing.yaml`, `opw-dev.yaml`). Those overlays publish host ports (web on 18069/28069, longpoll on
-  18072/28072, Postgres on 15432/25432).
+  the overlay (`opw-testing.yaml`, `opw-dev.yaml`, `cm-testing.yaml`). Host ports are defined per stack env file.
 - Bind mounts replace named volumes for persistent state. Set `ODOO_STATE_ROOT` per stack so the deploy tooling derives
   `ODOO_DATA_DIR`, `ODOO_DB_DIR`, and `ODOO_LOG_DIR` (`filestore/`, `postgres/`, `logs/`; `ODOO_LOGFILE` defaults to
   `/volumes/logs/odoo.log`). When omitted, the CLI defaults to `${HOME}/odoo-ai/${ODOO_PROJECT_NAME}/...`; remote stacks
@@ -26,8 +26,8 @@ Key points:
   `/volumes/pyproject.toml` + `/volumes/uv.lock`), so shared Python dependencies such as `pydantic` and
   `pydantic-settings` are available in every container after a rebuild.
 - `docker/config/_restore_ssh_volume.yaml` mounts the restore SSH directory. Remote stacks default to `/root/.ssh`;
-  local uses `$HOME/.ssh`. In practice we generated `id_restore_opw` on `docker.shiny` and added the public key to
-  `root@opw-prod.shiny`.
+  local uses `$HOME/.ssh`. In practice we generated `id_restore_opw` on `docker-testing.shiny` and added the public key
+  to `root@opw-prod.shiny`.
 
 ## Deploy & Restore Loop
 
@@ -43,7 +43,7 @@ Key points:
 
 ## Application Layers
 
-- **Base Odoo**: provided by `ghcr.io/adomi-io/odoo:19.0` (11ty-based image).
+- **Base Odoo**: provided by `ghcr.io/adomi-io/odoo:18.0`.
 - **Custom addons**: `/volumes/addons` (repo), `/volumes/enterprise` (private mirror). Docker build stage copies both.
 - **Integrations**: Shopify active. Planned flows (eBay, etc.) reuse same deploy/restore path.
 

@@ -1,5 +1,5 @@
 Title: Dev & Testing Automation (GitHub Actions)
-Purpose: Describe the GitHub Actions-driven workflow that builds, tests, and deploys Odoo 18 Enterprise containers to docker.shiny for the dev/testing environments.
+Purpose: Describe the GitHub Actions-driven workflow that builds, tests, and deploys Odoo 18 Enterprise containers to docker-testing.shiny for the dev/testing environments.
 When to Use: Setting up or auditing CI/CD for non-production Odoo stacks.
 Applies To: Platform/Ops maintainers.
 Inputs/Outputs: Inputs — Git pushes to `main`/`testing`, secrets from GH environment store; Outputs — tagged container images, docker compose deploys, health-check logs.
@@ -12,7 +12,7 @@ Last Updated: 2025-10-01
 - GitHub Actions is the single automation surface. No on-host webhook receiver or queue.
 - Each push to `main` (dev) or `testing` (test) triggers a build job followed by a gated deploy job.
 - Builds run on a self-hosted runner with access to Odoo Enterprise sources via BuildKit secrets.
-- Deploys SSH into docker.shiny, render `.env` from secrets, run `docker compose pull/up`, execute module upgrades, and curl a health endpoint.
+- Deploys SSH into docker-testing.shiny, render `.env` from secrets, run `docker compose pull/up`, execute module upgrades, and curl a health endpoint.
 - Rollbacks are handled by redeploying a retained image tag through `workflow_dispatch`.
 
 ## Components
@@ -64,15 +64,15 @@ jobs:
     environment: ${{ github.ref_name == 'main' && 'DEV' || 'TESTING' }}
     steps:
       - write .env from ${{ secrets.ODOO_ENV_FILE }}
-      - ssh docker.shiny "docker login ghcr.io ..."
-      - ssh docker.shiny "IMAGE_TAG=${{ needs.build.outputs.image }} docker compose -f docker-compose.yml -f environments/${{ env_name }}.yaml pull web script-runner"
-      - ssh docker.shiny "... up -d --remove-orphans"
-      - ssh docker.shiny "docker compose exec script-runner /odoo/odoo-bin -u $ODOO_UPDATE -d $ODOO_DB_NAME --stop-after-init"
-      - ssh docker.shiny "curl -sf http://localhost:<port>/web/health"
-      - ssh docker.shiny "echo '<timestamp>|<env>|<tag>|<sha>' >> /opt/odoo-ai/releases.log"
+      - ssh docker-testing.shiny "docker login ghcr.io ..."
+      - ssh docker-testing.shiny "IMAGE_TAG=${{ needs.build.outputs.image }} docker compose -f docker-compose.yml -f environments/${{ env_name }}.yaml pull web script-runner"
+      - ssh docker-testing.shiny "... up -d --remove-orphans"
+      - ssh docker-testing.shiny "docker compose exec script-runner /odoo/odoo-bin -u $ODOO_UPDATE -d $ODOO_DB_NAME --stop-after-init"
+      - ssh docker-testing.shiny "curl -sf http://localhost:<port>/web/health"
+      - ssh docker-testing.shiny "echo '<timestamp>|<env>|<tag>|<sha>' >> /opt/odoo-ai/releases.log"
 ```
 
-### docker.shiny prerequisites
+### docker-testing.shiny prerequisites
 
 - Docker Engine + Compose plugin installed.
 - Self-hosted GitHub runner registered (with Docker socket access) to execute the workflow.
@@ -91,7 +91,7 @@ jobs:
 
 2. **Deploy**
    - Determine environment from branch or manual input.
-   - Render `.env` file on docker.shiny (base64 decode + chmod 600).
+   - Render `.env` file on docker-testing.shiny (base64 decode + chmod 600).
    - Pull the new image tags.
    - Run `docker compose up -d` with environment overlay.
    - Execute module upgrade in container.
@@ -114,7 +114,7 @@ jobs:
 
 ## Implementation Checklist
 
-1. Register self-hosted runner on docker.shiny (`runs-on: self-hosted, labels: [docker-shiny]`).
+1. Register self-hosted runner on docker-testing.shiny (`runs-on: self-hosted, labels: [docker-testing]`).
 2. Configure GH Environments (DEV, TESTING) with required secrets.
 3. Implement `/web/health` endpoint in Odoo returning 200.
 4. Author `docker-compose.yml` + environment overlays under `environments/`.

@@ -19,15 +19,15 @@ compose run configurations.
 
 Shared PyCharm run configurations live in the tracked `.idea/runConfigurations/` directory:
 
-- `OPW Local Init` (`.idea/runConfigurations/OPW_Local_Init.run.xml`) bootstraps the OPW stack with
+- `OPW Local - Init` (`.idea/runConfigurations/OPW_Local_Init.run.xml`) bootstraps the OPW stack with
   `uv run restore-from-upstream --stack opw-local --bootstrap-only`.
-- `CM Local Init` (`.idea/runConfigurations/CM_Local_Init.run.xml`) performs the same bootstrap for the CM stack so you
+- `CM Local - Init` (`.idea/runConfigurations/CM_Local_Init.run.xml`) performs the same bootstrap for the CM stack so you
   start from a clean database and filestore.
-- `OPW Local Up` / `CM Local Up` (`.idea/runConfigurations/OPW_Local_Up.run.xml`,
+- `OPW Local - Up` / `CM Local - Up` (`.idea/runConfigurations/OPW_Local_Up.run.xml`,
   `.idea/runConfigurations/CM_Local_Up.run.xml`) bring the corresponding stacks online after configuration changes.
-- `OPW Local Restore` / `CM Local Restore` (`.idea/runConfigurations/OPW_Local_Restore.run.xml`,
+- `OPW Local - Restore` / `CM Local - Restore` (`.idea/runConfigurations/OPW_Local_Restore.run.xml`,
   `.idea/runConfigurations/CM_Local_Restore.run.xml`) refresh local data from upstream.
-- `OPW Testing Restore` (`.idea/runConfigurations/OPW_Testing_Restore.run.xml`) runs the upstream restore for the
+- `OPW Testing - Restore` (`.idea/runConfigurations/OPW_Testing_Restore.run.xml`) runs the upstream restore for the
   remote testing stack.
 
 Bootstrap mode clears any existing database, installs modules from `ODOO_UPDATE`, and hardens the admin password if

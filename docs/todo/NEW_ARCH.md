@@ -14,7 +14,7 @@
 - References: @docs/tooling/docker.md, @docs/workflows/multi-project.md,
   @docker/config/README.md, @tools/docker_runner.py
 - Maintainers: cbusillo
-- Last Updated: 2025-12-21
+- Last Updated: 2025-12-23
 
 This doc is the single, durable source of truth for the OPW production
 migration, Docker deploy path, and addon modularization strategy. It is
@@ -30,8 +30,8 @@ intentionally concise and updated as we progress.
 ## Current State
 
 - OPW prod is live on a legacy host (system service, not Docker).
-- OPW dev/testing Docker stacks exist and are the target for validation.
-- CM is a test site only (not production).
+- OPW dev/testing Docker stacks exist and are restored on docker-testing.
+- CM is a test site only (not production) and restored on docker-testing.
 - `product_connect` is OPW-specific today and still monolithic.
 
 ## Target State
@@ -49,10 +49,10 @@ intentionally concise and updated as we progress.
 ## Stack Matrix
 
 - OPW prod: opw-prod (legacy) — Docker stack planned, not created yet.
-- OPW testing: opw-testing (target) — validate Docker deploy + restore.
-- OPW dev: opw-dev (target) — validate Docker deploy + restore.
+- OPW testing: opw-testing (target) — restored on docker-testing.
+- OPW dev: opw-dev (target) — restored on docker-testing.
 - OPW local: opw-local (active) — local dev stack.
-- CM testing: cm-testing (target) — non-production test.
+- CM testing: cm-testing (target) — restored on docker-testing.
 - CM local: cm-local (active) — local dev stack.
 
 ## Addon Map (direction)
@@ -107,7 +107,7 @@ Notes
 - Shared addons may target multiple stacks (deploy testing first, then prod).
 - Concurrency should be per-stack to avoid overlapping deploys.
 
-## Remote Layout (docker.shiny)
+## Remote Layout (docker-testing.shiny)
 
 ```text
 /opt/odoo-ai/
@@ -188,6 +188,6 @@ Notes
 
 ## Next Actions
 
-1. Validate OPW dev/testing Docker deploy + restore flow.
-2. Draft prod cutover checklist (with rollback).
+1. Draft prod cutover checklist (with rollback).
+2. Decide opw-prod Docker stack env values (host, ports, base URL).
 3. Extract the first shared addon (likely printnode).

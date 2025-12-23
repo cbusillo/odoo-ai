@@ -26,6 +26,7 @@ services:
   web:
     <<: *odoo-base
     command: /odoo/odoo-bin
+    restart: unless-stopped
     expose:
       - "8069"
       - "8072"
@@ -50,6 +51,8 @@ services:
   script-runner:
     <<: *odoo-base
     command: tail -f /dev/null
+    healthcheck:
+      disable: true
     ports: [ ]
     working_dir: /opt/project
     restart: unless-stopped

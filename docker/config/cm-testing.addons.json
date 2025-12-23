@@ -1,0 +1,35 @@
+{
+  "addons": {
+    "cm_custom": {
+      "branch": "testing",
+      "path": "addons/cm_custom",
+      "ref": "69f0e92b03b80d1b434964a00f7ddcc7af95a962"
+    },
+    "disable_odoo_online": {
+      "branch": "main",
+      "path": "addons/disable_odoo_online",
+      "ref": "da64c0787cbedfb429470c809a68bbca8470e7f4"
+    },
+    "discuss_record_links": {
+      "branch": "main",
+      "path": "addons/discuss_record_links",
+      "ref": "3a240111e565c8cd2a520330020a78b6759623fd"
+    },
+    "external_ids": {
+      "branch": "master",
+      "path": "addons/external_ids",
+      "ref": "512ec96ce8776c5e35cc69807baf8166072e27f1"
+    },
+    "hr_employee_name_extended": {
+      "branch": "main",
+      "path": "addons/hr_employee_name_extended",
+      "ref": "471a28341bfbdbaa75abad8de65e1caa0e328caa"
+    },
+    "product_connect": {
+      "branch": "testing",
+      "path": "addons/product_connect",
+      "ref": "dd28e97b914270181c292d2a2110ca2d9aa8526b"
+    }
+  },
+  "schema_version": "1.0"
+}

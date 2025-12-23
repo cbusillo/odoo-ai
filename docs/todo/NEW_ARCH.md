@@ -12,7 +12,7 @@
 - Inputs/Outputs: Inputs = stack env files, deploy/restore tooling, addon repo
   state. Outputs = decisions, status, next actions.
 - References: @docs/tooling/docker.md, @docs/workflows/multi-project.md,
-  @docker/config/README.md, @tools/docker_runner.py
+  @docker/config/README.md
 - Maintainers: cbusillo
 - Last Updated: 2025-12-23
 

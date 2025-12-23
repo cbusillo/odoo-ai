@@ -31,6 +31,7 @@ Core Rules
 
 Odoo Plugin “Magic Types” (PyCharm)
 
+- The Odoo plugin is optional; it is only used for type hints (not runtime or run configs).
 - Enable the Odoo plugin and use its provided types for precise hints:
     - Recordsets: `odoo.model.product_template`, `odoo.model.res_partner`.
     - Values payloads: `odoo.values.product_templates`, `odoo.values.sale_orders`.

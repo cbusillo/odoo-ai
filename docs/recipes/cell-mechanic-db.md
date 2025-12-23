@@ -17,15 +17,18 @@ compose run configurations.
 
 ## 2. One-click init via run configs
 
-Shared PyCharm run configurations live in the tracked `.run/` directory:
+Shared PyCharm run configurations live in the tracked `.idea/runConfigurations/` directory:
 
-- `OPW Local Init` (`.run/OPW_Local_Init.run.xml`) bootstraps the OPW stack with
-  `uv run python tools/docker_runner.py --stack opw-local --bootstrap-only`.
-- `CM Local Init` (`.run/CM_Local_Init.run.xml`) performs the same bootstrap for the CM stack so you start from a clean
-  database and filestore.
-- `OPW Local Up` / `CM Local Up` (`.run/OPW_Local_Up.run.xml`, `.run/CM_Local_Up.run.xml`) bring the corresponding
-  stacks online after configuration changes.
-- `OPW Testing Restore` (`.run/OPW_Testing_Restore.run.xml`) runs the upstream restore for the remote testing stack.
+- `OPW Local Init` (`.idea/runConfigurations/OPW_Local_Init.run.xml`) bootstraps the OPW stack with
+  `uv run restore-from-upstream --stack opw-local --bootstrap-only`.
+- `CM Local Init` (`.idea/runConfigurations/CM_Local_Init.run.xml`) performs the same bootstrap for the CM stack so you
+  start from a clean database and filestore.
+- `OPW Local Up` / `CM Local Up` (`.idea/runConfigurations/OPW_Local_Up.run.xml`,
+  `.idea/runConfigurations/CM_Local_Up.run.xml`) bring the corresponding stacks online after configuration changes.
+- `OPW Local Restore` / `CM Local Restore` (`.idea/runConfigurations/OPW_Local_Restore.run.xml`,
+  `.idea/runConfigurations/CM_Local_Restore.run.xml`) refresh local data from upstream.
+- `OPW Testing Restore` (`.idea/runConfigurations/OPW_Testing_Restore.run.xml`) runs the upstream restore for the
+  remote testing stack.
 
 Bootstrap mode clears any existing database, installs modules from `ODOO_UPDATE`, and hardens the admin password if
 `ODOO_ADMIN_PASSWORD` is set.
@@ -63,7 +66,7 @@ stack never reuses the default `odoo` containers or Postgres/filestore directori
 
 ## 5. Wire up PyCharm
 
-1. The shared `.run/CM_Local_Up.run.xml` run configuration brings the Docker stack online. After the containers are
+1. The shared `.idea/runConfigurations/CM_Local_Up.run.xml` run configuration brings the Docker stack online. After the
    running you can add a standard **Docker Compose** or **Python** configuration for interactive debugging if needed.
 2. If you prefer to build it manually: add a **Docker Compose** configuration, include
    `docker-compose.yml`, `docker-compose.override.yml`, and `docker/config/cm-local.yaml`; target the `script-runner`

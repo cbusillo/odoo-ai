@@ -66,10 +66,14 @@ def _submodule_info(repo_root: Path, path: Path) -> SubmoduleInfo:
     name = path.name
     if not path.exists():
         return SubmoduleInfo(name=name, path=path, head=None, branch=None, dirty=False, initialized=False)
-    inside = _git_output(
-        ["git", "-C", str(path), "rev-parse", "--is-inside-work-tree"], check=False
-    ).lower() == "true"
-    if not inside:
+    toplevel_raw = _git_output(["git", "-C", str(path), "rev-parse", "--show-toplevel"], check=False)
+    if not toplevel_raw:
+        return SubmoduleInfo(name=name, path=path, head=None, branch=None, dirty=False, initialized=False)
+    try:
+        toplevel = Path(toplevel_raw).resolve()
+    except OSError:
+        return SubmoduleInfo(name=name, path=path, head=None, branch=None, dirty=False, initialized=False)
+    if toplevel != path.resolve():
         return SubmoduleInfo(name=name, path=path, head=None, branch=None, dirty=False, initialized=False)
     head: str | None = _git_output(["git", "-C", str(path), "rev-parse", "HEAD"], check=False)
     if not head:
@@ -110,7 +114,7 @@ def _require_manifest(path: Path) -> AddonManifest:
         raise click.ClickException(f"manifest not found: {path}")
     try:
         manifest = _load_manifest(path)
-    except (json.JSONDecodeError, ValidationError) as exc:
+    except (OSError, json.JSONDecodeError, ValidationError) as exc:
         raise click.ClickException(f"invalid manifest: {exc}") from exc
     if manifest is None:
         raise click.ClickException(f"manifest not found: {path}")
@@ -196,10 +200,18 @@ def pin_command(stack_name: str, manifest_path: Path | None) -> None:
     repo_root = discover_repo_root(Path.cwd())
     manifest_file = manifest_path or _default_manifest_path(repo_root, stack_name)
     addons: dict[str, AddonPin] = {}
+    errors: list[str] = []
     for path in _submodule_paths(repo_root):
         info = _submodule_info(repo_root, path)
+        if not info.initialized:
+            errors.append(f"{info.name} is not initialized")
+            continue
         rel_path = str(path.relative_to(repo_root))
         addons[info.name] = AddonPin(path=rel_path, ref=info.head, branch=info.branch)
+    if errors:
+        for message in errors:
+            click.echo(f"- {message}")
+        raise click.ClickException("cannot pin stack manifest; initialize submodules")
     manifest = AddonManifest(addons=addons)
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
     _write_manifest(manifest_file, manifest)

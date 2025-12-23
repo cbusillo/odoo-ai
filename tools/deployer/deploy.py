@@ -1,11 +1,12 @@
 import json
 import logging
 import tempfile
+import time
 from collections.abc import Mapping
 from pathlib import Path
 
-from .command import CommandError
-from .compose_ops import local_compose, remote_compose_command
+from .command import CommandError, run_process
+from .compose_ops import local_compose, local_compose_command, local_compose_env, remote_compose_command
 from .health import HealthcheckError, wait_for_health
 from .remote import ensure_remote_directory, run_remote, sync_remote_repository, upload_file
 from .settings import StackSettings, infer_project_slug
@@ -129,6 +130,19 @@ def execute_compose_up(settings: StackSettings, remote: bool) -> None:
         local_compose(settings, ["up", "-d", *settings.services])
 
 
+def execute_compose_down(settings: StackSettings, remote: bool) -> None:
+    extra = ["down", "--remove-orphans"]
+    if remote:
+        if settings.remote_host is None:
+            raise ValueError("remote host missing")
+        if settings.remote_stack_path is None:
+            raise ValueError("remote stack path missing")
+        command = remote_compose_command(settings, extra)
+        run_remote(settings.remote_host, settings.remote_user, settings.remote_port, command, settings.remote_stack_path)
+    else:
+        local_compose(settings, extra)
+
+
 def execute_upgrade(settings: StackSettings, modules: tuple[str, ...], remote: bool) -> None:
     if not modules:
         raise ValueError("no modules configured for upgrade")
@@ -150,6 +164,43 @@ def execute_upgrade(settings: StackSettings, modules: tuple[str, ...], remote: b
         run_remote(settings.remote_host, settings.remote_user, settings.remote_port, command, settings.remote_stack_path)
     else:
         local_compose(settings, upgrade_subcommand)
+
+
+def wait_for_database(settings: StackSettings, remote: bool, timeout_seconds: int = 60) -> None:
+    if "database" not in settings.services:
+        return
+    db_user = settings.environment.get("ODOO_DB_USER") or "odoo"
+    db_name = settings.environment.get("ODOO_DB_NAME")
+    exec_subcommand = ["exec", "-T", "database", "pg_isready", "-U", db_user]
+    if db_name:
+        exec_subcommand += ["-d", db_name]
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        try:
+            if remote:
+                if settings.remote_host is None:
+                    raise ValueError("remote host missing")
+                if settings.remote_stack_path is None:
+                    raise ValueError("remote stack path missing")
+                command = remote_compose_command(settings, exec_subcommand)
+                run_remote(
+                    settings.remote_host,
+                    settings.remote_user,
+                    settings.remote_port,
+                    command,
+                    settings.remote_stack_path,
+                )
+            else:
+                run_process(
+                    local_compose_command(settings, exec_subcommand),
+                    cwd=settings.repo_root,
+                    env=local_compose_env(settings),
+                )
+            return
+        except Exception as error:  # noqa: BLE001
+            if time.monotonic() >= deadline:
+                raise error
+            time.sleep(2)
 
 
 def run_health_check(settings: StackSettings, remote: bool, timeout_seconds: int) -> None:
@@ -186,6 +237,7 @@ def deploy_stack(
     execute_compose_pull(settings, remote)
     execute_compose_up(settings, remote)
     if not skip_upgrade:
+        wait_for_database(settings, remote)
         execute_upgrade(settings, settings.update_modules, remote)
     if skip_health_check:
         return

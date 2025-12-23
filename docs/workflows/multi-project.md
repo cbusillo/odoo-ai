@@ -67,7 +67,7 @@ uv run deploy deploy --stack cm-local --build
 uv run deploy deploy --stack cm-local
 
 # Stop the stack
-uv run deploy deploy --stack cm-local --down
+uv run deploy down --stack cm-local
 ```
 
 Or manually with `docker compose`:
@@ -141,7 +141,7 @@ You can run multiple stacks simultaneously or switch between them:
 
 ```bash
 # Stop current stack
-uv run deploy deploy --stack opw-local --down
+uv run deploy down --stack opw-local
 
 # Start different stack
 uv run deploy deploy --stack cm-local

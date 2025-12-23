@@ -43,6 +43,10 @@ _logger = logging.getLogger(__name__)
 RESTORE_SCRIPT = "/volumes/scripts/restore_from_upstream.py"
 
 
+class StackVerifyError(RuntimeError):
+    pass
+
+
 def _handle_restore_exit(error: CommandError) -> None:
     if error.returncode == 10:
         _logger.warning(
@@ -83,7 +87,15 @@ def _maybe_verify_stack(settings, stack_name: str) -> None:
         verify_raw = "1"
     if not _is_truthy(verify_raw):
         return
-    run_process(["uv", "run", "stack", "verify", "--stack", stack_name], cwd=settings.repo_root)
+    result = run_process(
+        ["uv", "run", "stack", "verify", "--stack", stack_name],
+        cwd=settings.repo_root,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        output = "\n".join(part for part in ((result.stdout or "").strip(), (result.stderr or "").strip()) if part)
+        raise StackVerifyError(output or "stack verification failed")
 
 
 def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize: bool = False) -> int:
@@ -247,7 +259,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
-    return restore_stack(args.stack, bootstrap_only=args.bootstrap_only, no_sanitize=args.no_sanitize)
+    try:
+        return restore_stack(args.stack, bootstrap_only=args.bootstrap_only, no_sanitize=args.no_sanitize)
+    except StackVerifyError as exc:
+        _logger.error("%s", exc)
+        return 1
 
 
 def restore_from_upstream() -> int:  # Entry point for pyproject scripts

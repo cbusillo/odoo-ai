@@ -17,6 +17,7 @@
 Stack Matrix
 
 - `opw-local` → `docker/config/opw-local.env`, manifest `docker/config/opw-local.addons.json`
+- `opw-dev` → `docker/config/opw-dev.env`, manifest `docker/config/opw-dev.addons.json`
 - `opw-testing` → `docker/config/opw-testing.env`, manifest `docker/config/opw-testing.addons.json`
 - `opw-prod` → `docker/config/opw-prod.env`, manifest `docker/config/opw-prod.addons.json`
 - `cm-local` → `docker/config/cm-local.env`, manifest `docker/config/cm-local.addons.json`

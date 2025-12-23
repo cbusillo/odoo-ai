@@ -4,9 +4,9 @@ from pathlib import Path
 
 import click
 
-from .command import run_process
+from .command import CommandError, run_process
 from .compose_ops import local_compose_command, local_compose_env, remote_compose_command
-from .deploy import deploy_stack, render_settings, show_status
+from .deploy import deploy_stack, execute_compose_down, render_settings, show_status
 from .docker_ops import build_image, inspect_image_digest, pull_image, push_image
 from .health import HealthcheckError
 from .remote import run_remote, sync_remote_repository
@@ -43,7 +43,15 @@ def _maybe_verify_stack(settings: StackSettings, stack_name: str) -> None:
         verify_raw = "1"
     if not _is_truthy(verify_raw):
         return
-    run_process(["uv", "run", "stack", "verify", "--stack", stack_name], cwd=settings.repo_root)
+    result = run_process(
+        ["uv", "run", "stack", "verify", "--stack", stack_name],
+        cwd=settings.repo_root,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        output = "\n".join(part for part in ((result.stdout or "").strip(), (result.stderr or "").strip()) if part)
+        raise click.ClickException(output or "stack verification failed")
 
 
 def get_git_commit(repo_root: Path) -> str:
@@ -243,6 +251,16 @@ def status_command(stack_name: str, env_file: Path | None, remote_flag: bool | N
     settings = load_stack_settings(stack_name, env_file)
     remote = resolve_remote_flag(settings, remote_flag)
     show_status(settings, remote)
+
+
+@main.command("down")
+@click.option("--stack", "stack_name", required=True)
+@click.option("--env-file", type=click.Path(path_type=Path))
+@click.option("--remote/--local", "remote_flag", default=None)
+def down_command(stack_name: str, env_file: Path | None, remote_flag: bool | None) -> None:
+    settings = load_stack_settings(stack_name, env_file)
+    remote = resolve_remote_flag(settings, remote_flag)
+    execute_compose_down(settings, remote)
 
 
 @main.command("inspect")

@@ -412,6 +412,32 @@ class OdooUpstreamRestorer:
             entry.rename(target)
         _logger.info("Moved filestore contents into %s", local_dir)
 
+    def _cleanup_filestore_extras(self) -> None:
+        filestore_root = self._effective_filestore_root()
+        local_dir = filestore_root / self.local.db_name
+        candidates = [filestore_root]
+        if local_dir.exists():
+            candidates.append(local_dir)
+
+        known_extra_dirs = ("config", "data", "enterprise", "extra_addons", "logs", "scripts")
+        for base in candidates:
+            for name in known_extra_dirs:
+                path = base / name
+                if not path.is_dir():
+                    continue
+                try:
+                    if any(path.iterdir()):
+                        _logger.warning("Found unexpected non-empty filestore dir: %s", path)
+                        continue
+                except OSError as error:
+                    _logger.warning("Unable to inspect filestore dir %s: %s", path, error)
+                    continue
+                try:
+                    path.rmdir()
+                    _logger.info("Removed empty filestore dir: %s", path)
+                except OSError as error:
+                    _logger.warning("Unable to remove filestore dir %s: %s", path, error)
+
     def _resolve_restore_ssh_key(self) -> Path | None:
         key = self.local.restore_ssh_key
         if not key:
@@ -1343,6 +1369,7 @@ with registry.cursor() as cr:
             raise OdooRestorerError("Filestore rsync failed.")
         _logger.info("Filestore overwrite completed.")
         self._finalize_filestore_layout()
+        self._cleanup_filestore_extras()
         self.normalize_filestore_permissions(target_owner)
         if do_sanitize:
             try:

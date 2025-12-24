@@ -365,6 +365,8 @@ class OdooUpstreamRestorer:
 
     def _effective_filestore_root(self) -> Path:
         filestore = self.local.filestore_path
+        if filestore.name == self.local.db_name:
+            return filestore.parent
         data_dir = self.local.data_dir
         if data_dir:
             try:
@@ -380,7 +382,11 @@ class OdooUpstreamRestorer:
     def _finalize_filestore_layout(self) -> None:
         if not self.upstream:
             return
+        if self.upstream.db_name == self.local.db_name:
+            return
         filestore_root = self._effective_filestore_root()
+        if filestore_root.name == self.local.db_name:
+            filestore_root = filestore_root.parent
         local_dir = filestore_root / self.local.db_name
         upstream_dir = filestore_root / self.upstream.db_name
         if local_dir.exists():

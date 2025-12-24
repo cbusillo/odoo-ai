@@ -379,12 +379,18 @@ class OdooUpstreamRestorer:
         if local_dir.exists():
             if upstream_dir.exists():
                 try:
-                    if not any(local_dir.iterdir()):
-                        shutil.rmtree(local_dir)
-                        upstream_dir.rename(local_dir)
-                        _logger.info("Renamed filestore %s -> %s", upstream_dir.name, local_dir.name)
+                    for entry in upstream_dir.iterdir():
+                        target = local_dir / entry.name
+                        if target.exists():
+                            if target.is_dir():
+                                shutil.rmtree(target)
+                            else:
+                                target.unlink()
+                        entry.rename(target)
+                    upstream_dir.rmdir()
+                    _logger.info("Merged filestore %s into %s", upstream_dir.name, local_dir.name)
                 except OSError as error:
-                    _logger.warning("Unable to inspect filestore %s: %s", local_dir, error)
+                    _logger.warning("Unable to merge filestore %s: %s", upstream_dir, error)
             return
         if upstream_dir.exists():
             upstream_dir.rename(local_dir)

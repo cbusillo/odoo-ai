@@ -259,7 +259,7 @@ class LocalServerSettings(BaseSettings):
         expanded = os.path.expanduser(os.path.expandvars(raw))
         return Path(expanded)
 
-    @field_validator("filestore_path", mode="before")
+    @field_validator("filestore_path", "data_dir", mode="before")
     @classmethod
     def _normalize_filestore_path(cls, value: object) -> object:
         if value is None:
@@ -366,8 +366,15 @@ class OdooUpstreamRestorer:
     def _effective_filestore_root(self) -> Path:
         filestore = self.local.filestore_path
         data_dir = self.local.data_dir
-        if data_dir and filestore == data_dir and filestore.name != "filestore":
-            return filestore / "filestore"
+        if data_dir:
+            try:
+                filestore_resolved = filestore.resolve()
+                data_dir_resolved = data_dir.resolve()
+            except OSError:
+                filestore_resolved = filestore
+                data_dir_resolved = data_dir
+            if filestore_resolved == data_dir_resolved and filestore.name != "filestore":
+                return filestore / "filestore"
         return filestore
 
     def _finalize_filestore_layout(self) -> None:
@@ -484,8 +491,10 @@ class OdooUpstreamRestorer:
         filestore_root = self._effective_filestore_root()
         _logger.info("Overwriting filestore at %s", filestore_root)
         filestore_root.mkdir(parents=True, exist_ok=True)
-        remote_path = shlex.quote(f"{upstream.user}@{upstream.host}:{upstream.filestore_path}")
-        local_path = shlex.quote(str(filestore_root))
+        remote_root = f"{str(upstream.filestore_path).rstrip('/')}/"
+        local_root = f"{str(filestore_root).rstrip('/')}/"
+        remote_path = shlex.quote(f"{upstream.user}@{upstream.host}:{remote_root}")
+        local_path = shlex.quote(local_root)
         chown_option = f"--chown={target_owner}" if target_owner else ""
         ssh_parts = self._build_ssh_command()
         ssh_command = shlex.join(ssh_parts)

@@ -18,10 +18,6 @@ services:
       - docker/config/cm-testing.env
     ports:
       - "${ODOO_DB_HOST_PORT:-25432}:5432"
-    ulimits:
-      nofile:
-        soft: ${POSTGRES_HOST_NOFILE_SOFT:-1024}
-        hard: ${POSTGRES_HOST_NOFILE_HARD:-1024}
   script-runner:
     env_file:
       - .env

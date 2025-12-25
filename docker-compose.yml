@@ -25,8 +25,8 @@ x-odoo-base: &odoo-base
     - odoo_logs:/volumes/logs
 
 x-odoo-env: &odoo-env
-  ODOO_DB_HOST: ${ODOO_DB_HOST:-database}
-  ODOO_DB_PORT: ${ODOO_DB_PORT:-5432}
+  ODOO_DB_HOST: database
+  ODOO_DB_PORT: "5432"
   ODOO_ADDONS_PATH: ${ODOO_ADDONS_PATH:-/opt/project/addons,/odoo/addons,/volumes/enterprise}
   ODOO_UPDATE: ${ODOO_UPDATE:-AUTO}
 

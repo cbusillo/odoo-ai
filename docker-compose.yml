@@ -17,7 +17,7 @@ x-odoo-base: &odoo-base
   env_file:
     - .env
   volumes:
-    - ~/.ssh:/home/ubuntu/.ssh:ro
+    - ${ODOO_SSH_HOST_DIR:-/root/.ssh}:/home/ubuntu/.ssh:ro
     - ${ODOO_DATA_HOST_DIR:-${ODOO_STATE_ROOT}/filestore}:/volumes/data
     - ${ODOO_LOG_HOST_DIR:-${ODOO_STATE_ROOT}/logs}:/volumes/logs
 

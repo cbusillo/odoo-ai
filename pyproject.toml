@@ -39,6 +39,7 @@ test-rerun = "tools.testkit.shortcuts:test_rerun_failures"
 test-doctor = "tools.testkit.shortcuts:test_doctor"
 deploy = "tools.deployer.cli:main"
 restore-from-upstream = "tools.docker_runner:restore_from_upstream"
+stack = "tools.stack_cli:main"
 
 [tool.uv]
 preview = true

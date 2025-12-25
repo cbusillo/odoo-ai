@@ -40,6 +40,7 @@
 - Local deploy: `uv run deploy deploy --stack <stack>`
 - Local restore: `uv run restore-from-upstream --stack <stack>`
 - Remote deploys: Coolify UI (source = repo `docker-compose.yml` + env vars)
+- Local port bindings + live mounts: `docker-compose.override.yml` (local-only)
 
 ## Addon map (direction)
 
@@ -56,4 +57,5 @@ Rule: shared addons must never depend on `product_connect`.
 ## Next actions
 
 1. Validate OPW dev/testing stability in Coolify.
-2. Draft OPW prod cutover checklist when ready.
+2. Stabilize cm-testing (restart loops).
+3. Draft OPW prod cutover checklist when ready.

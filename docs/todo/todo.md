@@ -11,5 +11,6 @@
   - Move shared env vars into Coolify shared variables (PYTHON_VERSION,
     ODOO_VERSION, COMPOSE_BUILD_TARGET, ODOO_ADDONS_PATH,
     ODOO_ENTERPRISE_REPOSITORY, ODOO_UPDATE, GITHUB_TOKEN).
-  - Update NEW_ARCH.md to reflect Coolify-based deploy flow and remove legacy notes.
+  - Add Docker Hub login on the Coolify build host to avoid pull stalls.
+  - Verify cm-testing stability (restart loops) and capture root cause.
   - Prune uv scripts that are no longer used (keep restore/sanitize/init helpers).

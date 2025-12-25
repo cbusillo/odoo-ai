@@ -28,7 +28,7 @@ Tips
 ## Environment Variable Quick Reference
 
 - `DEPLOY_COMPOSE_FILES` accepts colon- or comma-delimited values. Example:
-  `DEPLOY_COMPOSE_FILES=docker-compose.yml:docker-compose.override.yml:docker/config/base.yaml:docker/config/opw.yaml`.
+  `DEPLOY_COMPOSE_FILES=docker/config/base.yaml:docker/config/opw.yaml`.
 - `ODOO_UPDATE=AUTO` discovers modules under `LOCAL_ADDONS_DIRS` or `ODOO_ADDONS_PATH`; set
   `LOCAL_ADDONS_DIRS=/volumes/addons/opw:/volumes/enterprise` (colon/comma delimited) to control the search.
 
@@ -36,6 +36,10 @@ Tips
 
 Local stacks use layered configs stored in `docker/config/`. The concise source
 of truth is `docker/config/README.md`.
+
+`docker-compose.override.yml` is local-only (ignored by git). Create it when
+you need port bindings or live code mounts; see
+`docs/workflows/multi-project.md` for an example.
 
 The `uv run deploy deploy --stack <name>` command reads `DEPLOY_COMPOSE_FILES`
 and assembles the correct file order automatically.

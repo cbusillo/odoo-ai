@@ -19,7 +19,7 @@ Compose overlays (most generic → most specific):
 
 ```text
 docker-compose.yml
-→ docker-compose.override.yml
+→ docker-compose.override.yml (local-only)
 → docker/config/base.yaml
 → docker/config/{project}.yaml
 → optional extras (e.g. docker/config/_restore_ssh_volume.yaml)
@@ -51,6 +51,8 @@ docker-compose.yml
 ## Notes
 
 - Real `*.env` files are untracked; keep secrets out of git.
+- Create a local `docker-compose.override.yml` to expose ports and mount the
+  repo for live-editing (see `docs/workflows/multi-project.md`).
 - Local-only overrides live in the env files (for example `ODOO_WEB_COMMAND`
   and host port mappings).
 - Use `docker/config/_restore_ssh_volume.yaml` when running

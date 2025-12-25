@@ -28,7 +28,7 @@ Tips
 ## Environment Variable Quick Reference
 
 - `DEPLOY_COMPOSE_FILES` accepts colon- or comma-delimited values. Example:
-  `DEPLOY_COMPOSE_FILES=docker-compose.yml:docker-compose.override.yml:docker/config/opw-local.yaml`.
+  `DEPLOY_COMPOSE_FILES=docker-compose.yml:docker-compose.override.yml:docker/config/base.yaml:docker/config/opw.yaml`.
 - `ODOO_UPDATE=AUTO` discovers modules under `LOCAL_ADDONS_DIRS` or `ODOO_ADDONS_PATH`; set
   `LOCAL_ADDONS_DIRS=/volumes/addons/opw:/volumes/enterprise` (colon/comma delimited) to control the search.
 

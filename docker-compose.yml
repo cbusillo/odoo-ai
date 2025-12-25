@@ -34,7 +34,7 @@ name: ${ODOO_PROJECT_NAME:-odoo}
 services:
   web:
     <<: *odoo-base
-    command: ${ODOO_WEB_COMMAND:-/odoo/odoo-bin}
+    command: ${ODOO_WEB_COMMAND:-/odoo/odoo-bin --db_host=database --db_port=5432}
     environment:
       <<: *odoo-env
     expose:
@@ -66,7 +66,7 @@ services:
       CHROMIUM_FLAGS: --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-software-rasterizer --window-size=1920,1080 --no-first-run --no-default-browser-check --disable-features=TranslateUI,site-per-process,IsolateOrigins,BlockInsecurePrivateNetworkRequests
   shell:
     <<: *odoo-base
-    command: odoo shell -d ${ODOO_DB_NAME}
+    command: odoo shell -d ${ODOO_DB_NAME} --db_host=database --db_port=5432
     environment:
       <<: *odoo-env
     tty: true

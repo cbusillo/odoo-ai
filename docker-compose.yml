@@ -34,7 +34,7 @@ name: ${ODOO_PROJECT_NAME:-odoo}
 services:
   web:
     <<: *odoo-base
-    command: ${ODOO_WEB_COMMAND:-/odoo/odoo-bin --db_host=database --db_port=5432}
+    command: /odoo/odoo-bin --db_host=database --db_port=5432
     environment:
       <<: *odoo-env
     expose:

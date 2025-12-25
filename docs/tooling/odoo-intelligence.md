@@ -53,5 +53,3 @@ Container management helpers
   failure.
 - `odoo-intelligence__odoo_restart(services="web-1")` (or `database-1`, `shell-1`, …) wraps `docker restart` with retry
   logic and will start the container when it is currently stopped.
-- Pair the above with the Docker MCP (`docker__list_containers`, `docker__run_container`, …) instead of raw `docker` CLI
-  to keep results structured and reusable inside Codex.

@@ -25,11 +25,6 @@ Tips
 - Stream long logs with `-f`, then Ctrl+C
 - Prefer updates via script-runner; avoid mutating the web container
 
-Note
-
-- Using the Docker MCP tools? See docs/tooling/docker-mcp.md for parameter shapes and examples (JSON for environment,
-  ports, volumes).
-
 ## Environment Variable Quick Reference
 
 - `DEPLOY_COMPOSE_FILES` accepts colon- or comma-delimited values. Example:

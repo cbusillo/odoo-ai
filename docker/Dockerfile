@@ -46,17 +46,13 @@ ENV PATH="/root/.local/bin:$PATH"
 RUN cp /root/.local/bin/uv* /usr/local/bin/
 
 # Use uv for faster package installations
-RUN uv pip install --no-deps --target=/opt/odoo-cleanup \
-      odoo-addon-database-cleanup \
-      --extra-index-url https://wheelhouse.odoo-community.org/oca-simple/ \
-    && uv pip install --target=/opt/odoo-upgrade git+https://github.com/odoo/upgrade-util \
+RUN uv pip install --target=/opt/odoo-upgrade git+https://github.com/odoo/upgrade-util \
     && uv pip install --target=/opt/odoo-stubs git+https://github.com/odoo-ide/odoo-stubs@18.0
 
 RUN PY_SITE="$(python3 -c "import site; print(site.getsitepackages()[0])")" \
     && echo "/odoo" > "${PY_SITE}/odoo_local.pth" \
     && echo "/volumes/enterprise" > "${PY_SITE}/odoo_enterprise.pth" \
     && echo "/opt/odoo-upgrade" > "${PY_SITE}/upgrade_utils.pth" \
-    && echo "/opt/odoo-cleanup" > "${PY_SITE}/database_cleanup.pth" \
     && echo "/opt/odoo-stubs" > "${PY_SITE}/odoostubs.pth"
 
 COPY --from=enterprise /enterprise /volumes/enterprise

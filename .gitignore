@@ -189,7 +189,6 @@ cython_debug/
 #.idea/
 
 *.override.yml
-!docker-compose.override.yml
 odoo.*.cfg
 odoo.*.conf
 

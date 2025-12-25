@@ -17,8 +17,8 @@ x-odoo-base: &odoo-base
   env_file:
     - .env
   volumes:
-    - ${ODOO_DATA_HOST_DIR:-${ODOO_STATE_ROOT}/filestore}:/volumes/data
-    - ${ODOO_LOG_HOST_DIR:-${ODOO_STATE_ROOT}/logs}:/volumes/logs
+    - odoo_data:/volumes/data
+    - odoo_logs:/volumes/logs
 
 name: ${ODOO_PROJECT_NAME:-odoo}
 services:
@@ -35,7 +35,7 @@ services:
     image: postgres:17
     restart: unless-stopped
     volumes:
-      - ${ODOO_DB_HOST_DIR:-${ODOO_STATE_ROOT}/postgres}:/var/lib/postgresql/data
+      - odoo_db:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=postgres
       - POSTGRES_PASSWORD=${ODOO_DB_PASSWORD}
@@ -61,3 +61,8 @@ services:
     command: odoo shell -d ${ODOO_DB_NAME}
     tty: true
     ports: [ ]
+
+volumes:
+  odoo_data:
+  odoo_logs:
+  odoo_db:

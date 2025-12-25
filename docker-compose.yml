@@ -13,30 +13,35 @@ x-odoo-base: &odoo-base
   build:
     dockerfile: docker/Dockerfile
     args:
-      PYTHON_VERSION: ${PYTHON_VERSION:?error}
-      ODOO_VERSION: ${ODOO_VERSION:?error}
+      PYTHON_VERSION: ${PYTHON_VERSION:-3.13}
+      ODOO_VERSION: ${ODOO_VERSION:-18.0}
       ODOO_ENTERPRISE_REPOSITORY: ${ODOO_ENTERPRISE_REPOSITORY:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
-    target: ${COMPOSE_BUILD_TARGET:-production}
+    target: ${COMPOSE_BUILD_TARGET:-development}
   env_file:
     - .env
   volumes:
     - odoo_data:/volumes/data
     - odoo_logs:/volumes/logs
 
+x-odoo-env: &odoo-env
+  ODOO_DB_HOST: ${ODOO_DB_HOST:-database}
+  ODOO_DB_PORT: ${ODOO_DB_PORT:-5432}
+  ODOO_ADDONS_PATH: ${ODOO_ADDONS_PATH:-/opt/project/addons,/odoo/addons,/volumes/enterprise}
+  ODOO_UPDATE: ${ODOO_UPDATE:-AUTO}
+
 name: ${ODOO_PROJECT_NAME:-odoo}
 services:
   web:
     <<: *odoo-base
     command: ${ODOO_WEB_COMMAND:-/odoo/odoo-bin}
+    environment:
+      <<: *odoo-env
     expose:
       - "8069"
       - "8072"
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    volumes:
-      - odoo_data:/volumes/data
-      - odoo_logs:/volumes/logs
 
   database:
     image: postgres:17
@@ -56,11 +61,14 @@ services:
     restart: unless-stopped
     shm_size: "2gb"
     environment:
+      <<: *odoo-env
       CHROMIUM_BIN: /usr/bin/chromium
       CHROMIUM_FLAGS: --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-software-rasterizer --window-size=1920,1080 --no-first-run --no-default-browser-check --disable-features=TranslateUI,site-per-process,IsolateOrigins,BlockInsecurePrivateNetworkRequests
   shell:
     <<: *odoo-base
     command: odoo shell -d ${ODOO_DB_NAME}
+    environment:
+      <<: *odoo-env
     tty: true
 
 volumes:

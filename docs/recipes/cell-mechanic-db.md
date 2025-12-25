@@ -1,96 +1,48 @@
-Title: Cell Mechanic Local Database
+# Cell Mechanic Local Database
 
-Use this recipe when you want to work on the `cell_mechanic` addon in isolation without disturbing the default OPW
-stack. It defines a dedicated database, filestore, and port mappings and integrates cleanly with PyCharm's Docker
-compose run configurations.
+Use this recipe to run the `cell_mechanic` addon in isolation on your laptop
+without touching the OPW stack. It sets a dedicated database, filestore, and
+ports so PyCharm can attach cleanly.
 
-## 1. Prepare environment overrides
+## Setup
 
-1. Create `docker/config/cm-local.env` with your stack-specific configuration.
-2. Adjust values as needed:
-    - `COMPOSE_PROJECT_NAME` controls the Docker project slug; use `cm-local` so container names are
-      `cm-local-web-1`, `cm-local-database-1`, etc.
-    - `ODOO_DB_NAME` & `ODOO_PROJECT_NAME` control the database name and Odoo config label inside the container.
-    - `ODOO_UPDATE` defaults to `cell_mechanic`; add additional module names if you want them auto-installed.
-    - Port variables are already offset from the main stack (`9069/9072/9432` via the `cm-local.yaml` overlay). Change
-      them if those ports are occupied locally.
+1. Create the local env file:
 
-## 2. One-click init via run configs
+   ```bash
+   cp docker/config/cm-local.env.example docker/config/cm-local.env
+   ```
 
-Shared PyCharm run configurations live in the tracked `.run/` directory:
+2. Update values as needed (`ODOO_DB_NAME`, `ODOO_STATE_ROOT`, `ODOO_UPDATE`).
 
-- `OPW Local Init` (`.run/OPW_Local_Init.run.xml`) bootstraps the OPW stack with
-  `uv run python tools/docker_runner.py --stack opw-local --bootstrap-only`.
-- `CM Local Init` (`.run/CM_Local_Init.run.xml`) performs the same bootstrap for the CM stack so you start from a clean
-  database and filestore.
-- `OPW Local Up` / `CM Local Up` (`.run/OPW_Local_Up.run.xml`, `.run/CM_Local_Up.run.xml`) bring the corresponding
-  stacks online after configuration changes.
-- `OPW Testing Restore` (`.run/OPW_Testing_Restore.run.xml`) runs the upstream restore for the remote testing stack.
+3. Start the stack:
 
-Bootstrap mode clears any existing database, installs modules from `ODOO_UPDATE`, and hardens the admin password if
-`ODOO_ADMIN_PASSWORD` is set.
+   ```bash
+   uv run deploy deploy --stack cm-local
+   ```
 
-## 3. Restore the cm database (optional)
+4. (Optional) Restore upstream data:
 
-If you need a fresh snapshot from upstream, run the restore helper:
+   ```bash
+   uv run restore-from-upstream --stack cm-local
+   ```
 
-```bash
-uv run restore-from-upstream --stack cm-local
-```
+## PyCharm
 
-The script will create the database, sync the filestore under `${ODOO_STATE_ROOT}`, and apply `ODOO_UPDATE` modules.
+- Use the shared run config `.run/CM_Local_Up.run.xml`, or create a Docker
+  Compose run config that includes:
+  `docker-compose.yml`, `docker-compose.override.yml`, and
+  `docker/config/cm-local.yaml`.
+- Run `/odoo/odoo-bin --dev all -d ${ODOO_DB_NAME} --config /volumes/config/_generated.conf`
+  in the `script-runner` service for debugging.
 
-## 4. Start the Docker services
-
-The layered compose configuration follows the pattern `base.yaml` → `project.yaml` (e.g., `cm-local.yaml`):
-
-```bash
-docker compose \
-  -f docker-compose.yml \
-  -f docker-compose.override.yml \
-  -f docker/config/cm-local.yaml \
-  up -d web script-runner
-```
-
-Or use the deploy tooling which reads `DEPLOY_COMPOSE_FILES` from your stack's `.env`:
-
-```bash
-uv run deploy deploy --stack cm-local
-```
-
-The `cm-local.yaml` overlay sets the compose project name (`cm-local`) and injects the cm-specific env file so this
-stack never reuses the default `odoo` containers or Postgres/filestore directories.
-
-## 5. Wire up PyCharm
-
-1. The shared `.run/CM_Local_Up.run.xml` run configuration brings the Docker stack online. After the containers are
-   running you can add a standard **Docker Compose** or **Python** configuration for interactive debugging if needed.
-2. If you prefer to build it manually: add a **Docker Compose** configuration, include
-   `docker-compose.yml`, `docker-compose.override.yml`, and `docker/config/cm-local.yaml`; target the `script-runner`
-   service; and run `/odoo/odoo-bin --dev all -d ${ODOO_DB_NAME} --config /volumes/config/_generated.conf`.
-3. Optionally add a *Before launch* step that runs
-   `docker compose -f docker-compose.yml -f docker-compose.override.yml -f docker/config/cm-local.yaml up web` so
-   PyCharm ensures the HTTP worker is live first.
-
-With this configuration you can run/debug Odoo directly from PyCharm against the `cell_mechanic` database while the
-default OPW stack stays untouched on ports 8069/8072.
-
-## 6. Switch back to the default stack
-
-Stop the cm containers when you return to the primary environment:
-
-```bash
-docker compose \
-  -f docker-compose.yml \
-  -f docker-compose.override.yml \
-  -f docker/config/cm-local.yaml \
-  down
-```
-
-Or use the deploy tooling:
+## Switch back to OPW
 
 ```bash
 uv run deploy deploy --stack cm-local --down
 ```
 
-Then launch your normal stack as usual (`uv run deploy deploy --stack opw-local` or `docker compose up -d web`).
+Then start OPW again:
+
+```bash
+uv run deploy deploy --stack opw-local
+```

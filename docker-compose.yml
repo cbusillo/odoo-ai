@@ -49,10 +49,6 @@ services:
       - POSTGRES_USER=${ODOO_DB_USER}
     expose:
       - "5432"
-    ulimits:
-      nofile:
-        soft: 524288
-        hard: 1048576
   script-runner:
     <<: *odoo-base
     command: tail -f /dev/null

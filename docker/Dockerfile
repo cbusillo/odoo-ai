@@ -72,7 +72,7 @@ RUN mkdir -p /tmp/enterprise_stub/src && \
     printf "[project]\nname = \"odoo18-enterprise\"\nversion = \"18.0.0\"\n" \
         > /tmp/enterprise_stub/pyproject.toml && \
     echo "/volumes/enterprise" > /tmp/enterprise_stub/src/odoo_enterprise.pth && \
-    pip install --no-build-isolation --no-deps /tmp/enterprise_stub && \
+    python3 -m pip install --no-build-isolation --no-deps /tmp/enterprise_stub && \
     rm -rf /tmp/enterprise_stub
 
 # Production build stage - only prod dependencies

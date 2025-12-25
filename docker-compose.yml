@@ -1,3 +1,7 @@
+x-bind-opts: &bind-opts
+  type: none
+  o: bind
+
 x-odoo-base: &odoo-base
   # TODO: SECURITY WARNING - Never push this image to a registry!
   # 1. GitHub token is embedded in Docker layer history
@@ -30,6 +34,9 @@ services:
       - "8072"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - odoo_data:/volumes/data
+      - odoo_logs:/volumes/logs
 
   database:
     image: postgres:17
@@ -64,5 +71,17 @@ services:
 
 volumes:
   odoo_data:
+    driver: local
+    driver_opts:
+      <<: *bind-opts
+      device: ${ODOO_STATE_ROOT}/filestore
   odoo_logs:
+    driver: local
+    driver_opts:
+      <<: *bind-opts
+      device: ${ODOO_STATE_ROOT}/logs
   odoo_db:
+    driver: local
+    driver_opts:
+      <<: *bind-opts
+      device: ${ODOO_STATE_ROOT}/postgres

@@ -56,7 +56,7 @@ services:
   script-runner:
     <<: *odoo-base
     command: tail -f /dev/null
-    ports: [ ]
+    ports: []
     working_dir: /opt/project
     restart: unless-stopped
     shm_size: "2gb"
@@ -67,7 +67,7 @@ services:
     <<: *odoo-base
     command: odoo shell -d ${ODOO_DB_NAME}
     tty: true
-    ports: [ ]
+    ports: []
 
 volumes:
   odoo_data:

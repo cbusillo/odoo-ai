@@ -30,8 +30,7 @@ ports so PyCharm can attach cleanly.
 
 - Use the shared run config `.run/CM_Local_Up.run.xml`, or create a Docker
   Compose run config that includes:
-  `docker-compose.yml`, `docker-compose.override.yml`, and
-  `docker/config/cm-local.yaml`.
+  `docker-compose.yml` and `docker-compose.override.yml`.
 - Run `/odoo/odoo-bin --dev all -d ${ODOO_DB_NAME} --config /volumes/config/_generated.conf`
   in the `script-runner` service for debugging.
 

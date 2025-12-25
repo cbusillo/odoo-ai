@@ -22,7 +22,6 @@ docker-compose.yml
 → docker-compose.override.yml
 → docker/config/base.yaml
 → docker/config/{project}.yaml
-→ docker/config/{project}-local.yaml
 → optional extras (e.g. docker/config/_restore_ssh_volume.yaml)
 ```
 
@@ -41,7 +40,7 @@ docker-compose.yml
    cp docker/config/opw-local.env.example docker/config/opw-local.env
    ```
 
-2. Fill in real values (DB credentials, API tokens, etc.).
+2. Fill in real values (DB credentials, API tokens, ports, etc.).
 
 3. Run the stack:
 
@@ -52,5 +51,7 @@ docker-compose.yml
 ## Notes
 
 - Real `*.env` files are untracked; keep secrets out of git.
+- Local-only overrides live in the env files (for example `ODOO_WEB_COMMAND`
+  and host port mappings).
 - Use `docker/config/_restore_ssh_volume.yaml` when running
   `uv run restore-from-upstream` so the container can reach upstream hosts.

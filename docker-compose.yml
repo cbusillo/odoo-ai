@@ -61,7 +61,13 @@ services:
     restart: unless-stopped
     shm_size: "2gb"
     healthcheck:
-      disable: true
+      test:
+        - CMD-SHELL
+        - test -x /odoo/odoo-bin && test -f /volumes/scripts/restore_from_upstream.py
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     environment:
       <<: *odoo-env
       CHROMIUM_BIN: /usr/bin/chromium

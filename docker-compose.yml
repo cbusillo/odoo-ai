@@ -60,6 +60,8 @@ services:
     working_dir: /opt/project
     restart: unless-stopped
     shm_size: "2gb"
+    healthcheck:
+      disable: true
     environment:
       <<: *odoo-env
       CHROMIUM_BIN: /usr/bin/chromium

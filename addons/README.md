@@ -1,79 +1,45 @@
 # Addon Management Guide
 
-This directory contains Odoo addons managed as git submodules. This approach provides version control, independent
-development, and easy sharing across projects.
+This directory contains Odoo addons managed directly in this repo (no submodules). This keeps shared code and
+deployment tooling in one place while still letting you isolate client-specific addons by directory.
 
 ## Current Addons
 
 - **`disable_odoo_online`** - Disables Odoo online features (recommended for all projects)
 - **`product_connect`** - Example addon demonstrating advanced patterns (e-commerce, Shopify integration)
 
-## Managing Your Addons
+## Adding Your Own Addon
 
-### Adding Your Own Addon
-
-1. **Create your addon repository**
-   ```bash
-   # In a separate location
-   mkdir my-custom-addon
-   cd my-custom-addon
-   git init
-   # Develop your addon...
-   git remote add origin https://github.com/yourusername/my-custom-addon
-   git push -u origin main
-   ```
-
-2. **Add it as a submodule to your fork**
-   ```bash
-   cd odoo-ai  # Your fork
-   git submodule add https://github.com/yourusername/my-custom-addon addons/my_custom_addon
-   git add .gitmodules addons/my_custom_addon
-   git commit -m "Add my custom addon"
-   git push
-   ```
-
-### Removing an Addon
-
-To remove an addon you don't need (e.g., the example `product_connect`):
+1. Create a new addon folder under `addons/`.
+2. Add the standard Odoo structure (`__manifest__.py`, `models/`, `views/`, etc.).
+3. Commit the new files in this repo.
 
 ```bash
-git submodule deinit addons/product_connect
-git rm addons/product_connect
-git commit -m "Remove product_connect example addon"
-```
-
-### Updating Addon Versions
-
-To update a specific addon to its latest version:
-
-```bash
-cd addons/my_custom_addon
-git pull origin main
-cd ../..
+mkdir -p addons/my_custom_addon
+touch addons/my_custom_addon/__init__.py addons/my_custom_addon/__manifest__.py
 git add addons/my_custom_addon
-git commit -m "Update my_custom_addon to latest version"
+git commit -m "Add my_custom_addon"
 ```
 
-### Working with Private Addons
-
-For private addon repositories, use SSH URLs:
+## Removing an Addon
 
 ```bash
-git submodule add git@github.com:company/private-addon addons/private_addon
+rm -rf addons/my_custom_addon
+git add -A
+git commit -m "Remove my_custom_addon"
 ```
 
-Configure deploy keys or SSH access for your CI/CD pipeline.
+## Sharing Addons Externally
+
+If an addon needs to be shared outside this repo, mirror or export it from this repo instead of embedding a submodule.
+Keep the monorepo as the source of truth.
 
 ## Cloning the Project
 
-When cloning a project with submodules:
+No submodules are required:
 
 ```bash
-# Clone with submodules
-git clone --recursive https://github.com/yourusername/odoo-ai
-
-# Or if already cloned
-git submodule update --init --recursive
+git clone https://github.com/yourusername/odoo-ai
 ```
 
 ## Addon Structure
@@ -127,8 +93,6 @@ git remote add upstream https://github.com/original/odoo-ai
 git fetch upstream
 git checkout main
 git merge upstream/main
-
-# Your addon submodules remain unchanged
 git push origin main
 ```
 

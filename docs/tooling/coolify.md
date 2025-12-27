@@ -11,7 +11,7 @@ When to Use
 
 Applies To
 
-- Coolify-managed environments (OPW dev/testing, CM testing).
+- Coolify-managed environments (OPW dev/testing, CM dev/testing).
 
 Inputs/Outputs
 

@@ -10,7 +10,7 @@ Coolify-managed environments.
 | OPW local      | developer laptop | `uv run deploy deploy --stack opw-local`     |
 | CM local       | developer laptop | `uv run deploy deploy --stack cm-local`      |
 | OPW dev/testing| Coolify + Docker | Coolify UI                                   |
-| CM testing     | Coolify + Docker | Coolify UI                                   |
+| CM dev/testing | Coolify + Docker | Coolify UI                                   |
 
 ## Key points
 

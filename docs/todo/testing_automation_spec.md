@@ -1,9 +1,9 @@
 # Dev & Testing Automation (Future)
 
-Status: deferred.
+Status: deferred (stale spec).
 
 We currently deploy dev/testing via **Coolify**. The previous GitHub Actions
-spec that pushed to `docker.shiny` is no longer aligned with the active flow
+spec that pushed to a legacy host is no longer aligned with the active flow
 and has been removed to reduce noise.
 
 If we revisit CI/CD automation, prefer one of:

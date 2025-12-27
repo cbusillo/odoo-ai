@@ -234,7 +234,7 @@ def compute_remote_host(config: StackConfig) -> str | None:
         if config.remote_host_raw.lower() == "local":
             return None
         return config.remote_host_raw
-    return "docker.shiny"
+    return None
 
 
 def compute_remote_user(config: StackConfig, remote_host: str | None) -> str | None:

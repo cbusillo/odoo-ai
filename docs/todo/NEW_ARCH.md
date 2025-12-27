@@ -34,7 +34,7 @@
 - OPW local: `opw-local` (active)
 - CM local: `cm-local` (active)
 - OPW dev/testing: Coolify (active)
-- CM testing: Coolify (active)
+- CM dev/testing: Coolify (active)
 - OPW prod: legacy (migration pending)
 
 ## Deploy & restore

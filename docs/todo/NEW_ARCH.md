@@ -7,7 +7,7 @@
 - References: @docs/tooling/docker.md, @docs/workflows/multi-project.md,
   @docker/config/README.md
 - Maintainer: cbusillo
-- Last Updated: 2025-12-25
+- Last Updated: 2025-12-27
 
 ## Intent
 
@@ -44,7 +44,8 @@
 
 ## Addon map (direction)
 
-- OPW-specific: `product_connect`
+- OPW-specific: `opw_custom` (planned prime layer)
+- Shared/base: `product_connect` (migrate common pieces here)
 - CM-specific: `cm_custom`
 - Shared (extract as needed): `printnode`, `repair`, `external_ids`
 
@@ -59,3 +60,5 @@ Rule: shared addons must never depend on `product_connect`.
 1. Validate OPW dev/testing stability in Coolify.
 2. Stabilize cm-testing (restart loops).
 3. Draft OPW prod cutover checklist when ready.
+4. Create `opw_custom` addon as OPW prime layer; migrate OPW-only logic from
+   `product_connect` over time.

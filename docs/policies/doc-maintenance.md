@@ -130,7 +130,7 @@ def sync_external_documentation():
     def update_python_references():
         python_features = find_python_feature_references()
         for feature in python_features:
-            if feature['version'] < '3.12':
+            if feature['version'] < '3.13':
                 suggest_modern_alternative(feature)
 ```
 

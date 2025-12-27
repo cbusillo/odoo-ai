@@ -23,8 +23,7 @@ RUN mkdir -p /enterprise /addons; \
     fi; \
     if [ -n "${ODOO_PRIVATE_ADDON_REPOSITORIES}" ]; then \
       if [ -z "${GITHUB_TOKEN}" ]; then \
-        echo "GITHUB_TOKEN missing; cannot clone private addons"; \
-        exit 1; \
+        echo "GITHUB_TOKEN missing; cloning addons without auth (public repos only)."; \
       fi; \
       for raw in $(printf '%s' "${ODOO_PRIVATE_ADDON_REPOSITORIES}" | tr ',' ' '); do \
         repo="$(echo "$raw" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"; \
@@ -37,9 +36,14 @@ RUN mkdir -p /enterprise /addons; \
           repo="${repo%@*}"; \
         fi; \
         name="${repo##*/}"; \
-        echo "Cloning private addon from ${repo} branch ${branch} into ${name}"; \
+        if [ -n "${GITHUB_TOKEN}" ]; then \
+          remote_url="https://${GITHUB_TOKEN}@github.com/${repo}"; \
+        else \
+          remote_url="https://github.com/${repo}"; \
+        fi; \
+        echo "Cloning addon from ${repo} branch ${branch} into ${name}"; \
         git clone --branch "$branch" --single-branch --depth 1 \
-          "https://${GITHUB_TOKEN}@github.com/${repo}" "/addons/${name}"; \
+          "$remote_url" "/addons/${name}"; \
         rm -rf "/addons/${name}/.git"; \
       done; \
     else \

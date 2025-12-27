@@ -8,7 +8,7 @@ deployment tooling in one place while still letting you isolate client-specific 
 - **`product_connect`** - Example addon demonstrating advanced patterns (e-commerce, Shopify integration)
 
 Private addons (not stored in this repo) are pulled during build using
-`ODOO_PRIVATE_ADDON_REPOSITORIES`.
+`ODOO_ADDON_REPOSITORIES`.
 
 ## Adding Your Own Addon
 

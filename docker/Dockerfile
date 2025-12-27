@@ -4,7 +4,7 @@ FROM postgres:17-bullseye AS pg17
 
 FROM alpine/git AS enterprise
 ARG ODOO_ENTERPRISE_REPOSITORY
-ARG ODOO_PRIVATE_ADDON_REPOSITORIES
+ARG ODOO_ADDON_REPOSITORIES
 ARG GITHUB_TOKEN
 ARG ODOO_VERSION
 SHELL ["/bin/sh", "-euxc"]
@@ -21,11 +21,12 @@ RUN mkdir -p /enterprise /addons; \
     else \
       echo "ODOO_ENTERPRISE_REPOSITORY is empty; skipping clone."; \
     fi; \
-    if [ -n "${ODOO_PRIVATE_ADDON_REPOSITORIES}" ]; then \
+    if [ -n "${ODOO_ADDON_REPOSITORIES}" ]; then \
       if [ -z "${GITHUB_TOKEN}" ]; then \
-        echo "GITHUB_TOKEN missing; cloning addons without auth (public repos only)."; \
+        echo "GITHUB_TOKEN missing; cannot clone addons."; \
+        exit 1; \
       fi; \
-      for raw in $(printf '%s' "${ODOO_PRIVATE_ADDON_REPOSITORIES}" | tr ',' ' '); do \
+      for raw in $(printf '%s' "${ODOO_ADDON_REPOSITORIES}" | tr ',' ' '); do \
         repo="$(echo "$raw" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"; \
         if [ -z "$repo" ]; then \
           continue; \
@@ -36,18 +37,14 @@ RUN mkdir -p /enterprise /addons; \
           repo="${repo%@*}"; \
         fi; \
         name="${repo##*/}"; \
-        if [ -n "${GITHUB_TOKEN}" ]; then \
-          remote_url="https://${GITHUB_TOKEN}@github.com/${repo}"; \
-        else \
-          remote_url="https://github.com/${repo}"; \
-        fi; \
+        remote_url="https://${GITHUB_TOKEN}@github.com/${repo}"; \
         echo "Cloning addon from ${repo} branch ${branch} into ${name}"; \
         git clone --branch "$branch" --single-branch --depth 1 \
           "$remote_url" "/addons/${name}"; \
         rm -rf "/addons/${name}/.git"; \
       done; \
     else \
-      echo "ODOO_PRIVATE_ADDON_REPOSITORIES is empty; skipping clone."; \
+      echo "ODOO_ADDON_REPOSITORIES is empty; skipping clone."; \
     fi
 
 FROM ghcr.io/adomi-io/odoo:${ODOO_VERSION} AS base

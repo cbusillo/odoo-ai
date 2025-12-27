@@ -10,7 +10,7 @@ Common operations (CLI)
 Odoo-specific
 
 - Web logs: `docker logs --tail=300 ${ODOO_PROJECT_NAME}-web-1`
-- Restart services: `docker restart ${ODOO_PROJECT_NAME}-web-1 ${ODOO_PROJECT_NAME}-shell-1`
+- Restart services: `docker restart ${ODOO_PROJECT_NAME}-web-1 ${ODOO_PROJECT_NAME}-script-runner-1`
 - Update module: `docker exec ${ODOO_PROJECT_NAME}-script-runner-1 /odoo/odoo-bin -u <module> --stop-after-init`
 - Restore data: `uv run restore-from-upstream --stack <stack-name>`
     - Available stacks: `opw-local`, `cm-local`

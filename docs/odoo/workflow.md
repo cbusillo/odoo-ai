@@ -74,7 +74,6 @@ class ShopifyService:
 - **Never run Python files directly**: Always use proper Odoo environment
 - **Container purposes**:
     - **${ODOO_PROJECT_NAME}-web-1**: Main web server (user requests)
-    - **${ODOO_PROJECT_NAME}-shell-1**: Interactive shell operations
     - **${ODOO_PROJECT_NAME}-script-runner-1**: Module updates, tests, one-off scripts
 
 ## Data Patterns

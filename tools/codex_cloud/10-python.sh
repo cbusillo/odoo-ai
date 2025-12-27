@@ -49,22 +49,55 @@ if [[ -d "$VOLUMES_ROOT/scripts" ]]; then
   find "$VOLUMES_ROOT/scripts" -type f -name '*.sh' -exec chmod +x {} +
 fi
 
-ENTERPRISE_REPOSITORY="${ODOO_ENTERPRISE_REPOSITORY:-}"
+ENTERPRISE_REPOSITORY_LIST="${ODOO_ENTERPRISE_REPOSITORY:-}"
 ODOO_VERSION="${ODOO_VERSION:-18.0}"
 ENTERPRISE_TARGET="$VOLUMES_ROOT/enterprise"
 
-if [[ -n "$ENTERPRISE_REPOSITORY" ]]; then
-  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-    REMOTE_URL="https://${GITHUB_TOKEN}@github.com/${ENTERPRISE_REPOSITORY}"
-    if [[ -d "$ENTERPRISE_TARGET/.git" ]]; then
-      git -C "$ENTERPRISE_TARGET" fetch --depth 1 origin "$ODOO_VERSION"
-      git -C "$ENTERPRISE_TARGET" reset --hard FETCH_HEAD
-    else
-      rm -rf "$ENTERPRISE_TARGET"
-      git clone --branch "$ODOO_VERSION" --single-branch --depth 1 "$REMOTE_URL" "$ENTERPRISE_TARGET"
-    fi
+if [[ -n "$ENTERPRISE_REPOSITORY_LIST" ]]; then
+  if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+    log "GITHUB_TOKEN missing; skipping enterprise/private addon clones"
   else
-    log "GITHUB_TOKEN missing; skipping enterprise clone"
+    idx=0
+    while IFS= read -r raw; do
+      repo="$(echo "$raw" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+      if [[ -z "$repo" ]]; then
+        continue
+      fi
+      if [[ "$idx" -eq 0 ]]; then
+        branch="$ODOO_VERSION"
+        if [[ "$repo" == *@* ]]; then
+          branch="${repo##*@}"
+          repo="${repo%@*}"
+        fi
+        REMOTE_URL="https://${GITHUB_TOKEN}@github.com/${repo}"
+        if [[ -d "$ENTERPRISE_TARGET/.git" ]]; then
+          git -C "$ENTERPRISE_TARGET" fetch --depth 1 origin "$branch"
+          git -C "$ENTERPRISE_TARGET" reset --hard FETCH_HEAD
+        else
+          rm -rf "$ENTERPRISE_TARGET"
+          git clone --branch "$branch" --single-branch --depth 1 "$REMOTE_URL" "$ENTERPRISE_TARGET"
+        fi
+        rm -rf "$ENTERPRISE_TARGET/.git"
+      else
+        branch="main"
+        if [[ "$repo" == *@* ]]; then
+          branch="${repo##*@}"
+          repo="${repo%@*}"
+        fi
+        name="${repo##*/}"
+        target="$VOLUMES_ROOT/addons/$name"
+        REMOTE_URL="https://${GITHUB_TOKEN}@github.com/${repo}"
+        if [[ -d "$target/.git" ]]; then
+          git -C "$target" fetch --depth 1 origin "$branch"
+          git -C "$target" reset --hard FETCH_HEAD
+        else
+          rm -rf "$target"
+          git clone --branch "$branch" --single-branch --depth 1 "$REMOTE_URL" "$target"
+        fi
+        rm -rf "$target/.git"
+      fi
+      idx=$((idx + 1))
+    done < <(printf '%s\n' "$ENTERPRISE_REPOSITORY_LIST" | tr ',' '\n')
   fi
 fi
 

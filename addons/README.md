@@ -5,8 +5,10 @@ deployment tooling in one place while still letting you isolate client-specific 
 
 ## Current Addons
 
-- **`disable_odoo_online`** - Disables Odoo online features (recommended for all projects)
 - **`product_connect`** - Example addon demonstrating advanced patterns (e-commerce, Shopify integration)
+
+Private addons (not stored in this repo) are pulled during build using
+`ODOO_ENTERPRISE_REPOSITORY` list entries after the enterprise repo.
 
 ## Adding Your Own Addon
 

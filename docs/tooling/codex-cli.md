@@ -48,7 +48,8 @@ Codex Cloud Environment
       later.
 - Runtime Environment Variables (added via the Codex UI so they persist for agent commands):
     - `ODOO_DB_USER`, `ODOO_DB_PASSWORD`, `ODOO_DB_NAME`, `ODOO_DB_HOST`, `ODOO_DB_PORT` (defaults in `.env.example`).
-    - `ODOO_ENTERPRISE_REPOSITORY`, `ODOO_VERSION`, `PYTHON_VERSION`, `COMPOSE_BUILD_TARGET`, and any feature flags.
+    - `ODOO_ENTERPRISE_REPOSITORY` (comma list: enterprise repo first, optional private addon repos after),
+      `ODOO_VERSION`, `PYTHON_VERSION`, `COMPOSE_BUILD_TARGET`, and any feature flags.
 - Runtime Shell Setup: The setup script writes `/volumes/config/runtime-env.sh` with the exported variables above; have
   tasks source it (e.g., `source /volumes/config/runtime-env.sh`) before running Odoo or tests so credentials survive
   the setup-only secret window.citeturn1search0

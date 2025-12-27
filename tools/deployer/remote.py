@@ -87,12 +87,3 @@ def sync_remote_repository(
         )
         raise RuntimeError(message) from error
     run_remote(host, user, port, ["git", "-C", str(path), "reset", "--hard", commit])
-    # Ensure submodules are synced to the requested commit so custom addons are available during remote builds.
-    run_remote(host, user, port, ["git", "-C", str(path), "submodule", "sync", "--recursive"])
-    run_remote(host, user, port, ["git", "-C", str(path), "submodule", "update", "--init", "--recursive"])
-    run_remote(
-        host,
-        user,
-        port,
-        ["git", "-C", str(path), "submodule", "foreach", "--recursive", "git reset --hard"],
-    )

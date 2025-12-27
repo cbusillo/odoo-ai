@@ -31,8 +31,8 @@ Tips
   `DEPLOY_COMPOSE_FILES=docker/config/base.yaml:docker/config/opw.yaml`.
 - `ODOO_UPDATE=AUTO` discovers modules under `LOCAL_ADDONS_DIRS` or `ODOO_ADDONS_PATH`; set
   `LOCAL_ADDONS_DIRS=/volumes/addons/opw:/volumes/enterprise` (colon/comma delimited) to control the search.
-- `ODOO_ENTERPRISE_REPOSITORY` accepts a comma-separated list: enterprise repo first, optional private addon repos
-  after (cloned into `/volumes/addons/<repo>`).
+- `ODOO_PRIVATE_ADDON_REPOSITORIES` accepts a comma-separated list of private addon repos (cloned into
+  `/volumes/addons/<repo>`).
 
 ## Layered Compose Configuration
 

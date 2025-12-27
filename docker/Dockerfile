@@ -4,47 +4,46 @@ FROM postgres:17-bullseye AS pg17
 
 FROM alpine/git AS enterprise
 ARG ODOO_ENTERPRISE_REPOSITORY
+ARG ODOO_PRIVATE_ADDON_REPOSITORIES
 ARG GITHUB_TOKEN
 ARG ODOO_VERSION
 SHELL ["/bin/sh", "-euxc"]
 RUN mkdir -p /enterprise /addons; \
     if [ -n "${ODOO_ENTERPRISE_REPOSITORY}" ]; then \
-      idx=0; \
-      for raw in $(printf '%s' "${ODOO_ENTERPRISE_REPOSITORY}" | tr ',' ' '); do \
+      if [ -z "${GITHUB_TOKEN}" ]; then \
+        echo "GITHUB_TOKEN missing; cannot clone enterprise"; \
+        exit 1; \
+      fi; \
+      echo "Cloning Enterprise Addons from ${ODOO_ENTERPRISE_REPOSITORY} branch ${ODOO_VERSION}"; \
+      git clone --branch "${ODOO_VERSION}" --single-branch --depth 1 \
+        "https://${GITHUB_TOKEN}@github.com/${ODOO_ENTERPRISE_REPOSITORY}" /enterprise; \
+      rm -rf /enterprise/.git; \
+    else \
+      echo "ODOO_ENTERPRISE_REPOSITORY is empty; skipping clone."; \
+    fi; \
+    if [ -n "${ODOO_PRIVATE_ADDON_REPOSITORIES}" ]; then \
+      if [ -z "${GITHUB_TOKEN}" ]; then \
+        echo "GITHUB_TOKEN missing; cannot clone private addons"; \
+        exit 1; \
+      fi; \
+      for raw in $(printf '%s' "${ODOO_PRIVATE_ADDON_REPOSITORIES}" | tr ',' ' '); do \
         repo="$(echo "$raw" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"; \
         if [ -z "$repo" ]; then \
           continue; \
         fi; \
-        if [ -z "${GITHUB_TOKEN}" ]; then \
-          echo "GITHUB_TOKEN missing; cannot clone $repo"; \
-          exit 1; \
+        branch="main"; \
+        if echo "$repo" | grep -q '@'; then \
+          branch="${repo##*@}"; \
+          repo="${repo%@*}"; \
         fi; \
-        if [ "$idx" -eq 0 ]; then \
-          branch="$ODOO_VERSION"; \
-          if echo "$repo" | grep -q '@'; then \
-            branch="${repo##*@}"; \
-            repo="${repo%@*}"; \
-          fi; \
-          echo "Cloning Enterprise Addons from ${repo} branch ${branch}"; \
-          git clone --branch "$branch" --single-branch --depth 1 \
-            "https://${GITHUB_TOKEN}@github.com/${repo}" /enterprise; \
-          rm -rf /enterprise/.git; \
-        else \
-          branch="main"; \
-          if echo "$repo" | grep -q '@'; then \
-            branch="${repo##*@}"; \
-            repo="${repo%@*}"; \
-          fi; \
-          name="${repo##*/}"; \
-          echo "Cloning private addon from ${repo} branch ${branch} into ${name}"; \
-          git clone --branch "$branch" --single-branch --depth 1 \
-            "https://${GITHUB_TOKEN}@github.com/${repo}" "/addons/${name}"; \
-          rm -rf "/addons/${name}/.git"; \
-        fi; \
-        idx=$((idx + 1)); \
+        name="${repo##*/}"; \
+        echo "Cloning private addon from ${repo} branch ${branch} into ${name}"; \
+        git clone --branch "$branch" --single-branch --depth 1 \
+          "https://${GITHUB_TOKEN}@github.com/${repo}" "/addons/${name}"; \
+        rm -rf "/addons/${name}/.git"; \
       done; \
     else \
-      echo "ODOO_ENTERPRISE_REPOSITORY is empty; skipping clone."; \
+      echo "ODOO_PRIVATE_ADDON_REPOSITORIES is empty; skipping clone."; \
     fi
 
 FROM ghcr.io/adomi-io/odoo:${ODOO_VERSION} AS base

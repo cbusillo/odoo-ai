@@ -60,8 +60,7 @@ Treat this file as the launch checklist for every Codex session. Skim it, open t
 - Run JetBrains inspections on changed scope and then git scope before the gate (`docs/tooling/inspection.md`).
 - Use Codex built-ins for routine file reads/searches and `apply_patch`; reserve JetBrains automation for IDE-only
   tasks.
-- Sandbox/approval profiles, Codex Cloud setup, and maintenance scripts are documented in `docs/tooling/codex-cli.md`
-  and `tools/codex_cloud/setup.sh`.
+- Sandbox/approval profiles are documented in `docs/tooling/codex-cli.md`.
 
 ## Domain Notes
 
@@ -92,6 +91,6 @@ Treat this file as the launch checklist for every Codex session. Skim it, open t
   `docs/references/test-templates.md`
 - Performance & bulk operations: `docs/workflows/performance-review.md`, `docs/workflows/bulk-operations.md`
 - Planning & estimation: `docs/workflows/planning.md`
-- Environment utilities: `docker/scripts/restore_from_upstream.py`, `tools/codex_cloud/setup.sh`
+- Environment utilities: `docker/scripts/restore_from_upstream.py`
 
 Keep AGENTS.md thin: route deeper guidance to the linked pages so we maintain a single, accurate source of truth.

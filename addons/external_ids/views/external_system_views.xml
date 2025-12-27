@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- External System Tree View -->
+    <record id="view_external_system_list" model="ir.ui.view">
+        <field name="name">external.system.list</field>
+        <field name="model">external.system</field>
+        <field name="arch" type="xml">
+            <list string="External Systems">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="url" optional="hide"/>
+                <field name="external_id_count"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- External System Form View -->
+    <record id="view_external_system_form" model="ir.ui.view">
+        <field name="name">external.system.form</field>
+        <field name="model">external.system</field>
+        <field name="arch" type="xml">
+            <form string="External System">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="bg-danger"
+                            invisible="active"/>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="System Name"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="url" widget="url" string="Base URL"/>
+                            <field name="sequence"/>
+                        </group>
+                        <group>
+                            <field name="id_format" placeholder="e.g., ^[0-9]+$"/>
+                            <field name="id_prefix"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="URL Templates">
+                            <field name="url_templates">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="active" widget="boolean_toggle"/>
+                                    <field name="name"/>
+                                    <field name="code"/>
+                                    <field name="res_model_id"/>
+                                    <field name="template" placeholder="e.g., {base}/admin/products/{id}"/>
+                                </list>
+                                <form>
+                                    <group>
+                                        <field name="active"/>
+                                        <field name="name"/>
+                                        <field name="code" placeholder="e.g., store, admin, ticket" readonly="id"/>
+                                        <field name="res_model_id" placeholder="Limit to a model (optional)"/>
+                                        <field name="template" placeholder="e.g., {base}/admin/products/{id}"/>
+                                    </group>
+                                    <footer>
+                                        <button name="action_open_rename_wizard" type="object" string="Rename Key"
+                                                class="btn-secondary"
+                                                attrs="{'invisible': ['|', ('id', '=', False), ('code', '=', False)]}"/>
+                                    </footer>
+                                </form>
+                            </field>
+                        </page>
+                    </notebook>
+                    <group>
+                        <field name="description" placeholder="Describe the purpose of this external system..."/>
+                        <field name="applicable_model_ids" widget="many2many_tags" options="{'no_create_edit': True}"/>
+                    </group>
+                    <notebook position="inside">
+                        <page string="External IDs" name="external_ids">
+                            <field name="external_ids" readonly="1">
+                                <list>
+                                    <field name="res_model"/>
+                                    <field name="record_name"/>
+                                    <field name="external_id"/>
+                                    <field name="last_sync"/>
+                                    <field name="active" widget="boolean_toggle"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- External System Search View -->
+    <record id="view_external_system_search" model="ir.ui.view">
+        <field name="name">external.system.search</field>
+        <field name="model">external.system</field>
+        <field name="arch" type="xml">
+            <search string="External Systems">
+                <field name="name"/>
+                <field name="code"/>
+                <filter string="Active" name="active" domain="[('active', '=', True)]"/>
+                <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Active Status" name="group_active" context="{'group_by': 'active'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- External System Action -->
+    <record id="action_external_system" model="ir.actions.act_window">
+        <field name="name">External Systems</field>
+        <field name="res_model">external.system</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_external_system_search"/>
+        <field name="context">{'search_default_active': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first external system
+            </p>
+            <p>
+                Define external systems like Discord, RepairShopr, Grafana, etc.
+                to track employee and customer IDs across different platforms.
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu for External Systems (parent declared in menu_views.xml) -->
+    <menuitem id="menu_external_systems" name="External Systems" parent="menu_external_ids_config"
+              action="action_external_system" sequence="10"/>
+</odoo>

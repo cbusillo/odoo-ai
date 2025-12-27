@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 70 70">
+    <rect width="70" height="70" fill="#6c4b9e" rx="10"/>
+    <g transform="translate(35, 35)">
+        <!-- Central hub -->
+        <circle cx="0" cy="0" r="8" fill="#ffffff" opacity="0.9"/>
+
+        <!-- Connection lines -->
+        <line x1="0" y1="0" x2="-20" y2="-12" stroke="#ffffff" stroke-width="2" opacity="0.7"/>
+        <line x1="0" y1="0" x2="20" y2="-12" stroke="#ffffff" stroke-width="2" opacity="0.7"/>
+        <line x1="0" y1="0" x2="0" y2="20" stroke="#ffffff" stroke-width="2" opacity="0.7"/>
+
+        <!-- External system nodes -->
+        <circle cx="-20" cy="-12" r="5" fill="#ffffff" opacity="0.8"/>
+        <circle cx="20" cy="-12" r="5" fill="#ffffff" opacity="0.8"/>
+        <circle cx="0" cy="20" r="5" fill="#ffffff" opacity="0.8"/>
+
+        <!-- ID labels -->
+        <text x="0" y="3" text-anchor="middle" font-family="Arial" font-size="10" font-weight="bold" fill="#6c4b9e">ID
+        </text>
+    </g>
+</svg>

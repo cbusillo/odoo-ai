@@ -1,0 +1,9 @@
+.qr-code-input {
+  max-width: 200px;
+}
+
+// Remove inline styles from buttons
+.search-mpn-online-btn,
+.btn {
+  white-space: nowrap;
+}

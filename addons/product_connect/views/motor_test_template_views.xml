@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- List View -->
+    <record id="view_motor_test_template_list" model="ir.ui.view">
+        <field name="name">motor.test.template.list</field>
+        <field name="model">motor.test.template</field>
+        <field name="arch" type="xml">
+            <list string="Motor Test Templates">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="tag"/>
+                <field name="result_type"/>
+                <field name="stage"/>
+                <field name="section"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_motor_test_template_form" model="ir.ui.view">
+        <field name="name">motor.test.template.form</field>
+        <field name="model">motor.test.template</field>
+        <field name="arch" type="xml">
+            <form string="Motor Test Template">
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="tag"/>
+                        <field name="result_type" widget="selection_badge"/>
+                        <field name="selection_options" invisible="result_type !='selection'"/>
+                        <field name="default_value"/>
+                        <field name="stage" widget="selection_badge"/>
+                        <field name="section" widget="selection_badge"/>
+                    </group>
+                    <group>
+                        <group colspan="2">
+                            <field name="strokes" widget="many2many_checkboxes"
+                                   string="Strokes this test applies to"/>
+                        </group>
+                        <group>
+                            <field name="manufacturers" widget="many2many_checkboxes"
+                                   string="Manufacturers this test applies to"/>
+                        </group>
+                        <group>
+                            <field name="configurations" widget="many2many_checkboxes"
+                                   string="Configurations this test applies to"/>
+                        </group>
+                    </group>
+
+                    <label for="conditions" string="Tests based on this test"/>
+                    <field name="conditions">
+                        <list editable="bottom">
+                            <field name="conditional_test" string="Test Name"/>
+                            <field name="action_type"/>
+                            <field name="conditional_operator"/>
+                            <field name="condition_value"/>
+                        </list>
+                    </field>
+                    <label for="conditional_tests" string="Tests that affect this test"/>
+                    <field name="conditional_tests">
+                        <list editable="bottom">
+                            <field name="template" string="Test Name"/>
+                            <field name="action_type"/>
+                            <field name="condition_value"/>
+                        </list>
+                    </field>
+                    <label for="missing_parts" string="Missing Parts that affect this test"/>
+                    <field name="missing_parts" readonly="1">
+                        <list>
+                            <field name="name"/>
+                            <field name="hidden_tests"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+
+    <!-- Action -->
+    <record id="action_motor_test_template" model="ir.actions.act_window">
+        <field name="name">Motor Test Templates</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">motor.test.template</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+
+    <!-- Menu -->
+    <menuitem id="menu_motor_test_template" name="Motor Tests" parent="menu_subheader_config_motor"
+              action="action_motor_test_template" sequence="30"/>
+
+
+</odoo>

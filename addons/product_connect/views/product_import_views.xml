@@ -1,0 +1,134 @@
+<odoo>
+    <!-- Product Import: List View -->
+    <record id="view_product_import_list" model="ir.ui.view">
+        <field name="name">product.import.list</field>
+        <field name="model">product.template</field>
+        <field name="groups_id" eval="[(6, 0, [ref('base.group_user')])]"/>
+        <field name="arch" type="xml">
+            <list class="product_import_list_view" string="Product Import" editable="top" multi_edit="1"
+                  open_form_view="1"
+                  decoration-warning="not name or is_price_or_cost_missing"
+                  decoration-danger="has_recent_messages">
+                <header>
+                    <button string="Enable" type="object" name="enable_ready_for_sale" icon="fa-upload"/>
+                </header>
+                <field name="default_code" width="60px"/>
+                <field name="images" widget="file_drop" optional="show" width="90"/>
+                <field name="image_count" column_invisible="1"/>
+                <field name="condition" optional="show"/>
+                <field name="manufacturer" options="{'no_create': True}"/>
+                <field name="vendor" optional="show"/>
+                <field name="mpn" widget="search_mpn_online"/>
+                <field name="initial_quantity" sum="Total Quantity" widget="integer"/>
+                <field name="bin"/>
+                <field name="name"/>
+                <field name="website_description" optional="show" widget="text" class="text-nowrap"
+                       string="Description"/>
+                <field name="part_type" options="{'no_create': True}" optional="show"/>
+                <field name="weight" optional="show" widget="integer" width="100px"/>
+                <field name="length" string="L" optional="show" width="20"/>
+                <field name="width" string="W" optional="show" width="20"/>
+                <field name="height" string="H" optional="show" width="20"/>
+                <field name="list_price" optional="show" width="60"/>
+                <field name="standard_price" optional="show" width="60"/>
+                <field name="has_recent_messages" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Product Import: Form View -->
+    <record id="view_product_import_form" model="ir.ui.view">
+        <field name="name">product.import.form</field>
+        <field name="model">product.template</field>
+        <field name="arch" type="xml">
+            <form string="Product Import">
+                <chatter/>
+                <sheet name="product_import_form">
+                    <field name="image_icon" widget="image" class="oe_avatar"/>
+                    <div class="oe_title">
+                        <label for="name" string="Product Name"></label>
+                        <h1>
+                            <div class="d-flex caution">
+                                <field class="text-break" name="name" options="{'line_breaks': False}"/>
+                            </div>
+                        </h1>
+                    </div>
+                    <notebook>
+                        <page string="Details">
+                            <group>
+                                <group>
+                                    <field name="default_code" readonly="1"/>
+                                    <field name="condition"/>
+                                    <field name="mpn"/>
+                                    <field name="manufacturer" options="{'no_create': True}"/>
+                                    <field name="vendor"/>
+                                    <field name="initial_quantity" widget="integer"/>
+                                    <field name="bin"/>
+                                    <field name="list_price"/>
+                                    <field name="standard_price"/>
+                                </group>
+                                <group>
+                                    <field name="name"/>
+                                    <field name="website_description"/>
+                                    <field name="part_type" options="{'no_create': True}"/>
+                                    <field name="weight" widget="integer"/>
+                                    <field name="length"/>
+                                    <field name="width"/>
+                                    <field name="height"/>
+
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Images">
+                            <group>
+                                <field name="images">
+                                    <list string="Images" editable="bottom">
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="image_1920" widget="image" readonly="1"/>
+                                        <field name="image_1920_resolution" string="Image Res"/>
+                                        <field name="image_1920_file_size_kb" widget="integer"/>
+                                    </list>
+                                </field>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_product_import_search" model="ir.ui.view">
+        <field name="name">product.import.search</field>
+        <field name="model">product.template</field>
+        <field name="arch" type="xml">
+            <search string="Product">
+                <field name="default_code" string="Product"
+                       filter_domain="['|', '|', ('name', 'ilike', self) , ('default_code', 'ilike', self), ('bin', 'ilike', self)]"/>
+                <field name="name"/>
+                <field name="default_code"/>
+                <field name="bin"/>
+                <field name="vendor"/>
+            </search>
+
+        </field>
+    </record>
+
+    <record id="action_product_import" model="ir.actions.act_window">
+        <field name="name">Product Import</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">product.template</field>
+        <field name="view_mode">list,form</field>
+        <field name="groups_id" eval="[(6,0,[ref('base.group_user')])]"/>
+        <field name="view_ids" eval="[(5, 0, 0),
+        (0, 0, {'view_mode': 'list', 'view_id': ref('view_product_import_list')}),
+        (0, 0, {'view_mode': 'form', 'view_id': ref('view_product_import_form')})]"/>
+        <field name="search_view_id" ref="view_product_import_search"/>
+        <field name="domain">[('source', '=', 'import'), ('is_ready_for_sale', '=', False)]</field>
+        <field name="context">{'default_source': 'import'}</field>
+    </record>
+
+    <!-- Product Import: Sequence -->
+    <menuitem id="menu_product_import" name="Product Import" action="action_product_import"
+              parent="stock.menu_stock_inventory_control" sequence="10"
+              groups="base.group_user"/>
+</odoo>

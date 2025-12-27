@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="product_connect.TestingBanner">
+        <t t-if="state.isTestEnvironment">
+            <div t-attf-class="{{bannerClasses}}">
+                <div class="banner-content">
+                    <span>⚠️</span>
+                    <span t-out="bannerText"/>
+                    <span>(<t t-out="state.hostname"/>)</span>
+                    <span>⚠️</span>
+                </div>
+            </div>
+        </t>
+    </t>
+</templates>

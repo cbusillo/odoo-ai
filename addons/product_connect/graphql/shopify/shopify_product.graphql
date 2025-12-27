@@ -1,0 +1,88 @@
+fragment UserErrorFields on UserError {
+    field
+    message
+}
+
+fragment MetafieldFields on Metafield {
+    id
+    key
+    value
+}
+
+fragment VariantFields on ProductVariant {
+    id
+    price
+    sku
+    barcode
+    inventoryItem {
+        unitCost { amount currencyCode }
+        measurement { weight { value } }
+    }
+}
+
+fragment MediaImageFields on MediaImage {
+    __typename
+    id
+    alt
+    originalSource { url }
+    preview { image { url } }
+}
+
+fragment ProductFields on Product {
+    id
+    title
+    descriptionHtml
+    vendor
+    productType
+    status
+    totalInventory
+    createdAt
+    updatedAt
+    media (first: 250, sortKey: POSITION) { nodes { status ...MediaImageFields } }
+    variants(first: 1) { nodes { ...VariantFields } }
+    metafields(first: 15, namespace: "custom") { nodes { ...MetafieldFields } }
+}
+
+query GetProductIds($cursor: String, $limit: Int!, $query: String) {
+    products(first: $limit, after: $cursor, query: $query, sortKey: UPDATED_AT) {
+        pageInfo { hasNextPage endCursor }
+        nodes { id }
+    }
+}
+
+query GetProducts($cursor: String, $limit: Int!, $query: String) {
+    products(first: $limit, after: $cursor, query: $query, sortKey: UPDATED_AT) {
+        pageInfo { hasNextPage endCursor }
+        nodes { ...ProductFields }
+    }
+}
+
+query GetLocations {
+    locations(first: 5) { nodes { id } }
+}
+mutation ProductSet($identifier: ProductSetIdentifiers, $input: ProductSetInput!) {
+    productSet(identifier: $identifier, input: $input) {
+        product {
+            id
+            updatedAt
+            variants (first: 1) { nodes { ...VariantFields } }
+            metafields (first: 15, namespace: "custom") { nodes { ...MetafieldFields } }
+            media (first: 250, sortKey: POSITION) { nodes { status ...MediaImageFields } }
+            resourcePublicationsV2(onlyPublished: true, first: 10) {
+                nodes { publication { id } }
+            }
+        }
+        userErrors { field message } }
+}
+
+mutation UpdatePublications($id: ID!, $input: [PublicationInput!]!) {
+    publishablePublish(id: $id, input: $input) {
+        userErrors { ...UserErrorFields } }
+}
+
+mutation DeleteProduct($input: ProductDeleteInput!, $synchronous: Boolean = false ) {
+    productDelete(input: $input, synchronous: $synchronous) {
+        deletedProductId
+        userErrors { ...UserErrorFields }
+    }
+}

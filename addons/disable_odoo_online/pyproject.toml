@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "disable_odoo_online"
+version = "0.0.0"  # Real version in __manifest__.py
+description = "Disables Odoo online features"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.setuptools]
+packages = []  # No packages to install, just dependencies
+
+[tool.ruff]
+line-length = 133
+
+[tool.ruff.lint]
+select = ["ANN"]
+ignore = [
+    "D", # pydocstyle
+    "COM812", # trailing-comma-missing (conflicts with formatter)
+    "ISC001", # single-line-implicit-string-concatenation (conflicts with formatter)
+    "FBT001", # Boolean default positional argument - PyCharm shows inlay hints
+    "FBT002", # Boolean positional argument - PyCharm shows inlay hints
+    "TRY300", # Unnecessary else after return - prefer early returns
+    "F821", # Undefined name - needed for JetBrains Odoo magic strings like type["odoo.model.res_users"]
+    "SLF001", # Private member access - PyCharm handles this better with context awareness, Odoo uses _fields etc as public API
+]

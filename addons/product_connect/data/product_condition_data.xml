@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="product_condition_used" model="product.condition">
+            <field name="name">Used</field>
+            <field name="code">used</field>
+        </record>
+
+        <record id="product_condition_new" model="product.condition">
+            <field name="name">New</field>
+            <field name="code">new</field>
+        </record>
+
+        <record id="product_condition_open_box" model="product.condition">
+            <field name="name">Open Box</field>
+            <field name="code">open_box</field>
+        </record>
+
+        <record id="product_condition_broken" model="product.condition">
+            <field name="name">Broken</field>
+            <field name="code">broken</field>
+        </record>
+
+        <record id="product_condition_refurbished" model="product.condition">
+            <field name="name">Refurbished</field>
+            <field name="code">refurbished</field>
+        </record>
+    </data>
+</odoo>

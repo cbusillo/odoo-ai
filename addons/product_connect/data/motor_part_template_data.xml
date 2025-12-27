@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Motor Parts -->
+        <record id="motor_part_powerhead" model="motor.part.template">
+            <field name="name">Powerhead</field>
+            <field name="hidden_tests" eval="[(6, 0, [
+        ref('motor_test_template_engine_ecu_hours'),
+        ref('motor_test_template_motor_spins'),
+    ])]"/>
+            <field name="sequence">10</field>
+        </record>
+
+        <record id="motor_part_cylinder_head" model="motor.part.template">
+            <field name="name">Cylinder Head</field>
+            <field name="sequence">20</field>
+        </record>
+
+        <record id="motor_part_trim_unit" model="motor.part.template">
+            <field name="name">Trim Unit</field>
+            <field name="hidden_tests" eval="[(6, 0, [
+        ref('motor_test_template_trim_tilt_unit_status'),
+        ref('motor_test_template_trim_tilt_unit_leaks'),
+    ])]"/>
+            <field name="sequence">30</field>
+        </record>
+
+        <record id="motor_part_lower_unit" model="motor.part.template">
+            <field name="name">Lower Unit</field>
+            <field name="hidden_tests" eval="[(6, 0, [
+        ref('motor_test_template_shaft_length'),
+        ref('motor_test_template_lower_unit_rotation_check'),
+        ref('motor_test_template_lower_unit_gear_engages'),
+        ref('motor_test_template_lower_unit_fluid_has_water'),
+        ref('motor_test_template_lower_unit_fluid_has_metal'),
+        ref('motor_test_template_lower_unit_holds_pressure'),
+        ref('motor_test_template_lower_unit_rotation_check_when_removed'),
+        ref('motor_test_template_drive_shaft_seals_leaking'),
+        ref('motor_test_template_prop_shaft_seals_leaking'),
+        ref('motor_test_template_shift_shaft_seals_leaking'),
+    ])]"/>
+            <field name="sequence">40</field>
+        </record>
+
+        <record id="motor_part_fuel_pump" model="motor.part.template">
+            <field name="name">Fuel Pump</field>
+            <field name="hidden_tests" eval="[(6, 0, [
+        ref('motor_test_template_fuel_pump_is_electric'),
+        ref('motor_test_template_fuel_pump_status'),
+    ])]"/>
+            <field name="sequence">50</field>
+        </record>
+
+        <record id="motor_part_flywheel" model="motor.part.template">
+            <field name="name">Flywheel</field>
+            <field name="sequence">60</field>
+        </record>
+
+        <record id="motor_part_stator" model="motor.part.template">
+            <field name="name">Stator</field>
+            <field name="sequence">70</field>
+        </record>
+
+        <record id="motor_part_carburetors" model="motor.part.template">
+            <field name="name">Carburetors</field>
+            <field name="sequence">80</field>
+        </record>
+
+        <record id="motor_part_engine_wire_harness" model="motor.part.template">
+            <field name="name">Engine Wire Harness</field>
+            <field name="sequence">90</field>
+        </record>
+
+        <record id="motor_part_starter" model="motor.part.template">
+            <field name="name">Starter</field>
+            <field name="sequence">100</field>
+        </record>
+
+        <record id="motor_part_top_cowling" model="motor.part.template">
+            <field name="name">Top Cowling</field>
+            <field name="sequence">110</field>
+        </record>
+
+        <record id="motor_part_mid_cowling" model="motor.part.template">
+            <field name="name">Mid Cowling</field>
+            <field name="sequence">120</field>
+        </record>
+
+        <record id="motor_part_ecu" model="motor.part.template">
+            <field name="name">ECU</field>
+            <field name="sequence">130</field>
+        </record>
+    </data>
+</odoo>

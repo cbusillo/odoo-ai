@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data>
+        <!-- Label Paper Format -->
+        <record id="paperformat_label_4x2" model="report.paperformat">
+            <field name="name">4x2 Thermal Label</field>
+            <field name="format">custom</field>
+            <field name="page_height">50</field>
+            <field name="page_width">101</field>
+            <field name="orientation">Portrait</field>
+            <field name="margin_top">0</field>
+            <field name="margin_bottom">0</field>
+            <field name="margin_left">0</field>
+            <field name="margin_right">0</field>
+            <field name="disable_shrinking" eval="True"/>
+            <field name="dpi">96</field>
+        </record>
+        <!-- Report Action -->
+        <record id="report_motor_template_label_4x2_noprice" model="ir.actions.report">
+            <field name="name">Motor Label 4x2 No Price (PDF)</field>
+            <field name="model">motor</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">product_connect.report_motortemplatelabel4x2noprice</field>
+            <field name="report_file">product_motor.report_motortemplatelabel4x2noprice</field>
+            <field name="paperformat_id" ref="product_connect.paperformat_label_4x2"/>
+            <field name="print_report_name">'Motor Labels - %s' % object.motor_number</field>
+            <field name="binding_model_id" ref="model_motor"/>
+            <field name="binding_type">report</field>
+        </record>
+
+        <!-- Report Template -->
+        <template id="report_motortemplatelabel4x2noprice">
+            <t t-call="web.html_container">
+                <t t-foreach="docs" t-as="o">
+                    <div class="page"
+                         style="padding-top:2mm; height:46mm; width:97mm; font-family: Arial, sans-serif; ">
+                        <!-- Left section (QR and Motor Number) with controlled QR code size -->
+                        <div style="float: left; width: 33%; height: 100%; text-align: center; ">
+                            <div>
+                                <div>
+                                    <img t-att-src="'data:image/png;base64,%s' % o.generate_qr_code()"
+                                         style="width:38mm; height:38mm; margin-top: -4mm; margin-left: -5mm; margin-bottom: 0"/>
+                                </div>
+                                <div style="margin-top: -4.5mm;">
+                                    <p style="margin-top: 0; font-size: 8mm; font-weight: bold">
+                                        <span t-field="o.motor_number"/>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Middle section -->
+                        <div style="float: left; width: 34%; height: 100%; text-align: center;">
+                            <p style="margin-top: 4mm; font-size: 4mm;">
+                                <span t-out="datetime.datetime.now().strftime('%m-%d-%Y')"/>
+                            </p>
+                            <p style="font-size: 6mm;margin: 0">
+                                <span t-field="o.manufacturer"/>
+                            </p>
+                            <p style="font-size: 6mm;margin: 0; white-space: nowrap;">
+                                <span style="font-weight: bold;" t-field="o.model"/>
+                            </p>
+                            <p style="font-size: 6mm;margin: 0; white-space: nowrap;">
+                                <span t-field="o.serial_number"/>
+                            </p>
+                            <p style="font-size: 6mm;margin: 0">
+                                <span t-field="o.stroke"/>
+                            </p>
+                        </div>
+
+                        <!-- Right section (Horsepower and Year) -->
+                        <div style="font-size: 10mm; font-weight: bold; float: left; width: 33%; height: 100%; display: table;">
+                            <div style="display: table-row; text-align: right;">
+                                <div style="display: table-cell; vertical-align: top;">
+                                    <span t-out="o.get_horsepower_formatted()"/>
+                                </div>
+                            </div>
+                            <div style="display: table-row;">
+                                <div style="display: table-cell;"></div>
+                            </div>
+                            <div style="display: table-row; text-align: right;">
+                                <div style="display: table-cell; vertical-align: bottom;">
+                                    <span t-out="str(o.year) if o.year else ''"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </template>
+    </data>
+</odoo>

@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+    <!-- External Systems -->
+    <record id="external_system_shopify_admin" model="external.system">
+        <field name="name">Shopify Admin</field>
+        <field name="code">shopify_admin</field>
+        <!-- Set this to your admin base URL, e.g., https://admin.shopify.com/store/<store_key> -->
+        <field name="url">https://admin.shopify.com/store/YOUR_STORE_KEY</field>
+        <!-- Keep format simple initially; allow numeric IDs -->
+        <field name="id_format">^\d+$</field>
+        <field name="sequence" eval="10"/>
+        <field name="active" eval="True"/>
+        <!-- Applies to partners and products -->
+        <field name="applicable_model_ids" eval="[(6, 0, [
+            ref('base.model_res_partner'),
+            ref('product.model_product_product'),
+            ref('model_product_template')
+        ])]"/>
+    </record>
+
+    <record id="external_system_shopify_store" model="external.system">
+        <field name="name">Shopify Store</field>
+        <field name="code">shopify_store</field>
+        <!-- Set to your storefront base, e.g., https://yourstore.myshopify.com or custom domain -->
+        <field name="url">https://yourstore.myshopify.com</field>
+        <field name="id_format">^\d+$</field>
+        <field name="sequence" eval="11"/>
+        <field name="active" eval="True"/>
+        <!-- Applies to products only -->
+        <field name="applicable_model_ids" eval="[(6, 0, [
+            ref('product.model_product_product'),
+            ref('model_product_template')
+        ])]"/>
+    </record>
+
+    <record id="external_system_ebay" model="external.system">
+        <field name="name">eBay</field>
+        <field name="code">ebay</field>
+        <field name="url">https://www.ebay.com</field>
+        <!-- Typical username charset; relax if needed -->
+        <field name="id_format">^[A-Za-z0-9._-]+$</field>
+        <field name="sequence" eval="20"/>
+        <field name="active" eval="True"/>
+        <field name="applicable_model_ids" eval="[(6, 0, [ref('base.model_res_partner')])]"/>
+    </record>
+
+    <record id="external_system_discord" model="external.system">
+        <field name="name">Discord</field>
+        <field name="code">discord</field>
+        <field name="url">https://discord.com</field>
+        <!-- Numeric snowflake, usually 17-20 digits; loosen to digits only -->
+        <field name="id_format">^\d{17,20}$</field>
+        <field name="sequence" eval="30"/>
+        <field name="active" eval="True"/>
+        <field name="applicable_model_ids" eval="[(6, 0, [ref('hr.model_hr_employee')])]"/>
+    </record>
+
+    <record id="external_system_repairshopr" model="external.system">
+        <field name="name">RepairShopr</field>
+        <field name="code">repairshopr</field>
+        <field name="url">https://YOURSUBDOMAIN.repairshopr.com</field>
+        <field name="id_format">^\d+$</field>
+        <field name="sequence" eval="40"/>
+        <field name="active" eval="True"/>
+        <field name="applicable_model_ids" eval="[(6, 0, [
+            ref('hr.model_hr_employee'),
+            ref('base.model_res_partner')
+        ])]"/>
+    </record>
+
+    <record id="external_system_timeclock" model="external.system">
+        <field name="name">TimeClock</field>
+        <field name="code">timeclock</field>
+        <field name="url">https://timeclock.example.com</field>
+        <field name="id_format">^\d+$</field>
+        <field name="sequence" eval="50"/>
+        <field name="active" eval="True"/>
+        <field name="applicable_model_ids" eval="[(6, 0, [ref('hr.model_hr_employee')])]"/>
+    </record>
+
+    <!-- URL Templates (Shopify) -->
+    <record id="shopify_admin_url_customer_admin" model="external.system.url">
+        <field name="name">Customer Admin</field>
+        <field name="code">customer_admin</field>
+        <field name="system_id" ref="external_system_shopify_admin"/>
+        <field name="resource">customer</field>
+        <field name="res_model_id" ref="base.model_res_partner"/>
+        <field name="template">{base}/customers/{id}</field>
+        <field name="sequence" eval="10"/>
+    </record>
+
+    <record id="shopify_admin_url_product_admin" model="external.system.url">
+        <field name="name">Product Admin</field>
+        <field name="code">product_admin</field>
+        <field name="system_id" ref="external_system_shopify_admin"/>
+        <field name="resource">product</field>
+        <field name="res_model_id" ref="product.model_product_product"/>
+        <field name="template">{base}/products/{id}</field>
+        <field name="sequence" eval="10"/>
+    </record>
+
+    <record id="shopify_store_url_product_store" model="external.system.url">
+        <field name="name">Product Store</field>
+        <field name="code">product_store</field>
+        <field name="system_id" ref="external_system_shopify_store"/>
+        <field name="resource">product</field>
+        <field name="res_model_id" ref="product.model_product_product"/>
+        <field name="template">{base}/products/{id}</field>
+        <field name="sequence" eval="10"/>
+    </record>
+
+    <!-- URL Templates (eBay) -->
+    <record id="ebay_url_profile_partner" model="external.system.url">
+        <field name="name">User Profile</field>
+        <field name="code">profile</field>
+        <field name="system_id" ref="external_system_ebay"/>
+        <field name="res_model_id" ref="base.model_res_partner"/>
+        <field name="template">{base}/usr/{id}</field>
+        <field name="sequence" eval="10"/>
+    </record>
+
+    <!-- URL Templates (Discord) -->
+    <record id="discord_url_user_employee" model="external.system.url">
+        <field name="name">User Profile</field>
+        <field name="code">profile</field>
+        <field name="system_id" ref="external_system_discord"/>
+        <field name="res_model_id" ref="hr.model_hr_employee"/>
+        <field name="template">https://discord.com/users/{id}</field>
+        <field name="sequence" eval="10"/>
+    </record>
+
+    <!-- URL Templates (RepairShopr) -->
+    <record id="repairshopr_url_employee_profile" model="external.system.url">
+        <field name="name">Employee Profile</field>
+        <field name="code">profile</field>
+        <field name="system_id" ref="external_system_repairshopr"/>
+        <field name="res_model_id" ref="hr.model_hr_employee"/>
+        <field name="template">{base}/users/{id}</field>
+        <field name="sequence" eval="10"/>
+    </record>
+    <record id="repairshopr_url_partner_customer_admin" model="external.system.url">
+        <field name="name">Customer Admin</field>
+        <field name="code">customer_admin</field>
+        <field name="system_id" ref="external_system_repairshopr"/>
+        <field name="res_model_id" ref="base.model_res_partner"/>
+        <field name="template">{base}/customers/{id}</field>
+        <field name="sequence" eval="20"/>
+    </record>
+
+    <!-- URL Templates (TimeClock) -->
+    <record id="timeclock_url_employee_profile" model="external.system.url">
+        <field name="name">Employee Profile</field>
+        <field name="code">profile</field>
+        <field name="system_id" ref="external_system_timeclock"/>
+        <field name="res_model_id" ref="hr.model_hr_employee"/>
+        <field name="template">{base}/employees/{id}</field>
+        <field name="sequence" eval="10"/>
+    </record>
+
+</odoo>

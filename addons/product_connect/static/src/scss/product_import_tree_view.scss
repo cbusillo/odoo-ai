@@ -1,0 +1,55 @@
+.product_import_list_view .table-sm td {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.product_import_list_view .o_data_cell,
+.product_import_list_view .o_list_record_selector,
+.product_import_list_view .o_field_cell,
+.product_import_list_view .o_column_sortable,
+.product_import_list_view .table-sm,
+.product_import_list_view th {
+  font-size: 0.9em;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.product_import_list_view .o_list_record_open_form_view .btn {
+  width: auto;
+  min-width: 0;
+  padding: 0;
+  font-size: 0.90em;
+}
+
+.product_import_list_view .form-check {
+  min-height: 0.25em;
+}
+
+/* Small width */
+.product_import_list_view th[data-name="weight"],
+.product_import_list_view th[data-name="price"],
+.product_import_list_view th[data-name="cost"],
+.product_import_list_view th[data-name="quantity"],
+.product_import_list_view th[data-name="image_upload"],
+{
+  width: 5em !important;
+  max-width: 5em !important;
+}
+
+/* Medium width */
+.product_import_list_view [name="mpn"] {
+  min-width: 50px;
+}
+
+.product_import_list_view [name="default_code"] {
+  min-width: 4em;
+  max-width: 4em;
+}
+
+.product_import_list_view th:last-child,
+.product_import_list_view td:last-child {
+  max-width: 20px !important;
+  width: 20px !important;
+  padding: 0 !important;
+}
+

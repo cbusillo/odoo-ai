@@ -1,0 +1,9 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_external_system_user,external.system.user,model_external_system,base.group_user,1,0,0,0
+access_external_system_manager,external.system.manager,model_external_system,base.group_system,1,1,1,1
+access_external_system_url_user,external.system.url.user,model_external_system_url,base.group_user,1,0,0,0
+access_external_system_url_manager,external.system.url.manager,model_external_system_url,base.group_system,1,1,1,1
+access_external_id_user,external.id.user,model_external_id,base.group_user,1,0,0,0
+access_external_id_hr_user,external.id.hr.user,model_external_id,hr.group_hr_user,1,1,1,1
+access_external_id_partner_manager,external.id.partner.manager,model_external_id,base.group_partner_manager,1,1,1,1
+access_external_id_product_manager,external.id.product.manager,model_external_id,product.group_product_manager,1,1,1,1

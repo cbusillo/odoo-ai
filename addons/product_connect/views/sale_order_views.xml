@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_order_form_inherit_product_connect" model="ir.ui.view">
+        <field name="name">sale.order.form.inherit.product_connect</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <!-- Add platform fields after partner_id -->
+            <field name="partner_id" position="after">
+                <field name="source_platform" readonly="1" invisible="not source_platform"/>
+                <field name="shopify_order_id" readonly="1" invisible="not shopify_order_id"/>
+                <field name="ebay_order_id" readonly="1" invisible="not ebay_order_id"/>
+            </field>
+
+            <!-- Add shipping cost fields in a new group -->
+            <xpath expr="//group[@name='order_details']" position="after">
+                <group string="Shipping Information" name="shipping_info"
+                       invisible="not shipping_charge and not shipping_paid">
+                    <group>
+                        <field name="shipping_charge"/>
+                        <field name="shipping_paid"/>
+                        <field name="shipping_margin"/>
+                    </group>
+                    <group>
+                        <field name="shipstation_order_id" readonly="1" invisible="not shipstation_order_id"/>
+                        <field name="shipping_tracking_numbers" readonly="1" invisible="not shipping_tracking_numbers"/>
+                    </group>
+                </group>
+            </xpath>
+
+            <!-- Add Shopify Note field after the note field -->
+            <xpath expr="//field[@name='note']" position="after">
+                <field name="shopify_note" readonly="1" invisible="not shopify_note"
+                       placeholder="Imported notes from Shopify/eBay will appear here..."/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Tree view to show platform -->
+    <record id="view_order_tree_inherit_product_connect" model="ir.ui.view">
+        <field name="name">sale.order.tree.inherit.product_connect</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_tree"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="after">
+                <field name="source_platform" optional="show"/>
+            </field>
+            <field name="amount_total" position="after">
+                <field name="shipping_charge" optional="hide"/>
+                <field name="shipping_margin" optional="hide"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Search view to filter by platform -->
+    <record id="view_sales_order_filter_inherit_product_connect" model="ir.ui.view">
+        <field name="name">sale.order.search.inherit.product_connect</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_sales_order_filter"/>
+        <field name="arch" type="xml">
+            <filter name="my_sale_orders_filter" position="after">
+                <separator/>
+                <filter string="Shopify Orders" name="shopify_orders" domain="[('source_platform', '=', 'shopify')]"/>
+                <filter string="eBay Orders" name="ebay_orders" domain="[('source_platform', '=', 'ebay')]"/>
+                <filter string="Manual Orders" name="manual_orders" domain="[('source_platform', '=', 'manual')]"/>
+            </filter>
+            <filter name="order_month" position="before">
+                <filter string="Platform" name="groupby_platform" context="{'group_by': 'source_platform'}"/>
+            </filter>
+        </field>
+    </record>
+</odoo>

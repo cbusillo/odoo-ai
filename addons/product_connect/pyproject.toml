@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "product_connect"
+version = "0.0.0"  # Real version in __manifest__.py
+description = "Core business module for motors and Shopify sync"
+requires-python = ">=3.12"
+dependencies = [
+    "printnodeapi @ git+https://github.com/cbusillo/PrintNode-Python@master",
+    "shopifyapi",
+    "pdfminer.six",
+    "simple_zpl2 @ git+https://github.com/sacherjj/simple_zpl2@master",
+    "pillow",
+    "qrcode",
+    "requests",
+    "pydantic-settings",
+    "httpx[http2]",
+    "ariadne-codegen[subscriptions]",
+    "phonenumbers",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pydevd-odoo",
+    "debugpy",
+    "watchdog",
+    "types-Pillow",
+    "types-requests",
+    "types-geoip2",
+    "pydantic[email,timezone]",
+    "rich",
+    "websocket-client",
+    "setuptools",
+    "playwright",
+]
+
+[tool.setuptools]
+packages = []
+
+[tool.uv]
+managed = false
+
+[tool.ruff]
+line-length = 133
+target-version = "py312"
+exclude = [
+    "services/shopify/gql/",
+    "graphql/schema/",
+]
+
+[tool.ruff.lint]
+select = ["ANN"]
+ignore = [
+    "D", # pydocstyle
+    "COM812", # trailing-comma-missing (conflicts with formatter)
+    "ISC001", # single-line-implicit-string-concatenation (conflicts with formatter)
+    "FBT001", # Boolean default positional argument - PyCharm shows inlay hints
+    "FBT002", # Boolean positional argument - PyCharm shows inlay hints
+    "TRY300", # Unnecessary else after return - prefer early returns
+    "F821", # Undefined name - needed for JetBrains Odoo magic strings like type["odoo.model.res_users"]
+    "SLF001", # Private member access - PyCharm handles this better with context awareness, Odoo uses _fields etc as public API
+    "ARG001", # Unused function argument - PyCharm handles this better with context awareness
+    "ARG002", # Unused method argument - PyCharm handles this better with context awareness
+    "ANN201", # Missing type annotation for function - PyCharm handles this better with context awareness
+    "ANN202", # Missing type annotation for function - PyCharm handles this better with context awareness
+]

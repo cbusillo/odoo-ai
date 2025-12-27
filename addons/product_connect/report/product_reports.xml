@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data>
+        <!-- Label Paper Format -->
+        <record id="paperformat_label_2x1" model="report.paperformat">
+            <field name="name">2.25x1.25 Thermal Label</field>
+            <field name="default" eval="True"/>
+            <field name="format">custom</field>
+            <field name="print_page_height">32</field>
+            <field name="print_page_width">57</field>
+            <field name="orientation">Portrait</field>
+            <field name="margin_top">0</field>
+            <field name="margin_bottom">0</field>
+            <field name="margin_left">0</field>
+            <field name="margin_right">0</field>
+            <field name="disable_shrinking" eval="True"/>
+            <field name="dpi">203</field>
+        </record>
+        <!-- Report Action -->
+        <record id="report_product_template_label_2x1_noprice" model="ir.actions.report">
+            <field name="name">Product Label 2.25x1.25 No Price (PDF)</field>
+            <field name="model">product.template</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">product_connect.report_producttemplatelabel2x1noprice</field>
+            <field name="report_file">product.report_producttemplatelabel2x1noprice</field>
+            <field name="paperformat_id" ref="product_connect.paperformat_label_2x1"/>
+            <field name="print_report_name">'Products Labels - %s' % object.name</field>
+            <field name="binding_model_id" eval="False"/>
+            <field name="binding_type">report</field>
+        </record>
+        <record id="report_product_template_label_2x1_bin_noprice" model="ir.actions.report">
+            <field name="name">Product Label 2.25x1.25 Bin No Price (PDF)</field>
+            <field name="model">product.template</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">product_connect.report_producttemplatelabel2x1binnoprice</field>
+            <field name="report_file">product.report_producttemplatelabel2x1binnoprice</field>
+            <field name="paperformat_id" ref="product_connect.paperformat_label_2x1"/>
+            <field name="print_report_name">'Products Labels - %s' % object.name</field>
+            <field name="binding_model_id" eval="False"/>
+            <field name="binding_type">report</field>
+        </record>
+        <!-- Report Template -->
+        <template id="report_producttemplatelabel2x1noprice">
+            <t t-call="web.html_container">
+                <t t-foreach="products_data" t-as="product">
+                    <t t-foreach="range(product['initial_quantity'])" t-as="i">
+                        <div class="page"
+                             style="padding-top: 1mm; height:29mm; width:57mm; font-family: Arial, sans-serif; page-break-before: always;">
+                            <div>
+                                <div t-out="product['default_code']"
+                                     style="display: inline-block; width: 20mm; height: 20mm; vertical-align: top;"
+                                     t-options="{'widget': 'barcode', 'symbology': 'QR', 'img_style': 'width:20mm;height:20mm;'}">
+                                </div>
+                                <div style="display: inline-block; padding-left: 5mm; vertical-align: top; text-align: center">
+                                    <p style="margin: 0; font-size: 2mm;">
+                                        <span t-out="product['current_date']"/>
+                                    </p>
+                                    <p style="margin: 0.25mm; font-size: 4mm;">SKU:
+                                        <span style="font-weight: bold;" t-out="product['default_code']"/>
+                                    </p>
+                                    <p style="margin: 0; font-size: 2mm;">MPN:</p>
+                                    <p style="margin: 0; font-size: 3mm;">
+                                        <span t-out="product['mpn']"/>
+                                    </p>
+                                    <p style="margin: 0; font-size: 4mm;">
+                                        <span style="font-weight: bold;" t-out="product['motor_number']"/>
+                                    </p>
+                                    <p style="margin: 0.25mm; font-size: 2.5mm;">Condition:
+                                        <span t-out="product['condition']"/>
+                                    </p>
+                                </div>
+                            </div>
+                            <!-- Name at the Bottom -->
+                            <div style="width:95%; text-align: center; padding-top: 1mm;">
+                                <p style="margin: 0; font-size: 3mm;" t-out="product['name']"/>
+                            </div>
+                        </div>
+                    </t>
+                </t>
+            </t>
+        </template>
+        <template id="report_producttemplatelabel2x1binnoprice">
+            <t t-call="web.html_container">
+                <t t-foreach="products_data" t-as="product">
+                    <div class="page"
+                         style="padding-top: 1mm; height:29mm; width:57mm; font-family: Arial, sans-serif; page-break-before: always; display: flex; align-items: center; justify-content: center;">
+                        <div style="display: flex; align-items: center;">
+                            <!-- QR Code -->
+                            <div t-out="product['bin']" style="flex: 0 0 auto; width: 20mm; height: 20mm;"
+                                 t-options="{'widget': 'barcode', 'symbology': 'QR', 'img_style': 'width:20mm;height:20mm;'}">
+                            </div>
+                            <div style="padding-left: 4mm; text-align: center;">
+                                <p style="margin: 0; font-size: 2mm;">
+                                    <span t-out="product['current_date']"/>
+                                </p>
+                                <p style="margin: 0; font-size: 8mm;">
+                                    <span t-out="product['bin']"/>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </template>
+    </data>
+</odoo>

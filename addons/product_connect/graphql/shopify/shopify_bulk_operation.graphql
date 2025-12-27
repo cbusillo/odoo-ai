@@ -1,0 +1,39 @@
+mutation StagedUploadsCreate($input: [StagedUploadInput!]!) {
+    stagedUploadsCreate(input: $input) {
+        stagedTargets {
+            url
+            parameters {
+                name
+                value
+            }
+            resourceUrl
+        }
+        userErrors {
+            field
+            message
+        }
+    }
+}
+
+mutation ProductSetBulkRun($mutation: String!, $stagedUploadPath: String!) {
+    bulkOperationRunMutation(mutation: $mutation, stagedUploadPath: $stagedUploadPath) {
+        bulkOperation {
+            id
+            status
+        }
+        userErrors {
+            field
+            message
+        }
+    }
+}
+
+query CurrentBulkOperation {
+    currentBulkOperation {
+        id
+        status
+        objectCount
+        url
+        partialDataUrl
+    }
+}

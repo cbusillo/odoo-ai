@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_res_config_settings_drl" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.drl</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority" eval="90"/>
+        <field name="inherit_id" ref="mail.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[@id='discuss']" position="inside">
+                <setting id="discuss_record_links_setting" string="Smart Record Links"
+                         help="Configure inline linking models, prefixes, search fields, and labels">
+                    <label for="discuss_record_links_summary"/>
+                    <div class="o_row">
+                        <field name="discuss_record_links_summary" readonly="1" class="oe_inline"/>
+                    </div>
+                    <div class="o_row">
+                        <button string="Configure Models" type="action"
+                                name="%(action_discuss_record_link_config)d"
+                                class="oe_link"/>
+                    </div>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>

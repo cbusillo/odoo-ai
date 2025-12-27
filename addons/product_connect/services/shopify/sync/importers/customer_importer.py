@@ -1,0 +1,366 @@
+import logging
+import re
+
+from odoo.api import Environment
+from odoo.addons.phone_validation.tools.phone_validation import phone_format
+from odoo.exceptions import UserError
+
+from ...gql import (
+    Client,
+    AddressFields,
+    CustomerFields,
+)
+from ..base import ShopifyBaseImporter, ShopifyPage
+from ...helpers import (
+    parse_shopify_id_from_gid,
+    write_if_changed,
+    normalize_str,
+    normalize_phone,
+    normalize_email,
+)
+from typing import Literal
+
+_logger = logging.getLogger(__name__)
+
+
+AddressRole = Literal["shipping", "billing"]
+AddressType = Literal["delivery", "invoice"]
+
+
+class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
+    def __init__(self, env: Environment, sync_record: "odoo.model.shopify_sync") -> None:
+        super().__init__(env, sync_record)
+
+    def _fetch_page(self, client: Client, query: str | None, cursor: str | None) -> ShopifyPage[CustomerFields]:
+        return client.get_customers(query=query, cursor=cursor, limit=self.page_size)
+
+    def _import_one(self, shopify_customer: CustomerFields) -> bool:
+        return self.import_customer(shopify_customer)
+
+    def _get_or_create_category(self, name: str) -> "odoo.model.res_partner_category":
+        category = self.env["res.partner.category"].search([("name", "=", name)], limit=1)
+        if not category:
+            category = self.env["res.partner.category"].create({"name": name})
+        return category
+
+    def _get_tax_exempt_fiscal_position(self) -> "odoo.model.account_fiscal_position":
+        fiscal_position = self.env["account.fiscal.position"].search([("name", "ilike", "tax exempt")], limit=1)
+        if not fiscal_position:
+            fiscal_position = self.env["account.fiscal.position"].create({"name": "Tax Exempt", "auto_apply": False})
+        return fiscal_position
+
+    def import_customers_since_last_import(self) -> int:
+        return self.run_since_last_import("customer")
+
+    def _format_phone_number(self, phone: str) -> str:
+        if not phone or not phone.strip():
+            return ""
+        country = self.env.company.country_id or self.env["res.country"].search([("code", "=", "US")], limit=1)
+        if not country:
+            return phone.strip()
+        phone_code = int(country.phone_code or 0)
+        formatted = phone_format(phone, country.code, phone_code, force_format="E164", raise_exception=False)
+        return formatted or phone.strip()
+
+    @staticmethod
+    def _geolocalize_partner(partner: "odoo.model.res_partner") -> None:
+        if not partner or not partner.exists():
+            return
+
+        if not any((partner.street, partner.city, partner.zip, partner.country_id)):
+            return
+
+        try:
+            partner.geo_localize()
+        except UserError as error:
+            _logger.warning(f"Failed to geolocalize partner {partner.name} (ID: {partner.id}): {str(error)}", exc_info=True)
+
+    def import_customer(self, shopify_customer: CustomerFields) -> bool:
+        shopify_customer_id = parse_shopify_id_from_gid(shopify_customer.id)
+        tags = [t.strip().lower() for t in shopify_customer.tags]
+        is_ebay = "ebay" in tags
+
+        if shopify_customer.default_email_address and shopify_customer.default_email_address.email_address:
+            shopify_email = normalize_email(shopify_customer.default_email_address.email_address)
+        else:
+            shopify_email = ""
+
+        if shopify_customer.default_phone_number and shopify_customer.default_phone_number.phone_number:
+            shopify_phone = shopify_customer.default_phone_number.phone_number
+        elif shopify_customer.default_address and shopify_customer.default_address.phone:
+            shopify_phone = shopify_customer.default_address.phone
+        else:
+            shopify_phone = None
+        shopify_phone = shopify_phone.strip() if shopify_phone else ""
+
+        partner = self.env["res.partner"].search([("shopify_customer_id", "=", shopify_customer_id)], limit=1)
+        if not partner and shopify_email:
+            partner = self.env["res.partner"].search([("email", "ilike", shopify_email)], limit=1)
+        if not partner and shopify_phone:
+            formatted_phone = self._format_phone_number(shopify_phone)
+            if formatted_phone:
+                partner = self.env["res.partner"].search(
+                    ["|", ("phone", "=", formatted_phone), ("mobile", "=", formatted_phone)],
+                    limit=1,
+                )
+
+        email = shopify_email or (partner.email if partner else "")
+        phone = self._format_phone_number(shopify_phone) or (partner.phone if partner else "")
+
+        last_name_raw = (shopify_customer.last_name or "").strip()
+        ebay_username = ""
+        if is_ebay:
+            ebay_match = re.search(r"\(([^)]+)\)$", last_name_raw)
+            if ebay_match:
+                ebay_username = ebay_match.group(1).strip()
+                last_name_raw = re.sub(r"\s*\([^)]+\)\s*$", "", last_name_raw)
+        last_name = last_name_raw
+
+        first_name = (shopify_customer.first_name or "").strip()
+        name_parts = [first_name, last_name]
+        name = (
+            re.sub(r"\s{2,}", " ", " ".join(p for p in name_parts if p)).strip()
+            or email
+            or phone
+            or f"Customer {shopify_customer_id}"
+        )
+        # Truncate name to 512 characters (Odoo char field limit)
+        if name and len(name) > 512:
+            name = name[:512]
+
+        tax_exempt_flag = bool(shopify_customer.tax_exempt) if shopify_customer.tax_exempt is not None else False
+        fiscal_position = self._get_tax_exempt_fiscal_position() if tax_exempt_flag else False
+
+        opt_in_states = {"SUBSCRIBED", "PENDING"}
+        email_state = shopify_customer.default_email_address.marketing_state if shopify_customer.default_email_address else None
+        sms_state = shopify_customer.default_phone_number.marketing_state if shopify_customer.default_phone_number else None
+        email_blacklisted_flag = email_state not in opt_in_states if email_state else False
+        sms_blacklisted_flag = sms_state not in opt_in_states if sms_state else False
+
+        partner_vals: "odoo.values.res_partner" = {
+            "shopify_customer_id": shopify_customer_id,
+            "name": name,
+            "ebay_username": ebay_username or False,
+            "phone_blacklisted": sms_blacklisted_flag,
+            "mobile_blacklisted": sms_blacklisted_flag,
+            "property_account_position_id": fiscal_position.id if fiscal_position else False,
+        }
+        if email:
+            partner_vals["email"] = email
+        if phone:
+            partner_vals["phone"] = phone
+        if not partner:
+            partner = self.env["res.partner"].create(partner_vals)
+            changed = True
+        else:
+            changed = write_if_changed(partner, partner_vals)
+
+        self._geolocalize_partner(partner)
+
+        # Always ensure Shopify category is assigned
+        shopify_category = self._get_or_create_category("Shopify")
+        if shopify_category.id not in partner.category_id.ids:
+            partner.write({"category_id": [(4, shopify_category.id)]})
+            changed = True
+
+        addresses_changed = False
+        addresses_to_process: list[tuple[AddressFields, AddressRole]] = []
+        if shopify_customer.default_address:
+            addresses_to_process.append((shopify_customer.default_address, "billing"))
+        if shopify_customer.addresses_v_2 and shopify_customer.addresses_v_2.nodes:
+            for addr in shopify_customer.addresses_v_2.nodes:
+                addresses_to_process.append((addr, "shipping"))
+        processed_ids: set[str] = set()
+        for address, role in addresses_to_process:
+            address_id = address.id
+            if address_id in processed_ids:
+                continue
+            processed_ids.add(address_id)
+            addresses_changed |= self.process_address(address, partner, role=role)
+        if addresses_changed:
+            changed = True
+
+        if (
+            not tax_exempt_flag
+            and partner.property_account_position_id
+            and "tax exempt" in partner.property_account_position_id.name.casefold()
+        ):
+            partner.property_account_position_id = False
+
+        # Update phone blacklist status based on marketing opt-out
+        if sms_blacklisted_flag != partner.phone_blacklisted:
+            partner.phone_blacklisted = sms_blacklisted_flag
+            partner.mobile_blacklisted = sms_blacklisted_flag
+            changed = True
+
+        # Manage email blacklist via mail.blacklist model
+        if partner.email_normalized:
+            blacklist_sudo = self.env["mail.blacklist"].sudo()
+            existing_blacklist = blacklist_sudo.search([("email", "=", partner.email_normalized)], limit=1)
+
+            if email_blacklisted_flag and not existing_blacklist:
+                blacklist_sudo.create({"email": partner.email_normalized})
+                changed = True
+            elif not email_blacklisted_flag and existing_blacklist:
+                existing_blacklist.unlink()
+                changed = True
+
+        return changed
+
+    def process_address(self, address: AddressFields, partner: "odoo.model.res_partner", role: AddressRole) -> bool:
+        shopify_address_id = parse_shopify_id_from_gid(address.id)
+
+        country = (
+            self.env["res.country"].search([("code", "=", address.country_code_v_2.value)], limit=1)
+            if address.country_code_v_2
+            else False
+        )
+
+        state = False
+        if country and (address.province_code or address.province):
+            domain: list[tuple] = [("country_id", "=", country.id)]
+            if address.province_code and address.province:
+                domain = [
+                    "|",
+                    ("code", "=", address.province_code.strip()),
+                    ("name", "ilike", address.province.strip()),
+                ] + domain
+            elif address.province_code:
+                domain.append(("code", "=", address.province_code.strip()))
+            else:
+                domain.append(("name", "ilike", address.province.strip()))
+            state = self.env["res.country.state"].search(domain, limit=1)
+
+        formatted_phone = self._format_phone_number(address.phone) if address.phone else ""
+        existing_numbers = {normalize_phone(p) for p in (partner.phone, partner.mobile) if p}
+        phone_mismatch = bool(formatted_phone and existing_numbers and normalize_phone(formatted_phone) not in existing_numbers)
+        existing_address = self.env["res.partner"].search([("shopify_address_id", "=", shopify_address_id)], limit=1)
+
+        partner_has_address = any(
+            (
+                partner.street,
+                partner.street2,
+                partner.city,
+                partner.zip,
+                partner.state_id,
+                partner.country_id,
+            )
+        )
+        is_different_address = partner_has_address and any(
+            (
+                normalize_str(address.address_1) != normalize_str(partner.street),
+                normalize_str(address.address_2) != normalize_str(partner.street2),
+                normalize_str(address.city) != normalize_str(partner.city),
+                normalize_str(address.zip) != normalize_str(partner.zip),
+                country and country.id != partner.country_id.id,
+                state and state.id != partner.state_id.id,
+                phone_mismatch,
+                normalize_str(address.company) != normalize_str(partner.company_name),
+            )
+        )
+
+        if not existing_address and is_different_address:
+
+            def phone_matches(child_address: "odoo.model.res_partner") -> bool:
+                if not formatted_phone:
+                    return True  # No phone to match, consider it a match based on other fields
+                existing_phones = {normalize_phone(p) for p in (child_address.phone, child_address.mobile) if p}
+                if not existing_phones:
+                    return True  # Existing address has no phone, still consider it a match
+                return normalize_phone(formatted_phone) in existing_phones
+
+            possible_duplicates = partner.child_ids.filtered(
+                lambda a: normalize_str(a.street) == normalize_str(address.address_1)
+                and normalize_str(a.street2) == normalize_str(address.address_2)
+                and normalize_str(a.city) == normalize_str(address.city)
+                and normalize_str(a.zip) == normalize_str(address.zip)
+                and (not country or a.country_id.id == country.id)
+                and (not state or a.state_id.id == state.id)
+                and phone_matches(a)
+                and normalize_str(a.company_name) == normalize_str(address.company)
+            )
+            for possible_duplicate in possible_duplicates:
+                if possible_duplicate.shopify_address_id and possible_duplicate.shopify_address_id != shopify_address_id:
+                    continue
+                if not possible_duplicate.shopify_address_id:
+                    write_if_changed(possible_duplicate, {"shopify_address_id": shopify_address_id})
+                    return False  # Found duplicate, only updated shopify_address_id, no other changes needed
+                existing_address = possible_duplicate
+                break
+
+        # New address_type logic and early return for main address update
+        # For billing addresses, always update the main partner record (unless existing_address is a different record)
+        if role == "billing" and not existing_address:
+            main_address_vals: "odoo.values.res_partner" = {
+                "shopify_address_id": shopify_address_id,
+                "street": (address.address_1 or "").strip(),
+                "street2": (address.address_2 or "").strip(),
+                "city": (address.city or "").strip(),
+                "zip": (address.zip or "").strip(),
+                "state_id": state.id if state else False,
+                "country_id": country.id if country else False,
+            }
+            if formatted_phone:
+                main_address_vals["phone"] = formatted_phone
+            changed = write_if_changed(partner, main_address_vals)
+            self._geolocalize_partner(partner)
+            return changed
+
+        # If the address is the same as current main address, just update shopify_address_id
+        if not is_different_address:
+            main_address_vals: "odoo.values.res_partner" = {
+                "shopify_address_id": shopify_address_id,
+            }
+            changed = write_if_changed(partner, main_address_vals)
+            return changed
+
+        address_type: AddressType = "invoice" if role == "billing" else "delivery"
+
+        address_vals: "odoo.values.res_partner" = {
+            "shopify_address_id": shopify_address_id,
+            "parent_id": partner.id,
+            "type": address_type,
+            "name": None if (address.name or "").strip() == (partner.name or "").strip() else (address.name or "").strip(),
+            "street": (address.address_1 or "").strip(),
+            "street2": (address.address_2 or "").strip(),
+            "city": (address.city or "").strip(),
+            "zip": (address.zip or "").strip(),
+            "state_id": state.id if state else False,
+            "country_id": country.id if country else False,
+        }
+        if address.company:
+            address_vals["company_name"] = address.company.strip()
+
+        if formatted_phone:
+            address_vals["phone"] = formatted_phone
+
+        if existing_address:
+            if existing_address.type != address_type:
+                copy_defaults = {
+                    "type": address_type,
+                    "shopify_address_id": f"{shopify_address_id}:{address_type}",
+                    "name": address_vals.get("name"),
+                }
+                company_name_to_set = address_vals.get("company_name")
+                if company_name_to_set:
+                    copy_defaults["company_name"] = company_name_to_set
+                copied_address = existing_address.copy(default=copy_defaults)
+                # Odoo automatically sets company_name to False for child contacts
+                # We need to explicitly set it again if it was provided
+                if company_name_to_set and not copied_address.company_name:
+                    copied_address.write({"company_name": company_name_to_set})
+                self._geolocalize_partner(copied_address)
+                return True
+            changed = write_if_changed(existing_address, address_vals)
+            return changed
+        elif is_different_address:
+            address_vals["category_id"] = [(6, 0, partner.category_id.ids)]
+            company_name_to_set = address_vals.get("company_name")
+            created_address = self.env["res.partner"].create(address_vals)
+            # Odoo automatically sets company_name to False for child contacts
+            # We need to explicitly set it again if it was provided
+            if company_name_to_set and not created_address.company_name:
+                created_address.write({"company_name": company_name_to_set})
+            self._geolocalize_partner(created_address)
+            return True
+        return False

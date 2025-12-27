@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <menuitem id="menu_cm_custom_root" name="CM Operations" sequence="50"/>
+</odoo>

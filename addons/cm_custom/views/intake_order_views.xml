@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_intake_order_tree" model="ir.ui.view">
+        <field name="name">intake.order.tree</field>
+        <field name="model">intake.order</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="state"/>
+                <field name="employee"/>
+                <field name="client"/>
+                <field name="transport_order"/>
+                <field name="finish_date"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_intake_order_form" model="ir.ui.view">
+        <field name="name">intake.order.form</field>
+        <field name="model">intake.order</field>
+        <field name="arch" type="xml">
+            <form string="Intake Order">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="state"/>
+                            <field name="employee"/>
+                            <field name="client"/>
+                        </group>
+                        <group>
+                            <field name="transport_order"/>
+                            <field name="finish_date"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Devices">
+                            <field name="devices">
+                                <list editable="bottom">
+                                    <field name="device"/>
+                                    <field name="has_case"/>
+                                    <field name="customer_stated_notes"/>
+                                    <field name="products" widget="many2many_tags"/>
+                                </list>
+                                <form string="Intake Device">
+                                    <group>
+                                        <field name="device"/>
+                                        <field name="has_case"/>
+                                        <field name="customer_stated_notes"/>
+                                        <field name="products" widget="many2many_tags"/>
+                                    </group>
+                                </form>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_intake_orders" model="ir.actions.act_window">
+        <field name="name">Intake Orders</field>
+        <field name="res_model">intake.order</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_intake_orders" name="Intake Orders"
+              parent="menu_cm_custom_root" action="action_intake_orders" sequence="20"/>
+</odoo>

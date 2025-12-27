@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_product_inventory_wizard_form" model="ir.ui.view">
+        <field name="name">product.inventory.wizard.form</field>
+        <field name="model">product.inventory.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Inventory Wizard">
+                <header invisible="not products">
+                    <button string="Save Bins"
+                            type="object"
+                            name="action_apply_bin_changes"
+                            class="btn btn-primary"
+                            invisible="not bin_needs_update"/>
+                    <button string="Save Bins"
+                            type="object"
+                            name="action_apply_bin_changes"
+                            class="btn btn-secondary"
+                            invisible="bin_needs_update"/>
+                    <button string="Cancel" class="btn btn-secondary" special="cancel"/>
+                    <button string="Print Bin Label"
+                            type="object"
+                            name="action_print_bin_label"
+                            class="btn btn-primary"/>
+                    <button string="Print Product Labels"
+                            type="object"
+                            name="action_print_product_labels"
+                            class="btn btn-primary"
+                            invisible="total_product_labels_to_print == 0"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="scan_box" string="Scan Here:" placeholder="Scan or type SKU"/>
+                            <field name="current_bin" string="Current Bin" readonly="1" force_save="1"/>
+                            <field name="bin_needs_update" invisible="1"/>
+                            <field name="count_of_products_not_selected" string="Missing Products"/>
+                            <field name="hide_last_scanned_product" widget="boolean_toggle" class="large-toggle"
+                                   string="Hide Last Scanned Product?"/>
+                        </group>
+                        <group>
+                            <field name="use_available_quantity_for_labels" widget="boolean_toggle"
+                                   class="large-toggle"/>
+                            <field name="product_labels_to_print" invisible="use_available_quantity_for_labels"/>
+                            <field name="total_product_labels_to_print"/>
+
+                        </group>
+                    </group>
+
+                    <group colspan="2" string="Last Scanned Product"
+                           invisible="not last_scanned_product or hide_last_scanned_product">
+                        <group>
+                            <field name="last_scanned_product_image" widget="image" readonly="1" nolabel="1"
+                                   class="bg-transparent"/>
+                        </group>
+
+                        <group>
+                            <field name="last_scanned_product_name" readonly="1"/>
+                            <field name="last_scanned_product_default_code" readonly="1"/>
+                            <field name="last_scanned_product_bin" readonly="1"
+                                   decoration-danger="last_scanned_product_bin != current_bin"/>
+                            <label for="last_scanned_product_qty_available"/>
+                            <div style="display: inline-flex; align-items: center;">
+                                <field name="last_scanned_product_qty_available" widget="float"
+                                       options="{'digits': [3,0]}"
+                                       readonly="1" nolabel="1" style="margin-right: 8px;"/>
+                                <span title="Warning" class="fa fa-exclamation-triangle text-warning"
+                                      invisible="last_scanned_product_qty_available &lt; 2"
+                                      style="display: inline-block; position: relative;top: -3px"/>
+                            </div>
+                            <field name="last_scanned_product_scanned_quantity" string="Quantity Scanned" readonly="1"
+                                   decoration-danger="last_scanned_product_qty_available != last_scanned_product_scanned_quantity"/>
+                            <field name="last_scanned_product_template" readonly="1" widget="many2one"
+                                   options="{'open_record': true, 'view_type': 'form', 'force_form_view': true}"
+                                   context="{'form_view_ref': 'product.product_template_only_form_view'}"/>
+                        </group>
+                    </group>
+                    <field name="products" nolabel="1">
+                        <list create="0" editable="bottom" default_order="is_selected asc">
+                            <field name="is_selected" widget="boolean_toggle" width="50px" class="large-toggle"/>
+                            <field name="default_code"/>
+                            <field name="name"/>
+                            <field name="original_bin" decoration-danger="original_bin != parent.current_bin"/>
+                            <field name="qty_available" string="On Hand" widget="float" options="{'digits': [3,0]}"/>
+                            <field name="quantity_scanned" string="Scanned"
+                                   decoration-danger="quantity_scanned != qty_available"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_product_inventory_wizard" model="ir.actions.act_window">
+        <field name="name">Inventory Wizard</field>
+        <field name="res_model">product.inventory.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="groups_id" eval="[(6,0,[ref('base.group_user')])]"/>
+    </record>
+
+    <menuitem id="menu_print_product_inventory_wizard"
+              name="Product Inventory"
+              parent="stock.menu_stock_inventory_control"
+              action="action_product_inventory_wizard" sequence="9"
+              groups="base.group_user"/>
+</odoo>

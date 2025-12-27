@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <menuitem id="menu_employee_names_tools_conf" name="Recompute Employee Names"
+                  parent="hr.menu_human_resources_configuration"
+                  action="hr_employee_name_extended.action_recompute_employee_names"
+                  sequence="200"
+                  groups="hr.group_hr_manager"/>
+    </data>
+</odoo>

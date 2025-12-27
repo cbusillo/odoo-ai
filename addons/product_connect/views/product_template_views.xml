@@ -1,0 +1,274 @@
+<odoo>
+    <!-- Simple window action to open product templates list for tests/tours -->
+    <record id="action_product_template" model="ir.actions.act_window">
+        <field name="name">Products</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">product.template</field>
+        <field name="target">current</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="context">{"search_default_goods": 1, "default_is_storable": True}</field>
+    </record>
+    <!-- Product Template: Server Action: Print Bin Labels -->
+    <record id="server_action_product_template_print_bin_labels" model="ir.actions.server">
+        <field name="name">Print Bin Labels</field>
+        <field name="model_id" ref="model_product_template"/>
+        <field name="binding_model_id" ref="model_product_template"/>
+        <field name="binding_type">action</field>
+        <field name="state">code</field>
+        <field name="code">
+            action = records.print_bin_labels()
+        </field>
+    </record>
+
+    <!-- Product Template: Server Action: Print Product Labels -->
+    <record id="server_action_product_template_print_product_labels" model="ir.actions.server">
+        <field name="name">Print Product Labels</field>
+        <field name="model_id" ref="model_product_template"/>
+        <field name="binding_model_id" ref="model_product_template"/>
+        <field name="binding_type">action</field>
+        <field name="state">code</field>
+        <field name="code">
+            action = records.print_product_labels(use_available_qty=True)
+        </field>
+    </record>
+
+    <record id="server_action_product_template_print_product_labels_picture" model="ir.actions.server">
+        <field name="name">Print Product Labels (Picture)</field>
+        <field name="model_id" ref="model_product_template"/>
+        <field name="binding_model_id" ref="model_product_template"/>
+        <field name="binding_type">action</field>
+        <field name="state">code</field>
+        <field name="code">
+            action = records.print_product_labels(use_available_qty=True, printer_job_type="product_label_picture")
+        </field>
+    </record>
+
+    <!-- Product Template: List View -->
+    <record id="view_product_template_list_inherit" model="ir.ui.view">
+        <field name="name">product.template.list.inherit</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_tree_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='default_code']" position="after">
+                <field name="bin"/>
+            </xpath>
+            <xpath expr="//field[@name='virtual_available']" position="attributes">
+                <attribute name="optional">hide</attribute>
+            </xpath>
+            <xpath expr="//field[@name='virtual_available']" position="after">
+                <field name="shopify_product_id"/>
+                <field name="create_date" optional="hide"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Product Template: Form View -->
+    <record id="view_product_template_form_inherit" model="ir.ui.view">
+        <field name="name">product.template.form.inherit</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_only_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='options']" position="before">
+                <div class="mb-3">
+                    <label for="source" class="d-inline me-2">Source</label>
+                    <field name="source" readonly="1" class="d-inline text-primary"/>
+                </div>
+                <div class="mb-3" invisible="not motor">
+                    <label for="motor" class="d-inline me-2">Motor</label>
+                    <field name="motor" options="{'no_create': True}" class="d-inline text-primary"/>
+                </div>
+            </xpath>
+            <xpath expr="//field[@name='default_code']" position="attributes">
+                <attribute name="string">SKU</attribute>
+                <attribute name="readonly">[('type', '=', 'consu')]</attribute>
+            </xpath>
+            <field name="default_code" position="after">
+                <field name="condition"/>
+                <field name="manufacturer"/>
+                <field name="part_type"/>
+                <field name="mpn"/>
+                <field name="bin"/>
+                <field name="shopify_product_id" widget="CopyClipboardChar"/>
+                <field name="shopify_product_url" widget="CopyClipboardURL"/>
+                <field name="shopify_product_admin_url" widget="CopyClipboardURL"/>
+
+            </field>
+            <xpath expr="//field[@name='create_repair']" position="after">
+                <field name="website_description"/>
+            </xpath>
+            <xpath expr="//group[@name='group_lots_and_weight']/div[@name='weight']" position="after">
+                <div class="o_row">
+                    <span>Dimensions (in)</span>
+                </div>
+                <div class="o_row" style="display: flex; align-items: center;">
+                    <label for="length" string="L" style="width: 40px;"/>
+                    <field name="length" style="max-width: 30px; margin-right: 10px;"/>
+
+                    <label for="width" string="W" style="width: 40px;"/>
+                    <field name="width" style="max-width: 30px; margin-right: 10px;"/>
+
+                    <label for="height" string="H" style="width: 40px;"/>
+                    <field name="height" style="max-width: 30px;"/>
+                </div>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page string="Test Details" invisible="not motor">
+                    <field name="motor_tests" string="">
+                        <list>
+                            <field name="name"/>
+                            <field name="computed_result"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="product_template_search_inherit" model="ir.ui.view">
+        <field name="name">product.template.search.inherit</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_search_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='name']" position="after">
+                <field name="default_code" string="SKU" filter_domain="[('default_code', 'ilike', self)]"/>
+                <separator/>
+                <filter name="filter_source_motor" string="Motor Products" domain="[('source', '=', 'motor')]"/>
+                <filter name="filter_source_import" string="Import Products" domain="[('source', '=', 'import')]"/>
+                <separator/>
+                <filter name="filter_is_ready_for_sale" string="Enabled Products"
+                        domain="[('is_ready_for_sale', '=', True)]"/>
+            </xpath>
+            <xpath expr="//field[@name='name']" position="attributes">
+                <attribute name="filter_domain">[
+                    '|', '|', '|', '|',
+                    ('name', 'ilike', self),
+                    ('mpn', 'ilike', self),
+                    ('bin', 'ilike', self),
+                    ('website_description', 'ilike', self),
+                    ('default_code', 'ilike', self)]
+                </attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="product_template_list_edit" model="ir.ui.view">
+        <field name="name">product.template.list.edit</field>
+        <field name="model">product.template</field>
+        <field name="arch" type="xml">
+            <list editable="bottom" multi_edit="1">
+                <field name="name"/>
+                <field name="default_code" readonly="1"/>
+                <field name="bin"/>
+                <field name="condition"/>
+                <field name="manufacturer"/>
+                <field name="part_type"/>
+                <field name="mpn"/>
+                <field name="shopify_product_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_product_template_dimensions_list" model="ir.ui.view">
+        <field name="name">product.template.dimensions.list</field>
+        <field name="model">product.template</field>
+        <field name="priority" eval="20"/>
+        <field name="arch" type="xml">
+            <list string="Product" editable="bottom" multi_edit="1" delete="False" create="False" open_form_view="1"
+                  decoration-warning="not (length and height and width and weight and bin)">
+                <field name="name" readonly="1"/>
+                <field name="default_code" readonly="1"/>
+                <field name="qty_available" string="Quantity" readonly="1" widget="float" options="{'digits': [3,0]}"/>
+                <field name="length"/>
+                <field name="width"/>
+                <field name="height"/>
+                <field name="weight"/>
+                <field name="bin"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_product_template_dimensions_search" model="ir.ui.view">
+        <field name="name">product.template.dimensions.search</field>
+        <field name="model">product.template</field>
+        <field name="arch" type="xml">
+            <search string="Product">
+                <field name="default_code" string="SKU" filter_domain="[('default_code','=', self)]"/>
+                <field name="default_code" string="Product" filter_domain="
+                ['|', '|', '|', '|', '|', '|',
+                    ('name', 'ilike', self),
+                    ('default_code', 'ilike', self),
+                    ('bin', 'ilike', self),
+                    ('weight', 'ilike', self),
+                    ('length', 'ilike', self),
+                    ('width', 'ilike', self),
+                    ('height', 'ilike', self)]"/>
+                <field name="name"/>
+
+                <field name="bin"/>
+
+                <filter name="filter_zero_dimensions" string="Zero Dimensions"
+                        domain="['|', '|', '|', '|', '|', ('length', '=', 0), ('length', '=', False), ('width', '=', 0), ('width', '=', False), ('height', '=', 0), ('height', '=', False)]"/>
+                <filter name="filter_zero_weight" string="Zero Weight"
+                        domain="['|', ('weight', '=', 0), ('weight', '=', False)]"/>
+                <filter name="filter_missing_bin" string="Missing Bin"
+                        domain="['|',('bin', '=', False), ('bin', '=','')]"/>
+                <filter name="filter_has_bin" string="Has Bin" domain="[('bin', '!=', False), ('bin', '!=', '')]"/>
+                <filter name="filter_has_quantity" string="Has Quantity" domain="[('initial_quantity', '>', 0)]"/>
+                <filter name="filter_has_bin_and_quantity" string="Has Bin and Quantity"
+                        domain="[('bin', '!=', False), ('bin', '!=', ''), ('initial_quantity', '>', 0)]"/>
+                <filter name="group_by_bin" context="{'group_by':'bin', 'order': 'bin'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_product_template_dimensions_form" model="ir.actions.act_window">
+        <field name="name">Product Dimensions</field>
+        <field name="res_model">product.template</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_ids"
+               eval="[(5, 0, 0), (ref('view_product_template_dimensions_list'), 'list'), (ref('view_product_template_list_inherit'), 'form')]"/>
+        <field name="search_view_id" ref="view_product_template_dimensions_search"/>
+        <field name="domain">[('type', '=', 'consu')]</field>
+    </record>
+
+    <record model="ir.actions.act_window.view" id="product_template_dimensions_list_view">
+        <field name="sequence">10</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_product_template_dimensions_list"/>
+        <field name="act_window_id" ref="action_product_template_dimensions_form"/>
+    </record>
+
+    <record id="action_product_template_list_edit" model="ir.actions.act_window">
+        <field name="name">Product Edit</field>
+        <field name="res_model">product.template</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="product_template_list_edit"/>
+    </record>
+
+    <record id="stock.product_template_action_product" model="ir.actions.act_window">
+        <field name="view_mode">list,kanban,form</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('product.product_template_tree_view')}),
+            (0, 0, {'view_mode': 'kanban', 'view_id': ref('product.product_template_kanban_view')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('product.product_template_only_form_view')})]"/>
+        <field name="context">
+            {"search_default_filter_is_ready_for_sale": 1, "search_default_goods": 1, 'default_is_storable': True}
+        </field>
+    </record>
+
+    <!-- Menu item -->
+    <menuitem id="menu_product_template_edit" name="Product Edit" action="action_product_template_list_edit"
+              parent="stock.menu_stock_inventory_control" sequence="2"/>
+    <menuitem id="menu_product_template_dimensions_form" name="Product Dimensions"
+              parent="stock.menu_stock_inventory_control" sequence="4"
+              action="action_product_template_dimensions_form"/>
+
+    <!-- reorder configuration menu items -->
+    <record id="stock.menu_product_category_config_stock" model="ir.ui.menu">
+        <field name="sequence">10</field>
+    </record>
+    <record id="stock.menu_wms_barcode_nomenclature_all" model="ir.ui.menu">
+        <field name="sequence">10</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,147 @@
+<odoo>
+    <!-- Multi-measure Graph View for Product Processing -->
+    <record id="view_product_processing_graph" model="ir.ui.view">
+        <field name="name">product.processing.graph</field>
+        <field name="model">product.template</field>
+        <field name="type">graph</field>
+        <field name="arch" type="xml">
+            <graph string="Product Processing Report" type="line">
+                <field name="is_ready_for_sale_last_enabled_date" interval="day"/>
+                <field name="initial_price_total" type="measure" string="Revenue Value"/>
+                <field name="initial_cost_total" type="measure" string="Cost Value"/>
+                <field name="initial_quantity" type="measure" string="Units Processed"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- Pivot View for Detailed Analysis -->
+    <record id="view_product_processing_pivot" model="ir.ui.view">
+        <field name="name">product.processing.pivot</field>
+        <field name="model">product.template</field>
+        <field name="arch" type="xml">
+            <pivot string="Product Processing Report" sample="1">
+                <field name="is_ready_for_sale_last_enabled_date" type="row" interval="month"/>
+                <field name="source" type="col"/>
+                <field name="initial_quantity" type="measure" string="Total Units"/>
+                <field name="initial_price_total" type="measure" string="Revenue Value"/>
+                <field name="initial_cost_total" type="measure" string="Cost Value"/>
+            </pivot>
+        </field>
+    </record>
+
+    <!-- Multi-Axis Graph View (Multigraph) -->
+    <record id="view_product_processing_multigraph" model="ir.ui.view">
+        <field name="name">product.processing.multigraph</field>
+        <field name="model">product.template</field>
+        <field name="type">graph</field>
+        <field name="arch" type="xml">
+            <graph string="Product Processing Analytics" type="line" js_class="multigraph">
+                <field name="is_ready_for_sale_last_enabled_date" interval="day"/>
+                <field name="initial_price_total" type="measure" widget="monetary" string="Revenue Value"/>
+                <field name="initial_cost_total" type="measure" widget="monetary" string="Cost Value"/>
+                <field name="initial_quantity" type="measure" string="Units Processed"/>
+                <field name="image_count" type="measure" string="Image Count"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- List View for Product Processing -->
+    <record id="view_product_processing_list" model="ir.ui.view">
+        <field name="name">product.processing.list</field>
+        <field name="model">product.template</field>
+        <field name="arch" type="xml">
+            <list string="Product Processing List">
+                <field name="display_name" string="Product"/>
+                <field name="default_code" string="SKU"/>
+                <field name="source" string="Source"/>
+                <field name="is_ready_for_sale_last_enabled_date" string="Last Enabled Date"/>
+                <field name="initial_price_total" string="Revenue Value" widget="monetary"/>
+                <field name="initial_cost_total" string="Cost Value" widget="monetary"/>
+                <field name="initial_quantity" string="Units Processed"/>
+                <field name="image_count" string="Images"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Search View with Predefined Filters -->
+    <record id="view_product_processing_search" model="ir.ui.view">
+        <field name="name">product.processing.search</field>
+        <field name="model">product.template</field>
+        <field name="arch" type="xml">
+            <search string="Product Processing">
+                <field name="name"/>
+                <field name="default_code"/>
+                <field name="source"/>
+                <field name="is_ready_for_sale_last_enabled_date"/>
+
+                <!-- Date Range Filters (Mutually Exclusive) -->
+                <filter string="Date Range" name="date_range_group" date="is_ready_for_sale_last_enabled_date"
+                        default_period="custom_is_ready_for_sale_last_enabled_date_last_7_days">
+                    <filter name="is_ready_for_sale_last_enabled_date_last_7_days" string="Last 7 Days"
+                            domain="[('is_ready_for_sale_last_enabled_date', '>=', (context_today() - datetime.timedelta(days=7)).strftime('%Y-%m-%d'))]"/>
+                    <filter name="last_30_days" string="Last 30 Days"
+                            domain="[('is_ready_for_sale_last_enabled_date', '>=', (context_today() - datetime.timedelta(days=30)).strftime('%Y-%m-%d'))]"/>
+                    <filter name="last_90_days" string="Last 90 Days"
+                            domain="[('is_ready_for_sale_last_enabled_date', '>=', (context_today() - datetime.timedelta(days=90)).strftime('%Y-%m-%d'))]"/>
+                    <filter name="last_365_days" string="Last 365 Days"
+                            domain="[('is_ready_for_sale_last_enabled_date', '>=', (context_today() - datetime.timedelta(days=365)).strftime('%Y-%m-%d'))]"/>
+                </filter>
+
+                <separator/>
+
+                <!-- Product Type Filters -->
+                <filter name="motor_products" string="Motor Products" domain="[('source', '=', 'motor')]"/>
+                <filter name="import_products" string="Import Products" domain="[('source', '=', 'import')]"/>
+
+                <separator/>
+
+                <!-- Group By Options -->
+                <group expand="1" string="Group By">
+                    <filter string="Processed Date" name="groupby_processed_date"
+                            context="{'group_by': 'is_ready_for_sale_last_enabled_date'}"/>
+                    <filter string="Source" name="groupby_source" context="{'group_by': 'source'}"/>
+                    <filter string="Part Type" name="groupby_part_type" context="{'group_by': 'part_type'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action for Product Processing Analytics -->
+    <record id="action_product_processing_analytics" model="ir.actions.act_window">
+        <field name="name">Product Processing Analytics</field>
+        <field name="res_model">product.template</field>
+        <field name="view_mode">multigraph,pivot,list</field>
+        <field name="domain">[('is_ready_for_sale', '=', True),
+                              ('is_ready_for_sale_last_enabled_date', '!=', False)]</field>
+        <field name="context">{
+            'search_default_motor_products': 1,
+            'search_default_import_products': 1,
+            'search_default_date_range_group': 1,
+            'graph_groupbys': ['is_ready_for_sale_last_enabled_date:day'],
+            'graph_measures': ['initial_price_total', 'initial_cost_total', 'initial_quantity', 'image_count'],
+            'pivot_measures': ['initial_price_total', 'initial_cost_total']
+        }</field>
+        <field name="search_view_id" ref="view_product_processing_search"/>
+        <field name="view_id" ref="view_product_processing_multigraph"/>
+        <field name="view_ids" eval="[(5, 0, 0),
+                                      (0, 0, {'view_mode': 'multigraph', 'view_id': ref('view_product_processing_multigraph')}),
+                                      (0, 0, {'view_mode': 'pivot', 'view_id': ref('view_product_processing_pivot')}),
+                                      (0, 0, {'view_mode': 'list', 'view_id': ref('view_product_processing_list')})]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No processed products found
+            </p>
+            <p>
+                This view shows revenue, cost, and quantity trends for processed products over time.
+                Use the graph view for multi-axis analysis, or switch to pivot for detailed analysis.
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu Items -->
+    <menuitem id="menu_product_processing_report"
+              name="Product Processing"
+              parent="stock.menu_warehouse_report"
+              action="action_product_processing_analytics"
+              sequence="20"/>
+</odoo>

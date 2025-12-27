@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Default structured rows (supersede JSON fallback when present) -->
+    <record id="drl_cfg_pro" model="discuss.record.link.config">
+        <field name="active">1</field>
+        <field name="prefix">pro</field>
+        <field name="label">Products</field>
+        <field name="model_id" ref="product.model_product_product"/>
+        <field name="limit">8</field>
+        <field name="display_template">[{{ default_code }}] {{ name }}</field>
+        <!-- Leave search_field_ids empty so admins select; server will fallback to display_name if none -->
+    </record>
+
+    <!-- Additional examples (mot, po, mo) can be added via the UI to avoid cross-module XML id coupling. -->
+</odoo>

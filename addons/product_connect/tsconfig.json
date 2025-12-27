@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "ES2020",
+    "strict": true,
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {
+      "@product_connect/*": [
+        "static/src/*"
+      ]
+    }
+  },
+  "include": [
+    "static/src/**/*"
+  ]
+}

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Main Menu -->
+    <menuitem
+            id="menu_external_ids_root"
+            name="External IDs"
+            sequence="50"
+            groups="base.group_system"
+            web_icon="external_ids,static/description/icon.png"/>
+
+    <!-- Configuration Menu -->
+    <menuitem
+            id="menu_external_ids_config"
+            name="Configuration"
+            parent="menu_external_ids_root"
+            sequence="100"/>
+
+    <!-- External Systems Menu is declared in external_system_views.xml (needs action present) -->
+
+    <!-- All External IDs menu declared in external_id_views.xml (needs action present) -->
+
+</odoo>

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_transport_order_tree" model="ir.ui.view">
+        <field name="name">transport.order.tree</field>
+        <field name="model">transport.order</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="state"/>
+                <field name="arrival_date"/>
+                <field name="scheduled_date"/>
+                <field name="departure_date"/>
+                <field name="employee"/>
+                <field name="client"/>
+                <field name="contact"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_transport_order_form" model="ir.ui.view">
+        <field name="name">transport.order.form</field>
+        <field name="model">transport.order</field>
+        <field name="arch" type="xml">
+            <form string="Transport Order">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="state"/>
+                            <field name="employee"/>
+                            <field name="client"/>
+                            <field name="contact"/>
+                        </group>
+                        <group>
+                            <field name="arrival_date"/>
+                            <field name="scheduled_date"/>
+                            <field name="departure_date"/>
+                            <field name="quantity_in_counted"/>
+                            <field name="quantity_out"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="location_latitude"/>
+                            <field name="location_longitude"/>
+                        </group>
+                        <group>
+                            <field name="device_notes" colspan="2"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Devices">
+                            <field name="devices">
+                                <list editable="bottom">
+                                    <field name="device"/>
+                                    <field name="movement_type"/>
+                                    <field name="verification_scan"/>
+                                    <field name="scan_date"/>
+                                </list>
+                                <form string="Transport Device">
+                                    <group>
+                                        <field name="device"/>
+                                        <field name="movement_type"/>
+                                        <field name="verification_scan"/>
+                                        <field name="scan_date"/>
+                                    </group>
+                                </form>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_transport_orders" model="ir.actions.act_window">
+        <field name="name">Transport Orders</field>
+        <field name="res_model">transport.order</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_transport_orders" name="Transport Orders"
+              parent="menu_cm_custom_root" action="action_transport_orders" sequence="10"/>
+</odoo>

@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Shipping Analytics Pivot View -->
+    <record id="view_sale_order_shipping_pivot" model="ir.ui.view">
+        <field name="name">sale.order.shipping.pivot</field>
+        <field name="model">sale.order</field>
+        <field name="arch" type="xml">
+            <pivot string="Shipping Analytics" sample="1">
+                <field name="source_platform" type="row"/>
+                <field name="carrier_id" type="row"/>
+                <field name="create_date" interval="month" type="col"/>
+                <field name="shipping_charge" type="measure"/>
+                <field name="shipping_paid" type="measure"/>
+                <field name="shipping_margin" type="measure"/>
+                <field name="amount_total" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <!-- Shipping Analytics Graph View -->
+    <record id="view_sale_order_shipping_graph" model="ir.ui.view">
+        <field name="name">sale.order.shipping.graph</field>
+        <field name="model">sale.order</field>
+        <field name="arch" type="xml">
+            <graph string="Shipping Analytics" type="bar" stacked="0" sample="1">
+                <field name="create_date" interval="month"/>
+                <field name="shipping_margin" type="measure"/>
+                <field name="source_platform" type="row"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- Shipping Cost Analysis View -->
+    <record id="view_sale_order_shipping_cost_graph" model="ir.ui.view">
+        <field name="name">sale.order.shipping.cost.graph</field>
+        <field name="model">sale.order</field>
+        <field name="arch" type="xml">
+            <graph string="Shipping Cost vs Revenue" type="line" sample="1">
+                <field name="create_date" interval="week"/>
+                <field name="shipping_charge" type="measure"/>
+                <field name="shipping_paid" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+
+    <!-- Search view for shipping analytics -->
+    <record id="view_sale_order_shipping_search" model="ir.ui.view">
+        <field name="name">sale.order.shipping.search</field>
+        <field name="model">sale.order</field>
+        <field name="arch" type="xml">
+            <search string="Shipping Analytics">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="source_platform"/>
+                <field name="carrier_id"/>
+                <separator/>
+                <filter string="Has Shipping" name="has_shipping" domain="[('shipping_charge', '>', 0)]"/>
+                <filter string="Positive Margin" name="positive_margin" domain="[('shipping_margin', '>', 0)]"/>
+                <filter string="Negative Margin" name="negative_margin" domain="[('shipping_margin', '&lt;', 0)]"/>
+                <separator/>
+                <!-- Date Range Filters with Nested Structure -->
+                <filter string="Date Range" name="date_range_group" date="create_date"
+                        default_period="custom_create_date_last_7_days">
+                    <filter name="create_date_last_7_days" string="Last 7 Days"
+                            domain="[('create_date', '>=', (context_today() - datetime.timedelta(days=7)).strftime('%Y-%m-%d'))]"/>
+                    <filter name="create_date_last_30_days" string="Last 30 Days"
+                            domain="[('create_date', '>=', (context_today() - datetime.timedelta(days=30)).strftime('%Y-%m-%d'))]"/>
+                    <filter name="create_date_last_90_days" string="Last 90 Days"
+                            domain="[('create_date', '>=', (context_today() - datetime.timedelta(days=90)).strftime('%Y-%m-%d'))]"/>
+                </filter>
+                <separator/>
+                <group expand="0" string="Group By">
+                    <filter string="Platform" name="group_platform" context="{'group_by':'source_platform'}"/>
+                    <filter string="Carrier" name="group_carrier" context="{'group_by':'carrier_id'}"/>
+                    <filter string="Customer" name="group_partner" context="{'group_by':'partner_id'}"/>
+                    <separator/>
+                    <filter string="Order Date" name="group_date" context="{'group_by':'create_date'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action for Shipping Analytics -->
+    <record id="action_sale_order_shipping_analytics" model="ir.actions.act_window">
+        <field name="name">Shipping Analytics</field>
+        <field name="res_model">sale.order</field>
+        <field name="view_mode">pivot,graph</field>
+        <field name="search_view_id" ref="view_sale_order_shipping_search"/>
+        <field name="domain">[('shipping_charge', '>', 0)]</field>
+        <field name="context">{'search_default_has_shipping': 1, 'search_default_date_range_group': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No shipping data found
+            </p>
+            <p>
+                This report shows shipping costs, revenue, and margins across all orders.
+            </p>
+        </field>
+    </record>
+
+    <!-- Action for Carrier Performance -->
+    <record id="action_carrier_performance_report" model="ir.actions.act_window">
+        <field name="name">Carrier Performance</field>
+        <field name="res_model">sale.order</field>
+        <field name="view_mode">pivot,graph</field>
+        <field name="view_id" ref="view_sale_order_shipping_pivot"/>
+        <field name="search_view_id" ref="view_sale_order_shipping_search"/>
+        <field name="domain">[('carrier_id', '!=', False)]</field>
+        <field name="context">{'search_default_group_carrier': 1, 'search_default_date_range_group': 1}</field>
+    </record>
+
+    <!-- Menu items -->
+    <menuitem id="menu_shipping_analytics"
+              name="Shipping Analytics"
+              parent="sale.sale_menu_root"
+              sequence="50"/>
+
+    <menuitem id="menu_shipping_dashboard"
+              name="Shipping Dashboard"
+              parent="menu_shipping_analytics"
+              action="action_sale_order_shipping_analytics"
+              sequence="10"/>
+
+    <menuitem id="menu_carrier_performance"
+              name="Carrier Performance"
+              parent="menu_shipping_analytics"
+              action="action_carrier_performance_report"
+              sequence="20"/>
+</odoo>

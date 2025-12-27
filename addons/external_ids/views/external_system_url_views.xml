@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_external_system_url_list" model="ir.ui.view">
+        <field name="name">external.system.url.list</field>
+        <field name="model">external.system.url</field>
+        <field name="arch" type="xml">
+            <list string="URL Templates">
+                <field name="sequence" widget="handle"/>
+                <field name="active" widget="boolean_toggle"/>
+                <field name="system_id"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="res_model_id"/>
+                <field name="template"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_external_system_url_form" model="ir.ui.view">
+        <field name="name">external.system.url.form</field>
+        <field name="model">external.system.url</field>
+        <field name="arch" type="xml">
+            <form string="URL Template">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="active"/>
+                            <field name="system_id"/>
+                            <field name="name"/>
+                            <field name="code" placeholder="e.g., store" readonly="id"/>
+                        </group>
+                        <group>
+                            <field name="res_model_id" placeholder="Limit to a model (optional)"/>
+                            <field name="sequence"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="template" placeholder="e.g., {base}/admin/products/{id}"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_open_rename_wizard" type="object" string="Rename Key" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_external_system_url_rename_wizard" model="ir.ui.view">
+        <field name="name">external.system.url.rename.wizard.form</field>
+        <field name="model">external.system.url.rename.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Rename URL Key">
+                <group>
+                    <field name="url_id" invisible="1"/>
+                    <field name="new_code" placeholder="e.g., store"/>
+                </group>
+                <footer>
+                    <button string="Rename" name="action_rename" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_external_system_url" model="ir.actions.act_window">
+        <field name="name">URL Templates</field>
+        <field name="res_model">external.system.url</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_external_system_url" name="URL Templates" parent="menu_external_ids_config"
+              action="action_external_system_url" sequence="20"/>
+
+</odoo>

@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data>
+        <record id="paperformat_motor_product_pull_list" model="report.paperformat">
+            <field name="name">Motor Product Pull List A4</field>
+            <field name="default" eval="True"/>
+            <field name="format">Letter</field>
+            <field name="page_height">0</field>
+            <field name="page_width">0</field>
+            <field name="orientation">Portrait</field>
+            <field name="margin_top">5</field>
+            <field name="margin_bottom">10</field>
+            <field name="margin_left">7</field>
+            <field name="margin_right">7</field>
+            <field name="header_line" eval="False"/>
+            <field name="header_spacing">0</field>
+            <field name="dpi">90</field>
+        </record>
+        <!-- Motor Product Pull List -->
+        <record id="action_report_motor_product_pull_list" model="ir.actions.report">
+            <field name="name">Pull List (PDF)</field>
+            <field name="model">product.template</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">product_connect.report_motorproductpulllist</field>
+            <field name="report_file">product_connect.report_motorproductpulllist</field>
+            <field name="paperformat_id" ref="product_connect.paperformat_motor_product_pull_list"/>
+            <field name="print_report_name">'Motor Products Pull List - %s' % object.name</field>
+            <field name="binding_model_id" ref="model_product_template"/>
+            <field name="binding_type">report</field>
+        </record>
+
+        <!-- Report Template -->
+        <template id="report_motorproductpulllist">
+            <t t-call="web.basic_layout">
+                <main>
+                    <div class="page">
+                        <style>
+                            .pull-list-header {
+                                display: flex;
+                                justify-content: space-between;
+                                align-items: center;
+                                margin-bottom: 10px;
+                                padding: 5px;
+                                background-color: #f0f0f0;
+                                border-radius: 5px;
+                            }
+
+                            .pull-list-table {
+                                width: 100%;
+                                border-collapse: collapse;
+                                margin-bottom: 10px;
+                            }
+
+                            .pull-list-table th, .pull-list-table td {
+                                border: 1px solid #ddd;
+                                padding: 4px;
+                                text-align: left;
+                            }
+
+                            .pull-list-table th {
+                                background-color: #f2f2f2;
+                            }
+
+                            .checkbox {
+                                width: 20px;
+                                height: 20px;
+                                border: 2px solid #000;
+                                display: inline-block;
+                                margin-right: 10px;
+                            }
+
+                            .motor-header {
+                                background-color: #e0e0e0;
+                                font-weight: bold;
+                            }
+                        </style>
+
+                        <div class="pull-list-header">
+                            <h2>Pull List for
+                                <t t-out="context_timestamp(datetime.datetime.now()).strftime('%m-%d-%Y')"/>
+                            </h2>
+                        </div>
+
+                        <table class="pull-list-table">
+                            <thead>
+                                <tr>
+                                    <th>Qty Listing</th>
+                                    <th>Quantity</th>
+                                    <th>MPN</th>
+                                    <th>Name</th>
+                                    <th>Done</th>
+                                    <th>QC</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-set="current_motor" t-value="False"/>
+                                <t t-foreach="docs.filtered(lambda p: p.is_listable).sorted(key=lambda p: p.motor.id)"
+                                   t-as="product">
+                                    <t t-if="product.motor != current_motor">
+                                        <tr class="motor-header">
+                                            <td colspan="6"><span t-field="product.motor.display_name"/></td>
+                                        </tr>
+                                        <t t-set="current_motor" t-value="product.motor"/>
+                                    </t>
+                                    <tr>
+                                        <td>
+                                            <t t-if="product.motor_product_template.is_quantity_listing">Yes</t>
+                                        </td>
+                                        <td><span t-field="product.initial_quantity"/></td>
+                                        <td><span t-field="product.first_mpn"/></td>
+                                        <td><span t-field="product.motor_product_template.name"/></td>
+                                        <td><div class="checkbox"></div></td>
+                                        <td><div class="checkbox"></div></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                        <div class="footer">
+                            <div>
+                                <strong>Total Items:</strong> <t t-out="len(docs)"/>
+                            </div>
+                            <div class="page-number">
+                                Page <span class="page"/> of <span class="topage"/>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </t>
+        </template>
+    </data>
+</odoo>

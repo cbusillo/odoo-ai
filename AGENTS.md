@@ -75,8 +75,8 @@ Treat this file as the launch checklist for every Codex session. Skim it, open t
 
 ## Addons & External Code
 
-- New external addons must arrive as Git submodules (`git submodule add <repo-url> addons/<name>`); commit `.gitmodules`
-  and the submodule path, and keep generated artifacts out of this repo.
+- Addons live directly in this repo under `./addons/` (no submodules). If an addon needs to be shared
+  externally, mirror or export it from this repo instead of embedding a submodule.
 - Compose already maps host `./addons` to `/volumes/addons`; no extra container wiring required.
 
 ## Research & Citations

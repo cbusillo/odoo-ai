@@ -1,0 +1,3 @@
+<component name="DependencyValidationManager">
+  <scope name="Generated" pattern="file[product_connect]:services/shopify/gql/*||file[product_connect]:graphql/schema/*" />
+</component>

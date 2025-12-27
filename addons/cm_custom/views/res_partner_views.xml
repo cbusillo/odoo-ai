@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_res_partner_form_cm_custom" model="ir.ui.view">
+        <field name="name">res.partner.form.cm.custom</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet/notebook" position="inside">
+                <page string="CM Operations">
+                    <group>
+                        <group>
+                            <field name="is_repair_client"/>
+                            <field name="is_buyback_client"/>
+                            <field name="is_accessories_client"/>
+                            <field name="is_devices_client"/>
+                        </group>
+                        <group>
+                            <field name="availability_calendar"/>
+                            <field name="unavailability_calendar"/>
+                            <field name="average_time_on_location_per_device" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Owned Devices">
+                            <field name="devices">
+                                <list>
+                                    <field name="serial_number"/>
+                                    <field name="model"/>
+                                    <field name="bin"/>
+                                    <field name="is_in_manufacturer_warranty"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Devices At Depot">
+                            <field name="devices_at_depot" readonly="1">
+                                <list>
+                                    <field name="serial_number"/>
+                                    <field name="model"/>
+                                    <field name="bin"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Orders">
+                            <group>
+                                <field name="transport_orders">
+                                    <list>
+                                        <field name="name"/>
+                                        <field name="state"/>
+                                        <field name="arrival_date"/>
+                                        <field name="departure_date"/>
+                                    </list>
+                                </field>
+                                <field name="intake_orders">
+                                    <list>
+                                        <field name="state"/>
+                                        <field name="transport_order"/>
+                                        <field name="finish_date"/>
+                                    </list>
+                                </field>
+                                <field name="diagnostic_orders" readonly="1">
+                                    <list>
+                                        <field name="state"/>
+                                        <field name="start_date"/>
+                                        <field name="finish_date"/>
+                                        <field name="bin"/>
+                                    </list>
+                                </field>
+                            </group>
+                        </page>
+                        <page string="Repair">
+                            <field name="repair_batches">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="state"/>
+                                    <field name="start_date"/>
+                                    <field name="finish_date"/>
+                                    <field name="bin"/>
+                                </list>
+                            </field>
+                            <field name="repair_batch_devices" readonly="1">
+                                <list>
+                                    <field name="batch_id"/>
+                                    <field name="device_id"/>
+                                    <field name="state"/>
+                                    <field name="start_date"/>
+                                    <field name="finish_date"/>
+                                </list>
+                            </field>
+                            <field name="qc_orders" readonly="1">
+                                <list>
+                                    <field name="batch_id"/>
+                                    <field name="device_id"/>
+                                    <field name="state"/>
+                                    <field name="start_date"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Accounting">
+                            <field name="invoices" widget="many2many_tags"/>
+                        </page>
+                    </notebook>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates>
+    <t t-name="product_connect.MotorTestWidget">
+        <div class="container">
+            <div class="row">
+                <t t-if="this.motorTestsBySection.sections and Object.keys(this.motorTestsBySection.sections).length > 0">
+                    <t t-foreach="Object.entries(this.motorTestsBySection.sections)" t-as="sectionEntry"
+                       t-key="sectionEntry[0]">
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header bg-primary text-white p-2 rounded-top">
+                                    <h3 class="card-title mb-0">
+                                        <t t-out="sectionEntry[0]"/>
+                                    </h3>
+                                </div>
+                                <div class="card-body">
+                                    <t t-foreach="sectionEntry[1]" t-as="test" t-key="test.id">
+                                        <div class="o_motor_test mb-3" t-att-data-test-id="test.id">
+                                            <strong>
+                                                <t t-out="test.data.name"/>
+                                            </strong>
+                                            <div>
+                                                <t t-if="test.data.result_type === 'yes_no' || test.data.result_type === 'selection'">
+                                                    <ResettableBadgeSelectionField id="test.id"
+                                                                                   name="test.data.result_type + '_result'"
+                                                                                   record="test"
+                                                                                   domain="getSelectionFieldDomain(test.id)"
+                                                                                   t-on-click="onFieldChanged"/>
+                                                </t>
+                                                <t t-if="test.data.result_type === 'numeric'">
+                                                    <FloatField id="test.id" name="'numeric_result'" record="test"
+                                                                t-on-change="onFieldChanged"/>
+                                                </t>
+                                                <t t-if="test.data.result_type === 'text'">
+                                                    <CharField id="test.id" name="'text_result'" record="test"
+                                                               t-on-change="onFieldChanged"/>
+                                                </t>
+                                                <t t-if="test.data.result_type === 'file'">
+                                                    <PdfViewerField id="test.id" name="'file_result'" record="test"
+                                                                    t-on-change="onFieldChanged"/>
+                                                </t>
+                                            </div>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </t>
+                <t t-else="">
+                    <div class="col-md-12">
+                        <p>No motor tests found.</p>
+                    </div>
+                </t>
+            </div>
+
+        </div>
+    </t>
+</templates>

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- External ID Tree View -->
+    <record id="view_external_id_list" model="ir.ui.view">
+        <field name="name">external.id.list</field>
+        <field name="model">external.id</field>
+        <field name="arch" type="xml">
+            <list string="External IDs" editable="bottom">
+                <field name="system_id"/>
+                <field name="resource"/>
+                <field name="res_model"/>
+                <field name="record_name"/>
+                <field name="external_id"/>
+                <field name="last_sync"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- External ID Form View -->
+    <record id="view_external_id_form" model="ir.ui.view">
+        <field name="name">external.id.form</field>
+        <field name="model">external.id</field>
+        <field name="arch" type="xml">
+            <form string="External ID">
+                <header>
+                    <button name="action_sync" type="object" string="Sync" class="btn-primary"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Inactive" bg_color="bg-danger" invisible="active"/>
+                    <group>
+                        <group>
+                            <field name="system_id" options="{'no_create': True}"/>
+                            <field name="resource"/>
+                            <field name="external_id"/>
+                            <field name="reference" widget="reference" options="{'no_open': True}" colspan="2"
+                                   placeholder="Type to search a record"/>
+                        </group>
+                        <group>
+                            <field name="last_sync"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="notes" placeholder="Additional notes..."/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- External ID Search View -->
+    <record id="view_external_id_search" model="ir.ui.view">
+        <field name="name">external.id.search</field>
+        <field name="model">external.id</field>
+        <field name="arch" type="xml">
+            <search string="External IDs">
+                <field name="system_id"/>
+                <field name="external_id"/>
+                <field name="record_name"/>
+                <filter string="Active" name="active" domain="[('active', '=', True)]"/>
+                <filter string="Inactive" name="inactive" domain="[('active', '=', False)]"/>
+                <separator/>
+                <filter string="Employees" name="employees" domain="[('res_model', '=', 'hr.employee')]"/>
+                <filter string="Partners" name="partners" domain="[('res_model', '=', 'res.partner')]"/>
+                <filter string="Products" name="products" domain="[('res_model', '=', 'product.product')]"/>
+                <separator/>
+                <filter string="Recently Synced" name="recent_sync"
+                        domain="[('last_sync', '&gt;=', (context_today() - relativedelta(days=7)).strftime('%Y-%m-%d'))]"/>
+                <filter string="Never Synced" name="never_synced" domain="[('last_sync', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="System" name="group_system" context="{'group_by': 'system_id'}"/>
+                    <filter string="Model" name="group_model" context="{'group_by': 'res_model'}"/>
+                    <filter string="Active Status" name="group_active" context="{'group_by': 'active'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- External ID Action -->
+    <record id="action_external_id" model="ir.actions.act_window">
+        <field name="name">External IDs</field>
+        <field name="res_model">external.id</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_external_id_search"/>
+        <field name="context">{'search_default_active': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No external IDs found
+            </p>
+            <p>
+                External IDs link employees and partners to their accounts in external systems.
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu for All External IDs (parent declared in menu_views.xml) -->
+    <menuitem id="menu_external_ids" name="All External IDs" parent="menu_external_ids_root" action="action_external_id"
+              sequence="10"/>
+</odoo>

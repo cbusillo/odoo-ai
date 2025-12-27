@@ -1,0 +1,23 @@
+.o_motor_part_missing_column {
+  width: 1px;
+  min-width: 80px;
+}
+
+.motor_image_adder .o_field_image button {
+  width: 100px !important;
+  height: 100px !important;
+}
+
+.motor_image_adder .o_field_image button .fa {
+  font-size: 75px;
+}
+
+.motor_main_notebook > .tab-content > .tab-pane > .motor_nested_notebook {
+  margin-top: -16px !important;
+}
+
+html body .o_notebook .nav-tabs > li > a {
+  padding-top: 3px !important; /* Minimal padding for visual comfort */
+  padding-bottom: 3px !important;
+}
+

@@ -1,0 +1,57 @@
+<odoo>
+    <record id="product_image_edit_list" model="ir.ui.view">
+        <field name="name">product.image.edit.list</field>
+        <field name="model">product.image</field>
+        <field name="arch" type="xml">
+            <list string="Product Images" editable="bottom">
+                <field name="name"/>
+                <field name="image_1920" widget="image_upload"/>
+                <field name="create_date"/>
+                <field name="product_tmpl_id"/>
+                <field name="image_1920_resolution" string="Image Res"/>
+                <field name="image_1920_file_size_kb" widget="integer"/>
+                <button name="action_open_full_image" type="object" string="View Full Image" class="btn btn-primary"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_product_image_edit_search" model="ir.ui.view">
+        <field name="name">product.image.edit.search</field>
+        <field name="model">product.image</field>
+        <field name="arch" type="xml">
+            <search string="Product Images">
+                <filter string="Low Resolution &lt; 1920x1920" name="filter_low_resolution"
+                        domain="[('image_1920_width', '&lt;', 1919),('image_1920_height', '&lt;', 1919)]"/>
+                <filter string="Tiny Image &lt; 20kB" name="filter_very_small_image"
+                        domain="[('image_1920_file_size', '&lt;=', 1024 * 20)]"/>
+                <filter string="Small Image 20kB &lt; 75kB" name="filter_small_image"
+                        domain="[('image_1920_file_size', '&gt;', 1024 * 20), ('image_1920_file_size', '&lt;=', 1024 * 75)]"/>
+                <filter string="Medium Image 75kB &lt; 200kB" name="filter_medium_image"
+                        domain="[('image_1920_file_size', '&gt;', 1024 * 75), ('image_1920_file_size', '&lt;=', 1024 * 200)]"/>
+                <filter string="Large Image 200kB &lt; 500kB" name="filter_large_image"
+                        domain="[('image_1920_file_size', '&gt;', 1024 * 200), ('image_1920_file_size', '&lt;=', 1024 * 500)]"/>
+                <filter string="Huge Image &gt; 500kB" name="filter_very_large_image"
+                        domain="[('image_1920_file_size', '&gt;', 1024 * 500)]"/>
+                <separator/>
+                <group string="Group By">
+                    <filter string="Product" name="groupby_product" context="{'group_by': 'product_tmpl_id'}"/>
+                </group>
+                <separator/>
+            </search>
+
+        </field>
+    </record>
+
+
+    <record id="action_product_image_edit" model="ir.actions.act_window">
+        <field name="name">Product Images</field>
+        <field name="res_model">product.image</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" ref="product_image_edit_list"/>
+        <field name="search_view_id" ref="view_product_image_edit_search"/>
+    </record>
+
+    <menuitem id="menu_product_image_edit" name="Product Images"
+              parent="stock.menu_stock_inventory_control" sequence="3"
+              action="action_product_image_edit"/>
+</odoo>

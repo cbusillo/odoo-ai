@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="product_connect.BooleanToggleTooltipField">
+        <div t-att-title="computedTitle" t-on-click="onDisabledClick" class="d-inline-block">
+            <CheckBox
+                    id="props.id"
+                    value="state.value"
+                    className="'o_field_boolean o_boolean_toggle form-switch'"
+                    disabled="props.readonly"
+                    onChange.bind="onChange"/>
+        </div>
+    </t>
+</templates>

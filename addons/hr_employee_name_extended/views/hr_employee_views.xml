@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_employee_form_extended" model="ir.ui.view">
+        <field name="name">hr.employee.form.extended.namex</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='name']" position="attributes">
+                <attribute name="readonly">1</attribute>
+                <attribute name="force_save">1</attribute>
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='job_title']" position="after">
+                <separator string="Name Details"/>
+                <group col="4">
+                    <field name="first_name" required="1" string="First Name (Given)">
+                        <attribute name="options">{'no_open': True}</attribute>
+                    </field>
+                    <field name="last_name" required="1" string="Last Name (Family/Surname)"/>
+                    <field name="nick_name" string="Nickname"/>
+                    <field name="name_format" string="Name Format"/>
+                    <!-- display_name now derives from name_get; omit explicit field -->
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_employee_tree_extended" model="ir.ui.view">
+        <field name="name">hr.employee.tree.extended.namex</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='name']" position="after">
+                <field name="first_name" optional="show"/>
+                <field name="last_name" optional="show"/>
+                <field name="nick_name" optional="hide"/>
+                <field name="display_name" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_employee_filter_extended" model="ir.ui.view">
+        <field name="name">hr.employee.search.extended.namex</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <field name="first_name" string="First Name"/>
+                <field name="last_name" string="Last Name"/>
+                <field name="nick_name" string="Nickname"/>
+                <separator/>
+                <filter name="has_nickname" string="Has Nickname" domain="[('nick_name','!=',False)]"/>
+                <filter name="missing_first_or_last" string="Missing Parts"
+                        domain="['|', ('first_name','=',False), ('last_name','=',False)]"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

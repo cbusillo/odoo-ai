@@ -3,7 +3,7 @@
 ## Front-matter
 
 - Purpose: Track OPW/CM migration status and addon modularization decisions.
-- Applies to: OPW (prod/dev/testing/local), CM (testing/local), Docker deploy.
+- Applies to: OPW (prod/dev/testing/local), CM (dev/testing/local), Docker deploy.
 - References: @docs/tooling/docker.md, @docs/workflows/multi-project.md,
   @docker/config/README.md
 - Maintainer: cbusillo
@@ -19,8 +19,10 @@
 
 - OPW prod: legacy host (not Docker).
 - OPW dev/testing: Coolify-managed.
-- CM testing: Coolify-managed.
+- CM dev/testing: Coolify-managed.
 - Local dev: `opw-local`, `cm-local`.
+- Addons are monorepo-based; external addons are pulled at build time via
+  `ODOO_ADDON_REPOSITORIES`.
 
 ## Target state
 
@@ -54,11 +56,19 @@ Rule: shared addons must never depend on `product_connect`.
 ## Decisions log
 
 - 2025-12-25: Prune remote stack overlays/docs; keep local stacks + Coolify.
+- 2025-12-27: Move addons into monorepo; pull external addons at build time via
+  `ODOO_ADDON_REPOSITORIES` (token required). Keep Coolify as control plane.
 
 ## Next actions
 
 1. Validate OPW dev/testing stability in Coolify.
-2. Stabilize cm-testing (restart loops).
+2. Stabilize cm-testing (restart loops) if still present.
 3. Draft OPW prod cutover checklist when ready.
 4. Create `opw_custom` addon as OPW prime layer; migrate OPW-only logic from
    `product_connect` over time.
+
+## Completed
+
+- Coolify dev/testing env vars normalized and deduplicated (build vs runtime
+  split; minimal custom vars).
+- Codex Cloud tooling removed from repo (no longer used).

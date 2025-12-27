@@ -51,5 +51,5 @@ Container management helpers
 - `odoo-intelligence__odoo_status(verbose=true)` reports the compose containers that belong to the project and whether
   they are running; if the database container is stopped it now triggers a compose-backed autostart before reporting
   failure.
-- `odoo-intelligence__odoo_restart(services="web-1")` (or `database-1`, `shell-1`, …) wraps `docker restart` with retry
+- `odoo-intelligence__odoo_restart(services="web-1")` (or `database-1`, `script-runner-1`, …) wraps `docker restart` with retry
   logic and will start the container when it is currently stopped.

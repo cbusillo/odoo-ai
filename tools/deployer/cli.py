@@ -96,7 +96,7 @@ def run_build(
     if no_cache:
         build_args.append("--no-cache")
 
-    services = [service for service in ("web", "script-runner", "shell") if service in settings.services]
+    services = [service for service in ("web", "script-runner") if service in settings.services]
     build_args.extend(services)
 
     if remote:

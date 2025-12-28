@@ -6,6 +6,7 @@ Commands
 - `uv run test unit|js|integration|tour` — phase-scoped loops; combine with module filters to minimize scope.
 - `uv run test wait --json` — poll detached runs and return a single JSON payload.
 - `uv run test plan --phase all` — inspect sharding/phase allocations before a large run.
+- `uv run test validate --json` — verify all tests executed + summarize failures.
 
 Scoping Flags
 

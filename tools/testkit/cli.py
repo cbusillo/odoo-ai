@@ -749,3 +749,13 @@ def doctor_cmd(json_out: bool) -> None:
         click.echo(f"Disk free: {free_pct}%")
         click.echo(f"CPUs: {cpu}")
     sys.exit(0)
+
+
+@test.command("validate")
+@click.option("--session", default=None, help="Specific session dir name")
+@click.option("--json", "json_out", is_flag=True, help="Emit JSON output")
+def validate_cmd(session: str | None, json_out: bool) -> None:
+    from .validate import validate
+
+    rc = validate(session=session, json_out=json_out)
+    raise SystemExit(rc)

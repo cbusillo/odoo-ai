@@ -60,6 +60,7 @@ def write_session_index(session_dir: Path, aggregate: dict) -> None:
         f"Overall: {'PASSED' if ok else 'FAILED'}",
         "",
         "## Phases",
+        "",
     ]
     for cat in ("unit", "js", "integration", "tour"):
         cat_dir = session_dir / cat
@@ -71,7 +72,7 @@ def write_session_index(session_dir: Path, aggregate: dict) -> None:
             log = session_file.with_suffix("").with_suffix(".log")
             entries.append(f"- {cat}: {base} → {session_file.name} / {log.name}")
         if entries:
-            lines.append(f"### {cat.title()}")
+            lines.extend([f"### {cat.title()}", ""])
             lines.extend(entries)
             lines.append("")
     (session_dir / "index.md").write_text("\n".join(lines))

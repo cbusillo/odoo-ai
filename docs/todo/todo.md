@@ -15,8 +15,9 @@
   - Prune uv scripts that are no longer used (keep restore/sanitize/init helpers).
 
 - DX cleanup + workflow hardening:
-  - Sweep repo for stale docs/scripts after monorepo shift; remove or update.
-  - Add one-button restore/init wrappers (dev/testing) that enforce sanitize
-    failure guards.
-  - Define prod deploy gate: pre-deploy CT backup + rollback strategy.
   - Decide auto-deploy triggers for dev/testing vs manual prod promotion.
+
+- Completed (recent):
+  - Swept stale docs/scripts after monorepo shift; removed/updated.
+  - Added one-button restore/init wrappers (dev/testing).
+  - Added prod deploy gate workflow + CLI (backup/list/rollback).

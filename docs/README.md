@@ -33,6 +33,7 @@ Use path+anchor “handles” when sharing docs between sessions, for example:
     - docs/workflows/planning.md — planning templates
     - docs/workflows/service-patterns.md — service layer patterns
     - docs/workflows/bulk-operations.md — mass data processing
+    - docs/workflows/prod-deploy.md — prod deploy gate + rollback
 - Tooling
     - docs/tooling/codex-cli.md — sessions, profiles, sandbox/approval
     - docs/tooling/runtime-baselines.md — where Python/runtime versions live

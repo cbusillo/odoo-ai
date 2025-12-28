@@ -231,9 +231,5 @@ def main(argv: Sequence[str] | None = None) -> int:
     return restore_stack(args.stack, bootstrap_only=args.bootstrap_only, no_sanitize=args.no_sanitize)
 
 
-def restore_from_upstream() -> int:  # Entry point for pyproject scripts
-    return main()
-
-
 if __name__ == "__main__":  # pragma: no cover
     sys.exit(main())

@@ -28,7 +28,7 @@ Coolify and do not use the overlays in `docker/config/`.
 3. (Optional) Restore upstream data:
 
    ```bash
-   uv run restore-from-upstream --stack opw-local
+   uv run restore opw-local
    ```
 
 ## Notes

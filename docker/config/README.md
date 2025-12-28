@@ -56,4 +56,4 @@ docker-compose.yml
 - Local-only overrides live in the env files (for example `ODOO_WEB_COMMAND`
   and host port mappings).
 - Use `docker/config/_restore_ssh_volume.yaml` when running
-  `uv run restore-from-upstream` so the container can reach upstream hosts.
+  `uv run restore` so the container can reach upstream hosts.

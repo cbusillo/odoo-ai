@@ -40,7 +40,7 @@
 ## Deploy & restore
 
 - Local deploy: `uv run deploy deploy --stack <stack>`
-- Local restore: `uv run restore-from-upstream --stack <stack>`
+- Local restore: `uv run restore <stack>`
 - Remote deploys: Coolify UI (source = repo `docker-compose.yml` + env vars)
 - Local port bindings + live mounts: `docker-compose.override.yml` (local-only)
 

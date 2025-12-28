@@ -18,8 +18,8 @@ Treat this file as the launch checklist for every Codex session. Skim it, open t
 - Always go through `uv run ...`; the Odoo environment must bootstrap every command (tests, scripts, shell helpers).
 - Never call the system Python directly; use `uv run python ...` (or the scripted helpers) so the managed env stays in
   sync.
-- Common helper entry points are defined in `[project.scripts]` inside `pyproject.toml` (examples: `test`, `test-plan`,
-  `restore-from-upstream`). Prefer them over ad-hoc commands and suggest additions when a useful script is missing.
+- Common helper entry points are defined in `[project.scripts]` inside `pyproject.toml` (examples: `test`, `restore`).
+  Prefer them over ad-hoc commands and suggest additions when a useful script is missing.
 - GPT service users seed automatically during restores when `.env` defines `ODOO_KEY`; see
   `docs/tooling/gpt-service-user.md` for provisioning details and API key usage.
 - When you need multi-line scratch code, save it under `tmp/scripts/` and run `uv run python tmp/scripts/<name>.py`
@@ -91,6 +91,6 @@ Treat this file as the launch checklist for every Codex session. Skim it, open t
   `docs/references/test-templates.md`
 - Performance & bulk operations: `docs/workflows/performance-review.md`, `docs/workflows/bulk-operations.md`
 - Planning & estimation: `docs/workflows/planning.md`
-- Environment utilities: `docker/scripts/restore_from_upstream.py`
+- Environment utilities: restore helpers in `tools/` (use `uv run restore`)
 
 Keep AGENTS.md thin: route deeper guidance to the linked pages so we maintain a single, accurate source of truth.

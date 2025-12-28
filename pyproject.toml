@@ -51,6 +51,7 @@ init-cm-dev = "tools.restore_shortcuts:init_cm_dev"
 init-cm-testing = "tools.restore_shortcuts:init_cm_testing"
 init-opw-local = "tools.restore_shortcuts:init_opw_local"
 init-cm-local = "tools.restore_shortcuts:init_cm_local"
+prod-gate = "tools.prod_gate:main"
 stack = "tools.stack_cli:main"
 
 [tool.uv]

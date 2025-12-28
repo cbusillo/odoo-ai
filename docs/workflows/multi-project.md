@@ -52,6 +52,8 @@ Coolify and do not use the overlays in `docker/config/`.
         - ./addons:/volumes/addons
         - ./pyproject.toml:/opt/project/pyproject.toml:ro
         - ./addons:/opt/project/addons
+      environment:
+        - ODOO_ADDON_REPOSITORIES=
   ```
 
 - Use unique `ODOO_STATE_ROOT` per stack to avoid sharing filestore/postgres.

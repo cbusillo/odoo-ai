@@ -248,8 +248,6 @@ def compute_remote_user(config: StackConfig, remote_host: str | None) -> str | N
 def compute_remote_stack_path(name: str, config: StackConfig, remote_host: str | None) -> Path | None:
     if config.remote_stack_path_raw:
         return Path(config.remote_stack_path_raw)
-    if remote_host:
-        return Path("/opt/odoo-ai/repos") / name
     return None
 
 

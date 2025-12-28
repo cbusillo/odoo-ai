@@ -32,7 +32,8 @@ Coolify-managed environments.
 ## Application layers
 
 - Base Odoo: `ghcr.io/adomi-io/odoo:18.0`
-- Custom addons: `/volumes/addons` (repo), `/volumes/enterprise` (private mirror)
+- Custom addons: `/volumes/addons` (repo + `ODOO_ADDON_REPOSITORIES`)
+  and `/volumes/enterprise` (private mirror)
 - Integrations: Shopify active
 
 ## References

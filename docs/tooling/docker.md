@@ -18,6 +18,8 @@ Odoo-specific
       container can reach the upstream host
     - When an upstream dump is unavailable, bootstrap an empty database with
       `uv run python tools/docker_runner.py --stack <stack-name> --bootstrap-only`
+- One-button shortcuts: `uv run restore-opw-dev`, `restore-opw-testing`, `restore-cm-dev`,
+  `restore-cm-testing`, `restore-opw-local`, `restore-cm-local`, and matching `init-*`.
 
 Tips
 

@@ -1,4 +1,4 @@
-# Multi-Project Configuration (Local Dev)
+Title: Multi-Project Configuration (Local Dev)
 
 This guide covers running multiple isolated stacks locally (OPW + Cell Mechanic)
 using layered Docker Compose configs. Remote environments are managed in

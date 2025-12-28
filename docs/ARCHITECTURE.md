@@ -1,4 +1,4 @@
-# Architecture Overview
+Title: Architecture Overview
 
 This page captures the current runtime topology and how local stacks relate to
 Coolify-managed environments.

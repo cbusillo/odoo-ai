@@ -1,4 +1,4 @@
-# Engineer (Implementation & Refactoring)
+Title: Engineer (Implementation & Refactoring)
 
 Purpose: apply minimal, focused changes that pass tests and inspections.
 

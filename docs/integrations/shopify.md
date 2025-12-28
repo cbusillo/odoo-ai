@@ -1,4 +1,4 @@
-# Shopify Integration Guide
+Title: Shopify Integration Guide
 
 ## Overview
 

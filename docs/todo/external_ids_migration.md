@@ -1,4 +1,4 @@
-# External IDs Migration — Candidates and Seeding
+Title: External IDs Migration — Candidates and Seeding
 
 This doc lists model fields we can migrate into the `external_ids` framework and the systems/templates to seed.
 
@@ -28,4 +28,3 @@ This doc lists model fields we can migrate into the `external_ids` framework and
 ## Notes
 - Keep `external.system.id_format` conservative at first to avoid false validation errors. Enable regexes when formats are stable.
 - Use URL templates instead of computed fields; templates can reference `{id}`, `{gid}`, `{model}`, `{name}`, `{code}`, `{base}`.
-

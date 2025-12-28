@@ -1,4 +1,4 @@
-# Odoo Workflow & Style
+Title: Odoo Workflow & Style
 
 Odoo-specific patterns and best practices.
 

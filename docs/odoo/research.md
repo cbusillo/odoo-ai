@@ -1,4 +1,4 @@
-# Odoo Core Research
+Title: Odoo Core Research
 
 Specialized patterns for researching and navigating Odoo core functionality and architecture.
 

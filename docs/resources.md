@@ -1,4 +1,4 @@
-# External Resources
+Title: External Resources
 
 This document provides links to external documentation and API references for the technologies used in this project.
 

@@ -1,4 +1,4 @@
-# Production Deploy Gate
+Title: Production Deploy Gate
 
 This workflow keeps production deploys deliberate: run tests, take a full
 Proxmox backup + snapshot, then deploy via Coolify. Rollbacks use snapshots.

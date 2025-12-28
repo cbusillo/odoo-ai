@@ -10,7 +10,7 @@ Use these focused guides for platform-specific details. This page is an index on
 
 ## eBay
 
-- Status: not implemented yet — research/TODO lives in `docs/integrations/ebay.md`.
+- Status: not implemented yet — research/TODO currently removed.
   Use that page to collect requirements, data points, API notes, and open questions
   until we green‑light an implementation.
 

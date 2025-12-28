@@ -33,7 +33,6 @@ dev = [
     "rich",
     "websocket-client",
     "setuptools",
-    "playwright",
 ]
 
 [tool.setuptools]

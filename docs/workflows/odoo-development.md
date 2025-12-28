@@ -1,4 +1,7 @@
-Title: Odoo Development Workflow
+---
+title: Odoo Development Workflow
+---
+
 
 Principles
 
@@ -8,4 +11,3 @@ Principles
 Handles
 
 - @docs/odoo/orm.md, @docs/odoo/security.md, @docs/odoo/performance.md, @docs/odoo/workflow.md
-

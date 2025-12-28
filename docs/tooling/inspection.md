@@ -1,4 +1,7 @@
-Title: Inspections (JetBrains)
+---
+title: Inspections (JetBrains)
+---
+
 
 Scopes
 
@@ -13,4 +16,3 @@ Results Schema
 Policy
 
 - Zero‑warning on touched files before full gate; narrow suppressions only.
-

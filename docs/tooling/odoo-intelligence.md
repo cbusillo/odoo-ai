@@ -1,4 +1,7 @@
-Title: Odoo Intelligence Tools
+---
+title: Odoo Intelligence Tools
+---
+
 
 Why use them first
 

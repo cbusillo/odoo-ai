@@ -1,4 +1,7 @@
-Title: Testing
+---
+title: Testing
+---
+
 
 Use the unified test CLI via `uv run`. Keep inner loops fast, then close with the full gate.
 

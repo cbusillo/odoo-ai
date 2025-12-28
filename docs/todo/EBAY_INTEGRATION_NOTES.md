@@ -1,4 +1,7 @@
-Title: eBay Integration Notes
+---
+title: eBay Integration Notes
+---
+
 
 ## Current State
 

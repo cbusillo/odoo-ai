@@ -1,4 +1,7 @@
-Title: Acceptance Gate (Zero‑Warning + Full Tests)
+---
+title: Acceptance Gate (Zero‑Warning + Full Tests)
+---
+
 
 Definition of Done
 
@@ -13,4 +16,3 @@ Loop vs Gate
 Notes
 
 - Narrow suppressions only, with one‑line justification and reference; no blanket suppressions.
-

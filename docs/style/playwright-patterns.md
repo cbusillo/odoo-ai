@@ -1,4 +1,7 @@
-Title: Playwright Patterns
+---
+title: Playwright Patterns
+---
+
 
 Principles
 

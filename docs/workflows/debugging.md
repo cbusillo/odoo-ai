@@ -1,4 +1,7 @@
-Title: Debugging Workflow
+---
+title: Debugging Workflow
+---
+
 
 Use this practical, repeatable flow for diagnosing issues without relying on CLI‑specific code blocks.
 

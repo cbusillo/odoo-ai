@@ -1,4 +1,7 @@
-Title: 🔗 External Integrations Index
+---
+title: 🔗 External Integrations Index
+---
+
 
 Use these focused guides for platform-specific details. This page is an index only to avoid duplication.
 

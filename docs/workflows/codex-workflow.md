@@ -1,4 +1,7 @@
-Title: Codex Workflow
+---
+title: Codex Workflow
+---
+
 
 Working Loop
 
@@ -12,4 +15,3 @@ Working Loop
 Notes
 
 - Use separate Codex sessions for analysis vs implementation to keep context lean; pass document handles, not content.
-

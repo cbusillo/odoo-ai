@@ -1,4 +1,7 @@
-Title: Odoo Framework Patterns
+---
+title: Odoo Framework Patterns
+---
+
 
 Approach
 

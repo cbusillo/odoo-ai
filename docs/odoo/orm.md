@@ -1,4 +1,7 @@
-Title: Odoo ORM Patterns (18)
+---
+title: Odoo ORM Patterns (18)
+---
+
 
 ## New Decorators and APIs
 

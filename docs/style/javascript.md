@@ -1,4 +1,7 @@
-Title: JavaScript Style
+---
+title: JavaScript Style
+---
+
 
 Modules and Frameworks (Odoo 18)
 

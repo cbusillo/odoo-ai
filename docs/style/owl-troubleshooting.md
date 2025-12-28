@@ -1,4 +1,7 @@
-Title: Owl Troubleshooting
+---
+title: Owl Troubleshooting
+---
+
 
 Common frontend issues and solutions.
 

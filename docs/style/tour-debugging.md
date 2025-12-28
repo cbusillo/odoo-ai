@@ -1,4 +1,7 @@
-Title: Tour Debugging
+---
+title: Tour Debugging
+---
+
 
 Debugging patterns for Odoo tour tests and browser automation issues.
 

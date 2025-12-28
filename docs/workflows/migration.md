@@ -1,4 +1,4 @@
-# Migration Patterns (Odoo 18)
+Title: Migration Patterns (Odoo 18)
 
 Key changes
 

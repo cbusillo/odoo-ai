@@ -1,4 +1,4 @@
-# Test Templates
+Title: Test Templates
 
 Detailed test patterns and examples for Scout agent.
 

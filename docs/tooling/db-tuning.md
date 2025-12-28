@@ -1,4 +1,4 @@
-# PostgreSQL Tuning for Parallel Test Runs
+Title: PostgreSQL Tuning for Parallel Test Runs
 
 Goal: enable high parallelism (dozens of Odoo test containers) without the DB being the bottleneck.
 

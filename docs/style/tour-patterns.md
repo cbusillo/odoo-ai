@@ -1,4 +1,4 @@
-# Tour Test Patterns
+Title: Tour Test Patterns
 
 Browser test patterns and tour definitions for UI testing.
 

@@ -1,4 +1,4 @@
-# Hoot Testing Patterns Reference
+Title: Hoot Testing Patterns Reference
 
 This document contains comprehensive patterns for writing Hoot tests in Odoo 18. It's designed as a reference guide, not loaded into agent contexts to preserve tokens.
 

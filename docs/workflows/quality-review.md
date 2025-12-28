@@ -1,4 +1,4 @@
-# Quality Control Workflow
+Title: Quality Control Workflow
 
 This file contains detailed patterns and examples extracted from the QC agent documentation to keep the main agent file
 concise.

@@ -1,4 +1,4 @@
-# Stack Migration & Addon Modularization (Living Doc)
+Title: Stack Migration & Addon Modularization (Living Doc)
 
 ## Front-matter
 

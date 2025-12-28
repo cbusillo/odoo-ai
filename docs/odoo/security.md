@@ -1,4 +1,4 @@
-# Odoo Security Patterns (18)
+Title: Odoo Security Patterns (18)
 
 ## Overview
 

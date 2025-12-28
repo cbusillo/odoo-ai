@@ -1,4 +1,4 @@
-# Planning Templates
+Title: Planning Templates
 
 ## New Model Planning Template
 

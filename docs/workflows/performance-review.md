@@ -1,4 +1,4 @@
-# Performance Optimization Patterns
+Title: Performance Optimization Patterns
 
 This file contains detailed performance patterns and examples extracted from the Flash agent documentation.
 

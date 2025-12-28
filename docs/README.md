@@ -1,4 +1,4 @@
-# Project Documentation
+Title: Project Documentation
 
 This repository is organized for Codex CLI–driven development with small, focused documents that are easy to load by
 handle.

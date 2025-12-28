@@ -1,4 +1,4 @@
-# Debugging Workflow
+Title: Debugging Workflow
 
 Use this practical, repeatable flow for diagnosing issues without relying on CLI‑specific code blocks.
 
@@ -35,4 +35,3 @@ References
 - Odoo: docs/odoo/orm.md, docs/odoo/security.md, docs/odoo/performance.md
 - Testing: docs/style/testing.md, docs/style/testing-advanced.md
 - Tooling: docs/tooling/inspection.md, docs/tooling/odoo-intelligence.md, docs/tooling/testing-cli.md
-

@@ -1,4 +1,4 @@
-# Inspection Workflows
+Title: Inspection Workflows
 
 Systematic workflows for code inspection and quality assessment.
 

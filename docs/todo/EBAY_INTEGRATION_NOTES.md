@@ -5,7 +5,9 @@ title: eBay Integration Notes
 
 ## Current State
 
-We're currently extracting eBay order information from Shopify orders (via the Note Attributes field), which includes:
+We're currently extracting eBay order information from Shopify orders (via the
+Note Attributes field), which includes:
+
 - eBay Sales Record Number
 - eBay Order ID
 - Delivery dates
@@ -13,14 +15,17 @@ We're currently extracting eBay order information from Shopify orders (via the N
 ## Future Enhancements
 
 ### eBay Product URLs
-Currently we have a Shopify URL link on product pages. To add eBay product URLs, we would need:
 
-1. **eBay Item Number Storage**: Add a field to store the eBay item number on `product.template` or `product.product`
+Currently we have a Shopify URL link on product pages. To add eBay product
+URLs, we would need:
+
+1. **eBay Item Number Storage**: Add a field to store the eBay item number on
+   `product.template` or `product.product`
    - Field name suggestion: `ebay_item_id` or `ebay_listing_id`
-   
+
 2. **URL Generation**: eBay item URLs follow the pattern:
    - `https://www.ebay.com/itm/{item_id}`
-   
+
 3. **Data Source**: We need to determine how to get the eBay item IDs:
    - From eBay API directly?
    - From Shopify metafields if they're storing it?

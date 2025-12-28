@@ -3,8 +3,8 @@ title: Project Documentation
 ---
 
 
-This repository is organized for Codex CLI–driven development with small, focused documents that are easy to load by
-handle.
+This repository is organized for Codex CLI–driven development with small,
+focused documents that are easy to load by handle.
 
 Use path+anchor “handles” when sharing docs between sessions, for example:
 
@@ -33,8 +33,8 @@ Use path+anchor “handles” when sharing docs between sessions, for example:
     - docs/workflows/refactor-safety.md — pre‑refactor checks
     - docs/workflows/performance-review.md — performance analysis
     - docs/workflows/migration.md — migration patterns (Odoo 18)
-    - docs/workflows/planning.md — planning templates
-    - docs/workflows/service-patterns.md — service layer patterns
+    - docs/workflows/planning.md — planning workflow
+    - docs/workflows/service-patterns.md — service layer sources of truth
     - docs/workflows/bulk-operations.md — mass data processing
     - docs/workflows/prod-deploy.md — prod deploy gate + rollback
 - Tooling
@@ -45,35 +45,34 @@ Use path+anchor “handles” when sharing docs between sessions, for example:
         - docs/tooling/testing-cli.md — uv test phases and flags
         - docs/tooling/docker.md — container operations
         - docs/tooling/coolify.md — Coolify app logs/envs
-            - docs/testing.md — testing overview and pointers
+            - docs/TESTING.md — testing overview and pointers
 - Odoo Canon
-    - docs/odoo/orm.md — recordsets, batching, computed fields
+    - docs/odoo/orm.md — ORM sources of truth
     - docs/odoo/security.md — ACLs, access rules, safe defaults
-    - docs/odoo/performance.md — ORM perf, N+1, batching
-    - docs/odoo/workflow.md — module layout, imports, container paths
+    - docs/odoo/performance.md — performance sources of truth
+    - docs/odoo/workflow.md — Odoo workflow and conventions
 - Architecture & Resources
-    - docs/architecture.md — system architecture overview
+    - docs/ARCHITECTURE.md — system architecture overview
     - docs/resources.md — external documentation links
 - Integrations
     - docs/integrations/README.md — integrations index
     - docs/integrations/shopify.md — Shopify integration guide
-    - docs/integrations/graphql.md — GraphQL patterns (Shopify)
-    - docs/integrations/webhooks.md — Webhook patterns
-    - docs/integrations/shopify-sync.md — Shopify sync patterns
+    - docs/integrations/graphql.md — GraphQL sources of truth (Shopify)
+    - docs/integrations/webhooks.md — webhook sources of truth
+    - docs/integrations/shopify-sync.md — Shopify sync sources of truth
 - Style
     - docs/style/index.md — style index (start here)
     - docs/style/python.md — type hints, f‑strings, line length
     - docs/style/javascript.md — ES modules, Owl patterns
         - docs/style/testing.md — base classes, fixtures, tours
         - docs/style/hoot-testing.md — Hoot testing
-        - docs/style/owl-components.md — Owl components
-        - docs/style/owl-troubleshooting.md — Owl troubleshooting
-        - docs/style/playwright-patterns.md — Playwright patterns
-        - docs/style/playwright-selectors.md — Playwright selectors
+        - docs/style/owl-components.md — Owl sources of truth
+        - docs/style/owl-troubleshooting.md — Owl troubleshooting sources of truth
+        - docs/style/browser-automation.md — built-in browser tooling
         - docs/style/tour-debugging.md — Tour debugging
-        - docs/style/tour-patterns.md — Tour patterns
-        - docs/style/test-scenarios.md — Common test scenarios
-        - docs/style/testing-advanced.md — Advanced Odoo testing
+        - docs/style/tour-patterns.md — tour sources of truth
+        - docs/style/test-scenarios.md — test scenario sources of truth
+        - docs/style/testing-advanced.md — advanced testing sources of truth
 
 Notes
 
@@ -81,4 +80,4 @@ Notes
 - `docs/todo/` holds tracked, living work-in-progress docs.
   Use `*.local.md` for personal scratch notes (git-ignored).
 - Living migration doc (tracked): `docs/todo/NEW_ARCH.md` (active OPW/CM stack
-    + addons plan).
+  and addons plan).

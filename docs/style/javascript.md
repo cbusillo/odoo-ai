@@ -10,6 +10,11 @@ Modules and Frameworks (Odoo 18)
 - Do not add `/** @odoo-module */` to new files; we ship native ESM only.
 - No semicolons; prefer clean ES syntax consistent with Owl.js style.
 
+Version Guardrails
+
+- Owl.js 2.x patterns only (hooks, native ESM modules).
+- No legacy `odoo.define` modules or AMD imports.
+
 Libraries
 
 - Owl.js 2.0 for components; use hooks like `useState`, `useRef`, `onMounted`.

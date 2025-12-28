@@ -16,6 +16,8 @@ Core Rules
   (see @docs/style/python.md).
 - Docs-as-code: keep docs accurate. When code behavior changes, update affected pages and cross‑references in the same
   PR.
+- Version guardrails: no legacy Odoo 16 view patterns (no `<tree>`, no
+  `attrs`/`states`), and no AMD `odoo.define` modules.
 
 Descriptive Code (Naming & DRY)
 

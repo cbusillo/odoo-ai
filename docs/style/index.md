@@ -20,20 +20,19 @@ JavaScript / Owl
 Testing
 
 - @docs/style/testing.md — fundamentals, LLM‑friendly results
-- @docs/style/testing-advanced.md — advanced patterns
-- @docs/references/test-templates.md — templates and mocks
-- @docs/style/hoot-testing.md — Hoot test patterns
+- @docs/style/testing-advanced.md — advanced testing sources of truth
+- @docs/references/test-templates.md — test template sources of truth
+- @docs/style/hoot-testing.md — Hoot testing sources of truth
 
-Playwright / Tours
+Browser Automation / Tours
 
-- @docs/style/playwright-patterns.md — patterns
-- @docs/style/playwright-selectors.md — selectors
-- @docs/style/tour-patterns.md — tour patterns
-- @docs/style/tour-debugging.md — debugging tours
+- @docs/style/browser-automation.md — built-in browser tooling
+- @docs/style/tour-patterns.md — tour sources of truth
+- @docs/style/tour-debugging.md — tour debugging sources of truth
 
 Odoo Canon
 
-- @docs/odoo/orm.md — ORM patterns
-- @docs/odoo/security.md — security
-- @docs/odoo/performance.md — performance
+- @docs/odoo/orm.md — ORM sources of truth
+- @docs/odoo/security.md — security sources of truth
+- @docs/odoo/performance.md — performance sources of truth
 - @docs/odoo/workflow.md — project workflow, naming

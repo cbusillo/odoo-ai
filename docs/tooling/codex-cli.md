@@ -26,6 +26,8 @@ Notes
 - For multi-line scratch scripts, drop a file under `tmp/scripts/` (gitignored) and run
   `uv run python tmp/scripts/<file>.py`
   instead of using heredocs; this keeps the `uv run` sandbox bypass active and makes reruns easy.
+- Use the built-in browser tools (`browser`, `code_bridge`) for UI validation;
+  do not use Playwright in this repo.
 - When testing service logins, skip the marketing site by loading `/odoo/web/login` directly. If the quick-login widget
   is still hidden, run `document.querySelector('form.oe_login_form').classList.remove('d-none')` (and set
   `display='block'`) to reveal the desktop form before typing credentials.

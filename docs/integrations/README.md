@@ -3,13 +3,16 @@ title: 🔗 External Integrations Index
 ---
 
 
-Use these focused guides for platform-specific details. This page is an index only to avoid duplication.
+Use these focused guides for platform-specific details. This page is an index
+only to avoid duplication.
 
 ## Shopify
 
 - Sync patterns: docs/integrations/shopify-sync.md
-- GraphQL & Webhooks: docs/integrations/graphql.md, docs/integrations/webhooks.md
-- Do not modify generated files: `services/shopify/gql/*`
+- GraphQL sources of truth: docs/integrations/graphql.md
+- Webhook patterns: docs/integrations/webhooks.md
+- Do not modify generated files:
+  `addons/product_connect/services/shopify/gql/*`
 
 ## ShipStation
 

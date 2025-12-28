@@ -4,7 +4,7 @@ This directory contains all temporary files for the project, keeping the root di
 
 ## Directory Structure
 
-```
+```text
 tmp/
 ├── test-logs/      # Test runner output (created automatically)
 ├── scripts/        # Temporary analysis and utility scripts (create on demand)
@@ -43,6 +43,7 @@ The `tmp/` directory is used for:
 ## Cleanup
 
 To clean old test results:
+
 ```bash
 # Remove test results older than 7 days
 find tmp/tests -type d -name "odoo-tests-*" -mtime +7 -exec rm -rf {} +

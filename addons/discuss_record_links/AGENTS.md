@@ -15,4 +15,4 @@ Testing
 
 References
 
-- @docs/odoo/security.md, @docs/style/playwright-selectors.md
+- @docs/odoo/security.md, @docs/style/browser-automation.md

@@ -117,7 +117,7 @@ Anti‑Patterns
 - Untyped public functions or method parameters.
 - Blanket JetBrains suppressions.
 
-### Structured Settings
+Structured Settings
 
 - When you need structured configuration outside of Odoo models, prefer Pydantic v2 `BaseModel` classes over manual
   `os.environ` parsing. They provide typing, validation, and consistent alias handling.

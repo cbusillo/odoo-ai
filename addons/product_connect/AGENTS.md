@@ -6,8 +6,9 @@ Purpose
 
 Do Not Modify
 
-- `services/shopify/gql/*` — generated GraphQL client files
-- `graphql/schema/*` — Shopify schema definitions
+- `addons/product_connect/services/shopify/gql/*` — generated GraphQL client
+  files
+- `addons/product_connect/graphql/schema/*` — Shopify schema definitions
 
 Key Areas
 

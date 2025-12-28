@@ -14,13 +14,15 @@ Set these in your `.env` or shell before running the gate (prefix per client):
 - `<PREFIX>_PROD_BACKUP_MODE` (default `both`; options: `snapshot`, `vzdump`, `both`)
 - `<PREFIX>_PROD_SNAPSHOT_PREFIX` (optional; default `<prefix>-predeploy`)
 
-Example for OPW:
+Example for OPW (commented):
 
-OPW_PROD_PROXMOX_HOST=prox-main
-OPW_PROD_CT_ID=111
-OPW_PROD_BACKUP_STORAGE=pbs
-OPW_PROD_BACKUP_MODE=both
-OPW_PROD_SNAPSHOT_PREFIX=opw-predeploy
+```text
+# OPW_PROD_PROXMOX_HOST=prox-main
+# OPW_PROD_CT_ID=111
+# OPW_PROD_BACKUP_STORAGE=pbs
+# OPW_PROD_BACKUP_MODE=both
+# OPW_PROD_SNAPSHOT_PREFIX=opw-predeploy
+```
 
 ## Deploy flow (OPW example)
 

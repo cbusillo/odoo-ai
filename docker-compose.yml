@@ -31,20 +31,23 @@ x-odoo-env: &odoo-env
   ODOO_ADDONS_PATH: ${ODOO_ADDONS_PATH:-/opt/project/addons,/odoo/addons,/volumes/enterprise}
   ODOO_UPDATE: ${ODOO_UPDATE:-AUTO}
 
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 30s
+  timeout: 5s
+
 name: ${ODOO_PROJECT_NAME:-odoo}
 services:
   web:
     <<: *odoo-base
-    command: /odoo/odoo-bin --db_host=database --db_port=5432
+    command: /odoo/odoo-bin
     environment:
       <<: *odoo-env
     expose:
       - "8069"
       - "8072"
     healthcheck:
+      <<: *healthcheck-defaults
       test: [ "CMD-SHELL", "curl -fsS http://127.0.0.1:${ODOO_HTTP_PORT:-8069}/web/health || exit 1" ]
-      interval: 30s
-      timeout: 5s
       retries: 5
       start_period: 20s
     extra_hosts:
@@ -68,15 +71,18 @@ services:
     restart: unless-stopped
     shm_size: "2gb"
     healthcheck:
+      <<: *healthcheck-defaults
       test: [ "CMD-SHELL", "test -x /odoo/odoo-bin && test -f /volumes/scripts/restore_from_upstream.py" ]
-      interval: 30s
-      timeout: 5s
       retries: 3
       start_period: 10s
     environment:
       <<: *odoo-env
       CHROMIUM_BIN: /usr/bin/chromium
-      CHROMIUM_FLAGS: --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-software-rasterizer --window-size=1920,1080 --no-first-run --no-default-browser-check --disable-features=TranslateUI,site-per-process,IsolateOrigins,BlockInsecurePrivateNetworkRequests
+      CHROMIUM_FLAGS: >-
+        --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage
+        --disable-software-rasterizer --window-size=1920,1080 --no-first-run
+        --no-default-browser-check
+        --disable-features=TranslateUI,site-per-process,IsolateOrigins,BlockInsecurePrivateNetworkRequests
 volumes:
   odoo_data:
     driver: local

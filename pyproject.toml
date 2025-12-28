@@ -28,7 +28,6 @@ packages = ["tools"]
 test = "tools.testkit.cli:main"  # example: uv run test unit --json
 test-validate = "tools.testkit.validate:main"
 deploy = "tools.deployer.cli:main"
-restore-from-upstream = "tools.docker_runner:restore_from_upstream"  # example: uv run restore opw-dev --init
 restore = "tools.restore_shortcuts:main"
 prod-gate = "tools.prod_gate:main"
 stack = "tools.stack_cli:main"

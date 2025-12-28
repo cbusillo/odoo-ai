@@ -22,12 +22,12 @@ Coolify-managed environments.
   `docker/scripts/install_dev_requirements.sh` use `uv sync` with
   `/volumes/pyproject.toml` and `/volumes/uv.lock`.
 - Use `docker/config/_restore_ssh_volume.yaml` when running
-  `uv run restore-from-upstream` locally so the container can reach upstream.
+  `uv run restore` locally so the container can reach upstream.
 
 ## Local deploy/restore
 
 - Deploy: `uv run deploy deploy --stack <stack>`
-- Restore: `uv run restore-from-upstream --stack <stack>`
+- Restore: `uv run restore <stack>`
 
 ## Application layers
 
@@ -41,5 +41,5 @@ Coolify-managed environments.
 - Docker usage – `docs/tooling/docker.md`
 - Local stack layering – `docker/config/README.md`
 - Multi-project local config – `docs/workflows/multi-project.md`
-- Restore entry point – `uv run restore-from-upstream` (`tools/docker_runner.py`)
+- Restore entry point – `uv run restore` (`tools/restore_shortcuts.py`)
 - Deploy CLI – `uv run deploy` (`tools/deployer/cli.py`)

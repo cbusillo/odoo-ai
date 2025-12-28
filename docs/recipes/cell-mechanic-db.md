@@ -23,7 +23,7 @@ ports so PyCharm can attach cleanly.
 4. (Optional) Restore upstream data:
 
    ```bash
-   uv run restore-from-upstream --stack cm-local
+   uv run restore cm-local
    ```
 
 ## PyCharm

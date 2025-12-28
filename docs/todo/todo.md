@@ -1,4 +1,7 @@
-Title: TODO / Optimization Ideas
+---
+title: TODO / Optimization Ideas
+---
+
 
 - Optimize motor product generation (create_motor_products):
   - Profile product template matching and creation loops; consider batched

@@ -1,4 +1,7 @@
-Title: Reviewer (Inspection & Code Review)
+---
+title: Reviewer (Inspection & Code Review)
+---
+
 
 Purpose: enforce zero‑warning policy efficiently.
 

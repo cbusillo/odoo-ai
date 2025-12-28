@@ -1,4 +1,7 @@
-Title: Coding Standards (Top‑Level)
+---
+title: Coding Standards (Top‑Level)
+---
+
 
 Core Rules
 

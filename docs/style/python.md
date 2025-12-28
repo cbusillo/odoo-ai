@@ -1,4 +1,7 @@
-Title: Python Style
+---
+title: Python Style
+---
+
 
 Purpose
 

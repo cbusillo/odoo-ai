@@ -1,4 +1,7 @@
-Title: Coolify Operations
+---
+title: Coolify Operations
+---
+
 
 Purpose
 

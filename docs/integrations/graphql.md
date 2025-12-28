@@ -1,4 +1,7 @@
-Title: GraphQL Patterns (Shopify)
+---
+title: GraphQL Patterns (Shopify)
+---
+
 
 ## GraphQL Query Structure
 

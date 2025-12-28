@@ -1,4 +1,7 @@
-Title: Style Index
+---
+title: Style Index
+---
+
 
 Core
 

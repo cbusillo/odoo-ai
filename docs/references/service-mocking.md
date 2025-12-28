@@ -1,4 +1,7 @@
-Title: Service Mocking Reference
+---
+title: Service Mocking Reference
+---
+
 
 Comprehensive guide for mocking Odoo services in Hoot tests. This reference is not loaded into agent contexts to preserve tokens.
 

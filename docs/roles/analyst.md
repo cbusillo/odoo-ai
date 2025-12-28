@@ -1,4 +1,7 @@
-Title: Analyst (Research & Discovery)
+---
+title: Analyst (Research & Discovery)
+---
+
 
 Purpose: find patterns and authoritative guidance; return concise evidence.
 

@@ -1,4 +1,7 @@
-Title: Owl Component Patterns
+---
+title: Owl Component Patterns
+---
+
 
 Detailed Owl.js 2.0 component patterns for Odoo 18.
 

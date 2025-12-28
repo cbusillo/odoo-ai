@@ -1,4 +1,7 @@
-Title: Service Layer Patterns (Owl)
+---
+title: Service Layer Patterns (Owl)
+---
+
 
 Common service usage patterns in Owl.js components.
 

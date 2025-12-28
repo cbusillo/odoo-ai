@@ -3,4 +3,3 @@ config:
     line_length: 133
   MD007:
     indent: 4
-  MD041: false

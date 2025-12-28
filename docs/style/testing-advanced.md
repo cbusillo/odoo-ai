@@ -1,4 +1,7 @@
-Title: Advanced Testing (Odoo 18)
+---
+title: Advanced Testing (Odoo 18)
+---
+
 
 This guide covers advanced testing patterns specific to Odoo 18, building on the foundational patterns
 in [testing.md](../testing.md). Examples are drawn from the `product_connect` module to demonstrate real-world usage.

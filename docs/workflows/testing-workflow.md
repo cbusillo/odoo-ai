@@ -1,4 +1,7 @@
-Title: Testing Workflow
+---
+title: Testing Workflow
+---
+
 
 Fast → Full
 
@@ -8,4 +11,3 @@ Fast → Full
 Logs & Summaries
 
 - Parse `tmp/test-logs/latest/summary.json` (or per‑phase summaries) for a single result.
-

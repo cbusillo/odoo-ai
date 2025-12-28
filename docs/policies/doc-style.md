@@ -1,4 +1,7 @@
-Title: Doc Style (LLM‑Friendly)
+---
+title: Doc Style (LLM‑Friendly)
+---
+
 
 Goals
 
@@ -6,10 +9,10 @@ Goals
 
 Structure
 
-- Front‑matter: Title, Purpose, When to Use, Applies To, Inputs/Outputs, References, Maintainers, Last Updated.
+- Front‑matter uses YAML with `title` (and optional Purpose, When to Use, Applies To, Inputs/Outputs, References,
+  Maintainers, Last Updated).
 - Short headings; minimal examples; consistent anchor names.
 
 Handles
 
 - Use path+anchor: @docs/odoo/orm.md#recordsets; avoid pasting large excerpts.
-

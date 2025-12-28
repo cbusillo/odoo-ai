@@ -1,4 +1,7 @@
-Title: Hoot Testing Patterns (Owl)
+---
+title: Hoot Testing Patterns (Owl)
+---
+
 
 Comprehensive Hoot test patterns for Owl.js components.
 

@@ -1,4 +1,7 @@
-Title: External IDs Migration — Candidates and Seeding
+---
+title: External IDs Migration — Candidates and Seeding
+---
+
 
 This doc lists model fields we can migrate into the `external_ids` framework and the systems/templates to seed.
 

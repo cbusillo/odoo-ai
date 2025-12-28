@@ -1,4 +1,7 @@
-Title: Documentation Maintenance Patterns
+---
+title: Documentation Maintenance Patterns
+---
+
 
 Use these guidelines to keep documentation accurate, concise, and discoverable.
 

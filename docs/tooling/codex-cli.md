@@ -1,4 +1,7 @@
-Title: Codex CLI
+---
+title: Codex CLI
+---
+
 
 Purpose
 

@@ -1,4 +1,7 @@
-Title: Shopify Sync Patterns
+---
+title: Shopify Sync Patterns
+---
+
 
 Data synchronization patterns for Shopify integration and external systems.
 

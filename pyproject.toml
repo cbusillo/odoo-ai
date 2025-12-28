@@ -25,18 +25,8 @@ dev = [
 packages = ["tools"]
 
 [project.scripts]
-test = "tools.testkit.cli:main"
+test = "tools.testkit.cli:main"  # example: uv run test unit --json
 test-validate = "tools.testkit.validate:main"
-test-plan = "tools.testkit.shortcuts:test_plan"
-test-unit = "tools.testkit.shortcuts:test_unit"
-test-js = "tools.testkit.shortcuts:test_js"
-test-integration = "tools.testkit.shortcuts:test_integration"
-test-tour = "tools.testkit.shortcuts:test_tour"
-test-clean = "tools.testkit.shortcuts:test_clean"
-test-status = "tools.testkit.shortcuts:test_status"
-test-wait = "tools.testkit.shortcuts:test_wait"
-test-rerun = "tools.testkit.shortcuts:test_rerun_failures"
-test-doctor = "tools.testkit.shortcuts:test_doctor"
 deploy = "tools.deployer.cli:main"
 restore-from-upstream = "tools.docker_runner:restore_from_upstream"  # example: uv run restore opw-dev --init
 restore = "tools.restore_shortcuts:main"

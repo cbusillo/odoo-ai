@@ -60,7 +60,7 @@ COPY /docker/config /volumes/config
 COPY /docker/scripts /volumes/scripts
 COPY /addons /volumes/addons
 COPY --from=addon_sources /addons /volumes/addons
-COPY --from=addon_sources /addons-external /volumes/addons-external
+COPY --from=addon_sources /extra_addons /volumes/extra_addons
 COPY /pyproject.toml /volumes/pyproject.toml
 COPY /uv.lock /volumes/uv.lock
 

@@ -358,7 +358,7 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
 
     default_state_root = Path.home() / "odoo-ai" / (config.project_name or name)
     state_root_path = _expand_path(config.odoo_state_root or default_state_root)
-    data_dir_host = _expand_path(config.odoo_data_host_dir or state_root_path / "filestore")
+    data_dir_host = _expand_path(config.odoo_data_host_dir or state_root_path / "data")
     db_dir_host = _expand_path(config.odoo_db_host_dir or state_root_path / "postgres")
     log_dir_host = _expand_path(config.odoo_log_host_dir or state_root_path / "logs")
     compose_env_path = state_root_path / ".compose.env"

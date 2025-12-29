@@ -91,7 +91,7 @@ volumes:
     driver: local
     driver_opts:
       <<: *bind-opts
-      device: ${ODOO_STATE_ROOT}/filestore
+      device: ${ODOO_STATE_ROOT}
   odoo_logs:
     driver: local
     driver_opts:

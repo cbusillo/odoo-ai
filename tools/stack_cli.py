@@ -94,6 +94,14 @@ def promote_command(
         known = ", ".join(sorted(groups)) if groups else "(none)"
         raise click.ClickException(f"unknown group '{group_name}'. Known groups: {known}")
 
+    if not dry_run:
+        prod_targets = [target for target in targets if target.endswith("-prod")]
+        if prod_targets:
+            click.confirm(
+                f"Push {from_ref} to prod branch(es): {', '.join(prod_targets)}?",
+                abort=True,
+            )
+
     for target in targets:
         command = ["git", "push", remote, f"{from_ref}:{target}"]
         click.echo(f"$ {' '.join(command)}")

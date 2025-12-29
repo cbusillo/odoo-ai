@@ -4,7 +4,6 @@ import argparse
 import json
 import re
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 
 def _read_json(p: Path) -> dict | None:

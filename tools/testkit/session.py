@@ -4,12 +4,11 @@ import json
 import os
 import re
 import time
-from dataclasses import dataclass
 from pathlib import Path
 
 from .db import cleanup_test_databases, create_template_from_production, get_production_db_name
 from .filestore import cleanup_filestores
-from .phases import IntegrationPhase, JsPhase, PhaseOutcome, TourPhase, UnitPhase
+from .phases import PhaseOutcome
 from .reporter import (
     aggregate_phase,
     begin_session_dir,
@@ -242,7 +241,7 @@ class TestSession:
         print("🔴 Overall: NOT GREEN")
         for name in ("unit", "js", "integration", "tour"):
             o = outcomes.get(name)
-            if o and o.return_code and o.return_code != 0:
+            if o and o.return_code is not None and o.return_code != 0:
                 return int(o.return_code)
         return 1
 
@@ -417,8 +416,6 @@ class TestSession:
 
         # Optionally pre-snapshot first integration/tour filestores when not skipped
         from .filestore import snapshot_filestore
-        from .settings import TestSettings
-
         settings = self.settings
 
         def _maybe_snapshot_first(phase: str, modules: list[str], skip_flag: bool) -> None:

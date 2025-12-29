@@ -3,10 +3,8 @@ from __future__ import annotations
 import json
 import os
 import re
-import secrets
 import subprocess
 import time
-from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -258,6 +256,7 @@ class OdooExecutor:
         print(f"📁 Logs: {phase_dir}")
 
         start_time = time.time()
+        counters: dict[str, int] = {"tests_run": 0, "failures": 0, "errors": 0, "skips": 0}
         summary = {
             "schema_version": SUMMARY_SCHEMA_VERSION,
             "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
@@ -271,7 +270,7 @@ class OdooExecutor:
             "start_time": start_time,
             "log_file": str(log_file),
             "summary_file": str(summary_file),
-            "counters": {"tests_run": 0, "failures": 0, "errors": 0, "skips": 0},
+            "counters": counters,
         }
 
         try:
@@ -306,11 +305,11 @@ class OdooExecutor:
                     if "Ran " in line and " tests in " in line:
                         m = re.search(r"Ran (\d+) tests", line)
                         if m:
-                            summary["counters"]["tests_run"] = int(m.group(1))
+                            counters["tests_run"] = int(m.group(1))
                     if line.startswith("FAIL:"):
-                        summary["counters"]["failures"] = int(summary["counters"].get("failures", 0)) + 1
+                        counters["failures"] = int(counters.get("failures", 0)) + 1
                     if line.startswith("ERROR:"):
-                        summary["counters"]["errors"] = int(summary["counters"].get("errors", 0)) + 1
+                        counters["errors"] = int(counters.get("errors", 0)) + 1
                     # repetitive detection
                     recent.append(line)
                     if len(recent) > 20:

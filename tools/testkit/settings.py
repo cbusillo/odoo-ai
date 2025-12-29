@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import ClassVar
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -8,7 +10,11 @@ SUMMARY_SCHEMA_VERSION = "1.0"
 
 
 class TestSettings(BaseSettings):
-    model_config = SettingsConfigDict(case_sensitive=False, env_file=".env", extra="ignore")
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
+        case_sensitive=False,
+        env_file=".env",
+        extra="ignore",
+    )
 
     # Core project/env
     project_name: str = Field("odoo", alias="ODOO_PROJECT_NAME")

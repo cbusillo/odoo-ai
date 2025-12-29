@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from .docker_api import compose_exec, ensure_services_up, get_script_runner_service
 from .settings import TestSettings
 

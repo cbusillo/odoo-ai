@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import os
 import subprocess
 from datetime import datetime
@@ -35,6 +33,17 @@ def _ssh_target(host: str, user: str | None) -> str:
     return host
 
 
+def _load_target_env(prefix: str) -> tuple[str, str | None, str]:
+    host = _env(prefix, "PROD_PROXMOX_HOST", required=True)
+    if host is None:
+        raise click.ClickException(f"{prefix}_PROD_PROXMOX_HOST is required")
+    user = _env(prefix, "PROD_PROXMOX_USER", default="root")
+    ctid = _env(prefix, "PROD_CT_ID", required=True)
+    if ctid is None:
+        raise click.ClickException(f"{prefix}_PROD_CT_ID is required")
+    return host, user, ctid
+
+
 @click.group()
 def main() -> None:
     """Prod deploy safety gates (backup + rollback)."""
@@ -47,11 +56,7 @@ def main() -> None:
 @click.option("--dry-run", is_flag=True)
 def backup_command(target: str, tag: str | None, run_tests: bool, dry_run: bool) -> None:
     prefix = target.upper()
-    host = _env(prefix, "PROD_PROXMOX_HOST", required=True)
-    if host is None:
-        raise click.ClickException(f"{prefix}_PROD_PROXMOX_HOST is required")
-    user = _env(prefix, "PROD_PROXMOX_USER", default="root")
-    ctid = _env(prefix, "PROD_CT_ID", required=True)
+    host, user, ctid = _load_target_env(prefix)
     storage = _env(prefix, "PROD_BACKUP_STORAGE")
     storage_value = storage or ""
     mode_raw = _env(prefix, "PROD_BACKUP_MODE", default="both")
@@ -100,11 +105,7 @@ def backup_command(target: str, tag: str | None, run_tests: bool, dry_run: bool)
 @click.option("--dry-run", is_flag=True)
 def rollback_command(target: str, snapshot_name: str, start: bool, dry_run: bool) -> None:
     prefix = target.upper()
-    host = _env(prefix, "PROD_PROXMOX_HOST", required=True)
-    if host is None:
-        raise click.ClickException(f"{prefix}_PROD_PROXMOX_HOST is required")
-    user = _env(prefix, "PROD_PROXMOX_USER", default="root")
-    ctid = _env(prefix, "PROD_CT_ID", required=True)
+    host, user, ctid = _load_target_env(prefix)
 
     ssh = _ssh_target(host, user)
     _run(["ssh", ssh, "pct", "rollback", str(ctid), snapshot_name], dry_run=dry_run)
@@ -117,11 +118,7 @@ def rollback_command(target: str, snapshot_name: str, start: bool, dry_run: bool
 @click.option("--dry-run", is_flag=True)
 def list_command(target: str, dry_run: bool) -> None:
     prefix = target.upper()
-    host = _env(prefix, "PROD_PROXMOX_HOST", required=True)
-    if host is None:
-        raise click.ClickException(f"{prefix}_PROD_PROXMOX_HOST is required")
-    user = _env(prefix, "PROD_PROXMOX_USER", default="root")
-    ctid = _env(prefix, "PROD_CT_ID", required=True)
+    host, user, ctid = _load_target_env(prefix)
 
     ssh = _ssh_target(host, user)
     _run(["ssh", ssh, "pct", "listsnapshot", str(ctid)], dry_run=dry_run)

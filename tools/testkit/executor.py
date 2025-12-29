@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import logging
 import os
@@ -303,7 +301,6 @@ class OdooExecutor:
                 for raw in iter(stdout.readline, ""):
                     line = raw.rstrip("\n")
                     lf.write(line + "\n")
-                    last_out = time.time()
                     # counters heuristic from Odoo test output
                     if "Ran " in line and " tests in " in line:
                         m = re.search(r"Ran (\d+) tests", line)
@@ -322,6 +319,7 @@ class OdooExecutor:
                         stalled, msg = _detect_repetitive(recent, seen)
                         if stalled:
                             summary["repetitive_pattern"] = msg
+                    last_out = now
                 process.wait()
                 rc = int(process.returncode or 0)
 

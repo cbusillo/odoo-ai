@@ -1,10 +1,8 @@
-from __future__ import annotations
-
 import json
 import logging
 import os
 import time
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as element_tree
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -13,6 +11,15 @@ from .failures import parse_failures
 from .settings import SUMMARY_SCHEMA_VERSION
 
 _logger = logging.getLogger(__name__)
+
+
+def load_json(path: Path) -> dict | None:
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        _logger.debug("reporter: failed to read %s (%s)", path, exc)
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def write_latest_json(session_dir: Path) -> None:
@@ -104,7 +111,6 @@ def begin_session_dir() -> tuple[Path, str, float]:
 
 
 def aggregate_phase(session_dir: Path, phase: str) -> dict | None:
-    """Aggregate shard summaries for a phase and write all.summary.json and all.failures.json."""
     phase_dir = session_dir / phase
     if not phase_dir.exists():
         return None
@@ -115,12 +121,10 @@ def aggregate_phase(session_dir: Path, phase: str) -> dict | None:
     success = True
     merged_failures: list[dict] = []
     for sf in summaries:
-        try:
-            data = json.loads(sf.read_text())
-        except (OSError, json.JSONDecodeError) as exc:
-            _logger.debug("reporter: failed to read summary %s (%s)", sf, exc)
+        data = load_json(sf)
+        if data is None:
             continue
-        c = (data.get("counters") or {}) if isinstance(data, dict) else {}
+        c = data.get("counters") or {}
         for k in counters:
             try:
                 counters[k] += int(c.get(k, 0))
@@ -149,69 +153,81 @@ def _map_failure_type_to_junit(failure_type: str) -> str:
     return "failure"
 
 
+def _int_from_counter(counters: dict[str, Any], key: str) -> int:
+    raw = counters.get(key, 0)
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _junit_counts(counters: dict[str, Any], entries: list[dict[str, Any]]) -> tuple[int, int, int, int]:
+    tests = _int_from_counter(counters, "tests_run")
+    fail_count = sum(1 for entry in entries if _map_failure_type_to_junit(str(entry.get("type", ""))) == "failure")
+    err_count = sum(1 for entry in entries if _map_failure_type_to_junit(str(entry.get("type", ""))) == "error")
+    if tests == 0:
+        tests = fail_count + err_count
+    skipped = _int_from_counter(counters, "skips")
+    return tests, fail_count, err_count, skipped
+
+
+def _append_junit_failures(suite: element_tree.Element, entries: list[dict[str, Any]]) -> None:
+    for entry in entries:
+        name = entry.get("test") or entry.get("fingerprint") or "unknown"
+        tc = element_tree.SubElement(suite, "testcase", attrib={"name": str(name)})
+        mapped = _map_failure_type_to_junit(str(entry.get("type", "")))
+        message = entry.get("message") or entry.get("type") or ""
+        el = element_tree.SubElement(tc, mapped, attrib={"message": str(message)})
+        tb = entry.get("traceback")
+        if tb:
+            el.text = str(tb)
+
+
 def write_junit_for_phase(session_dir: Path, phase: str) -> Path | None:
     phase_dir = session_dir / phase
     agg_path = phase_dir / "all.summary.json"
     if not agg_path.exists():
         return None
-    try:
-        agg = json.loads(agg_path.read_text())
-    except (OSError, json.JSONDecodeError) as exc:
-        _logger.debug("reporter: failed to read aggregate %s (%s)", agg_path, exc)
+    agg = load_json(agg_path)
+    if agg is None:
         return None
     failures_path = phase_dir / "all.failures.json"
-    failures: list[dict] = []
-    try:
-        data = json.loads(failures_path.read_text())
-        failures = data.get("entries") or []
-    except (OSError, json.JSONDecodeError) as exc:
-        _logger.debug("reporter: failed to read failures %s (%s)", failures_path, exc)
-        failures = []
+    failures_data = load_json(failures_path) or {}
+    failure_entries: list[dict] = failures_data.get("entries") or []
 
-    tests = int((agg.get("counters") or {}).get("tests_run", 0))
-    # Approximate failures/errors from parsed entries if counters are zero
-    fail_count = sum(1 for e in failures if _map_failure_type_to_junit(e.get("type", "")) == "failure")
-    err_count = sum(1 for e in failures if _map_failure_type_to_junit(e.get("type", "")) == "error")
-    if tests == 0:
-        tests = fail_count + err_count
+    counters = agg.get("counters") or {}
+    tests, fail_count, err_count, skipped = _junit_counts(counters, failure_entries)
 
-    suite = ET.Element(
+    suite = element_tree.Element(
         "testsuite",
         attrib={
             "name": f"{phase}",
             "tests": str(tests),
             "failures": str(fail_count),
             "errors": str(err_count),
-            "skipped": str(int((agg.get("counters") or {}).get("skips", 0))),
+            "skipped": str(skipped),
         },
     )
-    for e in failures:
-        name = e.get("test") or e.get("fingerprint") or "unknown"
-        tc = ET.SubElement(suite, "testcase", attrib={"name": name})
-        mapped = _map_failure_type_to_junit(e.get("type", ""))
-        el = ET.SubElement(tc, mapped, attrib={"message": (e.get("message") or e.get("type") or "")})
-        tb = e.get("traceback")
-        if tb:
-            el.text = tb
+    _append_junit_failures(suite, failure_entries)
 
-    tree = ET.ElementTree(suite)
+    tree = element_tree.ElementTree(suite)
     out = phase_dir / "junit.xml"
     tree.write(out, encoding="utf-8", xml_declaration=True)
     return out
 
 
 def write_junit_root(session_dir: Path) -> Path:
-    suites = ET.Element("testsuites")
+    suites = element_tree.Element("testsuites")
     total_tests = total_fail = total_err = total_skip = 0
     for phase in ("unit", "js", "integration", "tour"):
-        p = session_dir / phase / "junit.xml"
-        if not p.exists():
+        junit_path = session_dir / phase / "junit.xml"
+        if not junit_path.exists():
             continue
         try:
-            tree = ET.parse(str(p))
+            tree = element_tree.parse(str(junit_path))
             suite = tree.getroot()
-        except (OSError, ET.ParseError) as exc:
-            _logger.debug("reporter: failed to parse junit %s (%s)", p, exc)
+        except (OSError, element_tree.ParseError) as exc:
+            _logger.debug("reporter: failed to parse junit %s (%s)", junit_path, exc)
             continue
         suites.append(suite)
         total_tests += int(suite.attrib.get("tests", 0))
@@ -228,53 +244,36 @@ def write_junit_root(session_dir: Path) -> Path:
         }
     )
     out = session_dir / "junit.xml"
-    ET.ElementTree(suites).write(out, encoding="utf-8", xml_declaration=True)
+    element_tree.ElementTree(suites).write(out, encoding="utf-8", xml_declaration=True)
     return out
 
 
 def write_junit_for_shard(summary_file: Path, log_file: Path) -> Path | None:
-    try:
-        data = json.loads(summary_file.read_text())
-    except (OSError, json.JSONDecodeError) as exc:
-        _logger.debug("reporter: failed to read shard summary %s (%s)", summary_file, exc)
+    data = load_json(summary_file)
+    if data is None:
         return None
     counters = data.get("counters") or {}
-    tests = int(counters.get("tests_run", 0))
     failures = parse_failures(log_file)
-    fail_count = sum(1 for e in failures if _map_failure_type_to_junit(e.get("type", "")) == "failure")
-    err_count = sum(1 for e in failures if _map_failure_type_to_junit(e.get("type", "")) == "error")
-    if tests == 0:
-        tests = fail_count + err_count
+    tests, fail_count, err_count, skipped = _junit_counts(counters, failures)
 
-    suite = ET.Element(
+    suite = element_tree.Element(
         "testsuite",
         attrib={
             "name": Path(summary_file).stem.replace(".summary", ""),
             "tests": str(tests),
             "failures": str(fail_count),
             "errors": str(err_count),
-            "skipped": str(int(counters.get("skips", 0))),
+            "skipped": str(skipped),
         },
     )
-    for e in failures:
-        name = e.get("test") or e.get("fingerprint") or "unknown"
-        tc = ET.SubElement(suite, "testcase", attrib={"name": name})
-        mapped = _map_failure_type_to_junit(e.get("type", ""))
-        el = ET.SubElement(tc, mapped, attrib={"message": (e.get("message") or e.get("type") or "")})
-        tb = e.get("traceback")
-        if tb:
-            el.text = tb
+    _append_junit_failures(suite, failures)
 
     out = summary_file.with_suffix("").with_suffix(".junit.xml")
-    ET.ElementTree(suite).write(out, encoding="utf-8", xml_declaration=True)
+    element_tree.ElementTree(suite).write(out, encoding="utf-8", xml_declaration=True)
     return out
 
 
 def update_weight_cache_from_session(session_dir: Path, cache_path: Path | None = None) -> None:
-    """Update weights cache with elapsed seconds per module and phase.
-
-    For shard summaries that list multiple modules, time is divided equally.
-    """
     if cache_path is None:
         cache_path = Path("tmp/test-logs/weights.json")
     try:
@@ -288,9 +287,8 @@ def update_weight_cache_from_session(session_dir: Path, cache_path: Path | None 
         if not phase_dir.exists():
             continue
         for sf in phase_dir.glob("*.summary.json"):
-            try:
-                data = json.loads(sf.read_text())
-            except (OSError, json.JSONDecodeError):
+            data = load_json(sf)
+            if data is None:
                 continue
             secs = float(data.get("elapsed_seconds") or 0.0)
             mods = data.get("modules") or []

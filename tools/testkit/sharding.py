@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import logging
 import re
@@ -9,6 +7,7 @@ from pathlib import Path
 from .counts import count_js_tests, count_py_tests
 
 _logger = logging.getLogger(__name__)
+SEC_PER_BUCKET = 5
 
 
 def discover_modules_with(patterns: list[str], addons_root: Path | None = None) -> list[str]:
@@ -69,8 +68,6 @@ def compute_weights(modules: list[str], phase: str) -> dict[str, int]:
         _logger.debug("sharding: failed to load weight cache (%s)", exc)
         cache = {}
     ph_cache = cache.get(phase) or {}
-    # Convert seconds to weight buckets (5s per bucket) to avoid dwarfing counts
-    SEC_PER_BUCKET = 5
     for name in list(weights.keys()):
         rec = ph_cache.get(name)
         if not rec:

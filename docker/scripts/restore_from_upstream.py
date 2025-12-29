@@ -817,7 +817,7 @@ class OdooUpstreamRestorer:
         try:
             subprocess.run(
                 command,
-                input=script.encode("utf-8"),
+                input=script.encode(),
                 env=self.os_env,
                 check=True,
             )
@@ -979,7 +979,7 @@ with registry.cursor() as cr:
         self._run_odoo_shell(script)
         self._reset_db_connection()
 
-    def ensure_admin_user(self, *, do_sanitize: bool) -> None:
+    def ensure_admin_user(self) -> None:
         """Ensure the admin user has safe credentials."""
         self.connect_to_db()
         with self.local.db_conn.cursor() as cursor:
@@ -1090,7 +1090,7 @@ with registry.cursor() as cr:
         else:
             _logger.info("Skipping sanitization per --no-sanitize flag.")
 
-        self.ensure_admin_user(do_sanitize=do_sanitize)
+        self.ensure_admin_user()
         self.connect_to_db()
         self.assert_core_schema_healthy()
         self.ensure_gpt_users()
@@ -1134,7 +1134,7 @@ with registry.cursor() as cr:
         for raw_dir in candidate_dirs:
             try:
                 base = Path(raw_dir).expanduser()
-                base = base.resolve(strict=False)
+                base = base.resolve()
             except OSError:
                 base = Path(raw_dir)
 
@@ -1277,7 +1277,7 @@ with registry.cursor() as cr:
             self._reset_db_connection()
 
     def restore_from_upstream(self, do_sanitize: bool = True) -> None:
-        upstream = self._require_upstream()
+        self._require_upstream()
         target_owner = self._resolve_filestore_owner()
         _logger.info("Resolved filestore owner: %s", target_owner or "<default>")
         filestore_proc = self.overwrite_filestore(target_owner)

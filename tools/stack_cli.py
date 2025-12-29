@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections import defaultdict
 from collections.abc import Iterable
 from pathlib import Path
@@ -22,7 +20,7 @@ def _list_remote_branches(repo_root: Path, remote: str) -> list[str]:
     output = _git_output(["git", "ls-remote", "--heads", remote], cwd=repo_root, check=False)
     branches: list[str] = []
     for line in output.splitlines():
-        _, ref = (line.split(None, 1) + [""])[:2]
+        _, ref = (line.split(maxsplit=1) + [""])[:2]
         if not ref.startswith("refs/heads/"):
             continue
         branches.append(ref.removeprefix("refs/heads/"))

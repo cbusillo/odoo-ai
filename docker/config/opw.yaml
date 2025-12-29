@@ -4,16 +4,10 @@
 services:
   web:
     env_file:
-      - .env
-      - docker/config/base.env
       - docker/config/opw.env
   script-runner:
     env_file:
-      - .env
-      - docker/config/base.env
       - docker/config/opw.env
   database:
     env_file:
-      - .env
-      - docker/config/base.env
       - docker/config/opw.env

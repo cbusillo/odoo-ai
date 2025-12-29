@@ -36,7 +36,7 @@ Tips
 - `ODOO_UPDATE=AUTO` discovers modules under `LOCAL_ADDONS_DIRS` or `ODOO_ADDONS_PATH`; set
   `LOCAL_ADDONS_DIRS=/volumes/addons/opw:/volumes/enterprise` (colon/comma delimited) to control the search.
 - `ODOO_ADDON_REPOSITORIES` accepts a comma-separated list of addon repos (cloned into
-  `/volumes/addons/<repo>`). These are cloned with `GITHUB_TOKEN`.
+  `/volumes/addons-external/<repo>`). These are cloned with `GITHUB_TOKEN`.
 
 ## Layered Compose Configuration
 

@@ -6,9 +6,7 @@ import os
 import re
 import sys
 from collections.abc import Sequence
-from pathlib import Path
 
-# Reuse the Git helpers defined for the deploy CLI
 from tools.deployer.cli import get_git_commit, get_git_remote_url
 from tools.deployer.command import CommandError, run_process
 from tools.deployer.compose_ops import local_compose_command, remote_compose_command
@@ -21,16 +19,17 @@ from tools.deployer.deploy import (
 from tools.deployer.remote import run_remote
 from tools.deployer.settings import StackSettings, load_stack_settings
 
-def _ensure_stack_env(settings: StackSettings, stack_name: str) -> Path:
-    env_path = settings.env_file
-    if env_path.exists():
-        return env_path
-    raise FileNotFoundError(f"No environment file found for stack '{stack_name}'. Expected {env_path}.")
-
 logging.basicConfig(level=logging.INFO)
 _logger = logging.getLogger(__name__)
 
 RESTORE_SCRIPT = "/volumes/scripts/restore_from_upstream.py"
+
+
+def _ensure_stack_env(settings: StackSettings, stack_name: str) -> None:
+    env_path = settings.env_file
+    if env_path.exists():
+        return
+    raise FileNotFoundError(f"No environment file found for stack '{stack_name}'. Expected {env_path}.")
 
 
 def _handle_restore_exit(error: CommandError) -> None:
@@ -74,7 +73,7 @@ def _add_toggle_args(command: list[str], *, bootstrap_only: bool, no_sanitize: b
 
 def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize: bool = False) -> int:
     settings = load_stack_settings(stack_name)
-    env_file_path = _ensure_stack_env(settings, stack_name)
+    _ensure_stack_env(settings, stack_name)
     image_reference = _current_image_reference(settings)
     env_values_raw = build_updated_environment(settings, image_reference)
 
@@ -160,7 +159,7 @@ def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize:
             _handle_restore_exit(error)
         _run_remote_compose(settings, ["up", "-d", "--remove-orphans", "web"])
     else:
-        write_env_file(env_file_path, env_values)
+        write_env_file(settings.env_file, env_values)
 
         if "database" in settings.services:
             _run_local_compose(settings, ["up", "-d", "--remove-orphans", "database"], check=False)

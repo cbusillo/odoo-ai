@@ -17,7 +17,7 @@ from tools.deployer.compose_ops import local_compose_command, remote_compose_com
 from tools.deployer.deploy import deploy_stack
 from tools.deployer.remote import run_remote
 from tools.deployer.settings import discover_repo_root, load_stack_settings
-from tools.docker_runner import restore_stack
+from tools.stack_restore import restore_stack
 
 
 ENV_SUFFIXES = ("dev", "testing", "prod")

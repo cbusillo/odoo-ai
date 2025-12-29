@@ -11,10 +11,22 @@ from .remote import ensure_remote_directory, run_remote, sync_remote_repository,
 from .settings import StackSettings
 
 
+def _run_compose(settings: StackSettings, args: list[str], remote: bool) -> None:
+    if remote:
+        if settings.remote_host is None:
+            raise ValueError("remote host missing")
+        if settings.remote_stack_path is None:
+            raise ValueError("remote stack path missing")
+        command = remote_compose_command(settings, args)
+        run_remote(settings.remote_host, settings.remote_user, settings.remote_port, command, settings.remote_stack_path)
+        return
+    local_compose(settings, args)
+
+
 def build_updated_environment(
     settings: StackSettings, image_reference: str, extra_variables: Mapping[str, str] | None = None
 ) -> dict[str, str]:
-    data = dict(settings.environment)
+    data = settings.environment.copy()
     data[settings.image_variable_name] = image_reference
     if extra_variables is not None:
         data.update(extra_variables)
@@ -106,27 +118,11 @@ def push_env_to_remote(settings: StackSettings, env_values: Mapping[str, str]) -
 
 
 def execute_compose_pull(settings: StackSettings, remote: bool) -> None:
-    if remote:
-        if settings.remote_host is None:
-            raise ValueError("remote host missing")
-        if settings.remote_stack_path is None:
-            raise ValueError("remote stack path missing")
-        command = remote_compose_command(settings, ["pull", *settings.services])
-        run_remote(settings.remote_host, settings.remote_user, settings.remote_port, command, settings.remote_stack_path)
-    else:
-        local_compose(settings, ["pull", *settings.services])
+    _run_compose(settings, ["pull", *settings.services], remote)
 
 
 def execute_compose_up(settings: StackSettings, remote: bool) -> None:
-    if remote:
-        if settings.remote_host is None:
-            raise ValueError("remote host missing")
-        if settings.remote_stack_path is None:
-            raise ValueError("remote stack path missing")
-        command = remote_compose_command(settings, ["up", "-d", *settings.services])
-        run_remote(settings.remote_host, settings.remote_user, settings.remote_port, command, settings.remote_stack_path)
-    else:
-        local_compose(settings, ["up", "-d", *settings.services])
+    _run_compose(settings, ["up", "-d", *settings.services], remote)
 
 
 def execute_upgrade(settings: StackSettings, modules: tuple[str, ...], remote: bool) -> None:
@@ -141,15 +137,7 @@ def execute_upgrade(settings: StackSettings, modules: tuple[str, ...], remote: b
         "-lc",
         f"{settings.odoo_bin_path} -u {module_argument} -d $ODOO_DB_NAME --stop-after-init",
     ]
-    if remote:
-        if settings.remote_host is None:
-            raise ValueError("remote host missing")
-        if settings.remote_stack_path is None:
-            raise ValueError("remote stack path missing")
-        command = remote_compose_command(settings, upgrade_subcommand)
-        run_remote(settings.remote_host, settings.remote_user, settings.remote_port, command, settings.remote_stack_path)
-    else:
-        local_compose(settings, upgrade_subcommand)
+    _run_compose(settings, upgrade_subcommand, remote)
 
 
 def run_health_check(settings: StackSettings, remote: bool, timeout_seconds: int) -> None:
@@ -158,7 +146,7 @@ def run_health_check(settings: StackSettings, remote: bool, timeout_seconds: int
         try:
             run_remote(settings.remote_host, settings.remote_user, settings.remote_port, command)
             return
-        except Exception as error:  # noqa: BLE001
+        except (CommandError, OSError) as error:
             raise HealthcheckError(f"remote health check failed: {error}") from error
     wait_for_health(settings.healthcheck_url, timeout_seconds=timeout_seconds)
 
@@ -194,15 +182,7 @@ def deploy_stack(
 
 def show_status(settings: StackSettings, remote: bool) -> None:
     status_command = ["ps"]
-    if remote:
-        if settings.remote_host is None:
-            raise ValueError("remote host missing")
-        if settings.remote_stack_path is None:
-            raise ValueError("remote stack path missing")
-        command = remote_compose_command(settings, status_command)
-        run_remote(settings.remote_host, settings.remote_user, settings.remote_port, command, settings.remote_stack_path)
-    else:
-        local_compose(settings, status_command)
+    _run_compose(settings, status_command, remote)
 
 
 def render_settings(settings: StackSettings, image_reference: str) -> str:

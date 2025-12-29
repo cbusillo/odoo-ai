@@ -1,6 +1,7 @@
 import shlex
 import logging
 from dataclasses import dataclass
+from typing import ClassVar
 import os
 from pathlib import Path
 
@@ -71,7 +72,7 @@ def infer_project_slug(stack_name: str) -> str | None:
 
 
 class StackConfig(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow")
 
     compose_files_raw: str | None = Field(None, alias="DEPLOY_COMPOSE_FILES")
     compose_command_raw: str | None = Field(None, alias="DEPLOY_COMPOSE_COMMAND")

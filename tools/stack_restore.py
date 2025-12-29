@@ -5,6 +5,8 @@ import logging
 import os
 import re
 import sys
+from dataclasses import replace
+from pathlib import Path
 from collections.abc import Sequence
 
 from tools.deployer.cli import get_git_commit, get_git_remote_url
@@ -24,6 +26,7 @@ logging.basicConfig(level=logging.INFO)
 _logger = logging.getLogger(__name__)
 
 RESTORE_SCRIPT = "/volumes/scripts/restore_from_upstream.py"
+RESTORE_SSH_OVERLAY = Path("docker/config/_restore_ssh_volume.yaml")
 
 
 def _ensure_stack_env(settings: StackSettings, stack_name: str) -> None:
@@ -58,6 +61,13 @@ def _current_image_reference(settings: StackSettings) -> str:
     return settings.environment.get(settings.image_variable_name) or settings.registry_image
 
 
+def _settings_for_restore(settings: StackSettings) -> StackSettings:
+    overlay = settings.repo_root / RESTORE_SSH_OVERLAY
+    if overlay in settings.compose_files:
+        return settings
+    return replace(settings, compose_files=(*settings.compose_files, overlay))
+
+
 def _add_toggle_env_flags(command: list[str], *, bootstrap_only: bool, no_sanitize: bool) -> None:
     if bootstrap_only:
         command.extend(["-e", "BOOTSTRAP_ONLY=1"])
@@ -75,8 +85,9 @@ def _add_toggle_args(command: list[str], *, bootstrap_only: bool, no_sanitize: b
 def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize: bool = False) -> int:
     settings = load_stack_settings(stack_name)
     _ensure_stack_env(settings, stack_name)
-    image_reference = _current_image_reference(settings)
-    env_values_raw = build_updated_environment(settings, image_reference)
+    restore_settings = _settings_for_restore(settings)
+    image_reference = _current_image_reference(restore_settings)
+    env_values_raw = build_updated_environment(restore_settings, image_reference)
 
     def _strip_quotes(raw: str) -> str:
         if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in {'"', "'"}:
@@ -125,17 +136,17 @@ def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize:
     for env_var_name in env_values_raw:
         env_values[env_var_name] = _resolve_value(env_var_name, set())
 
-    if settings.remote_host:
-        repository_url = get_git_remote_url(settings.repo_root)
-        commit = get_git_commit(settings.repo_root)
-        prepare_remote_stack(settings, repository_url, commit)
-        push_env_to_remote(settings, env_values)
+    if restore_settings.remote_host:
+        repository_url = get_git_remote_url(restore_settings.repo_root)
+        commit = get_git_commit(restore_settings.repo_root)
+        prepare_remote_stack(restore_settings, repository_url, commit)
+        push_env_to_remote(restore_settings, env_values)
 
-        if "database" in settings.services:
-            _run_remote_compose(settings, ["up", "-d", "--remove-orphans", "database"])
+        if "database" in restore_settings.services:
+            _run_remote_compose(restore_settings, ["up", "-d", "--remove-orphans", "database"])
 
-        _run_remote_compose(settings, ["up", "-d", "--remove-orphans", settings.script_runner_service])
-        _run_remote_compose(settings, ["stop", "web"])
+        _run_remote_compose(restore_settings, ["up", "-d", "--remove-orphans", restore_settings.script_runner_service])
+        _run_remote_compose(restore_settings, ["stop", "web"])
 
         remote_exec: list[str] = [
             "exec",
@@ -147,7 +158,7 @@ def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize:
 
         remote_exec.extend(
             [
-                settings.script_runner_service,
+                restore_settings.script_runner_service,
                 "python3",
                 RESTORE_SCRIPT,
             ]
@@ -155,19 +166,23 @@ def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize:
         _add_toggle_args(remote_exec, bootstrap_only=bootstrap_only, no_sanitize=no_sanitize)
 
         try:
-            _run_remote_compose(settings, remote_exec)
+            _run_remote_compose(restore_settings, remote_exec)
         except CommandError as error:
             _handle_restore_exit(error)
-        _run_remote_compose(settings, ["up", "-d", "--remove-orphans", "web"])
+        _run_remote_compose(restore_settings, ["up", "-d", "--remove-orphans", "web"])
     else:
-        ensure_local_bind_mounts(settings)
-        write_env_file(settings.env_file, env_values)
+        ensure_local_bind_mounts(restore_settings)
+        write_env_file(restore_settings.env_file, env_values)
 
-        if "database" in settings.services:
-            _run_local_compose(settings, ["up", "-d", "--remove-orphans", "database"], check=False)
+        if "database" in restore_settings.services:
+            _run_local_compose(restore_settings, ["up", "-d", "--remove-orphans", "database"], check=False)
 
-        _run_local_compose(settings, ["up", "-d", "--remove-orphans", settings.script_runner_service], check=False)
-        _run_local_compose(settings, ["stop", "web"], check=False)
+        _run_local_compose(
+            restore_settings,
+            ["up", "-d", "--remove-orphans", restore_settings.script_runner_service],
+            check=False,
+        )
+        _run_local_compose(restore_settings, ["stop", "web"], check=False)
         exec_extra = [
             "exec",
             "-T",
@@ -179,7 +194,7 @@ def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize:
         _add_toggle_env_flags(exec_extra, bootstrap_only=bootstrap_only, no_sanitize=no_sanitize)
         exec_extra.extend(
             [
-                settings.script_runner_service,
+                restore_settings.script_runner_service,
                 "python3",
                 RESTORE_SCRIPT,
             ]
@@ -188,13 +203,13 @@ def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize:
 
         try:
             run_process(
-                local_compose_command(settings, exec_extra),
-                cwd=settings.repo_root,
-                env=local_compose_env(settings),
+                local_compose_command(restore_settings, exec_extra),
+                cwd=restore_settings.repo_root,
+                env=local_compose_env(restore_settings),
             )
         except CommandError as error:
             _handle_restore_exit(error)
-        _run_local_compose(settings, ["up", "-d", "--remove-orphans", "web"], check=False)
+        _run_local_compose(restore_settings, ["up", "-d", "--remove-orphans", "web"], check=False)
 
     _logger.info("Restore completed for stack %s", stack_name)
     return 0

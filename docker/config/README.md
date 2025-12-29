@@ -1,6 +1,6 @@
 # Docker Config Layering (Local Dev)
 
-This directory holds local stack overlays used by `uv run deploy` and ad-hoc
+This directory holds local stack overlays used by `uv run stack` and ad-hoc
 `docker compose` commands. Coolify deployments ignore these files and use the
 repo's `docker-compose.yml` only.
 
@@ -22,7 +22,7 @@ docker-compose.yml
 → docker-compose.override.yml (local-only)
 → docker/config/base.yaml
 → docker/config/{project}.yaml
-→ optional extras (e.g. docker/config/_restore_ssh_volume.yaml)
+→ optional extras (used by restore flows)
 ```
 
 ## Local stacks
@@ -45,7 +45,7 @@ docker-compose.yml
 3. Run the stack:
 
    ```bash
-   uv run deploy deploy --stack opw-local
+   uv run stack up --stack opw-local
    ```
 
 ## Notes
@@ -55,5 +55,5 @@ docker-compose.yml
   repo for live-editing (see `docs/workflows/multi-project.md`).
 - Local-only overrides live in the env files (for example `ODOO_WEB_COMMAND`
   and host port mappings).
-- Use `docker/config/_restore_ssh_volume.yaml` when running
-  `uv run restore` so the container can reach upstream hosts.
+- Restore runs (`uv run stack up --restore`) automatically include the
+  `_restore_ssh_volume.yaml` overlay so the container can reach upstream hosts.

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import logging
 import time
@@ -230,7 +228,7 @@ def create_template_from_production(template_db: str) -> None:
     compose_exec(get_database_service(), ["bash", "-lc", cmd])
 
 
-def template_reuse_candidate(base_db: str, ttl_sec: int) -> str | None:
+def template_reuse_candidate(_base_db: str, ttl_sec: int) -> str | None:
     """Return an existing reusable template DB name or None.
 
     We record the last template name and time in tmp/test-logs/template.json.

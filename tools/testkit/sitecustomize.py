@@ -39,15 +39,15 @@ def _matches_target_module(py_module: str, targets: Iterable[str]) -> bool:
 def _install_loader_patch(total: int, index: int, only_modules: set[str]) -> None:
     orig_get = unittest.TestLoader.getTestCaseNames
 
-    def sliced_get(self: unittest.TestLoader, testCaseClass: type[unittest.TestCase]):  # type: ignore[override]
-        names = orig_get(self, testCaseClass)
+    def sliced_get(self: unittest.TestLoader, test_case_class: type[unittest.TestCase]):  # type: ignore[override]
+        names = orig_get(self, test_case_class)
         # Only slice targeted addon modules; otherwise leave untouched
-        py_mod = getattr(testCaseClass, "__module__", "")
+        py_mod = getattr(test_case_class, "__module__", "")
         if not _matches_target_module(py_mod, only_modules):
             return names
 
         out: list[str] = []
-        cls = getattr(testCaseClass, "__name__", "Test")
+        cls = getattr(test_case_class, "__name__", "Test")
         for n in names:
             if not n.startswith("test"):
                 # don’t slice non-tests

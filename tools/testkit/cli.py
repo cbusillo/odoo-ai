@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import os
 import sys
@@ -11,6 +9,7 @@ import click
 
 from .db import db_capacity
 from .phases import PhaseOutcome
+from .reporter import load_json
 from .session import PhaseName, TestSession
 from .settings import TestSettings
 from .sharding import plan_shards_for_phase
@@ -24,7 +23,7 @@ def _emit_bottomline(latest: Path, as_json: bool) -> int:
         else:
             click.echo("no_summary")
         return 2
-    data = _read_json_file(p)
+    data = load_json(p)
     if data is None:
         if as_json:
             print(json.dumps({"status": "invalid"}))
@@ -68,14 +67,52 @@ def _parse_multi(values: tuple[str, ...]) -> list[str]:
     return items
 
 
+def _apply_shard_overrides(
+    unit_shards: int | None,
+    js_shards: int | None,
+    integration_shards: int | None,
+    tour_shards: int | None,
+) -> None:
+    if unit_shards is not None:
+        os.environ["UNIT_SHARDS"] = str(unit_shards)
+    if js_shards is not None:
+        os.environ["JS_SHARDS"] = str(js_shards)
+    if integration_shards is not None:
+        os.environ["INTEGRATION_SHARDS"] = str(integration_shards)
+    if tour_shards is not None:
+        os.environ["TOUR_SHARDS"] = str(tour_shards)
+
+
+def _build_session(
+    *,
+    include: list[str],
+    omit: list[str],
+    unit_modules: tuple[str, ...],
+    unit_exclude: tuple[str, ...],
+    js_modules: tuple[str, ...],
+    js_exclude: tuple[str, ...],
+    integration_modules: tuple[str, ...],
+    integration_exclude: tuple[str, ...],
+    tour_modules: tuple[str, ...],
+    tour_exclude: tuple[str, ...],
+    keep_going: bool | None = None,
+) -> TestSession:
+    return TestSession(
+        keep_going=keep_going,
+        include_modules=include or None,
+        exclude_modules=omit or None,
+        unit_modules=_parse_multi(unit_modules) or None,
+        unit_exclude=_parse_multi(unit_exclude) or None,
+        js_modules=_parse_multi(js_modules) or None,
+        js_exclude=_parse_multi(js_exclude) or None,
+        integration_modules=_parse_multi(integration_modules) or None,
+        integration_exclude=_parse_multi(integration_exclude) or None,
+        tour_modules=_parse_multi(tour_modules) or None,
+        tour_exclude=_parse_multi(tour_exclude) or None,
+    )
+
+
 _PHASES: tuple[PhaseName, ...] = ("unit", "js", "integration", "tour")
-
-
-def _read_json_file(path: Path) -> dict | None:
-    try:
-        return json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError, ValueError):
-        return None
 
 
 def _phase_outcomes(focus_phase: PhaseName, outcome: PhaseOutcome) -> dict[str, PhaseOutcome]:
@@ -144,14 +181,7 @@ def run_all(
     overlap: bool,
 ) -> None:
     # Set env overrides for settings
-    if unit_shards is not None:
-        os.environ["UNIT_SHARDS"] = str(unit_shards)
-    if js_shards is not None:
-        os.environ["JS_SHARDS"] = str(js_shards)
-    if integration_shards is not None:
-        os.environ["INTEGRATION_SHARDS"] = str(integration_shards)
-    if tour_shards is not None:
-        os.environ["TOUR_SHARDS"] = str(tour_shards)
+    _apply_shard_overrides(unit_shards, js_shards, integration_shards, tour_shards)
     if skip_filestore_integration:
         os.environ["SKIP_FILESTORE_INTEGRATION"] = "1"
     if skip_filestore_tour:
@@ -221,7 +251,7 @@ def run_all(
                     session = cur.name
                 break
             if cur_json.exists():
-                data = _read_json_file(cur_json)
+                data = load_json(cur_json)
                 if data:
                     session = Path(data.get("current", "")).name or None
                     if session:
@@ -231,17 +261,17 @@ def run_all(
         print(json.dumps(payload))
         sys.exit(0)
 
-    rc = TestSession(
-        include_modules=include or None,
-        exclude_modules=omit or None,
-        unit_modules=_parse_multi(unit_modules) or None,
-        unit_exclude=_parse_multi(unit_exclude) or None,
-        js_modules=_parse_multi(js_modules) or None,
-        js_exclude=_parse_multi(js_exclude) or None,
-        integration_modules=_parse_multi(integration_modules) or None,
-        integration_exclude=_parse_multi(integration_exclude) or None,
-        tour_modules=_parse_multi(tour_modules) or None,
-        tour_exclude=_parse_multi(tour_exclude) or None,
+    rc = _build_session(
+        include=include,
+        omit=omit,
+        unit_modules=unit_modules,
+        unit_exclude=unit_exclude,
+        js_modules=js_modules,
+        js_exclude=js_exclude,
+        integration_modules=integration_modules,
+        integration_exclude=integration_exclude,
+        tour_modules=tour_modules,
+        tour_exclude=tour_exclude,
     ).run()
     if json_out:
         latest = Path("tmp/test-logs/latest")
@@ -455,28 +485,21 @@ def plan_cmd(
 ) -> None:
     """Print the weight-aware sharding plan for a phase or all phases."""
     # apply overrides to env so TestSession sees them if needed
-    if unit_shards is not None:
-        os.environ["UNIT_SHARDS"] = str(unit_shards)
-    if js_shards is not None:
-        os.environ["JS_SHARDS"] = str(js_shards)
-    if integration_shards is not None:
-        os.environ["INTEGRATION_SHARDS"] = str(integration_shards)
-    if tour_shards is not None:
-        os.environ["TOUR_SHARDS"] = str(tour_shards)
+    _apply_shard_overrides(unit_shards, js_shards, integration_shards, tour_shards)
 
     include = _parse_multi(modules)
     omit = _parse_multi(exclude)
-    ts = TestSession(
-        include_modules=include or None,
-        exclude_modules=omit or None,
-        unit_modules=_parse_multi(unit_modules) or None,
-        unit_exclude=_parse_multi(unit_exclude) or None,
-        js_modules=_parse_multi(js_modules) or None,
-        js_exclude=_parse_multi(js_exclude) or None,
-        integration_modules=_parse_multi(integration_modules) or None,
-        integration_exclude=_parse_multi(integration_exclude) or None,
-        tour_modules=_parse_multi(tour_modules) or None,
-        tour_exclude=_parse_multi(tour_exclude) or None,
+    ts = _build_session(
+        include=include,
+        omit=omit,
+        unit_modules=unit_modules,
+        unit_exclude=unit_exclude,
+        js_modules=js_modules,
+        js_exclude=js_exclude,
+        integration_modules=integration_modules,
+        integration_exclude=integration_exclude,
+        tour_modules=tour_modules,
+        tour_exclude=tour_exclude,
     )
 
     def _phase_plan(name: PhaseName, shards: int | None) -> dict:
@@ -544,7 +567,7 @@ def rerun_failures(json_out: bool) -> None:
         if not ph_dir.exists():
             continue
         for sf in ph_dir.glob("*.summary.json"):
-            data = _read_json_file(sf)
+            data = load_json(sf)
             if data is None:
                 continue
             rc = int(data.get("returncode") or 0)
@@ -610,7 +633,7 @@ def status_cmd(session: str | None, json_out: bool) -> None:
         out = {"status": "running"}
         print(json.dumps(out) if json_out else "running")
         sys.exit(2)
-    data = _read_json_file(p)
+    data = load_json(p)
     if data is None:
         print(json.dumps({"status": "invalid"}) if json_out else "invalid")
         sys.exit(3)
@@ -640,7 +663,7 @@ def wait_cmd(session: str | None, timeout: int, interval: int, json_out: bool) -
     while True:
         p = latest / "summary.json"
         if p.exists():
-            data = _read_json_file(p)
+            data = load_json(p)
             ok = bool((data or {}).get("success"))
             if json_out:
                 print(json.dumps({"success": ok, "summary": str(p.resolve())}))
@@ -697,25 +720,25 @@ def doctor_cmd(json_out: bool) -> None:
     # Shard guardrails
     # noinspection PyArgumentList
     st = TestSettings()
-    allowed = 0
+    suggested_max_shards = 0
     try:
-        allowed = max(1, (max_conn - active - int(st.conn_reserve)) // max(1, int(st.conn_per_shard)))
+        suggested_max_shards = max(1, (max_conn - active - int(st.conn_reserve)) // max(1, int(st.conn_per_shard)))
     except (TypeError, ValueError, ZeroDivisionError):
-        allowed = 0
+        suggested_max_shards = 0
 
     payload = {
         "docker": {"services": services, "database_ok": svc_ok.get("database"), "script_runner_ok": svc_ok.get("script-runner")},
         "db": {"max_connections": max_conn, "active": active},
         "disk": {"free_percent": free_pct},
         "cpu": {"count": cpu},
-        "guardrails": {"conn_per_shard": st.conn_per_shard, "reserve": st.conn_reserve, "suggested_max_shards": allowed},
+        "guardrails": {"conn_per_shard": st.conn_per_shard, "reserve": st.conn_reserve, "suggested_max_shards": suggested_max_shards},
     }
     if json_out:
         print(json.dumps(payload))
     else:
         click.echo(f"Docker services: {services}")
         click.echo(f"database ok={payload['docker']['database_ok']} script-runner ok={payload['docker']['script_runner_ok']}")
-        click.echo(f"DB connections: max={max_conn} active={active} suggested_max_shards={allowed}")
+        click.echo(f"DB connections: max={max_conn} active={active} suggested_max_shards={suggested_max_shards}")
         click.echo(f"Disk free: {free_pct}%")
         click.echo(f"CPUs: {cpu}")
     sys.exit(0)

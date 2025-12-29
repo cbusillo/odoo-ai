@@ -19,12 +19,12 @@ from tools.deployer.deploy import (
     write_env_file,
 )
 from tools.deployer.remote import run_remote
-from tools.deployer.settings import load_stack_settings
+from tools.deployer.settings import StackSettings, load_stack_settings
 
 STACK_ENV_TMP_DIR = Path("tmp") / "stack-env"
 
 
-def _ensure_stack_env(settings, stack_name: str) -> Path:
+def _ensure_stack_env(settings: StackSettings, stack_name: str) -> Path:
     env_path = settings.env_file
     if env_path.exists():
         return env_path
@@ -52,19 +52,19 @@ def _handle_restore_exit(error: CommandError) -> None:
     raise error
 
 
-def _run_local_compose(settings, extra: Sequence[str], *, check: bool = True) -> None:
+def _run_local_compose(settings: StackSettings, extra: Sequence[str], *, check: bool = True) -> None:
     command = local_compose_command(settings, extra)
     run_process(command, cwd=settings.repo_root, check=check)
 
 
-def _run_remote_compose(settings, extra: Sequence[str]) -> None:
+def _run_remote_compose(settings: StackSettings, extra: Sequence[str]) -> None:
     if settings.remote_host is None or settings.remote_stack_path is None:
         raise ValueError("remote compose requested without remote host configuration")
     command = remote_compose_command(settings, extra)
     run_remote(settings.remote_host, settings.remote_user, settings.remote_port, command, settings.remote_stack_path)
 
 
-def _current_image_reference(settings) -> str:
+def _current_image_reference(settings: StackSettings) -> str:
     return settings.environment.get(settings.image_variable_name) or settings.registry_image
 
 
@@ -100,20 +100,20 @@ def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize:
         name, default = expr, ""
         if ":-" in expr:
             name, default = (part.strip() for part in expr.split(":-", 1))
-        value = cache.get(name)
-        if value is not None:
-            return value
+        cached_value = cache.get(name)
+        if cached_value is not None:
+            return cached_value
         if name in env_values_raw:
             return _resolve_value(name, seen)
         return os.environ.get(name, default)
 
-    def _resolve_value(key: str, seen: set[str]) -> str:
-        if key in cache:
-            return cache[key]
-        if key in seen:
-            return env_values_raw.get(key, "")
-        seen.add(key)
-        raw = env_values_raw.get(key, "")
+    def _resolve_value(variable_name: str, seen: set[str]) -> str:
+        if variable_name in cache:
+            return cache[variable_name]
+        if variable_name in seen:
+            return env_values_raw.get(variable_name, "")
+        seen.add(variable_name)
+        raw = env_values_raw.get(variable_name, "")
         if not isinstance(raw, str):
             raw_str = str(raw)
         else:
@@ -127,13 +127,13 @@ def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize:
 
         resolved = os.path.expandvars(resolved)
         resolved = os.path.expanduser(resolved)
-        cache[key] = resolved
-        seen.discard(key)
+        cache[variable_name] = resolved
+        seen.discard(variable_name)
         return resolved
 
     env_values: dict[str, str] = {}
-    for key in env_values_raw:
-        env_values[key] = _resolve_value(key, set())
+    for env_var_name in env_values_raw:
+        env_values[env_var_name] = _resolve_value(env_var_name, set())
 
     if settings.remote_host:
         repository_url = get_git_remote_url(settings.repo_root)
@@ -183,8 +183,8 @@ def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize:
             "--user",
             "root",
         ]
-        for key, value in env_values.items():
-            exec_extra.extend(["-e", f"{key}={value}"])
+        for env_key, env_value in env_values.items():
+            exec_extra.extend(["-e", f"{env_key}={env_value}"])
         _add_toggle_env_flags(exec_extra, bootstrap_only=bootstrap_only, no_sanitize=no_sanitize)
         exec_extra.extend(
             [

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from odoo.tests import TransactionCase, tagged
 
 from ...models.config_util import extract_template_fields, render_template, parse_prefix, ModelCfg

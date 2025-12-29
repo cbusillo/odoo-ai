@@ -178,7 +178,7 @@ def compute_compose_files(name: str, repo_root: Path, config: StackConfig) -> tu
 def compute_compose_command(config: StackConfig) -> tuple[str, ...]:
     if config.compose_command_raw:
         return tuple(shlex.split(config.compose_command_raw))
-    return ("docker", "compose")
+    return "docker", "compose"
 
 
 def compute_compose_project(name: str, config: StackConfig) -> str:
@@ -209,7 +209,7 @@ def compute_services(config: StackConfig) -> tuple[str, ...]:
     values = split_values(config.services_raw)
     if values:
         return values
-    return ("database", "web", "script-runner")
+    return "database", "web", "script-runner"
 
 
 def compute_script_runner(config: StackConfig) -> str:
@@ -249,7 +249,7 @@ def compute_remote_user(config: StackConfig, remote_host: str | None) -> str | N
     return None
 
 
-def compute_remote_stack_path(name: str, config: StackConfig, remote_host: str | None) -> Path | None:
+def compute_remote_stack_path(_stack_name: str, config: StackConfig, _remote_host: str | None) -> Path | None:
     if config.remote_stack_path_raw:
         return Path(config.remote_stack_path_raw)
     return None

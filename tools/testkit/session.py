@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import logging
 import os
@@ -102,16 +100,15 @@ class TestSession:
         return discover()
 
     def run_phase(self, phase: PhaseName, modules: list[str], timeout: int) -> PhaseOutcome:
-        try:
-            runner = {
-                "unit": self._run_unit_sharded,
-                "js": self._run_js_sharded,
-                "integration": self._run_integration_sharded,
-                "tour": self._run_tour_sharded,
-            }[phase]
-        except KeyError as exc:
-            raise ValueError(f"Unknown phase {phase}") from exc
-        return runner(modules, timeout)
+        if phase == "unit":
+            return self._run_unit_sharded(modules, timeout)
+        if phase == "js":
+            return self._run_js_sharded(modules, timeout)
+        if phase == "integration":
+            return self._run_integration_sharded(modules, timeout)
+        if phase == "tour":
+            return self._run_tour_sharded(modules, timeout)
+        raise ValueError(f"Unknown phase {phase}")
 
     def _begin(self) -> None:
         self.session_dir, self.session_name, self.session_started = begin_session_dir()
@@ -217,8 +214,8 @@ class TestSession:
                 c = counters_raw if isinstance(counters_raw, dict) else {}
                 try:
                     total += int(c.get(key, 0))
-                except (TypeError, ValueError) as exc:
-                    _log_suppressed("sum counter", exc)
+                except (TypeError, ValueError) as error:
+                    _log_suppressed("sum counter", error)
             return total
 
         aggregate["counters_total"] = {
@@ -644,14 +641,10 @@ class TestSession:
 
     def _fanout_shards(self, phase: str, shards: list[_T], fn: Callable[[_T], int]) -> PhaseOutcome:
         assert self.session_dir is not None
-        max_workers = self.settings.max_procs or min(8, len(shards))
+        max_workers = int(self.settings.max_procs) if self.settings.max_procs else min(8, len(shards))
         return self._run_fanout(self.session_dir, phase, shards, max_workers, fn)
 
     def _fanout_method(self, phase: str, modules: list[str], timeout: int, n: int) -> PhaseOutcome:
-        """Run N shards by slicing test methods across shards via sitecustomize hook.
-
-        This keeps CPU busy even when a phase has very few classes.
-        """
         from concurrent.futures import ThreadPoolExecutor, as_completed
         from .executor import OdooExecutor
 
@@ -668,17 +661,14 @@ class TestSession:
             base_tag = "js_test" if is_js else ("tour_test" if is_tour else ("integration_test" if use_prod else "unit_test"))
             tag_expr = base_tag
             db_base = f"{self.settings.db_name}_test_{phase}"
-            # Ensure unique DB per slice
             db_name = f"{db_base}_m{idx:03d}"
             template_db = self._ensure_template_db() if use_prod else None
-            # Slicer env passed to container; add our tools path for sitecustomize
             extra_env = {
                 "OAI_TEST_SLICER": "1",
                 "TEST_SLICE_TOTAL": str(n),
                 "TEST_SLICE_INDEX": str(idx),
                 "TEST_SLICE_PHASE": phase,
                 "TEST_SLICE_MODULES": ",".join(modules),
-                # Prepend tools dir for sitecustomize.py
                 "PYTHONPATH": "/volumes/tools/testkit:$PYTHONPATH",
             }
             return ex.run(
@@ -694,7 +684,7 @@ class TestSession:
                 shard_label=f"ms{idx:03d}",
             ).returncode
 
-        max_workers = self.settings.max_procs or min(8, n)
+        max_workers = int(self.settings.max_procs) if self.settings.max_procs else min(8, n)
         rc_agg = 0
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
             futures = {pool.submit(_run, i): i for i in range(n)}

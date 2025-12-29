@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import click
 
 from tools.docker_runner import restore_stack

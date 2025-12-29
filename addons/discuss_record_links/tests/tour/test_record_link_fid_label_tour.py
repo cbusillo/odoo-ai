@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from odoo.tests import tagged
 
 from odoo.addons.product_connect.tests.base_types import TOUR_TAGS

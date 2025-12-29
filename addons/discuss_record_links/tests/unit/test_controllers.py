@@ -1,4 +1,3 @@
-from __future__ import annotations
 # noinspection SpellCheckingInspection
 # Justification: Odoo test code uses API names like `env.ref` and test SKUs (e.g., WIDGX)
 # which trigger IDE spellcheckers; suppress for this test file only.

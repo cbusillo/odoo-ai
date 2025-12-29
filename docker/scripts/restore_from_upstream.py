@@ -484,7 +484,7 @@ class OdooUpstreamRestorer:
         if self.local.db_conn:
             try:
                 self.local.db_conn.close()
-            except Exception:
+            except (psycopg2.Error, OSError):
                 pass
             self.local.db_conn = None
 

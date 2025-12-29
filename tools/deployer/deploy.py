@@ -158,7 +158,7 @@ def run_health_check(settings: StackSettings, remote: bool, timeout_seconds: int
         try:
             run_remote(settings.remote_host, settings.remote_user, settings.remote_port, command)
             return
-        except Exception as error:  # noqa: BLE001
+        except CommandError as error:
             raise HealthcheckError(f"remote health check failed: {error}") from error
     wait_for_health(settings.healthcheck_url, timeout_seconds=timeout_seconds)
 

@@ -30,7 +30,6 @@ def run_process(
         env=dict(env) if env is not None else None,
         capture_output=capture_output,
         text=True,
-        check=False,
     )
     if check and result.returncode != 0:
         raise CommandError(

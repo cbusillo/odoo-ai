@@ -56,8 +56,8 @@ and assembles the correct file order automatically.
   `ODOO_LOG_DIR` from that root (`filestore/`, `postgres/`, `logs/` subdirectories) before writing the merged `.env`
   that Compose and Pydantic consume. Stack env sources live in `docker/config/<stack>.env` (create them locally; they're
   git-ignored). If `ODOO_STATE_ROOT` is omitted (e.g., local dev), the CLI defaults to
-  `${HOME}/odoo-ai/${ODOO_PROJECT_NAME}/...`.
+  `~/odoo-ai/${ODOO_PROJECT_NAME}/...`.
 - Keep `ODOO_LOGFILE` pointed inside `/volumes/logs/` (e.g. `/volumes/logs/odoo.log`) so log rotation targets the
   bind-mounted directory.
 - Remote hosts are managed in Coolify; local stacks should keep state under
-  `${HOME}/odoo-ai/<stack>`.
+  `~/odoo-ai/<stack>`.

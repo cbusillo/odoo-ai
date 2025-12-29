@@ -1,7 +1,10 @@
 import hashlib
+import logging
 import os
 import unittest
 from collections.abc import Iterable
+
+_logger = logging.getLogger(__name__)
 
 
 def _enabled() -> bool:
@@ -72,9 +75,7 @@ def _main() -> None:
     _install_loader_patch(total, index, only_modules)
 
 
-# Activate on import
 try:
     _main()
-except Exception:
-    # Never break the interpreter due to slicer
-    pass
+except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+    _logger.debug("slicer: init failed (%s)", exc)

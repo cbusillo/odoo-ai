@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import json
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from .counts import count_js_tests, count_py_tests
 
-def discover_modules_with(patterns: list[str]) -> list[str]:
-    addons = Path("addons")
+_logger = logging.getLogger(__name__)
+
+
+def discover_modules_with(patterns: list[str], addons_root: Path | None = None) -> list[str]:
+    addons = addons_root or Path("addons")
     modules: list[str] = []
     if not addons.exists():
         return modules
@@ -29,28 +35,6 @@ def greedy_shards(items: list[str], n: int) -> list[list[str]]:
     return [s for s in shards if s]
 
 
-def _count_py_tests(paths: list[Path]) -> int:
-    total = 0
-    for p in paths:
-        try:
-            txt = p.read_text(errors="ignore")
-        except OSError:
-            continue
-        total += len(re.findall(r"^\s*def\s+test_", txt, flags=re.MULTILINE))
-    return total
-
-
-def _count_js_tests(paths: list[Path]) -> int:
-    total = 0
-    for p in paths:
-        try:
-            txt = p.read_text(errors="ignore")
-        except OSError:
-            continue
-        total += len(re.findall(r"\btest\s*\(", txt))
-    return total
-
-
 def compute_weights(modules: list[str], phase: str) -> dict[str, int]:
     """Estimate module weights by counting tests for the given phase.
 
@@ -63,16 +47,16 @@ def compute_weights(modules: list[str], phase: str) -> dict[str, int]:
             continue
         if phase == "unit":
             paths = list(root.glob("**/tests/unit/**/*.py"))
-            weights[name] = _count_py_tests(paths)
+            weights[name] = count_py_tests(paths)
         elif phase == "integration":
             paths = list(root.glob("**/tests/integration/**/*.py"))
-            weights[name] = _count_py_tests(paths)
+            weights[name] = count_py_tests(paths)
         elif phase == "tour":
             paths = list(root.glob("**/tests/tour/**/*.py"))
-            weights[name] = _count_py_tests(paths)
+            weights[name] = count_py_tests(paths)
         elif phase == "js":
             paths = list(root.glob("static/tests/**/*.test.js"))
-            weights[name] = _count_js_tests(paths)
+            weights[name] = count_js_tests(paths)
         else:
             weights[name] = 1
         # Ensure minimum weight 1 so an empty module still schedules
@@ -80,10 +64,9 @@ def compute_weights(modules: list[str], phase: str) -> dict[str, int]:
             weights[name] = 1
     # Blend in historical timing if available
     try:
-        import json
-
         cache = json.loads((Path("tmp/test-logs") / "weights.json").read_text())
-    except Exception:
+    except (OSError, json.JSONDecodeError) as exc:
+        _logger.debug("sharding: failed to load weight cache (%s)", exc)
         cache = {}
     ph_cache = cache.get(phase) or {}
     # Convert seconds to weight buckets (5s per bucket) to avoid dwarfing counts
@@ -189,7 +172,7 @@ def discover_test_classes(modules: list[str], phase: str) -> list[ClassItem]:
                 continue
             try:
                 txt = p.read_text(errors="ignore")
-            except Exception:
+            except OSError:
                 continue
             for cname, wt in _test_classes_in_file(txt):
                 out.append(ClassItem(module=mod, cls=cname, weight=wt))

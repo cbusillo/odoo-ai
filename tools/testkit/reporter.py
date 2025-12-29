@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 import xml.etree.ElementTree as ET
@@ -10,6 +11,8 @@ from typing import Any
 
 from .failures import parse_failures
 from .settings import SUMMARY_SCHEMA_VERSION
+
+_logger = logging.getLogger(__name__)
 
 
 def write_latest_json(session_dir: Path) -> None:
@@ -23,8 +26,8 @@ def update_latest_symlink(session_dir: Path) -> None:
     try:
         if latest.exists() or latest.is_symlink():
             latest.unlink()
-    except OSError:
-        pass
+    except OSError as exc:
+        _logger.debug("reporter: failed to unlink latest (%s)", exc)
     rel = os.path.relpath(session_dir, latest.parent)
     try:
         latest.symlink_to(rel)
@@ -47,7 +50,7 @@ def write_manifest(session_dir: Path) -> None:
                         "mtime": stat.st_mtime,
                     }
                 )
-            except OSError:
+            except (OSError, ValueError):
                 continue
     (session_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
 
@@ -114,14 +117,15 @@ def aggregate_phase(session_dir: Path, phase: str) -> dict | None:
     for sf in summaries:
         try:
             data = json.loads(sf.read_text())
-        except Exception:
+        except (OSError, json.JSONDecodeError) as exc:
+            _logger.debug("reporter: failed to read summary %s (%s)", sf, exc)
             continue
         c = (data.get("counters") or {}) if isinstance(data, dict) else {}
         for k in counters:
             try:
                 counters[k] += int(c.get(k, 0))
-            except Exception:
-                pass
+            except (ValueError, TypeError):
+                continue
         success = success and bool(data.get("success", False))
         # parse failures from corresponding log
         log = data.get("log_file")
@@ -152,14 +156,16 @@ def write_junit_for_phase(session_dir: Path, phase: str) -> Path | None:
         return None
     try:
         agg = json.loads(agg_path.read_text())
-    except Exception:
+    except (OSError, json.JSONDecodeError) as exc:
+        _logger.debug("reporter: failed to read aggregate %s (%s)", agg_path, exc)
         return None
     failures_path = phase_dir / "all.failures.json"
     failures: list[dict] = []
     try:
         data = json.loads(failures_path.read_text())
         failures = data.get("entries") or []
-    except Exception:
+    except (OSError, json.JSONDecodeError) as exc:
+        _logger.debug("reporter: failed to read failures %s (%s)", failures_path, exc)
         failures = []
 
     tests = int((agg.get("counters") or {}).get("tests_run", 0))
@@ -204,7 +210,8 @@ def write_junit_root(session_dir: Path) -> Path:
         try:
             tree = ET.parse(str(p))
             suite = tree.getroot()
-        except Exception:
+        except (OSError, ET.ParseError) as exc:
+            _logger.debug("reporter: failed to parse junit %s (%s)", p, exc)
             continue
         suites.append(suite)
         total_tests += int(suite.attrib.get("tests", 0))
@@ -228,7 +235,8 @@ def write_junit_root(session_dir: Path) -> Path:
 def write_junit_for_shard(summary_file: Path, log_file: Path) -> Path | None:
     try:
         data = json.loads(summary_file.read_text())
-    except Exception:
+    except (OSError, json.JSONDecodeError) as exc:
+        _logger.debug("reporter: failed to read shard summary %s (%s)", summary_file, exc)
         return None
     counters = data.get("counters") or {}
     tests = int(counters.get("tests_run", 0))
@@ -271,7 +279,8 @@ def update_weight_cache_from_session(session_dir: Path, cache_path: Path | None 
         cache_path = Path("tmp/test-logs/weights.json")
     try:
         cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
-    except Exception:
+    except (OSError, json.JSONDecodeError) as exc:
+        _logger.debug("reporter: failed to load weight cache (%s)", exc)
         cache = {}
 
     for phase in ("unit", "js", "integration", "tour"):
@@ -281,7 +290,7 @@ def update_weight_cache_from_session(session_dir: Path, cache_path: Path | None 
         for sf in phase_dir.glob("*.summary.json"):
             try:
                 data = json.loads(sf.read_text())
-            except Exception:
+            except (OSError, json.JSONDecodeError):
                 continue
             secs = float(data.get("elapsed_seconds") or 0.0)
             mods = data.get("modules") or []
@@ -299,8 +308,8 @@ def update_weight_cache_from_session(session_dir: Path, cache_path: Path | None 
     try:
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         cache_path.write_text(json.dumps(cache, indent=2))
-    except Exception:
-        pass
+    except OSError as exc:
+        _logger.debug("reporter: failed to write weight cache (%s)", exc)
 
 
 def prune_old_sessions(log_root: Path, keep: int) -> None:
@@ -319,5 +328,5 @@ def prune_old_sessions(log_root: Path, keep: int) -> None:
                 elif sub.is_dir():
                     sub.rmdir()
             p.rmdir()
-        except OSError:
-            pass
+        except OSError as exc:
+            _logger.debug("reporter: failed to prune session %s (%s)", p, exc)

@@ -198,8 +198,6 @@ odoo.*.conf
 /tmp/*
 !/tmp/README.md
 
-# Local stack artifacts
-/.odoo/
 
 /.claude/.compacted
 

@@ -8,7 +8,6 @@ from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 _logger = logging.getLogger(__name__)
 
 
@@ -366,7 +365,7 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
         compose_env_path.parent.mkdir(parents=True, exist_ok=True)
         merged_env_path = compose_env_path
     except OSError:
-        fallback_dir = repo_root / ".odoo" / "stack-env"
+        fallback_dir = Path.home() / "odoo-ai" / "stack-env"
         fallback_dir.mkdir(parents=True, exist_ok=True)
         merged_env_path = fallback_dir / f"{name}.env"
     compose_command = compute_compose_command(config)
@@ -403,7 +402,8 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
     _logger.info(
         "Env layering: %s -> merged at %s",
         " -> ".join(chain_pretty) if chain_pretty else "<none>",
-        str(merged_env_path.relative_to(repo_root)) if merged_env_path.is_relative_to(repo_root) else str(merged_env_path),
+        str(merged_env_path.relative_to(repo_root)) if merged_env_path.is_relative_to(repo_root) else str(
+            merged_env_path),
     )
     return StackSettings(
         name=name,

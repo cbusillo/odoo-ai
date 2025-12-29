@@ -10,6 +10,7 @@ import shlex
 import shutil
 import subprocess
 import textwrap
+from contextlib import suppress
 from dataclasses import dataclass
 from enum import Enum, IntEnum
 from pathlib import Path
@@ -207,6 +208,17 @@ def _blank_to_none(value: object) -> object:
     return value
 
 
+def _normalize_path(value: object) -> Path | None:
+    value = _blank_to_none(value)
+    if value is None:
+        return None
+    raw = str(value).strip()
+    if raw.startswith(("'", '"')) and raw.endswith(("'", '"')) and len(raw) >= 2:
+        raw = raw[1:-1]
+    expanded = os.path.expanduser(os.path.expandvars(raw))
+    return Path(expanded)
+
+
 class LocalServerSettings(BaseSettings):
     # noinspection Pydantic
     model_config = SettingsConfigDict(case_sensitive=False)
@@ -249,25 +261,12 @@ class LocalServerSettings(BaseSettings):
     @field_validator("restore_ssh_dir", "restore_ssh_key", mode="before")
     @classmethod
     def _normalize_restore_paths(cls, value: object) -> object:
-        value = _blank_to_none(value)
-        if value is None:
-            return None
-        raw = str(value).strip()
-        if raw.startswith(("'", '"')) and raw.endswith(("'", '"')) and len(raw) >= 2:
-            raw = raw[1:-1]
-        expanded = os.path.expanduser(os.path.expandvars(raw))
-        return Path(expanded)
+        return _normalize_path(value)
 
     @field_validator("filestore_path", mode="before")
     @classmethod
     def _normalize_filestore_path(cls, value: object) -> object:
-        if value is None:
-            return value
-        raw = str(value).strip()
-        if raw.startswith(("'", '"')) and raw.endswith(("'", '"')) and len(raw) >= 2:
-            raw = raw[1:-1]
-        expanded = os.path.expanduser(os.path.expandvars(raw))
-        return Path(expanded)
+        return _normalize_path(value)
 
     @field_validator("admin_password", mode="before")
     @classmethod
@@ -482,10 +481,8 @@ class OdooUpstreamRestorer:
 
     def _reset_db_connection(self) -> None:
         if self.local.db_conn:
-            try:
+            with suppress(psycopg2.Error):
                 self.local.db_conn.close()
-            except Exception:
-                pass
             self.local.db_conn = None
 
     def database_exists(self) -> bool:
@@ -893,7 +890,7 @@ with registry.cursor() as cr:
     }
 
     for user_data in payload["users"]:
-        partner_vals = dict(partner_defaults, name=user_data["name"], company_id=company.id)
+        partner_vals = {**partner_defaults, "name": user_data["name"], "company_id": company.id}
         partner = env["res.partner"].sudo().search([
             ("name", "=", user_data["name"]),
             ("company_id", "=", company.id),
@@ -903,7 +900,6 @@ with registry.cursor() as cr:
         else:
             partner = env["res.partner"].sudo().create(partner_vals)
 
-        group_ids: list[int]
         group_ids: list[int] = []
 
         def add_group(group_id: int) -> None:
@@ -934,9 +930,9 @@ with registry.cursor() as cr:
             except ValueError as exc:
                 raise ValueError(f"Unable to locate group xmlid '{xmlid}' for GPT user provisioning.") from exc
 
-        ctx = dict(env.context, no_reset_password=True)
+        ctx = {**env.context, "no_reset_password": True}
         user_model = env["res.users"].with_context(ctx).sudo()
-        user = user_model.search([("login", "=", user_data["login"] )], limit=1)
+        user = user_model.search([("login", "=", user_data["login"])], limit=1)
 
         common_vals = {
             "name": user_data["name"],
@@ -953,7 +949,7 @@ with registry.cursor() as cr:
             user.write(common_vals)
             action = "updated"
         else:
-            create_vals = dict(common_vals, login=user_data["login"])
+            create_vals = {**common_vals, "login": user_data["login"]}
             user = user_model.create(create_vals)
             action = "created"
 

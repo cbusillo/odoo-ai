@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="OPW Local Init" type="ShConfigurationType">
-    <option name="SCRIPT_TEXT" value="uv run up --stack opw-local --init" />
+  <configuration default="false" name="OPW Local Restore" type="ShConfigurationType">
+    <option name="SCRIPT_TEXT" value="uv run stack up --stack opw-local --restore" />
     <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
     <option name="SCRIPT_PATH" value="" />
     <option name="SCRIPT_OPTIONS" value="" />

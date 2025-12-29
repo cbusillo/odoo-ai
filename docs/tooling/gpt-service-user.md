@@ -32,11 +32,11 @@ with `admin-` to ensure a unique key index.
 
 - Provisioning is skipped if `ODOO_KEY` is blank or unset.
 - To rotate credentials, update `ODOO_KEY` and rerun
-  `uv run up --stack <stack> --restore`. The script regenerates both passwords
+  `uv run stack up --stack <stack> --restore`. The script regenerates both passwords
   and API keys.
 - Remove access by clearing `ODOO_KEY` and running the restore task again or
   deleting the users/keys in Odoo Settings.
 
 ## Related Commands
 
-- `uv run up --stack <stack> --restore`
+- `uv run stack up --stack <stack> --restore`

@@ -17,13 +17,13 @@ Odoo-specific
   `docker restart ${ODOO_PROJECT_NAME}-web-1 ${ODOO_PROJECT_NAME}-script-runner-1`
 - Update module:
   `docker exec ${ODOO_PROJECT_NAME}-script-runner-1 /odoo/odoo-bin -u <module> --stop-after-init`
-- Restore data: `uv run up --stack <stack-name> --restore`
+- Restore data: `uv run stack up --stack <stack-name> --restore`
   - Available stacks: `opw-local`, `cm-local`, `opw-dev`, `opw-testing`,
     `cm-dev`, `cm-testing`
   - Ensure the stack mounts an SSH directory (`RESTORE_SSH_DIR`) so the
     container can reach the upstream host
   - When an upstream dump is unavailable, bootstrap with
-    `uv run up --stack <stack-name> --init`
+    `uv run stack up --stack <stack-name> --init`
 
 Tips
 
@@ -51,7 +51,7 @@ of truth is `docker/config/README.md`.
 you need port bindings or live code mounts; see
 `docs/workflows/multi-project.md` for an example.
 
-The `uv run up --stack <name>` command reads `DEPLOY_COMPOSE_FILES` and
+The `uv run stack up --stack <name>` command reads `DEPLOY_COMPOSE_FILES` and
 assembles the correct file order automatically.
 
 ## Bind-Mount Conventions

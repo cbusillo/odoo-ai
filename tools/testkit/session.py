@@ -15,6 +15,7 @@ from .reporter import (
     begin_session_dir,
     prune_old_sessions,
     update_latest_symlink,
+    write_junit_for_phase,
     write_digest,
     write_latest_json,
     write_manifest,
@@ -198,18 +199,6 @@ class TestSession:
         write_digest(self.session_dir, aggregate)
         write_session_index(self.session_dir, aggregate)
         update_latest_symlink(self.session_dir)
-        # JUnit CI artifacts and weight cache update
-        try:
-            for ph in ("unit", "js", "integration", "tour"):
-                write_junit_for_phase(self.session_dir, ph)
-            from .reporter import write_junit_root as _root
-
-            _root(self.session_dir)
-            from .reporter import update_weight_cache_from_session as _uw
-
-            _uw(self.session_dir)
-        except Exception:
-            pass
         # JUnit CI artifacts and weight cache update
         try:
             for ph in ("unit", "js", "integration", "tour"):

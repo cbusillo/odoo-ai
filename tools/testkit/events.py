@@ -13,7 +13,7 @@ class EventStream:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         # Touch file
         try:
-            self.path.touch(exist_ok=True)
+            self.path.touch()
         except Exception:
             pass
 

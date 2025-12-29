@@ -291,13 +291,15 @@ class OdooExecutor:
                 except Exception:
                     pass
                 process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+                assert process.stdout is not None
+                stdout = process.stdout
 
                 last_out = time.time()
                 recent: list[str] = []
                 seen: dict[str, int] = {}
                 stall_threshold = 60
 
-                for raw in iter(process.stdout.readline, ""):
+                for raw in iter(stdout.readline, ""):
                     line = raw.rstrip("\n")
                     lf.write(line + "\n")
                     last_out = time.time()

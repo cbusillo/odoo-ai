@@ -20,7 +20,7 @@ import psycopg2
 from passlib.context import CryptContext
 from psycopg2 import sql
 from psycopg2.extensions import connection
-from pydantic import Field, SecretStr, ValidationError, field_validator
+from pydantic import Field, SecretStr, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 logging.basicConfig(level=logging.INFO)
@@ -237,7 +237,8 @@ class LocalServerSettings(BaseSettings):
     disable_cron: bool = Field(True, alias="SANITIZE_DISABLE_CRON")
     project_name: str = Field("odoo", alias="ODOO_PROJECT_NAME")
     addons_path: str | None = Field(None, alias="ODOO_ADDONS_PATH")
-    update_modules: str | None = Field(None, alias="ODOO_UPDATE")
+    update_modules: str | None = Field(None, alias="ODOO_UPDATE_MODULES")
+    update_modules_legacy: str | None = Field(None, alias="ODOO_UPDATE")
     local_addons_dirs: str | None = Field(None, alias="LOCAL_ADDONS_DIRS")
     auto_modules_raw: str | None = Field(None, alias="ODOO_AUTO_MODULES")
     odoo_key: SecretStr | None = Field(None, alias="ODOO_KEY")
@@ -250,6 +251,7 @@ class LocalServerSettings(BaseSettings):
         "base_url",
         "addons_path",
         "update_modules",
+        "update_modules_legacy",
         "local_addons_dirs",
         "auto_modules_raw",
         mode="before",
@@ -257,6 +259,12 @@ class LocalServerSettings(BaseSettings):
     @classmethod
     def _optional_str(cls, value: object) -> object:
         return _blank_to_none(value)
+
+    @model_validator(mode="after")
+    def _merge_update_modules(self) -> "LocalServerSettings":
+        if not self.update_modules and self.update_modules_legacy:
+            self.update_modules = self.update_modules_legacy
+        return self
 
     @field_validator("restore_ssh_dir", "restore_ssh_key", mode="before")
     @classmethod
@@ -1173,25 +1181,25 @@ with registry.cursor() as cr:
             if project_defaults:
                 desired = project_defaults
                 _logger.info(
-                    "ODOO_UPDATE=%s; using project defaults: %s",
+                    "ODOO_UPDATE_MODULES=%s; using project defaults: %s",
                     mods_env.upper() if mods_env else "AUTO",
                     ", ".join(desired),
                 )
             else:
                 desired = self.compute_update_module_list()
                 if not desired:
-                    _logger.info("ODOO_UPDATE unset/AUTO and no modules detected; skipping addon update.")
+                    _logger.info("ODOO_UPDATE_MODULES unset/AUTO and no modules detected; skipping addon update.")
                     return
                 mode_label = mods_env.upper() if mods_env else "AUTO"
                 _logger.info(
-                    "ODOO_UPDATE=%s; auto-detected modules: %s",
+                    "ODOO_UPDATE_MODULES=%s; auto-detected modules: %s",
                     mode_label,
                     ", ".join(desired),
                 )
         else:
             desired = [m.strip() for m in mods_env.split(",") if m.strip()]
             if not desired:
-                _logger.info("ODOO_UPDATE is empty after parsing; skipping.")
+                _logger.info("ODOO_UPDATE_MODULES is empty after parsing; skipping.")
                 return
 
         addons_env = (self.local.addons_path or "").strip()
@@ -1228,10 +1236,12 @@ with registry.cursor() as cr:
                 missing_fs.append(name)
 
         if missing_fs:
-            _logger.warning(f"Modules listed in ODOO_UPDATE not found on disk and will be skipped: {', '.join(missing_fs)}")
+            _logger.warning(
+                f"Modules listed in ODOO_UPDATE_MODULES not found on disk and will be skipped: {', '.join(missing_fs)}"
+            )
 
         if not found:
-            _logger.info("No valid modules from ODOO_UPDATE found on disk; skipping.")
+            _logger.info("No valid modules from ODOO_UPDATE_MODULES found on disk; skipping.")
             return
 
         self.connect_to_db()

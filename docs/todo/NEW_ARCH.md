@@ -43,7 +43,7 @@ title: Stack Migration & Addon Modularization (Living Doc)
 ## Deploy & restore
 
 - Local deploy: `uv run up --stack <stack>`
-- Local restore: `uv run restore <stack>`
+- Local restore: `uv run up --stack <stack> --restore`
 - Remote deploys: Coolify UI (source = repo `docker-compose.yml` + env vars)
 - Local port bindings + live mounts: `docker-compose.override.yml` (local-only)
 

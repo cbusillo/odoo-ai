@@ -2,7 +2,7 @@ ARG ODOO_VERSION=18.0
 
 FROM postgres:17-bullseye AS pg17
 
-FROM alpine/git AS enterprise
+FROM alpine/git AS addon_sources
 ARG ODOO_ENTERPRISE_REPOSITORY
 ARG ODOO_ADDON_REPOSITORIES
 ARG GITHUB_TOKEN
@@ -55,11 +55,12 @@ site_packages = Path(site.getsitepackages()[0])
 (site_packages / "odoostubs.pth").write_text("/opt/odoo-stubs\n")
 PY
 
-COPY --from=enterprise /enterprise /volumes/enterprise
+COPY --from=addon_sources /enterprise /volumes/enterprise
 COPY /docker/config /volumes/config
 COPY /docker/scripts /volumes/scripts
 COPY /addons /volumes/addons
-COPY --from=enterprise /addons /volumes/addons
+COPY --from=addon_sources /addons /volumes/addons
+COPY --from=addon_sources /addons-external /volumes/addons-external
 COPY /pyproject.toml /volumes/pyproject.toml
 COPY /uv.lock /volumes/uv.lock
 

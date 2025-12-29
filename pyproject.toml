@@ -58,3 +58,10 @@ ignore = [
     "ARG002", # Unused method argument - PyCharm handles this better with context awareness
     "ANN201", # Missing type annotation for function - PyCharm handles this better with context awareness
 ]
+
+[tool.mypy]
+python_version = "3.13"
+
+[[tool.mypy.overrides]]
+module = ["pydantic", "pydantic_settings"]
+ignore_missing_imports = true

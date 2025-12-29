@@ -64,7 +64,7 @@
                                     <footer>
                                         <button name="action_open_rename_wizard" type="object" string="Rename Key"
                                                 class="btn-secondary"
-                                                attrs="{'invisible': ['|', ('id', '=', False), ('code', '=', False)]}"/>
+                                                invisible="not id or not code"/>
                                     </footer>
                                 </form>
                             </field>

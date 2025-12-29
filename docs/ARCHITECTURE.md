@@ -10,8 +10,8 @@ Coolify-managed environments.
 
 | Environment     | Location         | Deployment                            |
 |-----------------|------------------|---------------------------------------|
-| OPW local       | developer laptop | `uv run stack up --stack opw-local`   |
-| CM local        | developer laptop | `uv run stack up --stack cm-local`    |
+| OPW local       | developer laptop | `uv run up --stack opw-local`         |
+| CM local        | developer laptop | `uv run up --stack cm-local`          |
 | OPW dev/testing | Coolify + Docker | Coolify UI                            |
 | CM dev/testing  | Coolify + Docker | Coolify UI                            |
 
@@ -29,7 +29,7 @@ Coolify-managed environments.
 
 ## Local deploy/restore
 
-- Deploy: `uv run stack up --stack <stack>`
+- Deploy: `uv run up --stack <stack>`
 - Restore: `uv run restore <stack>`
 
 ## Application layers

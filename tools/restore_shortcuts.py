@@ -1,6 +1,6 @@
 import click
 
-from tools.docker_runner import restore_stack
+from tools.stack_restore import restore_stack
 
 
 def _print_usage() -> None:

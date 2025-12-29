@@ -52,7 +52,7 @@ of truth is `docker/config/README.md`.
 you need port bindings or live code mounts; see
 `docs/workflows/multi-project.md` for an example.
 
-The `uv run stack up --stack <name>` command reads `DEPLOY_COMPOSE_FILES` and
+The `uv run up --stack <name>` command reads `DEPLOY_COMPOSE_FILES` and
 assembles the correct file order automatically.
 
 ## Bind-Mount Conventions

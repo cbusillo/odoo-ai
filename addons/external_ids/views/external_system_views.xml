@@ -63,8 +63,7 @@
                                     </group>
                                     <footer>
                                         <button name="action_open_rename_wizard" type="object" string="Rename Key"
-                                                class="btn-secondary"
-                                                invisible="not id or not code"/>
+                                                class="btn-secondary" invisible="not id or not code"/>
                                     </footer>
                                 </form>
                             </field>

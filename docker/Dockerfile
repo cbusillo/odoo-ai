@@ -101,10 +101,10 @@ RUN /volumes/scripts/install_dev_requirements.sh
 
 # Apply development patches for --dev mode issues
 COPY patches/fix_dev_mode_validation.patch /tmp/
-RUN cd / && \
-    patch -p0 < /tmp/fix_dev_mode_validation.patch && \
-    rm /tmp/fix_dev_mode_validation.patch && \
-    echo "✓ Applied --dev mode validation fix"
+WORKDIR /
+RUN patch -p0 < /tmp/fix_dev_mode_validation.patch \
+    && rm /tmp/fix_dev_mode_validation.patch \
+    && echo "✓ Applied --dev mode validation fix"
 
 # Common final steps
 ENV HOOK_SETUP_FILE=/volumes/scripts/hook_setup
@@ -113,5 +113,4 @@ RUN if [ -f "$HOOK_SETUP_FILE" ]; then cp "$HOOK_SETUP_FILE" /; else echo "hook_
 RUN ln -sf /etc/ssl/certs/ca-certificates.crt /usr/lib/ssl/cert.pem
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
-WORKDIR /
 USER ubuntu

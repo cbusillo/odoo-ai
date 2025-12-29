@@ -91,14 +91,14 @@ volumes:
     driver: local
     driver_opts:
       <<: *bind-opts
-      device: ${ODOO_STATE_ROOT}
+      device: ${ODOO_DATA_HOST_DIR}
   odoo_logs:
     driver: local
     driver_opts:
       <<: *bind-opts
-      device: ${ODOO_STATE_ROOT}/logs
+      device: ${ODOO_LOG_HOST_DIR}
   odoo_db:
     driver: local
     driver_opts:
       <<: *bind-opts
-      device: ${ODOO_STATE_ROOT}/postgres
+      device: ${ODOO_DB_HOST_DIR}

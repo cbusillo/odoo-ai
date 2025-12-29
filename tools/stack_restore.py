@@ -62,6 +62,9 @@ def _current_image_reference(settings: StackSettings) -> str:
 
 
 def _settings_for_restore(settings: StackSettings) -> StackSettings:
+    restore_dir = (settings.environment.get("RESTORE_SSH_DIR") or "").strip()
+    if not restore_dir:
+        return settings
     overlay = settings.repo_root / RESTORE_SSH_OVERLAY
     if overlay in settings.compose_files:
         return settings

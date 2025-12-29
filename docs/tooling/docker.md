@@ -35,7 +35,7 @@ Tips
 
 - `DEPLOY_COMPOSE_FILES` accepts colon- or comma-delimited values. Example:
   `DEPLOY_COMPOSE_FILES=docker/config/base.yaml:docker/config/opw.yaml`.
-- `ODOO_UPDATE=AUTO` discovers modules under `LOCAL_ADDONS_DIRS` or
+- `ODOO_UPDATE_MODULES=AUTO` discovers modules under `LOCAL_ADDONS_DIRS` or
   `ODOO_ADDONS_PATH`; set `LOCAL_ADDONS_DIRS=/volumes/addons/opw:/volumes/enterprise`
   (colon/comma delimited) to control the search.
 - `ODOO_ADDON_REPOSITORIES` accepts a comma-separated list of addon repos

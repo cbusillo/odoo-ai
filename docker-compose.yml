@@ -29,7 +29,6 @@ x-odoo-env: &odoo-env
   ODOO_DB_HOST: database
   ODOO_DB_PORT: "5432"
   ODOO_ADDONS_PATH: ${ODOO_ADDONS_PATH:-/opt/project/addons,/odoo/addons,/volumes/enterprise}
-  ODOO_UPDATE: ${ODOO_UPDATE:-AUTO}
 
 x-healthcheck-defaults: &healthcheck-defaults
   interval: 30s

@@ -49,7 +49,6 @@ class UnitPhase:
             db_name=f"{TestSettings().db_name}_test_unit",
             modules_to_install=self.modules,
             timeout=self.timeout,
-            use_module_prefix=False,
         ).returncode
         return PhaseOutcome("unit", rc, session_dir / "unit", None)
 
@@ -84,7 +83,6 @@ class IntegrationPhase:
             modules_to_install=self.modules,
             timeout=self.timeout,
             use_production_clone=True,
-            use_module_prefix=False,
         ).returncode
         return PhaseOutcome("integration", rc, session_dir / "integration", None)
 
@@ -103,6 +101,5 @@ class TourPhase:
             timeout=self.timeout,
             use_production_clone=True,
             is_tour_test=True,
-            use_module_prefix=False,
         ).returncode
         return PhaseOutcome("tour", rc, session_dir / "tour", None)

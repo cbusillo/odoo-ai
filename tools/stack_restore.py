@@ -9,9 +9,10 @@ from collections.abc import Sequence
 
 from tools.deployer.cli import get_git_commit, get_git_remote_url
 from tools.deployer.command import CommandError, run_process
-from tools.deployer.compose_ops import local_compose_command, remote_compose_command
+from tools.deployer.compose_ops import local_compose_command, local_compose_env, remote_compose_command
 from tools.deployer.deploy import (
     build_updated_environment,
+    ensure_local_bind_mounts,
     prepare_remote_stack,
     push_env_to_remote,
     write_env_file,
@@ -43,7 +44,7 @@ def _handle_restore_exit(error: CommandError) -> None:
 
 def _run_local_compose(settings: StackSettings, extra: Sequence[str], *, check: bool = True) -> None:
     command = local_compose_command(settings, extra)
-    run_process(command, cwd=settings.repo_root, check=check)
+    run_process(command, cwd=settings.repo_root, check=check, env=local_compose_env(settings))
 
 
 def _run_remote_compose(settings: StackSettings, extra: Sequence[str]) -> None:
@@ -159,6 +160,7 @@ def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize:
             _handle_restore_exit(error)
         _run_remote_compose(settings, ["up", "-d", "--remove-orphans", "web"])
     else:
+        ensure_local_bind_mounts(settings)
         write_env_file(settings.env_file, env_values)
 
         if "database" in settings.services:
@@ -188,6 +190,7 @@ def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize:
             run_process(
                 local_compose_command(settings, exec_extra),
                 cwd=settings.repo_root,
+                env=local_compose_env(settings),
             )
         except CommandError as error:
             _handle_restore_exit(error)

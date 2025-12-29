@@ -5,11 +5,13 @@ import os
 import sys
 from pathlib import Path
 from shutil import disk_usage
+from typing import cast
 
 import click
 
 from .db import db_capacity
-from .session import TestSession
+from .phases import PhaseOutcome
+from .session import PhaseName, TestSession
 from .settings import TestSettings
 from .sharding import plan_shards_for_phase
 
@@ -22,9 +24,8 @@ def _emit_bottomline(latest: Path, as_json: bool) -> int:
         else:
             click.echo("no_summary")
         return 2
-    try:
-        data = json.loads(p.read_text())
-    except Exception:
+    data = _read_json_file(p)
+    if data is None:
         if as_json:
             print(json.dumps({"status": "invalid"}))
         else:
@@ -67,6 +68,33 @@ def _parse_multi(values: tuple[str, ...]) -> list[str]:
     return items
 
 
+_PHASES: tuple[PhaseName, ...] = ("unit", "js", "integration", "tour")
+
+
+def _read_json_file(path: Path) -> dict | None:
+    try:
+        return json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError, ValueError):
+        return None
+
+
+def _phase_outcomes(focus_phase: PhaseName, outcome: PhaseOutcome) -> dict[str, PhaseOutcome]:
+    placeholders = {name: PhaseOutcome(name, None, None, None) for name in _PHASES}
+    placeholders[focus_phase] = outcome
+    return placeholders
+
+
+def _run_phase_and_exit(ts: TestSession, phase: PhaseName, timeout: int, json_out: bool) -> None:
+    ts.start()
+    modules = ts.discover_modules(phase)
+    outcome = ts.run_phase(phase, modules, timeout)
+    outcomes = _phase_outcomes(phase, outcome)
+    rc = ts.finish(outcomes)
+    if json_out:
+        _emit_bottomline(Path("tmp/test-logs/latest"), True)
+    sys.exit(rc)
+
+
 @test.command("run")
 @click.option("--json", "json_out", is_flag=True, help="Print bottom-line JSON at end")
 @click.option("--unit-shards", type=int, default=None, help="Override UNIT_SHARDS")
@@ -84,13 +112,13 @@ def _parse_multi(values: tuple[str, ...]) -> list[str]:
 @click.option("--integration-exclude", multiple=True, help="Integration phase: exclude these modules")
 @click.option("--tour-modules", multiple=True, help="Tour phase: only include these modules")
 @click.option("--tour-exclude", multiple=True, help="Tour phase: exclude these modules")
-@click.option("--skip-filestore-integration", is_flag=True, default=False, help="Skip filestore snapshot in integration phase")
-@click.option("--skip-filestore-tour", is_flag=True, default=False, help="Skip filestore snapshot in tour phase")
-@click.option("--detached", is_flag=True, default=False, help="Run in background and return immediately")
+@click.option("--skip-filestore-integration", is_flag=True, help="Skip filestore snapshot in integration phase")
+@click.option("--skip-filestore-tour", is_flag=True, help="Skip filestore snapshot in tour phase")
+@click.option("--detached", is_flag=True, help="Run in background and return immediately")
 @click.option("--unit-within-shards", type=int, default=None, help="Split unit by class across N shards")
 @click.option("--integration-within-shards", type=int, default=None, help="Split integration by class across N shards")
 @click.option("--tour-within-shards", type=int, default=None, help="Split tour by class across N shards")
-@click.option("--overlap", is_flag=True, default=False, help="Run phases in parallel (unit+js, integration+tour)")
+@click.option("--overlap", is_flag=True, help="Run phases in parallel (unit+js, integration+tour)")
 def run_all(
     json_out: bool,
     unit_shards: int | None,
@@ -193,13 +221,11 @@ def run_all(
                     session = cur.name
                 break
             if cur_json.exists():
-                try:
-                    data = json.loads(cur_json.read_text())
+                data = _read_json_file(cur_json)
+                if data:
                     session = Path(data.get("current", "")).name or None
                     if session:
                         break
-                except Exception:
-                    pass
             _t.sleep(0.1)
         payload = {"status": "running", "session": session}
         print(json.dumps(payload))
@@ -249,20 +275,7 @@ def run_unit(
         unit_modules=_parse_multi(unit_modules) or None,
         unit_exclude=_parse_multi(unit_exclude) or None,
     )
-    ts._begin()
-    out_unit = ts._run_unit_sharded(ts._discover_unit_modules(), 600)
-    from .phases import PhaseOutcome
-
-    outcomes = {
-        "unit": out_unit,
-        "js": PhaseOutcome("js", None, None, None),
-        "integration": PhaseOutcome("integration", None, None, None),
-        "tour": PhaseOutcome("tour", None, None, None),
-    }
-    rc = ts._finish(outcomes)
-    if json_out:
-        _emit_bottomline(Path("tmp/test-logs/latest"), True)
-    sys.exit(rc)
+    _run_phase_and_exit(ts, "unit", 600, json_out)
 
 
 @test.command("js")
@@ -272,7 +285,7 @@ def run_unit(
 @click.option("--exclude", "exclude", multiple=True, help="Exclude these modules")
 @click.option("--js-modules", multiple=True, help="JS phase: only include these modules")
 @click.option("--js-exclude", multiple=True, help="JS phase: exclude these modules")
-@click.option("--detached", is_flag=True, default=False, help="Run in background and return immediately")
+@click.option("--detached", is_flag=True, help="Run in background and return immediately")
 def run_js(
     json_out: bool,
     shards: int | None,
@@ -314,20 +327,7 @@ def run_js(
         js_modules=_parse_multi(js_modules) or None,
         js_exclude=_parse_multi(js_exclude) or None,
     )
-    ts._begin()
-    out_js = ts._run_js_sharded(ts._discover_js_modules(), 1200)
-    from .phases import PhaseOutcome
-
-    outcomes = {
-        "unit": PhaseOutcome("unit", None, None, None),
-        "js": out_js,
-        "integration": PhaseOutcome("integration", None, None, None),
-        "tour": PhaseOutcome("tour", None, None, None),
-    }
-    rc = ts._finish(outcomes)
-    if json_out:
-        _emit_bottomline(Path("tmp/test-logs/latest"), True)
-    sys.exit(rc)
+    _run_phase_and_exit(ts, "js", 1200, json_out)
 
 
 @test.command("integration")
@@ -337,7 +337,7 @@ def run_js(
 @click.option("--exclude", "exclude", multiple=True, help="Exclude these modules")
 @click.option("--integration-modules", multiple=True, help="Integration phase: only include these modules")
 @click.option("--integration-exclude", multiple=True, help="Integration phase: exclude these modules")
-@click.option("--skip-filestore", is_flag=True, default=False, help="Skip filestore snapshot for integration")
+@click.option("--skip-filestore", is_flag=True, help="Skip filestore snapshot for integration")
 def run_integration(
     json_out: bool,
     shards: int | None,
@@ -360,20 +360,7 @@ def run_integration(
         integration_modules=_parse_multi(integration_modules) or None,
         integration_exclude=_parse_multi(integration_exclude) or None,
     )
-    ts._begin()
-    out_int = ts._run_integration_sharded(ts._discover_integration_modules(), 900)
-    from .phases import PhaseOutcome
-
-    outcomes = {
-        "unit": PhaseOutcome("unit", None, None, None),
-        "js": PhaseOutcome("js", None, None, None),
-        "integration": out_int,
-        "tour": PhaseOutcome("tour", None, None, None),
-    }
-    rc = ts._finish(outcomes)
-    if json_out:
-        _emit_bottomline(Path("tmp/test-logs/latest"), True)
-    sys.exit(rc)
+    _run_phase_and_exit(ts, "integration", 900, json_out)
 
 
 @test.command("tour")
@@ -383,8 +370,8 @@ def run_integration(
 @click.option("--exclude", "exclude", multiple=True, help="Exclude these modules")
 @click.option("--tour-modules", multiple=True, help="Tour phase: only include these modules")
 @click.option("--tour-exclude", multiple=True, help="Tour phase: exclude these modules")
-@click.option("--skip-filestore", is_flag=True, default=False, help="Skip filestore snapshot for tour")
-@click.option("--detached", is_flag=True, default=False, help="Run in background and return immediately")
+@click.option("--skip-filestore", is_flag=True, help="Skip filestore snapshot for tour")
+@click.option("--detached", is_flag=True, help="Run in background and return immediately")
 def run_tour(
     json_out: bool,
     shards: int | None,
@@ -428,20 +415,7 @@ def run_tour(
         tour_modules=_parse_multi(tour_modules) or None,
         tour_exclude=_parse_multi(tour_exclude) or None,
     )
-    ts._begin()
-    out_tour = ts._run_tour_sharded(ts._discover_tour_modules(), 1800)
-    from .phases import PhaseOutcome
-
-    outcomes = {
-        "unit": PhaseOutcome("unit", None, None, None),
-        "js": PhaseOutcome("js", None, None, None),
-        "integration": PhaseOutcome("integration", None, None, None),
-        "tour": out_tour,
-    }
-    rc = ts._finish(outcomes)
-    if json_out:
-        _emit_bottomline(Path("tmp/test-logs/latest"), True)
-    sys.exit(rc)
+    _run_phase_and_exit(ts, "tour", 1800, json_out)
 
 
 @test.command("plan")
@@ -505,18 +479,15 @@ def plan_cmd(
         tour_exclude=_parse_multi(tour_exclude) or None,
     )
 
-    def _phase_plan(name: str, shards: int | None) -> dict:
+    def _phase_plan(name: PhaseName, shards: int | None) -> dict:
+        mods = ts.discover_modules(name)
         if name == "unit":
-            mods = ts._discover_unit_modules()
             n = shards if shards is not None else ts.settings.unit_shards
         elif name == "js":
-            mods = ts._discover_js_modules()
             n = shards if shards is not None else ts.settings.js_shards
         elif name == "integration":
-            mods = ts._discover_integration_modules()
             n = shards if shards is not None else ts.settings.integration_shards
         else:
-            mods = ts._discover_tour_modules()
             n = shards if shards is not None else ts.settings.tour_shards
         # Resolve auto value if <=0 using session heuristics
         if not mods:
@@ -525,7 +496,7 @@ def plan_cmd(
             if (n or 0) <= 0:
                 try:
                     cpu = len(os.sched_getaffinity(0))  # type: ignore[attr-defined]
-                except Exception:
+                except (AttributeError, OSError):
                     cpu = os.cpu_count() or 4
                 default_auto = 4 if name == "unit" else 2
                 n_effective = max(1, min(cpu, default_auto, len(mods)))
@@ -540,7 +511,7 @@ def plan_cmd(
             "strategy": plan.strategy,
         }
 
-    phases = [phase] if phase != "all" else ["unit", "js", "integration", "tour"]
+    phases: list[PhaseName] = list(_PHASES) if phase == "all" else [cast(PhaseName, phase)]
     payload = {"schema": "plan.v1", "phases": {}}
     for ph in phases:
         payload["phases"][ph] = _phase_plan(
@@ -548,12 +519,16 @@ def plan_cmd(
             unit_shards if ph == "unit" else js_shards if ph == "js" else integration_shards if ph == "integration" else tour_shards,
         )
 
-    print(json.dumps(payload, indent=2))
+    output = json.dumps(payload, indent=2)
+    if json_out:
+        print(output)
+    else:
+        click.echo(output)
     sys.exit(0)
 
 
 @test.command("rerun-failures")
-@click.option("--json", "json_out", is_flag=True, default=False, help="Emit JSON output")
+@click.option("--json", "json_out", is_flag=True, help="Emit JSON output")
 def rerun_failures(json_out: bool) -> None:
     """Re-run only failing modules from the latest session.
 
@@ -569,9 +544,8 @@ def rerun_failures(json_out: bool) -> None:
         if not ph_dir.exists():
             continue
         for sf in ph_dir.glob("*.summary.json"):
-            try:
-                data = json.loads(sf.read_text())
-            except Exception:
+            data = _read_json_file(sf)
+            if data is None:
                 continue
             rc = int(data.get("returncode") or 0)
             if rc != 0:
@@ -620,7 +594,7 @@ def main() -> None:  # pragma: no cover
 
 @test.command("status")
 @click.option("--session", default=None, help="Specific session dir name (e.g., test-YYYYMMDD_HHMMSS)")
-@click.option("--json", "json_out", is_flag=True, default=False, help="Emit JSON output")
+@click.option("--json", "json_out", is_flag=True, help="Emit JSON output")
 def status_cmd(session: str | None, json_out: bool) -> None:
     base = Path("tmp/test-logs")
     if session:
@@ -636,9 +610,8 @@ def status_cmd(session: str | None, json_out: bool) -> None:
         out = {"status": "running"}
         print(json.dumps(out) if json_out else "running")
         sys.exit(2)
-    try:
-        data = json.loads(p.read_text())
-    except Exception:
+    data = _read_json_file(p)
+    if data is None:
         print(json.dumps({"status": "invalid"}) if json_out else "invalid")
         sys.exit(3)
     ok = bool(data.get("success"))
@@ -653,7 +626,7 @@ def status_cmd(session: str | None, json_out: bool) -> None:
 @click.option("--session", default=None, help="Specific session dir name")
 @click.option("--timeout", type=int, default=0, help="Max seconds to wait (0 = no limit)")
 @click.option("--interval", type=int, default=10, help="Poll interval seconds")
-@click.option("--json", "json_out", is_flag=True, default=False, help="Emit JSON output")
+@click.option("--json", "json_out", is_flag=True, help="Emit JSON output")
 def wait_cmd(session: str | None, timeout: int, interval: int, json_out: bool) -> None:
     import time as _t
 
@@ -667,11 +640,8 @@ def wait_cmd(session: str | None, timeout: int, interval: int, json_out: bool) -
     while True:
         p = latest / "summary.json"
         if p.exists():
-            try:
-                data = json.loads(p.read_text())
-                ok = bool(data.get("success"))
-            except Exception:
-                ok = False
+            data = _read_json_file(p)
+            ok = bool((data or {}).get("success"))
             if json_out:
                 print(json.dumps({"success": ok, "summary": str(p.resolve())}))
             else:
@@ -684,7 +654,7 @@ def wait_cmd(session: str | None, timeout: int, interval: int, json_out: bool) -
 
 
 @test.command("doctor")
-@click.option("--json", "json_out", is_flag=True, default=False, help="Emit JSON output")
+@click.option("--json", "json_out", is_flag=True, help="Emit JSON output")
 def doctor_cmd(json_out: bool) -> None:
     """Quick environment diagnostics for the runner (Docker, DB, disk, shards)."""
     # Docker services
@@ -695,8 +665,8 @@ def doctor_cmd(json_out: bool) -> None:
         res = subprocess.run(["docker", "compose", "ps", "--services"], capture_output=True, text=True)
         if res.returncode == 0:
             services = [s for s in res.stdout.strip().split("\n") if s]
-    except Exception:
-        pass
+    except OSError:
+        services = []
     svc_ok = {}
     for s in ("database", "script-runner"):
         ok = False
@@ -704,21 +674,21 @@ def doctor_cmd(json_out: bool) -> None:
             try:
                 r = subprocess.run(["docker", "compose", "exec", "-T", s, "true"], capture_output=True)
                 ok = r.returncode == 0
-            except Exception:
+            except OSError:
                 ok = False
         svc_ok[s] = ok
 
     # DB capacity
     try:
         max_conn, active = db_capacity()
-    except Exception:
+    except (OSError, RuntimeError, ValueError):
         max_conn, active = (0, 0)
 
     # Disk
     try:
         du = disk_usage(".")
         free_pct = round(du.free / du.total * 100, 1)
-    except Exception:
+    except OSError:
         free_pct = -1.0
 
     # CPU
@@ -730,7 +700,7 @@ def doctor_cmd(json_out: bool) -> None:
     allowed = 0
     try:
         allowed = max(1, (max_conn - active - int(st.conn_reserve)) // max(1, int(st.conn_per_shard)))
-    except Exception:
+    except (TypeError, ValueError, ZeroDivisionError):
         allowed = 0
 
     payload = {

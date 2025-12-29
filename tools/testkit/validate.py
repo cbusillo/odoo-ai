@@ -2,47 +2,25 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 from pathlib import Path
+
+from .counts import count_js_tests, count_py_tests
+from .sharding import discover_modules_with
 
 
 def _read_json(p: Path) -> dict | None:
     try:
         return json.loads(p.read_text())
-    except Exception:
+    except (OSError, json.JSONDecodeError, ValueError):
         return None
 
 
 def _source_counts(addons_root: Path) -> dict[str, int]:
-    def count_py(glob: str) -> int:
-        total = 0
-        for p in addons_root.glob(glob):
-            if not p.is_file():
-                continue
-            try:
-                txt = p.read_text(errors="ignore")
-            except Exception:
-                continue
-            total += len(re.findall(r"^\s*def\s+test_", txt, flags=re.MULTILINE))
-        return total
-
-    def count_js() -> int:
-        total = 0
-        for p in addons_root.rglob("*.test.js"):
-            if not p.is_file():
-                continue
-            try:
-                txt = p.read_text(errors="ignore")
-            except Exception:
-                continue
-            total += len(re.findall(r"\btest\s*\(", txt))
-        return total
-
     return {
-        "unit": count_py("**/tests/unit/**/*.py"),
-        "integration": count_py("**/tests/integration/**/*.py"),
-        "tour": count_py("**/tests/tour/**/*.py"),
-        "js": count_js(),
+        "unit": count_py_tests(addons_root.glob("**/tests/unit/**/*.py")),
+        "integration": count_py_tests(addons_root.glob("**/tests/integration/**/*.py")),
+        "tour": count_py_tests(addons_root.glob("**/tests/tour/**/*.py")),
+        "js": count_js_tests(addons_root.rglob("*.test.js")),
     }
 
 
@@ -54,7 +32,7 @@ def _executed_counts(session_dir: Path) -> dict[str, int]:
         c = (results.get(ph) or {}).get("counters") or {}
         try:
             out[ph] = int(c.get("tests_run", 0))
-        except Exception:
+        except (ValueError, TypeError):
             out[ph] = 0
     return out
 
@@ -66,16 +44,7 @@ def _phase_modules(addons_root: Path, phase: str) -> list[str]:
         "tour": ["**/tests/tour/**/*.py"],
         "js": ["static/tests/**/*.test.js"],
     }
-    seen: set[str] = set()
-    for module_dir in addons_root.iterdir():
-        if not module_dir.is_dir() or not (module_dir / "__manifest__.py").exists():
-            continue
-        pats = patterns.get(phase, [])
-        for pat in pats:
-            if list(module_dir.glob(pat)):
-                seen.add(module_dir.name)
-                break
-    return sorted(seen)
+    return sorted(discover_modules_with(patterns.get(phase, []), addons_root))
 
 
 def _executed_modules(session_dir: Path, phase: str) -> list[str]:

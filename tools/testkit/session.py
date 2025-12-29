@@ -6,7 +6,7 @@ import os
 import re
 import time
 from collections.abc import Callable
-from typing import TypeVar
+from typing import Literal, TypeVar
 from pathlib import Path
 
 from .db import cleanup_test_databases, create_template_from_production, get_production_db_name
@@ -28,6 +28,7 @@ from .sharding import discover_modules_with, greedy_shards, plan_shards_for_phas
 
 _logger = logging.getLogger(__name__)
 _T = TypeVar("_T")
+PhaseName = Literal["unit", "js", "integration", "tour"]
 
 
 def _log_suppressed(action: str, exc: Exception) -> None:
@@ -82,6 +83,36 @@ class TestSession:
         }
         self._template_db: str | None = None
 
+    def start(self) -> None:
+        self._begin()
+
+    def finish(self, outcomes: dict[str, PhaseOutcome]) -> int:
+        return self._finish(outcomes)
+
+    def discover_modules(self, phase: PhaseName) -> list[str]:
+        try:
+            discover = {
+                "unit": self._discover_unit_modules,
+                "js": self._discover_js_modules,
+                "integration": self._discover_integration_modules,
+                "tour": self._discover_tour_modules,
+            }[phase]
+        except KeyError as exc:
+            raise ValueError(f"Unknown phase {phase}") from exc
+        return discover()
+
+    def run_phase(self, phase: PhaseName, modules: list[str], timeout: int) -> PhaseOutcome:
+        try:
+            runner = {
+                "unit": self._run_unit_sharded,
+                "js": self._run_js_sharded,
+                "integration": self._run_integration_sharded,
+                "tour": self._run_tour_sharded,
+            }[phase]
+        except KeyError as exc:
+            raise ValueError(f"Unknown phase {phase}") from exc
+        return runner(modules, timeout)
+
     def _begin(self) -> None:
         self.session_dir, self.session_name, self.session_started = begin_session_dir()
         os.environ["TEST_LOG_SESSION"] = self.session_name or ""
@@ -98,8 +129,8 @@ class TestSession:
             try:
                 if cur.exists() or cur.is_symlink():
                     cur.unlink()
-            except OSError:
-                pass
+            except OSError as exc:
+                _log_suppressed("unlink current", exc)
             rel = os.path.relpath(self.session_dir, cur.parent)
             try:
                 cur.symlink_to(rel)
@@ -107,8 +138,8 @@ class TestSession:
                 (cur.with_suffix(".json")).write_text(
                     json.dumps({"schema_version": SUMMARY_SCHEMA_VERSION, "current": str(self.session_dir)}, indent=2)
                 )
-        except OSError:
-            pass
+        except OSError as exc:
+            _log_suppressed("write current pointer", exc)
 
     def _emit_event(self, event: str, **payload: object) -> None:
         try:
@@ -186,8 +217,8 @@ class TestSession:
                 c = counters_raw if isinstance(counters_raw, dict) else {}
                 try:
                     total += int(c.get(key, 0))
-                except (TypeError, ValueError):
-                    pass
+                except (TypeError, ValueError) as exc:
+                    _log_suppressed("sum counter", exc)
             return total
 
         aggregate["counters_total"] = {
@@ -225,8 +256,8 @@ class TestSession:
             cj = cur.with_suffix(".json")
             if cj.exists():
                 cj.unlink()
-        except OSError:
-            pass
+        except OSError as exc:
+            _log_suppressed("clear current pointer", exc)
 
         if not any_fail:
             print("\n✅ All categories passed")

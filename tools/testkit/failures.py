@@ -22,20 +22,32 @@ def parse_failures(log_path: Path) -> list[dict]:
     hoot_lines: list[str] = []
     hoot_test: str | None = None
 
+    def _append_hoot_entry() -> None:
+        nonlocal hoot_lines, hoot_test, collecting_hoot
+        if not hoot_lines:
+            return
+        message = "\n".join(hoot_lines).strip()
+        entry = {"type": "js_fail", "test": hoot_test, "message": message}
+        entry["fingerprint"] = _hash_text(f"{hoot_test}\n{message}")
+        hoot_entries.append(entry)
+        hoot_lines = []
+        hoot_test = None
+        collecting_hoot = False
+
     with open(log_path, errors="ignore") as f:
         for raw in f:
             line = raw.rstrip("\n")
-            l = line.strip()
-            lw = l.lower()
+            stripped_line = line.strip()
+            lowered_line = stripped_line.lower()
             # Python traceback capture
-            if l.startswith("Traceback (most recent call last):"):
+            if stripped_line.startswith("Traceback (most recent call last):"):
                 collecting_tb = True
-                tb_lines = [l]
+                tb_lines = [stripped_line]
                 if cur is None:
                     cur = {"type": "error", "message": "", "test": None}
                 continue
             if collecting_tb:
-                if l == "" and tb_lines:
+                if not stripped_line and tb_lines:
                     cur = cur or {"type": "error", "message": "", "test": None}
                     tb = "\n".join(tb_lines)
                     cur["traceback"] = tb
@@ -45,36 +57,27 @@ def parse_failures(log_path: Path) -> list[dict]:
                     tb_lines = []
                     collecting_tb = False
                 else:
-                    tb_lines.append(l)
+                    tb_lines.append(stripped_line)
                 continue
 
             # HOOT per-test failure lines
-            m_hoot = re.search(r"\[HOOT] Test \"(?P<name>.+?)\" failed:", l)
+            m_hoot = re.search(r"\[HOOT] Test \"(?P<name>.+?)\" failed:", stripped_line)
             if m_hoot:
                 if collecting_hoot and hoot_lines:
-                    msg = "\n".join(hoot_lines).strip()
-                    ent = {"type": "js_fail", "test": hoot_test, "message": msg}
-                    ent["fingerprint"] = _hash_text(f"{hoot_test}\n{msg}")
-                    hoot_entries.append(ent)
+                    _append_hoot_entry()
                 collecting_hoot = True
-                hoot_lines = [l]
+                hoot_lines = [stripped_line]
                 hoot_test = m_hoot.group("name")
                 continue
             if collecting_hoot:
-                if re.match(r"^\d{4}-\d{2}-\d{2} ", l):
-                    msg = "\n".join(hoot_lines).strip()
-                    ent = {"type": "js_fail", "test": hoot_test, "message": msg}
-                    ent["fingerprint"] = _hash_text(f"{hoot_test}\n{msg}")
-                    hoot_entries.append(ent)
-                    collecting_hoot = False
-                    hoot_lines = []
-                    hoot_test = None
+                if re.match(r"^\d{4}-\d{2}-\d{2} ", stripped_line):
+                    _append_hoot_entry()
                 else:
-                    hoot_lines.append(l)
+                    hoot_lines.append(stripped_line)
 
             # Unittest-style headers (heuristic)
-            if lw.startswith(("fail:", "error:")):
-                parts = l.split(maxsplit=1)
+            if lowered_line.startswith(("fail:", "error:")):
+                parts = stripped_line.split(maxsplit=1)
                 typ = parts[0].rstrip(":").lower()
                 rest = parts[1] if len(parts) > 1 else ""
                 rest_l = rest.lower()
@@ -85,9 +88,6 @@ def parse_failures(log_path: Path) -> list[dict]:
 
     # Flush dangling blocks
     if collecting_hoot and hoot_lines:
-        msg = "\n".join(hoot_lines).strip()
-        ent = {"type": "js_fail", "test": hoot_test, "message": msg}
-        ent["fingerprint"] = _hash_text(f"{hoot_test}\n{msg}")
-        hoot_entries.append(ent)
+        _append_hoot_entry()
 
     return entries + hoot_entries

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import subprocess
@@ -21,6 +22,8 @@ from .docker_api import get_script_runner_service
 from .filestore import cleanup_single_test_filestore, filestore_exists, snapshot_filestore
 from .reporter import write_junit_for_shard
 from .settings import SUMMARY_SCHEMA_VERSION, TestSettings
+
+_logger = logging.getLogger(__name__)
 
 
 def _normalize(line: str) -> str:
@@ -144,11 +147,10 @@ class OdooExecutor:
                     snapshot_filestore(db_name, get_production_db_name())
                 kill_browsers_and_zombies()
         else:
-            # Scoped pre-test cleanup of DB and filestore to avoid cross-run interference
             try:
                 cleanup_single_test_filestore(db_name)
-            except Exception:
-                pass
+            except OSError as exc:
+                _logger.debug("executor: failed to cleanup filestore %s (%s)", db_name, exc)
             drop_and_create_test_database(db_name)
             if is_js_test or is_tour_test:
                 setup_test_authentication(db_name)
@@ -279,7 +281,6 @@ class OdooExecutor:
                 lf.write(f"Started: {datetime.now()}\n")
                 lf.write("=" * 80 + "\n\n")
                 lf.flush()
-                # Emit shard start event
                 try:
                     self._events.emit(
                         "shard_started",
@@ -288,8 +289,8 @@ class OdooExecutor:
                         db=db_name,
                         tags=test_tags_final,
                     )
-                except Exception:
-                    pass
+                except OSError as exc:
+                    _logger.debug("executor: failed to emit shard_started (%s)", exc)
                 process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
                 assert process.stdout is not None
                 stdout = process.stdout
@@ -324,7 +325,7 @@ class OdooExecutor:
                 process.wait()
                 rc = int(process.returncode or 0)
 
-        except Exception as e:  # pragma: no cover
+        except (OSError, subprocess.SubprocessError) as e:
             summary.update(
                 {
                     "end_time": time.time(),
@@ -334,6 +335,7 @@ class OdooExecutor:
                     "error": str(e),
                 }
             )
+            _logger.error("executor: test execution failed (%s)", e)
             with open(summary_file, "w") as f:
                 json.dump(summary, f, indent=2, default=str)
             return ExecResult(1, log_file, summary_file)
@@ -351,8 +353,8 @@ class OdooExecutor:
             json.dump(summary, f, indent=2, default=str)
         try:
             write_junit_for_shard(summary_file, log_file)
-        except Exception:
-            pass
+        except (OSError, ValueError) as exc:
+            _logger.debug("executor: failed to write junit (%s)", exc)
         try:
             self._events.emit(
                 "shard_finished",
@@ -362,6 +364,6 @@ class OdooExecutor:
                 rc=rc,
                 elapsed=elapsed,
             )
-        except Exception:
-            pass
+        except OSError as exc:
+            _logger.debug("executor: failed to emit shard_finished (%s)", exc)
         return ExecResult(rc, log_file, summary_file)

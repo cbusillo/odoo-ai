@@ -8,44 +8,9 @@ ARG ODOO_ADDON_REPOSITORIES
 ARG GITHUB_TOKEN
 ARG ODOO_VERSION
 SHELL ["/bin/sh", "-euxc"]
-RUN mkdir -p /enterprise /addons; \
-    if [ -n "${ODOO_ENTERPRISE_REPOSITORY}" ]; then \
-      if [ -z "${GITHUB_TOKEN}" ]; then \
-        echo "GITHUB_TOKEN missing; cannot clone enterprise"; \
-        exit 1; \
-      fi; \
-      echo "Cloning Enterprise Addons from ${ODOO_ENTERPRISE_REPOSITORY} branch ${ODOO_VERSION}"; \
-      git clone --branch "${ODOO_VERSION}" --single-branch --depth 1 \
-        "https://${GITHUB_TOKEN}@github.com/${ODOO_ENTERPRISE_REPOSITORY}" /enterprise; \
-      rm -rf /enterprise/.git; \
-    else \
-      echo "ODOO_ENTERPRISE_REPOSITORY is empty; skipping clone."; \
-    fi; \
-    if [ -n "${ODOO_ADDON_REPOSITORIES}" ]; then \
-      if [ -z "${GITHUB_TOKEN}" ]; then \
-        echo "GITHUB_TOKEN missing; cannot clone addons."; \
-        exit 1; \
-      fi; \
-      for raw in $(printf '%s' "${ODOO_ADDON_REPOSITORIES}" | tr ',' ' '); do \
-        repo="$(echo "$raw" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"; \
-        if [ -z "$repo" ]; then \
-          continue; \
-        fi; \
-        branch="main"; \
-        if echo "$repo" | grep -q '@'; then \
-          branch="${repo##*@}"; \
-          repo="${repo%@*}"; \
-        fi; \
-        name="${repo##*/}"; \
-        remote_url="https://${GITHUB_TOKEN}@github.com/${repo}"; \
-        echo "Cloning addon from ${repo} branch ${branch} into ${name}"; \
-        git clone --branch "$branch" --single-branch --depth 1 \
-          "$remote_url" "/addons/${name}"; \
-        rm -rf "/addons/${name}/.git"; \
-      done; \
-    else \
-      echo "ODOO_ADDON_REPOSITORIES is empty; skipping clone."; \
-    fi
+COPY /docker/scripts/fetch_addons.sh /usr/local/bin/fetch_addons.sh
+RUN chmod +x /usr/local/bin/fetch_addons.sh \
+    && /usr/local/bin/fetch_addons.sh
 
 FROM ghcr.io/adomi-io/odoo:${ODOO_VERSION} AS base
 ARG ODOO_VERSION

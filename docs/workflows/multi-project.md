@@ -25,13 +25,13 @@ Coolify and do not use the overlays in `docker/config/`.
 2. Start the stack (builds images by default):
 
    ```bash
-   uv run up --stack opw-local
+   uv run stack up --stack opw-local
    ```
 
 3. (Optional) Restore upstream data:
 
    ```bash
-   uv run up --stack opw-local --restore
+   uv run stack up --stack opw-local --restore
    ```
 
 ## Notes
@@ -60,5 +60,5 @@ Coolify and do not use the overlays in `docker/config/`.
   ```
 
 - Use unique `ODOO_STATE_ROOT` per stack to avoid sharing filestore/postgres.
-- Switch stacks by stopping one (`uv run down --stack cm-local`) before
+- Switch stacks by stopping one (`uv run stack down --stack cm-local`) before
   starting the other.

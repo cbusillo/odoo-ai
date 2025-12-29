@@ -29,8 +29,6 @@ test = "tools.testkit.cli:main"  # example: uv run test unit --json
 test-validate = "tools.testkit.validate:main"
 prod-gate = "tools.prod_gate:main"
 stack = "tools.stack_cli:main"
-up = "tools.stack_cli:up_command"
-down = "tools.stack_cli:down_command"
 
 [tool.uv]
 preview = true

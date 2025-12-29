@@ -5,7 +5,7 @@ from pathlib import Path
 import click
 
 from .command import run_process
-from .compose_ops import local_compose_command, remote_compose_command
+from .compose_ops import local_compose_command, local_compose_env, remote_compose_command
 from .deploy import deploy_stack, render_settings, show_status
 from .docker_ops import build_image, inspect_image_digest, pull_image, push_image
 from .health import HealthcheckError
@@ -96,8 +96,12 @@ def run_build(
     if no_cache:
         build_args.append("--no-cache")
 
-    services = [service for service in ("web", "script-runner") if service in settings.services]
-    build_args.extend(services)
+    services = [service for service in ("script-runner", "web") if service in settings.services]
+    if services:
+        # Avoid buildx export collisions when multiple services share the same image tag.
+        build_args.append(services[0])
+    else:
+        build_args.extend(settings.services)
 
     if remote:
         sync_repository(settings, repository_url, commit, remote)
@@ -105,7 +109,7 @@ def run_build(
         run_remote(settings.remote_host, settings.remote_user, settings.remote_port, command, settings.remote_stack_path)
     else:
         command = local_compose_command(settings, build_args)
-        run_process(command, cwd=settings.repo_root)
+        run_process(command, cwd=settings.repo_root, env=local_compose_env(settings))
 
 
 @click.group()

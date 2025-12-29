@@ -27,8 +27,6 @@ packages = ["tools"]
 [project.scripts]
 test = "tools.testkit.cli:main"  # example: uv run test unit --json
 test-validate = "tools.testkit.validate:main"
-deploy = "tools.deployer.cli:main"
-restore = "tools.restore_shortcuts:main"
 prod-gate = "tools.prod_gate:main"
 stack = "tools.stack_cli:main"
 up = "tools.stack_cli:up_command"

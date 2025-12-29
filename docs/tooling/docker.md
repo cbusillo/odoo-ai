@@ -17,14 +17,13 @@ Odoo-specific
   `docker restart ${ODOO_PROJECT_NAME}-web-1 ${ODOO_PROJECT_NAME}-script-runner-1`
 - Update module:
   `docker exec ${ODOO_PROJECT_NAME}-script-runner-1 /odoo/odoo-bin -u <module> --stop-after-init`
-- Restore data: `uv run restore <stack-name>`
+- Restore data: `uv run up --stack <stack-name> --restore`
   - Available stacks: `opw-local`, `cm-local`, `opw-dev`, `opw-testing`,
     `cm-dev`, `cm-testing`
   - Ensure the stack mounts an SSH directory (`RESTORE_SSH_DIR`) so the
     container can reach the upstream host
   - When an upstream dump is unavailable, bootstrap with
-    `uv run restore <stack-name> --init`
-- One-button shortcut: `uv run restore <stack> [--init]`.
+    `uv run up --stack <stack-name> --init`
 
 Tips
 

@@ -8,12 +8,12 @@ Coolify-managed environments.
 
 ## Runtime Topology
 
-| Environment     | Location         | Deployment                               |
-|-----------------|------------------|------------------------------------------|
-| OPW local       | developer laptop | `uv run deploy deploy --stack opw-local` |
-| CM local        | developer laptop | `uv run deploy deploy --stack cm-local`  |
-| OPW dev/testing | Coolify + Docker | Coolify UI                               |
-| CM dev/testing  | Coolify + Docker | Coolify UI                               |
+| Environment     | Location         | Deployment                            |
+|-----------------|------------------|---------------------------------------|
+| OPW local       | developer laptop | `uv run stack up --stack opw-local`   |
+| CM local        | developer laptop | `uv run stack up --stack cm-local`    |
+| OPW dev/testing | Coolify + Docker | Coolify UI                            |
+| CM dev/testing  | Coolify + Docker | Coolify UI                            |
 
 ## Key points
 
@@ -29,7 +29,7 @@ Coolify-managed environments.
 
 ## Local deploy/restore
 
-- Deploy: `uv run deploy deploy --stack <stack>`
+- Deploy: `uv run stack up --stack <stack>`
 - Restore: `uv run restore <stack>`
 
 ## Application layers

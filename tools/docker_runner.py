@@ -21,21 +21,11 @@ from tools.deployer.deploy import (
 from tools.deployer.remote import run_remote
 from tools.deployer.settings import StackSettings, load_stack_settings
 
-STACK_ENV_TMP_DIR = Path("tmp") / "stack-env"
-
-
 def _ensure_stack_env(settings: StackSettings, stack_name: str) -> Path:
     env_path = settings.env_file
     if env_path.exists():
         return env_path
-
-    stack_env_path = STACK_ENV_TMP_DIR / f"{stack_name}.env"
-    if stack_env_path.exists():
-        return stack_env_path
-
-    raise FileNotFoundError(
-        f"No environment file found for stack '{stack_name}'. Expected {env_path} or {stack_env_path}."
-    )
+    raise FileNotFoundError(f"No environment file found for stack '{stack_name}'. Expected {env_path}.")
 
 logging.basicConfig(level=logging.INFO)
 _logger = logging.getLogger(__name__)

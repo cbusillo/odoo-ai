@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-mkdir -p /enterprise /addons /addons-external
+mkdir -p /enterprise /addons /extra_addons
 
 if [ -n "${ODOO_ENTERPRISE_REPOSITORY:-}" ]; then
 	if [ -z "${GITHUB_TOKEN:-}" ]; then
@@ -35,7 +35,7 @@ if [ -n "${ODOO_ADDON_REPOSITORIES:-}" ]; then
 		esac
 		name="${repo##*/}"
 		remote_url="https://${GITHUB_TOKEN}@github.com/${repo}"
-		target_root="/addons-external"
+		target_root="/extra_addons"
 		echo "Cloning addon from ${repo} branch ${branch} into ${target_root}/${name}"
 		git clone --branch "$branch" --single-branch --depth 1 \
 			"$remote_url" "${target_root}/${name}"

@@ -1,4 +1,6 @@
+import http.client
 import time
+import urllib.error
 import urllib.request
 
 
@@ -15,7 +17,7 @@ def wait_for_health(url: str, timeout_seconds: int = 60, interval_seconds: float
                 status = response.getcode()
                 if status == 200:
                     return
-        except Exception as error:  # noqa: BLE001
+        except (urllib.error.URLError, http.client.HTTPException, OSError) as error:
             last_error = error
         time.sleep(interval_seconds)
     if last_error is not None:

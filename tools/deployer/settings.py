@@ -1,14 +1,25 @@
 import shlex
 import logging
-from dataclasses import dataclass
-from typing import ClassVar
 import os
+from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 _logger = logging.getLogger(__name__)
+
+
+def _paths_relative_to_repo(paths: Iterable[Path], repo_root: Path) -> list[str]:
+    entries: list[str] = []
+    for path in paths:
+        try:
+            entries.append(str(path.relative_to(repo_root)))
+        except ValueError:
+            entries.append(str(path))
+    return entries
 
 
 def discover_repo_root(start_directory: Path) -> Path:
@@ -158,15 +169,7 @@ def compute_compose_files(name: str, repo_root: Path, config: StackConfig) -> tu
         raise ValueError(f"no compose files resolved for {name}")
 
     # Log the resolved compose files relative to repo root for readability
-    try:
-        pretty = [str(p.relative_to(repo_root)) if p.is_relative_to(repo_root) else str(p) for p in layered_files]
-    except AttributeError:
-        pretty = []
-        for p in layered_files:
-            try:
-                pretty.append(str(p.relative_to(repo_root)))
-            except Exception:
-                pretty.append(str(p))
+    pretty = _paths_relative_to_repo(layered_files, repo_root)
     _logger.info("Compose files resolved: %s", ", ".join(pretty))
 
     return tuple(layered_files)
@@ -379,7 +382,7 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
     remote_env_path = compute_remote_env_path(config, remote_stack_path)
     github_token = config.github_token
     # Persist bind-mount paths back into the environment so downstream compose calls pick up overrides.
-    final_environment = dict(raw_environment)
+    final_environment = raw_environment.copy()
     final_environment["ODOO_STATE_ROOT"] = str(state_root_path)
     final_environment["ODOO_DATA_HOST_DIR"] = str(data_dir_host)
     final_environment["ODOO_LOG_HOST_DIR"] = str(log_dir_host)
@@ -391,15 +394,7 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
     _write_env_file(merged_env_path, final_environment)
 
     # Log the resolved environment layering and important derived values
-    try:
-        chain_pretty = [str(p.relative_to(repo_root)) if p.is_relative_to(repo_root) else str(p) for p in resolved_env_chain]
-    except AttributeError:
-        chain_pretty = []
-        for p in resolved_env_chain:
-            try:
-                chain_pretty.append(str(p.relative_to(repo_root)))
-            except Exception:
-                chain_pretty.append(str(p))
+    chain_pretty = _paths_relative_to_repo(resolved_env_chain, repo_root)
     _logger.info(
         "Env layering: %s -> merged at %s",
         " -> ".join(chain_pretty) if chain_pretty else "<none>",

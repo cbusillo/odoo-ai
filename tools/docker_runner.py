@@ -68,6 +68,20 @@ def _current_image_reference(settings) -> str:
     return settings.environment.get(settings.image_variable_name) or settings.registry_image
 
 
+def _add_toggle_env_flags(command: list[str], *, bootstrap_only: bool, no_sanitize: bool) -> None:
+    if bootstrap_only:
+        command.extend(["-e", "BOOTSTRAP_ONLY=1"])
+    if no_sanitize:
+        command.extend(["-e", "NO_SANITIZE=1"])
+
+
+def _add_toggle_args(command: list[str], *, bootstrap_only: bool, no_sanitize: bool) -> None:
+    if bootstrap_only:
+        command.append("--bootstrap-only")
+    if no_sanitize:
+        command.append("--no-sanitize")
+
+
 def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize: bool = False) -> int:
     settings = load_stack_settings(stack_name)
     env_file_path = _ensure_stack_env(settings, stack_name)
@@ -75,7 +89,7 @@ def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize:
     env_values_raw = build_updated_environment(settings, image_reference)
 
     def _strip_quotes(raw: str) -> str:
-        if len(raw) >= 2 and ((raw[0] == raw[-1]) and raw[0] in {'"', "'"}):
+        if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in {'"', "'"}:
             return raw[1:-1]
         return raw
 
@@ -139,10 +153,7 @@ def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize:
             "--user",
             "root",
         ]
-        if bootstrap_only:
-            remote_exec.extend(["-e", "BOOTSTRAP_ONLY=1"])
-        if no_sanitize:
-            remote_exec.extend(["-e", "NO_SANITIZE=1"])
+        _add_toggle_env_flags(remote_exec, bootstrap_only=bootstrap_only, no_sanitize=no_sanitize)
 
         remote_exec.extend(
             [
@@ -151,10 +162,7 @@ def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize:
                 RESTORE_SCRIPT,
             ]
         )
-        if bootstrap_only:
-            remote_exec.append("--bootstrap-only")
-        if no_sanitize:
-            remote_exec.append("--no-sanitize")
+        _add_toggle_args(remote_exec, bootstrap_only=bootstrap_only, no_sanitize=no_sanitize)
 
         try:
             _run_remote_compose(settings, remote_exec)
@@ -177,10 +185,7 @@ def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize:
         ]
         for key, value in env_values.items():
             exec_extra.extend(["-e", f"{key}={value}"])
-        if bootstrap_only:
-            exec_extra.extend(["-e", "BOOTSTRAP_ONLY=1"])
-        if no_sanitize:
-            exec_extra.extend(["-e", "NO_SANITIZE=1"])
+        _add_toggle_env_flags(exec_extra, bootstrap_only=bootstrap_only, no_sanitize=no_sanitize)
         exec_extra.extend(
             [
                 settings.script_runner_service,
@@ -188,10 +193,7 @@ def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize:
                 RESTORE_SCRIPT,
             ]
         )
-        if bootstrap_only:
-            exec_extra.append("--bootstrap-only")
-        if no_sanitize:
-            exec_extra.append("--no-sanitize")
+        _add_toggle_args(exec_extra, bootstrap_only=bootstrap_only, no_sanitize=no_sanitize)
 
         try:
             run_process(

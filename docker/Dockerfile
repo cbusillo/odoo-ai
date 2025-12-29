@@ -44,11 +44,16 @@ RUN cp /root/.local/bin/uv* /usr/local/bin/
 RUN uv pip install --target=/opt/odoo-upgrade git+https://github.com/odoo/upgrade-util \
     && uv pip install --target=/opt/odoo-stubs git+https://github.com/odoo-ide/odoo-stubs@18.0
 
-RUN PY_SITE="$(python3 -c "import site; print(site.getsitepackages()[0])")" \
-    && echo "/odoo" > "${PY_SITE}/odoo_local.pth" \
-    && echo "/volumes/enterprise" > "${PY_SITE}/odoo_enterprise.pth" \
-    && echo "/opt/odoo-upgrade" > "${PY_SITE}/upgrade_utils.pth" \
-    && echo "/opt/odoo-stubs" > "${PY_SITE}/odoostubs.pth"
+RUN python3 - <<'PY'
+import site
+from pathlib import Path
+
+site_packages = Path(site.getsitepackages()[0])
+(site_packages / "odoo_local.pth").write_text("/odoo\n")
+(site_packages / "odoo_enterprise.pth").write_text("/volumes/enterprise\n")
+(site_packages / "upgrade_utils.pth").write_text("/opt/odoo-upgrade\n")
+(site_packages / "odoostubs.pth").write_text("/opt/odoo-stubs\n")
+PY
 
 COPY --from=enterprise /enterprise /volumes/enterprise
 COPY /docker/config /volumes/config

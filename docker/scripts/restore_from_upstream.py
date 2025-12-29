@@ -414,8 +414,10 @@ class OdooUpstreamRestorer:
         upstream = self._require_upstream()
         _logger.info("Overwriting filestore...")
         self.local.filestore_path.mkdir(parents=True, exist_ok=True)
-        remote_path = shlex.quote(f"{upstream.user}@{upstream.host}:{upstream.filestore_path}")
-        local_path = shlex.quote(str(self.local.filestore_path))
+        remote_raw = f"{upstream.user}@{upstream.host}:{upstream.filestore_path}"
+        remote_path = shlex.quote(f"{remote_raw.rstrip('/')}/")
+        local_raw = str(self.local.filestore_path)
+        local_path = shlex.quote(f"{local_raw.rstrip('/')}/")
         chown_option = f"--chown={target_owner}" if target_owner else ""
         ssh_parts = self._build_ssh_command()
         ssh_command = shlex.join(ssh_parts)
@@ -436,22 +438,30 @@ class OdooUpstreamRestorer:
     def overwrite_database(self) -> None:
         upstream = self._require_upstream()
         backup_path = "/tmp/upstream_db_backup.sql.gz"
+        local_host = shlex.quote(self.local.host)
+        local_user = shlex.quote(self.local.db_user)
+        local_db = shlex.quote(self.local.db_name)
+        remote_user = shlex.quote(upstream.user)
+        remote_host = shlex.quote(upstream.host)
+        upstream_db_user = shlex.quote(upstream.db_user)
+        upstream_db_name = shlex.quote(upstream.db_name)
+        backup_path_quoted = shlex.quote(backup_path)
         ssh_parts = self._build_ssh_command()
         ssh_command = shlex.join(ssh_parts)
         dump_cmd = (
-            f"{ssh_command} {upstream.user}@{upstream.host} \"cd /tmp && sudo -u '{upstream.db_user}' "
-            f"pg_dump -Fc '{upstream.db_name}'\" | gzip > {backup_path}"
+            f"{ssh_command} {remote_user}@{remote_host} \"cd /tmp && sudo -u {upstream_db_user} "
+            f"pg_dump -Fc {upstream_db_name}\" | gzip > {backup_path_quoted}"
         )
         self.run_command(dump_cmd)
         self.terminate_all_db_connections()
-        self.run_command(f"dropdb --if-exists -h {self.local.host} -U {self.local.db_user} {self.local.db_name}")
-        self.run_command(f"createdb -h {self.local.host} -U {self.local.db_user} {self.local.db_name}")
+        self.run_command(f"dropdb --if-exists -h {local_host} -U {local_user} {local_db}")
+        self.run_command(f"createdb -h {local_host} -U {local_user} {local_db}")
         restore_cmd = (
-            f"gunzip < {backup_path} | pg_restore -d {self.local.db_name} -h {self.local.host} "
-            f"-U {self.local.db_user} --no-owner --role={self.local.db_user}"
+            f"gunzip < {backup_path_quoted} | pg_restore -d {local_db} -h {local_host} "
+            f"-U {local_user} --no-owner --role={local_user}"
         )
         self.run_command(restore_cmd)
-        self.run_command(f"rm {backup_path}")
+        self.run_command(f"rm {backup_path_quoted}")
 
     def connect_to_db(self) -> connection:
         if not self.local.db_conn:
@@ -481,8 +491,8 @@ class OdooUpstreamRestorer:
         with self._connect_with_retry("postgres") as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
-                    f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='{self.local.db_name}' "
-                    f"AND pid <> pg_backend_pid();"
+                    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=%s AND pid <> pg_backend_pid();",
+                    (self.local.db_name,),
                 )
                 conn.commit()
         _logger.info("All database connections terminated.")
@@ -503,7 +513,10 @@ class OdooUpstreamRestorer:
             raise OdooRestorerError(f"Failed to check database existence: {error}") from error
 
     def create_database(self) -> None:
-        self.run_command(f"createdb -h {self.local.host} -U {self.local.db_user} {self.local.db_name}")
+        local_host = shlex.quote(self.local.host)
+        local_user = shlex.quote(self.local.db_user)
+        local_db = shlex.quote(self.local.db_name)
+        self.run_command(f"createdb -h {local_host} -U {local_user} {local_db}")
 
     def needs_base_install(self) -> bool:
         try:
@@ -648,17 +661,27 @@ class OdooUpstreamRestorer:
                 raise OdooDatabaseUpdateError(f"Error: The following cron jobs are still active after sanitization:\n{errors}")
 
     def update_shopify_config(self) -> None:
-        if self.env_file and self.env_file.exists():
-            # noinspection PyArgumentList
-            settings = ShopifySettings(_env_file=self.env_file)
-        else:
-            # noinspection PyArgumentList
-            settings = ShopifySettings()
+        try:
+            if self.env_file and self.env_file.exists():
+                # noinspection PyArgumentList
+                settings = ShopifySettings(_env_file=self.env_file)
+            else:
+                # noinspection PyArgumentList
+                settings = ShopifySettings()
+        except ValidationError:
+            _logger.info("Shopify envs missing; clearing Shopify config.")
+            self.clear_shopify_config()
+            return
 
         shop_url_key = (settings.shop_url_key or "").strip()
         api_token = settings.api_token.get_secret_value().strip()
         webhook_key = (settings.webhook_key or "").strip()
         api_version = (settings.api_version or "").strip()
+
+        if not shop_url_key or not api_token or not webhook_key or not api_version:
+            _logger.info("Shopify envs incomplete; clearing Shopify config.")
+            self.clear_shopify_config()
+            return
 
         # Safety check: prevent setting production values, allow replacing production with development
         settings.shop_url_key = shop_url_key
@@ -742,6 +765,22 @@ class OdooUpstreamRestorer:
                         f"Safety check failed: {key} still contains production indicator '{indicator}'."
                     )
 
+    def clear_shopify_config(self) -> None:
+        self.connect_to_db()
+        keys = (
+            "shopify.shop_url_key",
+            "shopify.api_token",
+            "shopify.webhook_key",
+            "shopify.api_version",
+            "shopify.test_store",
+            "shopify.shop_url",
+            "shopify.store_url",
+        )
+        with self.local.db_conn.cursor() as cursor:
+            cursor.execute("DELETE FROM ir_config_parameter WHERE key = ANY(%s)", (list(keys),))
+            self.local.db_conn.commit()
+        _logger.info("Cleared Shopify configuration keys: %s", ", ".join(keys))
+
     def clear_shopify_ids(self) -> None:
         with self.local.db_conn.cursor() as cursor:
             cursor.execute(
@@ -773,7 +812,10 @@ class OdooUpstreamRestorer:
     def drop_database(self) -> None:
         _logger.info("Rolling back database update: dropping database")
         self.terminate_all_db_connections()
-        drop_cmd = f"dropdb --if-exists -h {self.local.host} -U {self.local.db_user} {self.local.db_name}"
+        local_host = shlex.quote(self.local.host)
+        local_user = shlex.quote(self.local.db_user)
+        local_db = shlex.quote(self.local.db_name)
+        drop_cmd = f"dropdb --if-exists -h {local_host} -U {local_user} {local_db}"
         self.run_command(drop_cmd)
 
     # --- Sanity checks ---

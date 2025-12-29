@@ -69,14 +69,13 @@ def compute_weights(modules: list[str], phase: str) -> dict[str, int]:
         _logger.debug("sharding: failed to load weight cache (%s)", exc)
         cache = {}
     ph_cache = cache.get(phase) or {}
-    # Convert seconds to weight buckets (5s per bucket) to avoid dwarfing counts
-    SEC_PER_BUCKET = 5
+    seconds_per_bucket = 5
     for name in list(weights.keys()):
         rec = ph_cache.get(name)
         if not rec:
             continue
         secs = float(rec.get("avg_secs") or 0.0)
-        bucket = max(0, int(secs // SEC_PER_BUCKET))
+        bucket = max(0, int(secs // seconds_per_bucket))
         weights[name] = max(1, int(weights[name]) + bucket)
     return weights
 

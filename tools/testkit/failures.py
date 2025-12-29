@@ -27,8 +27,12 @@ def parse_failures(log_path: Path) -> list[dict]:
         if not hoot_lines:
             return
         message = "\n".join(hoot_lines).strip()
-        entry = {"type": "js_fail", "test": hoot_test, "message": message}
-        entry["fingerprint"] = _hash_text(f"{hoot_test}\n{message}")
+        entry = {
+            "type": "js_fail",
+            "test": hoot_test,
+            "message": message,
+            "fingerprint": _hash_text(f"{hoot_test}\n{message}"),
+        }
         hoot_entries.append(entry)
         hoot_lines = []
         hoot_test = None

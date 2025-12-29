@@ -11,6 +11,7 @@ import click
 
 from .db import db_capacity
 from .phases import PhaseOutcome
+from .reporter import read_json_file
 from .session import PhaseName, TestSession
 from .settings import TestSettings
 from .sharding import plan_shards_for_phase
@@ -24,7 +25,7 @@ def _emit_bottomline(latest: Path, as_json: bool) -> int:
         else:
             click.echo("no_summary")
         return 2
-    data = _read_json_file(p)
+    data = read_json_file(p)
     if data is None:
         if as_json:
             print(json.dumps({"status": "invalid"}))
@@ -69,13 +70,6 @@ def _parse_multi(values: tuple[str, ...]) -> list[str]:
 
 
 _PHASES: tuple[PhaseName, ...] = ("unit", "js", "integration", "tour")
-
-
-def _read_json_file(path: Path) -> dict | None:
-    try:
-        return json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError, ValueError):
-        return None
 
 
 def _phase_outcomes(focus_phase: PhaseName, outcome: PhaseOutcome) -> dict[str, PhaseOutcome]:
@@ -221,7 +215,7 @@ def run_all(
                     session = cur.name
                 break
             if cur_json.exists():
-                data = _read_json_file(cur_json)
+                data = read_json_file(cur_json)
                 if data:
                     session = Path(data.get("current", "")).name or None
                     if session:
@@ -544,7 +538,7 @@ def rerun_failures(json_out: bool) -> None:
         if not ph_dir.exists():
             continue
         for sf in ph_dir.glob("*.summary.json"):
-            data = _read_json_file(sf)
+            data = read_json_file(sf)
             if data is None:
                 continue
             rc = int(data.get("returncode") or 0)
@@ -610,7 +604,7 @@ def status_cmd(session: str | None, json_out: bool) -> None:
         out = {"status": "running"}
         print(json.dumps(out) if json_out else "running")
         sys.exit(2)
-    data = _read_json_file(p)
+    data = read_json_file(p)
     if data is None:
         print(json.dumps({"status": "invalid"}) if json_out else "invalid")
         sys.exit(3)
@@ -640,7 +634,7 @@ def wait_cmd(session: str | None, timeout: int, interval: int, json_out: bool) -
     while True:
         p = latest / "summary.json"
         if p.exists():
-            data = _read_json_file(p)
+            data = read_json_file(p)
             ok = bool((data or {}).get("success"))
             if json_out:
                 print(json.dumps({"success": ok, "summary": str(p.resolve())}))

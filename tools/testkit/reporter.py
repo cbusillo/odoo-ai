@@ -15,6 +15,13 @@ from .settings import SUMMARY_SCHEMA_VERSION
 _logger = logging.getLogger(__name__)
 
 
+def read_json_file(path: Path) -> dict | None:
+    try:
+        return json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError, ValueError):
+        return None
+
+
 def write_latest_json(session_dir: Path) -> None:
     latest_json = Path("tmp/test-logs") / "latest.json"
     data = {"schema_version": SUMMARY_SCHEMA_VERSION, "latest": str(session_dir)}

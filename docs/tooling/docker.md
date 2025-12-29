@@ -47,17 +47,21 @@ of truth is `docker/config/README.md`.
 you need port bindings or live code mounts; see
 `docs/workflows/multi-project.md` for an example.
 
-The `uv run deploy deploy --stack <name>` command reads `DEPLOY_COMPOSE_FILES`
-and assembles the correct file order automatically.
+The `uv run stack up --stack <name>` command reads `DEPLOY_COMPOSE_FILES` and
+assembles the correct file order automatically.
 
 ## Bind-Mount Conventions
 
-- Always set `ODOO_STATE_ROOT` for each stack. The deploy tooling derives `ODOO_DATA_DIR`, `ODOO_DB_DIR`, and
-  `ODOO_LOG_DIR` from that root (`filestore/`, `postgres/`, `logs/` subdirectories) before writing the merged `.env`
-  that Compose and Pydantic consume. Stack env sources live in `docker/config/<stack>.env` (create them locally; they're
-  git-ignored). If `ODOO_STATE_ROOT` is omitted (e.g., local dev), the CLI defaults to
-  `~/odoo-ai/${ODOO_PROJECT_NAME}/...`.
-- Keep `ODOO_LOGFILE` pointed inside `/volumes/logs/` (e.g. `/volumes/logs/odoo.log`) so log rotation targets the
-  bind-mounted directory.
+- Always set `ODOO_STATE_ROOT` for each stack. The deploy tooling derives
+  `ODOO_DATA_DIR`, `ODOO_DB_DIR`, and `ODOO_LOG_DIR` from that root
+  (`filestore/`, `postgres/`, `logs/` subdirectories) before writing the merged
+  `.env` that Compose and Pydantic consume. The merged compose env is stored at
+  `${ODOO_STATE_ROOT}/.compose.env`. Stack env sources live in
+  `docker/config/<stack>.env` (create them locally; they're git-ignored). If
+  the state root is not writable (remote stacks), the CLI falls back to
+  `.odoo/stack-env/<stack>.env`. If `ODOO_STATE_ROOT` is omitted (e.g., local
+  dev), the CLI defaults to `~/odoo-ai/${ODOO_PROJECT_NAME}/...`.
+- Keep `ODOO_LOGFILE` pointed inside `/volumes/logs/` (e.g.
+  `/volumes/logs/odoo.log`) so log rotation targets the bind-mounted directory.
 - Remote hosts are managed in Coolify; local stacks should keep state under
   `~/odoo-ai/<stack>`.

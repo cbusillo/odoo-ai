@@ -361,9 +361,14 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
     data_dir_host = _expand_path(config.odoo_data_host_dir or state_root_path / "filestore")
     db_dir_host = _expand_path(config.odoo_db_host_dir or state_root_path / "postgres")
     log_dir_host = _expand_path(config.odoo_log_host_dir or state_root_path / "logs")
-    tmp_env_dir = repo_root / "tmp" / "stack-env"
-    tmp_env_dir.mkdir(parents=True, exist_ok=True)
-    merged_env_path = tmp_env_dir / f"{name}.env"
+    compose_env_path = state_root_path / ".compose.env"
+    try:
+        compose_env_path.parent.mkdir(parents=True, exist_ok=True)
+        merged_env_path = compose_env_path
+    except OSError:
+        fallback_dir = repo_root / ".odoo" / "stack-env"
+        fallback_dir.mkdir(parents=True, exist_ok=True)
+        merged_env_path = fallback_dir / f"{name}.env"
     compose_command = compute_compose_command(config)
     compose_files = compute_compose_files(name, repo_root, config)
     compose_project = compute_compose_project(name, config)

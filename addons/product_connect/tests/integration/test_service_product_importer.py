@@ -21,7 +21,7 @@ from ..fixtures.factories import ProductFactory, ShopifySyncFactory
 class TestProductImporter(IntegrationTestCase):
     @classmethod
     def _get_unique_sku(cls) -> str:
-        return generate_unique_sku("")
+        return generate_unique_sku()
 
     @staticmethod
     def _get_valid_image_base64() -> str:

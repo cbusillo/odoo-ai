@@ -1,6 +1,6 @@
 from typing import Self
 
-from odoo import api, models, fields
+from odoo import api, fields, models
 
 
 class ExternalIdMixin(models.AbstractModel):

@@ -1,6 +1,6 @@
-import shlex
 import logging
 import os
+import shlex
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -138,7 +138,7 @@ def discover_local_modules(environment: dict[str, str], repo_root: Path) -> tupl
 AUTO_INSTALLED_SENTINEL = "__AUTO_INSTALLED__"
 
 
-def resolve_update_modules(config: "StackConfig", environment: dict[str, str], repo_root: Path) -> tuple[str, ...]:
+def resolve_update_modules(config: "StackConfig", environment: dict[str, str]) -> tuple[str, ...]:
     update_source = config.update_modules_raw or config.update_modules_legacy
     if update_source and update_source.strip().upper() not in {"AUTO", ""}:
         return split_modules(update_source)
@@ -149,8 +149,6 @@ def resolve_update_modules(config: "StackConfig", environment: dict[str, str], r
 
 
 def infer_project_slug(stack_name: str) -> str | None:
-    """Best-effort project slug inference from stack naming conventions or env values."""
-
     lowered = stack_name.lower()
     for prefix in ("opw-", "cm-"):
         if lowered.startswith(prefix):
@@ -454,7 +452,7 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
     docker_context = compute_docker_context(repo_root, config)
     registry_image = compute_registry_image(config)
     healthcheck_url = compute_healthcheck_url(config)
-    update_modules = resolve_update_modules(config, raw_environment, repo_root)
+    update_modules = resolve_update_modules(config, raw_environment)
     services = compute_services(config)
     script_runner_service = compute_script_runner(config)
     odoo_bin_path = compute_odoo_bin(config)

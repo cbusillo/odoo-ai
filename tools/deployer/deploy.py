@@ -84,9 +84,7 @@ def push_env_to_remote(settings: StackSettings, env_values: Mapping[str, str]) -
         raise ValueError("remote host missing")
     if settings.remote_env_path is None:
         raise ValueError("remote env path missing")
-    logging.getLogger("deploy.remote").info(
-        "uploading env to %s", settings.remote_env_path
-    )
+    logging.getLogger("deploy.remote").info("uploading env to %s", settings.remote_env_path)
     ensure_remote_directory(settings.remote_host, settings.remote_user, settings.remote_port, settings.remote_env_path.parent)
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
         temp_path = Path(handle.name)
@@ -96,9 +94,7 @@ def push_env_to_remote(settings: StackSettings, env_values: Mapping[str, str]) -
         if settings.remote_stack_path is not None:
             default_env_path = settings.remote_stack_path / ".env"
             if default_env_path != settings.remote_env_path:
-                logging.getLogger("deploy.remote").info(
-                    "copying env to %s", default_env_path
-                )
+                logging.getLogger("deploy.remote").info("copying env to %s", default_env_path)
                 ensure_remote_directory(
                     settings.remote_host,
                     settings.remote_user,
@@ -163,9 +159,7 @@ def _run_upgrade_with_retry(settings: StackSettings, upgrade_subcommand: list[st
             _run_compose(settings, upgrade_subcommand, remote)
             return
         except CommandError as error:
-            message = "\n".join(
-                value for value in (error.stdout or "", error.stderr or "", str(error)) if value
-            )
+            message = "\n".join(value for value in (error.stdout or "", error.stderr or "", str(error)) if value)
             if "restarting" not in message and "is not running" not in message:
                 raise
             if attempt == max_attempts - 1:
@@ -234,14 +228,11 @@ def _installed_local_modules(settings: StackSettings) -> tuple[str, ...]:
     for attempt in range(10):
         result = run_process(command, capture_output=True, check=False, env=env)
         if result.returncode == 0:
-            installed = {line.strip() for line in (result.stdout or "").splitlines() if line.strip()}
             break
         last_error = (result.stderr or "").strip()
         time.sleep(2)
     else:
-        raise ValueError(
-            f"Failed to query installed modules after retries; database may be restarting. {last_error}"
-        )
+        raise ValueError(f"Failed to query installed modules after retries; database may be restarting. {last_error}")
     installed = {line.strip() for line in (result.stdout or "").splitlines() if line.strip()}
     if not installed:
         return ()

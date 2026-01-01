@@ -1,4 +1,4 @@
-from ..common_imports import tagged, TOUR_TAGS
+from ..common_imports import TOUR_TAGS, tagged
 from ..fixtures.base import TourTestCase
 
 
@@ -25,7 +25,7 @@ class TestMultigraphBrowser(TourTestCase):
         domain = eval(action.domain) if action.domain else []
         try:
             # This should not raise an exception even if no records are found
-            records = model.search(domain, limit=1)
+            model.search(domain, limit=1)
             # The search succeeded (even if it returned no records)
             self.assertTrue(True, "Domain search completed without error")
         except Exception as e:

@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 from .base_types import TEST_SHOPIFY_ID_MAX, TEST_SHOPIFY_ID_MIN
 
 
-def generate_unique_sku(prefix: Optional[str] = None) -> str:
+def generate_unique_sku() -> str:
     return str(random.randint(10000000, 99999999))
 
 

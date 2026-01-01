@@ -1,7 +1,8 @@
 """Simple demo-based tour test to verify infrastructure works"""
 
-import os
 import logging
+import os
+
 from odoo.tests import tagged
 
 _logger = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ class TestSimpleDemoTour(TourTestCase):
 
         # Test that we can perform basic searches
         try:
-            products = product_model.search([], limit=1)
+            product_model.search([], limit=1)
             self.assertTrue(True, "Product search completed without error")
         except Exception as e:
             self.fail(f"Product search failed: {e}")
@@ -51,7 +52,7 @@ class TestSimpleDemoTour(TourTestCase):
         # Test that basic web interface components are accessible
         menu_model = self.env["ir.ui.menu"]
         try:
-            menus = menu_model.search([], limit=5)
+            menu_model.search([], limit=5)
             self.assertTrue(True, "Menu search completed without error")
         except Exception as e:
             self.fail(f"Menu search failed: {e}")

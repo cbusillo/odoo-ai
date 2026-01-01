@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -813,15 +814,62 @@ def _run_status(target: str, env: str, *, wait: bool, interval: float, timeout: 
 
 
 def _print_local_doctor(entry: str, settings: StackSettings) -> None:
+    required_env = ("ODOO_DB_NAME", "ODOO_DB_USER")
+    visible_env = (
+        "ODOO_PROJECT_NAME",
+        "ODOO_VERSION",
+        "ODOO_STATE_ROOT",
+        "ODOO_DATA_HOST_DIR",
+        "ODOO_DB_HOST_DIR",
+        "ODOO_LOG_HOST_DIR",
+        "ODOO_DB_NAME",
+        "ODOO_DB_USER",
+    )
     console.print(f"Local stack: [bold]{entry}[/bold]")
     console.print(f"  name: {settings.name}")
+    console.print(f"  compose command: {' '.join(settings.compose_command)}")
     console.print(f"  env file: {settings.env_file}")
+    console.print(f"  source env: {settings.source_env_file}")
     console.print(f"  state root: {settings.state_root}")
     console.print(f"  compose project: {settings.compose_project}")
     console.print(f"  compose files: {', '.join(str(path) for path in settings.compose_files)}")
     console.print(f"  services: {', '.join(settings.services)}")
     console.print(f"  script runner: {settings.script_runner_service}")
     console.print(f"  registry image: {settings.registry_image}")
+    try:
+        commit = get_git_commit(settings.repo_root)
+        console.print(f"  image tag: {settings.registry_image}:{settings.name}-{commit[:7]}")
+    except (RuntimeError, OSError) as error:
+        console.print(f"  image tag: unavailable ({error})")
+
+    missing_env = [key for key in required_env if not settings.environment.get(key)]
+    if missing_env:
+        console.print(f"  missing env: {', '.join(missing_env)}")
+
+    missing_files = [path for path in settings.compose_files if not path.exists()]
+    missing_files = [path for path in (settings.env_file, settings.source_env_file) if not path.exists()]
+    missing_files.extend(path for path in settings.compose_files if not path.exists())
+    if missing_files:
+        console.print(f"  missing files: {', '.join(str(path) for path in missing_files)}")
+
+    compose_binary = settings.compose_command[0] if settings.compose_command else ""
+    if compose_binary:
+        compose_path = shutil.which(compose_binary)
+        if compose_path is None:
+            console.print(f"  compose binary: missing ({compose_binary})")
+        else:
+            console.print(f"  compose binary: {compose_path}")
+            if compose_binary == "docker":
+                result = run_process(["docker", "info"], capture_output=True, check=False)
+                if result.returncode == 0:
+                    console.print("  docker daemon: ok")
+                else:
+                    console.print("  docker daemon: unavailable")
+
+    for key in visible_env:
+        value = settings.environment.get(key)
+        if value:
+            console.print(f"  env {key}: {value}")
 
 
 def _prompt_choice(label: str, choices: Iterable[str], default: str) -> str:

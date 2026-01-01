@@ -8,6 +8,7 @@ import subprocess
 import sys
 import time
 import tomllib
+import urllib.error
 import urllib.request
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -866,10 +867,84 @@ def _print_local_doctor(entry: str, settings: StackSettings) -> None:
                 else:
                     console.print("  docker daemon: unavailable")
 
+    health_status = _check_healthcheck_url(settings.healthcheck_url)
+    if health_status:
+        console.print(f"  healthcheck url: {settings.healthcheck_url} ({health_status})")
+
+    if compose_binary:
+        _print_compose_health(settings)
+
     for key in visible_env:
         value = settings.environment.get(key)
         if value:
             console.print(f"  env {key}: {value}")
+
+
+def _check_healthcheck_url(url: str) -> str | None:
+    try:
+        with urllib.request.urlopen(url, timeout=3) as response:
+            return f"ok {response.status}"
+    except urllib.error.HTTPError as error:
+        return f"error {error.code}"
+    except (OSError, TimeoutError, urllib.error.URLError) as error:
+        return f"unreachable {error}"
+
+
+def _print_compose_health(settings: StackSettings) -> None:
+    services = settings.services
+    if not services:
+        return
+    console.print("  service health:")
+    for service in services:
+        container_id = _compose_container_id(settings, service)
+        if not container_id:
+            console.print(f"    - {service}: not running")
+            continue
+        state = _inspect_container_state(container_id)
+        health = _inspect_container_health(container_id)
+        if health is None:
+            console.print(f"    - {service}: {state}")
+            continue
+        console.print(f"    - {service}: {state}, health={health}")
+
+
+def _compose_container_id(settings: StackSettings, service: str) -> str | None:
+    try:
+        result = run_process(
+            local_compose_command(settings, ["ps", "-q", service]),
+            cwd=settings.repo_root,
+            env=local_compose_env(settings),
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        return None
+    container_id = (result.stdout or "").strip()
+    return container_id or None
+
+
+def _inspect_container_state(container_id: str) -> str:
+    result = run_process(
+        ["docker", "inspect", "-f", "{{.State.Status}}", container_id],
+        capture_output=True,
+        check=False,
+    )
+    state = (result.stdout or "").strip() if result.returncode == 0 else "unknown"
+    return state or "unknown"
+
+
+def _inspect_container_health(container_id: str) -> str | None:
+    result = run_process(
+        ["docker", "inspect", "-f", "{{.State.Health.Status}}", container_id],
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    health = (result.stdout or "").strip()
+    if not health or health == "<no value>":
+        return None
+    return health
 
 
 def _prompt_choice(label: str, choices: Iterable[str], default: str) -> str:

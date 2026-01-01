@@ -8,8 +8,10 @@
       <excludeFolder url="file://$MODULE_DIR$/addons/product_connect/services/shopify/gql" />
       <excludeFolder url="file://$MODULE_DIR$/tmp" />
       <excludeFolder url="file://$MODULE_DIR$/.code" />
+      <excludeFolder url="file://$MODULE_DIR$/.claude" />
+      <excludeFolder url="file://$MODULE_DIR$/.codex" />
     </content>
-    <orderEntry type="jdk" jdkName="Remote Python 3.12.3 Docker Compose (script-runner)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="cm-local web" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PackageRequirementsSettings">

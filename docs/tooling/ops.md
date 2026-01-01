@@ -24,6 +24,7 @@ Quick start
   uv run ops local down all
   uv run ops local restart opw
   uv run ops local upgrade opw
+  uv run ops local doctor opw
   uv run ops local up opw --build --no-cache
 
   uv run ops ship testing opw

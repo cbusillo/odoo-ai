@@ -29,7 +29,7 @@ from tools.deployer.command import run_process
 from tools.deployer.compose_ops import local_compose_command, local_compose_env
 from tools.deployer.deploy import deploy_stack, execute_upgrade
 from tools.deployer.health import HealthcheckError
-from tools.deployer.helpers import get_git_commit, resolve_image_reference, run_build
+from tools.deployer.helpers import get_git_commit
 from tools.deployer.settings import AUTO_INSTALLED_SENTINEL, StackSettings, discover_repo_root, load_stack_settings, parse_env_file
 from tools.stack_restore import restore_stack
 
@@ -655,17 +655,24 @@ def _run_local_action(
             suffix = f" ({', '.join(extras)})" if extras else ""
             console.print(f"[dry-run] {entry} local {action}{suffix}")
             continue
-        commit = get_git_commit(settings.repo_root)
         if build:
-            use_no_cache = no_cache and not no_cache_used
-            run_build(settings, remote=False, no_cache=use_no_cache, repository_url=None, commit=commit)
-            if use_no_cache:
+            build_args = ["build"]
+            if no_cache and not no_cache_used:
+                build_args.append("--no-cache")
+            services = [service for service in ("script-runner", "web") if service in settings.services]
+            if services:
+                build_args.append(services[0])
+            else:
+                build_args.extend(settings.services)
+            _run_local_compose(settings, build_args, dry_run=False)
+            if no_cache and not no_cache_used:
                 no_cache_used = True
         if action in ("restore", "init"):
             restore_stack(stack, env_file=env_file_path, bootstrap_only=action == "init")
             console.print(f"{entry} local {action} complete")
             continue
-        image_reference = resolve_image_reference(settings, tag=None, image=None)
+        commit = get_git_commit(settings.repo_root)
+        image_reference = f"{settings.registry_image}:{settings.name}-{commit[:7]}"
         try:
             deploy_stack(settings, image_reference, remote=False, commit=commit)
         except HealthcheckError as error:

@@ -9,7 +9,7 @@ from pathlib import Path
 from .command import CommandError, run_process
 from .compose_ops import local_compose, local_compose_command, local_compose_env, remote_compose_command
 from .health import HealthcheckError, wait_for_health
-from .remote import ensure_remote_directory, run_remote, sync_remote_repository, upload_file
+from .remote import ensure_remote_directory, run_remote, upload_file
 from .settings import AUTO_INSTALLED_SENTINEL, StackSettings, discover_local_modules
 
 
@@ -316,15 +316,6 @@ def prepare_remote_stack(settings: StackSettings, repository_url: str | None, co
         raise ValueError("remote stack configuration incomplete")
     if repository_url is None or commit is None:
         raise ValueError("repository metadata required for remote deployment")
-    sync_remote_repository(
-        settings.remote_host,
-        settings.remote_user,
-        settings.remote_port,
-        settings.remote_stack_path,
-        repository_url,
-        commit,
-        settings.github_token,
-    )
     for file_path in settings.compose_files:
         relative = file_path.relative_to(settings.repo_root)
         target = settings.remote_stack_path / relative

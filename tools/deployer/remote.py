@@ -2,7 +2,7 @@ import shlex
 from collections.abc import Sequence
 from pathlib import Path
 
-from .command import CommandError, run_process
+from .command import run_process
 
 
 def build_ssh_target(user: str | None, host: str) -> str:
@@ -52,38 +52,3 @@ def remote_path_exists(host: str, user: str | None, port: int | None, path: Path
     result = run_process(arguments, check=False)
     return result.returncode == 0
 
-
-def sync_remote_repository(
-    host: str,
-    user: str | None,
-    port: int | None,
-    path: Path,
-    repository_url: str,
-    commit: str,
-    github_token: str | None,
-) -> None:
-    ensure_remote_directory(host, user, port, path.parent)
-    if github_token:
-        token_url = f"https://x-access-token:{github_token}@github.com/"
-        run_remote(
-            host,
-            user,
-            port,
-            ["git", "config", "--global", f"url.{token_url}.insteadOf", "https://github.com/"],
-        )
-    repo_git = path / ".git"
-    if not remote_path_exists(host, user, port, repo_git):
-        run_remote(host, user, port, ["rm", "-rf", str(path)])
-        run_remote(host, user, port, ["git", "clone", repository_url, str(path)])
-    else:
-        run_remote(host, user, port, ["git", "-C", str(path), "remote", "set-url", "origin", repository_url])
-    run_remote(host, user, port, ["git", "-C", str(path), "fetch", "--prune", "origin"])
-    try:
-        run_remote(host, user, port, ["git", "-C", str(path), "cat-file", "-e", f"{commit}^{{commit}}"])
-    except CommandError as error:
-        message = (
-            "Remote repository is missing the requested commit. "
-            "Push your branch or deploy from a commit reachable on origin."
-        )
-        raise RuntimeError(message) from error
-    run_remote(host, user, port, ["git", "-C", str(path), "reset", "--hard", commit])

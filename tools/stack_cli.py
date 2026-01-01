@@ -19,7 +19,6 @@ from tools.deployer.remote import run_remote
 from tools.deployer.settings import discover_repo_root, load_stack_settings
 from tools.stack_restore import restore_stack
 
-
 ENV_SUFFIXES = ("dev", "testing", "prod")
 
 

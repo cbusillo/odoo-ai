@@ -1,7 +1,6 @@
-from odoo.tests import tagged
-
 from odoo.addons.product_connect.tests.base_types import TOUR_TAGS
 from odoo.addons.product_connect.tests.fixtures.base import TourTestCase
+from odoo.tests import tagged
 
 
 @tagged(*TOUR_TAGS)

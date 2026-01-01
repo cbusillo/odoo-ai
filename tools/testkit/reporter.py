@@ -29,32 +29,32 @@ def write_latest_json(session_dir: Path) -> None:
 
 
 def update_latest_symlink(session_dir: Path) -> None:
-    latest = Path("tmp/test-logs") / "latest"
+    latest_link = Path("tmp/test-logs") / "latest"
     try:
-        if latest.exists() or latest.is_symlink():
-            latest.unlink()
+        if latest_link.exists() or latest_link.is_symlink():
+            latest_link.unlink()
     except OSError as exc:
         _logger.debug("reporter: failed to unlink latest (%s)", exc)
-    rel = os.path.relpath(session_dir, latest.parent)
+    relative_path = os.path.relpath(session_dir, latest_link.parent)
     try:
-        latest.symlink_to(rel)
+        latest_link.symlink_to(relative_path)
     except OSError:
-        latest.with_suffix(".json").write_text(
+        latest_link.with_suffix(".json").write_text(
             json.dumps({"schema_version": SUMMARY_SCHEMA_VERSION, "latest": str(session_dir)}, indent=2)
         )
 
 
 def write_manifest(session_dir: Path) -> None:
     manifest: dict[str, Any] = {"schema_version": SUMMARY_SCHEMA_VERSION, "files": []}
-    for p in session_dir.rglob("*"):
-        if p.is_file():
+    for file_path in session_dir.rglob("*"):
+        if file_path.is_file():
             try:
-                stat = p.stat()
+                file_stat = file_path.stat()
                 manifest["files"].append(
                     {
-                        "path": str(p.relative_to(session_dir)),
-                        "size": stat.st_size,
-                        "mtime": stat.st_mtime,
+                        "path": str(file_path.relative_to(session_dir)),
+                        "size": file_stat.st_size,
+                        "mtime": file_stat.st_mtime,
                     }
                 )
             except (OSError, ValueError):
@@ -63,27 +63,27 @@ def write_manifest(session_dir: Path) -> None:
 
 
 def write_session_index(session_dir: Path, aggregate: dict) -> None:
-    ok = bool(aggregate.get("success", False))
+    is_success = bool(aggregate.get("success", False))
     lines = [
         f"# Test Session {aggregate.get('session', session_dir.name)}",
         "",
-        f"Overall: {'PASSED' if ok else 'FAILED'}",
+        f"Overall: {'PASSED' if is_success else 'FAILED'}",
         "",
         "## Phases",
         "",
     ]
-    for cat in ("unit", "js", "integration", "tour"):
-        cat_dir = session_dir / cat
-        if not cat_dir.exists():
+    for phase_name in ("unit", "js", "integration", "tour"):
+        phase_dir = session_dir / phase_name
+        if not phase_dir.exists():
             continue
-        entries = []
-        for session_file in sorted(cat_dir.glob("*.summary.json")):
-            base = session_file.stem.replace(".summary", "")
-            log = session_file.with_suffix("").with_suffix(".log")
-            entries.append(f"- {cat}: {base} → {session_file.name} / {log.name}")
-        if entries:
-            lines.extend([f"### {cat.title()}", ""])
-            lines.extend(entries)
+        phase_entries = []
+        for session_file in sorted(phase_dir.glob("*.summary.json")):
+            shard_name = session_file.stem.replace(".summary", "")
+            log_file = session_file.with_suffix("").with_suffix(".log")
+            phase_entries.append(f"- {phase_name}: {shard_name} → {session_file.name} / {log_file.name}")
+        if phase_entries:
+            lines.extend([f"### {phase_name.title()}", ""])
+            lines.extend(phase_entries)
             lines.append("")
     (session_dir / "index.md").write_text("\n".join(lines))
 
@@ -102,49 +102,49 @@ def write_digest(session_dir: Path, aggregate: dict) -> None:
 
 
 def begin_session_dir() -> tuple[Path, str, float]:
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    name = f"test-{ts}"
-    session_dir = Path("tmp/test-logs") / name
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    session_name = f"test-{timestamp}"
+    session_dir = Path("tmp/test-logs") / session_name
     session_dir.mkdir(parents=True, exist_ok=True)
-    started = time.time()
-    return session_dir, name, started
+    started_at = time.time()
+    return session_dir, session_name, started_at
 
 
 def aggregate_phase(session_dir: Path, phase: str) -> dict | None:
     phase_dir = session_dir / phase
     if not phase_dir.exists():
         return None
-    summaries = list(phase_dir.glob("*.summary.json"))
-    if not summaries:
+    summary_files = list(phase_dir.glob("*.summary.json"))
+    if not summary_files:
         return None
-    counters = {"tests_run": 0, "failures": 0, "errors": 0, "skips": 0}
-    success = True
-    merged_failures: list[dict] = []
-    for sf in summaries:
-        data = load_json(sf)
-        if data is None:
+    counter_totals = {"tests_run": 0, "failures": 0, "errors": 0, "skips": 0}
+    all_successful = True
+    merged_failure_entries: list[dict] = []
+    for summary_file in summary_files:
+        summary_data = load_json(summary_file)
+        if summary_data is None:
             continue
-        c = data.get("counters") or {}
-        for k in counters:
+        counter_values = summary_data.get("counters") or {}
+        for counter_name in counter_totals:
             try:
-                counters[k] += int(c.get(k, 0))
+                counter_totals[counter_name] += int(counter_values.get(counter_name, 0))
             except (ValueError, TypeError):
                 continue
-        success = success and bool(data.get("success", False))
+        all_successful = all_successful and bool(summary_data.get("success", False))
         # parse failures from corresponding log
-        log = data.get("log_file")
-        if log:
-            merged_failures.extend(parse_failures(Path(log)))
-    aggregate = {
+        log_file = summary_data.get("log_file")
+        if log_file:
+            merged_failure_entries.extend(parse_failures(Path(log_file)))
+    aggregate_data = {
         "schema_version": SUMMARY_SCHEMA_VERSION,
         "phase": phase,
-        "success": success,
-        "counters": counters,
-        "shards": len(summaries),
+        "success": all_successful,
+        "counters": counter_totals,
+        "shards": len(summary_files),
     }
-    (phase_dir / "all.summary.json").write_text(json.dumps(aggregate, indent=2))
-    (phase_dir / "all.failures.json").write_text(json.dumps({"entries": merged_failures}, indent=2))
-    return aggregate
+    (phase_dir / "all.summary.json").write_text(json.dumps(aggregate_data, indent=2))
+    (phase_dir / "all.failures.json").write_text(json.dumps({"entries": merged_failure_entries}, indent=2))
+    return aggregate_data
 
 
 def _map_failure_type_to_junit(failure_type: str) -> str:
@@ -162,80 +162,86 @@ def _int_from_counter(counters: dict[str, Any], key: str) -> int:
 
 
 def _junit_counts(counters: dict[str, Any], entries: list[dict[str, Any]]) -> tuple[int, int, int, int]:
-    tests = _int_from_counter(counters, "tests_run")
-    fail_count = sum(1 for entry in entries if _map_failure_type_to_junit(str(entry.get("type", ""))) == "failure")
-    err_count = sum(1 for entry in entries if _map_failure_type_to_junit(str(entry.get("type", ""))) == "error")
-    if tests == 0:
-        tests = fail_count + err_count
-    skipped = _int_from_counter(counters, "skips")
-    return tests, fail_count, err_count, skipped
+    tests_count = _int_from_counter(counters, "tests_run")
+    failure_count = sum(
+        1 for entry in entries if _map_failure_type_to_junit(str(entry.get("type", ""))) == "failure"
+    )
+    error_count = sum(1 for entry in entries if _map_failure_type_to_junit(str(entry.get("type", ""))) == "error")
+    if tests_count == 0:
+        tests_count = failure_count + error_count
+    skipped_count = _int_from_counter(counters, "skips")
+    return tests_count, failure_count, error_count, skipped_count
 
 
 def _append_junit_failures(suite: ElementTree.Element, entries: list[dict[str, Any]]) -> None:
     for entry in entries:
-        name = entry.get("test") or entry.get("fingerprint") or "unknown"
-        tc = ElementTree.SubElement(suite, "testcase", attrib={"name": str(name)})
-        mapped = _map_failure_type_to_junit(str(entry.get("type", "")))
-        message = entry.get("message") or entry.get("type") or ""
-        el = ElementTree.SubElement(tc, mapped, attrib={"message": str(message)})
-        tb = entry.get("traceback")
-        if tb:
-            el.text = str(tb)
+        test_name = entry.get("test") or entry.get("fingerprint") or "unknown"
+        testcase_element = ElementTree.SubElement(suite, "testcase", attrib={"name": str(test_name)})
+        junit_failure_type = _map_failure_type_to_junit(str(entry.get("type", "")))
+        failure_message = entry.get("message") or entry.get("type") or ""
+        failure_element = ElementTree.SubElement(
+            testcase_element,
+            junit_failure_type,
+            attrib={"message": str(failure_message)},
+        )
+        traceback_text = entry.get("traceback")
+        if traceback_text:
+            failure_element.text = str(traceback_text)
 
 
 def write_junit_for_phase(session_dir: Path, phase: str) -> Path | None:
     phase_dir = session_dir / phase
-    agg_path = phase_dir / "all.summary.json"
-    if not agg_path.exists():
+    aggregate_path = phase_dir / "all.summary.json"
+    if not aggregate_path.exists():
         return None
-    agg = load_json(agg_path)
-    if agg is None:
+    aggregate_data = load_json(aggregate_path)
+    if aggregate_data is None:
         return None
     failures_path = phase_dir / "all.failures.json"
     failures_data = load_json(failures_path) or {}
     failure_entries: list[dict] = failures_data.get("entries") or []
 
-    counters = agg.get("counters") or {}
-    tests, fail_count, err_count, skipped = _junit_counts(counters, failure_entries)
+    counters = aggregate_data.get("counters") or {}
+    tests_count, failure_count, error_count, skipped_count = _junit_counts(counters, failure_entries)
 
-    suite = ElementTree.Element(
+    suite_element = ElementTree.Element(
         "testsuite",
         attrib={
             "name": f"{phase}",
-            "tests": str(tests),
-            "failures": str(fail_count),
-            "errors": str(err_count),
-            "skipped": str(skipped),
+            "tests": str(tests_count),
+            "failures": str(failure_count),
+            "errors": str(error_count),
+            "skipped": str(skipped_count),
         },
     )
-    _append_junit_failures(suite, failure_entries)
+    _append_junit_failures(suite_element, failure_entries)
 
-    tree = ElementTree.ElementTree(suite)
-    out = phase_dir / "junit.xml"
-    tree.write(out, encoding="utf-8", xml_declaration=True)
-    return out
+    suite_tree = ElementTree.ElementTree(suite_element)
+    output_path = phase_dir / "junit.xml"
+    suite_tree.write(output_path, encoding="utf-8", xml_declaration=True)
+    return output_path
 
 
 def write_junit_root(session_dir: Path) -> Path:
-    suites = ElementTree.Element("testsuites")
+    suites_root = ElementTree.Element("testsuites")
     total_tests = total_fail = total_err = total_skip = 0
     for phase in ("unit", "js", "integration", "tour"):
         junit_path = session_dir / phase / "junit.xml"
         if not junit_path.exists():
             continue
         try:
-            tree = ElementTree.parse(str(junit_path))
-            suite = tree.getroot()
+            suite_tree = ElementTree.parse(str(junit_path))
+            suite_element = suite_tree.getroot()
         except (OSError, ElementTree.ParseError) as exc:
             _logger.debug("reporter: failed to parse junit %s (%s)", junit_path, exc)
             continue
-        suites.append(suite)
-        total_tests += int(suite.attrib.get("tests", 0))
-        total_fail += int(suite.attrib.get("failures", 0))
-        total_err += int(suite.attrib.get("errors", 0))
-        total_skip += int(suite.attrib.get("skipped", 0))
+        suites_root.append(suite_element)
+        total_tests += int(suite_element.attrib.get("tests", 0))
+        total_fail += int(suite_element.attrib.get("failures", 0))
+        total_err += int(suite_element.attrib.get("errors", 0))
+        total_skip += int(suite_element.attrib.get("skipped", 0))
 
-    suites.attrib.update(
+    suites_root.attrib.update(
         {
             "tests": str(total_tests),
             "failures": str(total_fail),
@@ -243,88 +249,100 @@ def write_junit_root(session_dir: Path) -> Path:
             "skipped": str(total_skip),
         }
     )
-    out = session_dir / "junit.xml"
-    ElementTree.ElementTree(suites).write(out, encoding="utf-8", xml_declaration=True)
-    return out
+    output_path = session_dir / "junit.xml"
+    ElementTree.ElementTree(suites_root).write(output_path, encoding="utf-8", xml_declaration=True)
+    return output_path
 
 
 def write_junit_for_shard(summary_file: Path, log_file: Path) -> Path | None:
-    data = load_json(summary_file)
-    if data is None:
+    summary_data = load_json(summary_file)
+    if summary_data is None:
         return None
-    counters = data.get("counters") or {}
-    failures = parse_failures(log_file)
-    tests, fail_count, err_count, skipped = _junit_counts(counters, failures)
+    counters = summary_data.get("counters") or {}
+    failure_entries = parse_failures(log_file)
+    tests_count, failure_count, error_count, skipped_count = _junit_counts(counters, failure_entries)
 
-    suite = ElementTree.Element(
+    suite_element = ElementTree.Element(
         "testsuite",
         attrib={
             "name": Path(summary_file).stem.replace(".summary", ""),
-            "tests": str(tests),
-            "failures": str(fail_count),
-            "errors": str(err_count),
-            "skipped": str(skipped),
+            "tests": str(tests_count),
+            "failures": str(failure_count),
+            "errors": str(error_count),
+            "skipped": str(skipped_count),
         },
     )
-    _append_junit_failures(suite, failures)
+    _append_junit_failures(suite_element, failure_entries)
 
-    out = summary_file.with_suffix("").with_suffix(".junit.xml")
-    ElementTree.ElementTree(suite).write(out, encoding="utf-8", xml_declaration=True)
-    return out
+    output_path = summary_file.with_suffix("").with_suffix(".junit.xml")
+    ElementTree.ElementTree(suite_element).write(output_path, encoding="utf-8", xml_declaration=True)
+    return output_path
 
 
 def update_weight_cache_from_session(session_dir: Path, cache_path: Path | None = None) -> None:
     if cache_path is None:
         cache_path = Path("tmp/test-logs/weights.json")
     try:
-        cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
+        weight_cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
     except (OSError, json.JSONDecodeError) as exc:
         _logger.debug("reporter: failed to load weight cache (%s)", exc)
-        cache = {}
+        weight_cache = {}
 
     for phase in ("unit", "js", "integration", "tour"):
         phase_dir = session_dir / phase
         if not phase_dir.exists():
             continue
-        for sf in phase_dir.glob("*.summary.json"):
-            data = load_json(sf)
-            if data is None:
+        for summary_file in phase_dir.glob("*.summary.json"):
+            summary_data = load_json(summary_file)
+            if summary_data is None:
                 continue
-            secs = float(data.get("elapsed_seconds") or 0.0)
-            mods = data.get("modules") or []
-            if not secs or not mods:
+            elapsed_seconds = float(summary_data.get("elapsed_seconds") or 0.0)
+            module_names = summary_data.get("modules") or []
+            if not elapsed_seconds or not module_names:
                 continue
-            per = secs / max(1, len(mods))
-            ph = cache.setdefault(phase, {})
-            for m in mods:
-                rec = ph.setdefault(m, {"avg_secs": 0.0, "count": 0, "last_secs": 0.0})
-                c = int(rec.get("count", 0))
-                avg = float(rec.get("avg_secs", 0.0))
-                new_avg = (avg * c + per) / (c + 1)
-                rec.update({"avg_secs": new_avg, "count": c + 1, "last_secs": per})
+            per_module_seconds = elapsed_seconds / max(1, len(module_names))
+            phase_cache = weight_cache.setdefault(phase, {})
+            for module_name in module_names:
+                module_record = phase_cache.setdefault(
+                    module_name,
+                    {"avg_secs": 0.0, "count": 0, "last_secs": 0.0},
+                )
+                record_count = int(module_record.get("count", 0))
+                average_seconds = float(module_record.get("avg_secs", 0.0))
+                new_average_seconds = (average_seconds * record_count + per_module_seconds) / (record_count + 1)
+                module_record.update(
+                    {
+                        "avg_secs": new_average_seconds,
+                        "count": record_count + 1,
+                        "last_secs": per_module_seconds,
+                    }
+                )
 
     try:
         cache_path.parent.mkdir(parents=True, exist_ok=True)
-        cache_path.write_text(json.dumps(cache, indent=2))
+        cache_path.write_text(json.dumps(weight_cache, indent=2))
     except OSError as exc:
         _logger.debug("reporter: failed to write weight cache (%s)", exc)
 
 
 def prune_old_sessions(log_root: Path, keep: int) -> None:
     try:
-        sessions = [d for d in log_root.iterdir() if d.is_dir() and d.name.startswith("test-")]
+        session_dirs = [
+            session_dir for session_dir in log_root.iterdir() if
+            session_dir.is_dir() and session_dir.name.startswith("test-")
+        ]
     except OSError:
         return
-    if len(sessions) <= keep:
+    if len(session_dirs) <= keep:
         return
-    for p in sorted(sessions, key=lambda p: p.name)[:-keep]:
+    for session_dir in sorted(session_dirs, key=lambda session_dir: session_dir.name)[:-keep]:
         try:
             # best-effort recursive removal
-            for sub in sorted(p.rglob("*"), reverse=True):
-                if sub.is_file() or sub.is_symlink():
-                    sub.unlink(missing_ok=True)
-                elif sub.is_dir():
-                    sub.rmdir()
-            p.rmdir()
+            for entry in sorted(session_dir.rglob("*"), reverse=True):
+                if entry.is_file() or entry.is_symlink():
+                    entry.unlink(missing_ok=True)
+                elif entry.is_dir():
+                    entry.rmdir()
+            session_dir.rmdir()
         except OSError as exc:
-            _logger.debug("reporter: failed to prune session %s (%s)", p, exc)
+            _logger.debug("reporter: failed to prune session %s (%s)", session_dir, exc)

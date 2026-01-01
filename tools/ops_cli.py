@@ -6,14 +6,15 @@ import re
 import subprocess
 import sys
 import time
-import urllib.request
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Iterable, Sequence
 import tomllib
+import urllib.request
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
 
 import click
+
 try:
     from rich.console import Console
     from rich.prompt import Confirm, Prompt
@@ -26,9 +27,11 @@ except ImportError:  # pragma: no cover - optional for arrow-key TUI
 
 from tools.deployer.command import run_process
 from tools.deployer.compose_ops import local_compose_command, local_compose_env
-from tools.deployer.deploy import execute_upgrade
+from tools.deployer.deploy import deploy_stack, execute_upgrade
+from tools.deployer.health import HealthcheckError
+from tools.deployer.helpers import get_git_commit, resolve_image_reference, run_build
 from tools.deployer.settings import AUTO_INSTALLED_SENTINEL, StackSettings, discover_repo_root, load_stack_settings, parse_env_file
-
+from tools.stack_restore import restore_stack
 
 console = Console()
 
@@ -145,16 +148,18 @@ def _normalize_history(history: object) -> list[dict[str, object]]:
             continue
         if env == "prod" and action not in (SHIP_ACTIONS + GATE_ACTIONS):
             continue
-        entries.append({
-            "target": target,
-            "env": env,
-            "action": action,
-            "deploy": bool(deploy),
-            "build": bool(build),
-            "no_cache": bool(no_cache),
-            "serial": bool(serial),
-            "ts": item.get("ts"),
-        })
+        entries.append(
+            {
+                "target": target,
+                "env": env,
+                "action": action,
+                "deploy": bool(deploy),
+                "build": bool(build),
+                "no_cache": bool(no_cache),
+                "serial": bool(serial),
+                "ts": item.get("ts"),
+            }
+        )
     return entries
 
 
@@ -166,15 +171,17 @@ def _write_state_payload(payload: dict[str, object]) -> None:
 
 def _update_payload_with_state(payload: dict[str, object], state: OpsState) -> dict[str, object]:
     updated = dict(payload)
-    updated.update({
-        "target": state.target,
-        "env": state.env,
-        "action": state.action,
-        "deploy": state.deploy,
-        "build": state.build,
-        "no_cache": state.no_cache,
-        "serial": state.serial,
-    })
+    updated.update(
+        {
+            "target": state.target,
+            "env": state.env,
+            "action": state.action,
+            "deploy": state.deploy,
+            "build": state.build,
+            "no_cache": state.no_cache,
+            "serial": state.serial,
+        }
+    )
     return updated
 
 
@@ -219,7 +226,7 @@ def _record_history(state: OpsState) -> None:
         "build": state.build,
         "no_cache": state.no_cache,
         "serial": state.serial,
-        "ts": datetime.now(timezone.utc).isoformat(),
+        "ts": datetime.now(UTC).isoformat(),
     }
     updated["history"] = [entry, *history][:HISTORY_LIMIT]
     _write_state_payload(updated)
@@ -298,15 +305,15 @@ def _target_names() -> list[str]:
 
 
 def _target_choices() -> list[str]:
-    return [* _target_names(), ALL_TARGET]
+    return [*_target_names(), ALL_TARGET]
 
 
 def _target_config(target: str) -> dict[str, object]:
     config = _load_ops_config()
     try:
         return dict(config.targets[target])
-    except KeyError as exc:
-        raise click.ClickException(f"Unknown target: {target}") from exc
+    except KeyError as error:
+        raise click.ClickException(f"Unknown target: {target}") from error
 
 
 def _resolve_local_stack(target: str) -> str:
@@ -380,7 +387,7 @@ def _coolify_request(path: str, *, method: str = "GET", body: dict[str, object] 
     if not host or not token:
         raise click.ClickException("COOLIFY_HOST/COOLIFY_TOKEN not set; cannot talk to Coolify.")
     url = f"{host.rstrip('/')}{path}"
-    data = json.dumps(body).encode("utf-8") if body is not None else None
+    data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(url, method=method, data=data)
     req.add_header("Authorization", f"Bearer {token}")
     if data is not None:
@@ -562,6 +569,26 @@ def _wait_for_status(
         time.sleep(interval)
 
 
+def _wait_for_deploy(entry: str, env: str, before_keys: dict[str, str]) -> None:
+    app_ref = _resolve_coolify_app(entry, env)
+    if not app_ref:
+        console.print(f"No Coolify app ref for {entry} {env}; skipping wait.")
+        return
+    expected = before_keys.get(entry)
+    success = _wait_for_status(
+        entry,
+        env,
+        app_ref,
+        interval=STATUS_INTERVAL_DEFAULT,
+        timeout=STATUS_TIMEOUT_DEFAULT,
+        expected_key=expected,
+    )
+    if success:
+        console.print(f"{entry} {env}: [green]deploy succeeded[/green]")
+    else:
+        raise click.ClickException(f"{entry} {env} deploy failed.")
+
+
 def _run_local_compose(settings: StackSettings, extra: Sequence[str], *, dry_run: bool) -> None:
     command = local_compose_command(settings, extra)
     if dry_run:
@@ -608,9 +635,9 @@ def _run_local_action(
     for entry in _targets_for(target):
         stack = _resolve_local_stack(entry)
         env_file_path = _resolve_local_env_file(entry)
-        env_file = str(env_file_path)
         if action == "down":
-            _run(["uv", "run", "stack", "down", "--stack", stack, "--env-file", env_file], dry_run=dry_run)
+            settings = load_stack_settings(stack, env_file_path)
+            _run_local_compose(settings, ["down"], dry_run=dry_run)
             console.print(f"{entry} local down complete")
             continue
         if action == "restart":
@@ -623,17 +650,34 @@ def _run_local_action(
             _run_local_upgrade(settings, dry_run=dry_run)
             console.print(f"{entry} local upgrade complete")
             continue
-        command = ["uv", "run", "stack", "up", "--stack", stack, "--env-file", env_file]
-        if not build:
-            command.append("--no-build")
-        elif no_cache and not no_cache_used:
-            command.append("--no-cache")
-            no_cache_used = True
-        if action == "restore":
-            command.append("--restore")
-        if action == "init":
-            command.append("--init")
-        _run(command, dry_run=dry_run, display=True)
+        settings = load_stack_settings(stack, env_file_path)
+        if dry_run:
+            extras: list[str] = []
+            if build:
+                extras.append("build")
+                if no_cache and not no_cache_used:
+                    extras.append("no-cache")
+                    no_cache_used = True
+            if action in ("restore", "init"):
+                extras.append(action)
+            suffix = f" ({', '.join(extras)})" if extras else ""
+            console.print(f"[dry-run] {entry} local {action}{suffix}")
+            continue
+        commit = get_git_commit(settings.repo_root)
+        if build:
+            use_no_cache = no_cache and not no_cache_used
+            run_build(settings, remote=False, no_cache=use_no_cache, repository_url=None, commit=commit)
+            if use_no_cache:
+                no_cache_used = True
+        if action in ("restore", "init"):
+            restore_stack(stack, env_file=env_file_path, bootstrap_only=action == "init")
+            console.print(f"{entry} local {action} complete")
+            continue
+        image_reference = resolve_image_reference(settings, tag=None, image=None)
+        try:
+            deploy_stack(settings, image_reference, remote=False, commit=commit)
+        except HealthcheckError as error:
+            raise click.ClickException(str(error)) from error
         console.print(f"{entry} local {action} complete")
 
 
@@ -641,7 +685,7 @@ def _run_prod_gate(target: str, *, dry_run: bool, skip_tests: bool) -> None:
     cmd = ["uv", "run", "prod-gate", "backup", "--target", target]
     if not skip_tests:
         cmd.append("--run-tests")
-    _run(cmd, dry_run=dry_run, display=True)
+    _run(cmd, dry_run=dry_run)
 
 
 def _run_ship(
@@ -711,7 +755,7 @@ def _run_ship(
     if serial and env in ("dev", "testing"):
         for entry in entries:
             branch = _resolve_branch(entry, env)
-            _run(["git", "push", "origin", f"HEAD:{branch}"], dry_run=dry_run, display=True)
+            _run(["git", "push", "origin", f"HEAD:{branch}"], dry_run=dry_run)
             if deploy:
                 app_ref = _resolve_coolify_app(entry, env)
                 if not app_ref:
@@ -719,27 +763,11 @@ def _run_ship(
                 else:
                     _coolify_deploy(app_ref, dry_run=dry_run)
             if wait_enabled:
-                app_ref = _resolve_coolify_app(entry, env)
-                if not app_ref:
-                    console.print(f"No Coolify app ref for {entry} {env}; skipping wait.")
-                    continue
-                expected = before_keys.get(entry)
-                success = _wait_for_status(
-                    entry,
-                    env,
-                    app_ref,
-                    interval=STATUS_INTERVAL_DEFAULT,
-                    timeout=STATUS_TIMEOUT_DEFAULT,
-                    expected_key=expected,
-                )
-                if success:
-                    console.print(f"{entry} {env}: [green]deploy succeeded[/green]")
-                else:
-                    raise click.ClickException(f"{entry} {env} deploy failed.")
+                _wait_for_deploy(entry, env, before_keys)
     else:
         for entry in entries:
             branch = _resolve_branch(entry, env)
-            _run(["git", "push", "origin", f"HEAD:{branch}"], dry_run=dry_run, display=True)
+            _run(["git", "push", "origin", f"HEAD:{branch}"], dry_run=dry_run)
         if deploy and env in ("dev", "testing"):
             for entry in entries:
                 app_ref = _resolve_coolify_app(entry, env)
@@ -750,23 +778,7 @@ def _run_ship(
 
         if wait_enabled:
             for entry in entries:
-                app_ref = _resolve_coolify_app(entry, env)
-                if not app_ref:
-                    console.print(f"No Coolify app ref for {entry} {env}; skipping wait.")
-                    continue
-                expected = before_keys.get(entry)
-                success = _wait_for_status(
-                    entry,
-                    env,
-                    app_ref,
-                    interval=STATUS_INTERVAL_DEFAULT,
-                    timeout=STATUS_TIMEOUT_DEFAULT,
-                    expected_key=expected,
-                )
-                if success:
-                    console.print(f"{entry} {env}: [green]deploy succeeded[/green]")
-                else:
-                    raise click.ClickException(f"{entry} {env} deploy failed.")
+                _wait_for_deploy(entry, env, before_keys)
 
     if post_apps:
         for app_ref in post_apps:
@@ -905,8 +917,8 @@ def _interactive(*, dry_run: bool, remember: bool, wait_deploy: bool) -> None:
             require_confirm=True,
             record_history=True,
         )
-    except (KeyboardInterrupt, EOFError):
-        raise click.Abort()
+    except (KeyboardInterrupt, EOFError) as error:
+        raise click.Abort() from error
 
 
 def _execute(

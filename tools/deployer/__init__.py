@@ -1,3 +1,1 @@
-from .cli import main
-
-__all__ = ["main"]
+"""Deployer utilities."""

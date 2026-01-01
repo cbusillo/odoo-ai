@@ -18,16 +18,16 @@ Coolify and do not use the overlays in `docker/config/`.
 
 1. Update the stack env file (`docker/config/opw-local.env`).
 
-2. Start the stack (builds images by default):
+2. Start the stack (add `--build` if you need a rebuild):
 
    ```bash
-   uv run stack up --stack opw-local
+   uv run ops local up opw --build
    ```
 
 3. (Optional) Restore upstream data:
 
    ```bash
-   uv run stack up --stack opw-local --restore
+   uv run ops local restore opw
    ```
 
 ## Notes
@@ -56,5 +56,5 @@ Coolify and do not use the overlays in `docker/config/`.
   ```
 
 - Use unique `ODOO_STATE_ROOT` per stack to avoid sharing filestore/postgres.
-- Switch stacks by stopping one (`uv run stack down --stack cm-local`) before
+- Switch stacks by stopping one (`uv run ops local down cm`) before
   starting the other.

@@ -67,7 +67,7 @@ Targets & environments
 
 Behavior notes
 
-- Local actions map to `uv run stack up/down` and use the stack env files
+- Local actions run deployer helpers directly and use the stack env files
   (`docker/config/opw-local.env`, `docker/config/cm-local.env`).
 - `ops local restart` performs a fast `docker compose restart web` for the
   target stack.

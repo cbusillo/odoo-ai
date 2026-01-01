@@ -1,4 +1,3 @@
-import logging
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -8,11 +7,6 @@ from .command import run_process
 from .compose_ops import local_compose_command, local_compose_env, remote_compose_command
 from .remote import run_remote, sync_remote_repository
 from .settings import StackSettings
-
-
-def configure_logging(verbose: bool) -> None:
-    level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(level=level, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
 
 def convert_key_values(values: Iterable[str]) -> dict[str, str]:

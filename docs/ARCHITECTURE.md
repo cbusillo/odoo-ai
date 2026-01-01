@@ -8,12 +8,12 @@ Coolify-managed environments.
 
 ## Runtime Topology
 
-| Environment     | Location         | Deployment                          |
-|-----------------|------------------|-------------------------------------|
-| OPW local       | developer laptop | `uv run stack up --stack opw-local` |
-| CM local        | developer laptop | `uv run stack up --stack cm-local`  |
-| OPW dev/testing | Coolify + Docker | Coolify UI                          |
-| CM dev/testing  | Coolify + Docker | Coolify UI                          |
+| Environment     | Location         | Deployment                           |
+|-----------------|------------------|--------------------------------------|
+| OPW local       | developer laptop | `uv run ops local up opw --build`    |
+| CM local        | developer laptop | `uv run ops local up cm --build`     |
+| OPW dev/testing | Coolify + Docker | Coolify UI                           |
+| CM dev/testing  | Coolify + Docker | Coolify UI                           |
 
 ## Key points
 
@@ -25,13 +25,13 @@ Coolify-managed environments.
   `docker/scripts/install_dev_requirements.sh` use `uv sync` with
   `/volumes/pyproject.toml` and `/volumes/uv.lock`.
 - Use `docker/config/_restore_ssh_volume.yaml` when running
-  `uv run stack up --stack <stack> --restore` locally so the container can reach
+  `uv run ops local restore <target>` locally so the container can reach
   upstream.
 
 ## Local deploy/restore
 
-- Deploy: `uv run stack up --stack <stack>`
-- Restore: `uv run stack up --stack <stack> --restore`
+- Deploy: `uv run ops local up <target> --build`
+- Restore: `uv run ops local restore <target>`
 
 ## Application layers
 
@@ -45,4 +45,4 @@ Coolify-managed environments.
 - Docker usage – `docs/tooling/docker.md`
 - Local stack layering – `docker/config/README.md`
 - Multi-project local config – `docs/workflows/multi-project.md`
-- Restore entry point – `uv run stack up --stack <stack> --restore`
+- Restore entry point – `uv run ops local restore <target>`

@@ -1,0 +1,12 @@
+title = "Ops CLI configuration"
+
+[state]
+path = "~/odoo-ai/ops.json"
+
+[coolify]
+host = "https://coolify.shinycomputers.com"
+auto_deploy = true
+
+[targets.opw]
+
+[targets.cm]

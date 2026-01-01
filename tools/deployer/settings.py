@@ -69,6 +69,85 @@ def split_modules(raw_value: str | None) -> tuple[str, ...]:
     return tuple(modules)
 
 
+def _map_addon_path(raw: str, repo_root: Path) -> Path:
+    expanded = os.path.expandvars(os.path.expanduser(raw))
+    path = Path(expanded)
+    if not path.is_absolute():
+        return (repo_root / path).resolve()
+    normalized = path.as_posix()
+    if normalized == "/volumes/addons":
+        return (repo_root / "addons").resolve()
+    if normalized.startswith("/volumes/addons/"):
+        suffix = normalized.removeprefix("/volumes/addons/")
+        return (repo_root / "addons" / suffix).resolve()
+    if normalized == "/opt/project/addons":
+        return (repo_root / "addons").resolve()
+    if normalized.startswith("/opt/project/addons/"):
+        suffix = normalized.removeprefix("/opt/project/addons/")
+        return (repo_root / "addons" / suffix).resolve()
+    if normalized == "/volumes/extra_addons":
+        return (repo_root / "extra_addons").resolve()
+    if normalized.startswith("/volumes/extra_addons/"):
+        suffix = normalized.removeprefix("/volumes/extra_addons/")
+        return (repo_root / "extra_addons" / suffix).resolve()
+    if normalized == "/opt/extra_addons":
+        return (repo_root / "extra_addons").resolve()
+    if normalized.startswith("/opt/extra_addons/"):
+        suffix = normalized.removeprefix("/opt/extra_addons/")
+        return (repo_root / "extra_addons" / suffix).resolve()
+    return path
+
+
+def _resolve_addon_dirs(environment: dict[str, str], repo_root: Path) -> list[Path]:
+    raw_dirs = environment.get("LOCAL_ADDONS_DIRS") or environment.get("ODOO_ADDONS_PATH") or ""
+    candidates = [_map_addon_path(item, repo_root) for item in split_values(raw_dirs)]
+    resolved: list[Path] = []
+    seen: set[Path] = set()
+    for path in candidates:
+        if not path.exists() or not path.is_dir():
+            continue
+        if path in seen:
+            continue
+        resolved.append(path)
+        seen.add(path)
+    if not resolved:
+        fallback = repo_root / "addons"
+        if fallback.exists() and fallback.is_dir():
+            resolved.append(fallback.resolve())
+    return resolved
+
+
+def _discover_modules_from_dirs(addon_dirs: Iterable[Path]) -> tuple[str, ...]:
+    discovered: set[str] = set()
+    for base in addon_dirs:
+        if not base.exists() or not base.is_dir():
+            continue
+        for child in base.iterdir():
+            if not child.is_dir():
+                continue
+            if (child / "__manifest__.py").exists() or (child / "__openerp__.py").exists():
+                discovered.add(child.name)
+    return tuple(sorted(discovered))
+
+
+def discover_local_modules(environment: dict[str, str], repo_root: Path) -> tuple[str, ...]:
+    addon_dirs = _resolve_addon_dirs(environment, repo_root)
+    return _discover_modules_from_dirs(addon_dirs)
+
+
+AUTO_INSTALLED_SENTINEL = "__AUTO_INSTALLED__"
+
+
+def resolve_update_modules(config: "StackConfig", environment: dict[str, str], repo_root: Path) -> tuple[str, ...]:
+    update_source = config.update_modules_raw or config.update_modules_legacy
+    if update_source and update_source.strip().upper() not in {"AUTO", ""}:
+        return split_modules(update_source)
+    auto_modules = (environment.get("ODOO_AUTO_MODULES") or "").strip()
+    if auto_modules and auto_modules.upper() != "AUTO":
+        return split_modules(auto_modules)
+    return (AUTO_INSTALLED_SENTINEL,)
+
+
 def infer_project_slug(stack_name: str) -> str | None:
     """Best-effort project slug inference from stack naming conventions or env values."""
 
@@ -375,8 +454,7 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
     docker_context = compute_docker_context(repo_root, config)
     registry_image = compute_registry_image(config)
     healthcheck_url = compute_healthcheck_url(config)
-    update_source = config.update_modules_raw or config.update_modules_legacy
-    update_modules = split_modules(update_source)
+    update_modules = resolve_update_modules(config, raw_environment, repo_root)
     services = compute_services(config)
     script_runner_service = compute_script_runner(config)
     odoo_bin_path = compute_odoo_bin(config)
@@ -440,12 +518,14 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
 def select_env_file(name: str, repo_root: Path, explicit: Path | None) -> Path:
     if explicit is not None:
         return explicit.resolve()
+    project_slug = infer_project_slug(name)
     candidates = [
         repo_root / "docker" / "config" / f"{name}.env",
         repo_root / "docker" / "config" / ".env.{name}",
+        repo_root / "docker" / "config" / f"{project_slug}.env" if project_slug else None,
         repo_root / ".env",
     ]
-    for candidate in candidates:
+    for candidate in [path for path in candidates if path is not None]:
         if candidate.exists():
             return candidate.resolve()
     raise FileNotFoundError(f"no env file found for {name}")

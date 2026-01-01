@@ -1,14 +1,16 @@
 import json
 import logging
+import os
 import tempfile
+import time
 from collections.abc import Mapping
 from pathlib import Path
 
-from .command import CommandError
-from .compose_ops import local_compose, remote_compose_command
+from .command import CommandError, run_process
+from .compose_ops import local_compose, local_compose_command, local_compose_env, remote_compose_command
 from .health import HealthcheckError, wait_for_health
 from .remote import ensure_remote_directory, run_remote, sync_remote_repository, upload_file
-from .settings import StackSettings
+from .settings import AUTO_INSTALLED_SENTINEL, StackSettings, discover_local_modules
 
 
 def _run_compose(settings: StackSettings, args: list[str], remote: bool) -> None:
@@ -125,10 +127,60 @@ def execute_compose_up(settings: StackSettings, remote: bool) -> None:
     _run_compose(settings, ["up", "-d", *settings.services], remote)
 
 
+def _wait_for_local_service(settings: StackSettings, service: str, *, timeout_seconds: int = 60) -> None:
+    if service not in settings.services:
+        return
+    start = time.monotonic()
+    while True:
+        result = run_process(
+            local_compose_command(settings, ["ps", "-q", service]),
+            cwd=settings.repo_root,
+            env=local_compose_env(settings),
+            capture_output=True,
+            check=False,
+        )
+        container_id = (result.stdout or "").strip()
+        if container_id:
+            status = run_process(
+                ["docker", "inspect", "-f", "{{.State.Status}}", container_id],
+                capture_output=True,
+                check=False,
+            )
+            if (status.stdout or "").strip() == "running":
+                return
+        if time.monotonic() - start > timeout_seconds:
+            raise ValueError(f"Timed out waiting for {service} to be running.")
+        time.sleep(2)
+
+
+def _run_upgrade_with_retry(settings: StackSettings, upgrade_subcommand: list[str], *, remote: bool) -> None:
+    if remote:
+        _run_compose(settings, upgrade_subcommand, remote)
+        return
+    max_attempts = 6
+    for attempt in range(max_attempts):
+        try:
+            _run_compose(settings, upgrade_subcommand, remote)
+            return
+        except CommandError as error:
+            message = "\n".join(
+                value for value in (error.stdout or "", error.stderr or "", str(error)) if value
+            )
+            if "restarting" not in message and "is not running" not in message:
+                raise
+            if attempt == max_attempts - 1:
+                raise
+            _wait_for_local_service(settings, settings.script_runner_service, timeout_seconds=60)
+            time.sleep(2)
+
+
 def execute_upgrade(settings: StackSettings, modules: tuple[str, ...], remote: bool) -> None:
-    if not modules:
+    resolved_modules = modules
+    if modules == (AUTO_INSTALLED_SENTINEL,):
+        resolved_modules = _installed_local_modules(settings)
+    if not resolved_modules:
         raise ValueError("no modules configured for upgrade")
-    module_argument = ",".join(dict.fromkeys(modules))
+    module_argument = ",".join(dict.fromkeys(resolved_modules))
     upgrade_subcommand = [
         "exec",
         "-T",
@@ -137,7 +189,64 @@ def execute_upgrade(settings: StackSettings, modules: tuple[str, ...], remote: b
         "-lc",
         f"{settings.odoo_bin_path} -u {module_argument} -d $ODOO_DB_NAME --stop-after-init",
     ]
-    _run_compose(settings, upgrade_subcommand, remote)
+    if not remote and "web" in settings.services:
+        _run_compose(settings, ["stop", "web"], remote)
+        try:
+            _run_compose(settings, ["up", "-d", settings.script_runner_service], remote)
+            _wait_for_local_service(settings, settings.script_runner_service, timeout_seconds=60)
+            _run_upgrade_with_retry(settings, upgrade_subcommand, remote=remote)
+        finally:
+            _run_compose(settings, ["up", "-d", "web"], remote)
+        return
+    if not remote:
+        _run_compose(settings, ["up", "-d", settings.script_runner_service], remote)
+        _wait_for_local_service(settings, settings.script_runner_service, timeout_seconds=60)
+    _run_upgrade_with_retry(settings, upgrade_subcommand, remote=remote)
+
+
+def _installed_local_modules(settings: StackSettings) -> tuple[str, ...]:
+    container_name = f"{settings.compose_project}-database-1"
+    db_name = settings.environment.get("ODOO_DB_NAME")
+    db_user = settings.environment.get("ODOO_DB_USER")
+    db_password = settings.environment.get("ODOO_DB_PASSWORD", "")
+    if not db_name or not db_user:
+        raise ValueError("ODOO_DB_NAME/ODOO_DB_USER missing for module upgrade")
+
+    query = "select name from ir_module_module where state in ('installed','to upgrade','to install')"
+    command = [
+        "docker",
+        "exec",
+        "-i",
+        container_name,
+        "psql",
+        "-qtAX",
+        "-U",
+        db_user,
+        "-d",
+        db_name,
+        "-c",
+        query,
+    ]
+    env = os.environ.copy()
+    if db_password:
+        env["PGPASSWORD"] = db_password
+    last_error = ""
+    for attempt in range(10):
+        result = run_process(command, capture_output=True, check=False, env=env)
+        if result.returncode == 0:
+            installed = {line.strip() for line in (result.stdout or "").splitlines() if line.strip()}
+            break
+        last_error = (result.stderr or "").strip()
+        time.sleep(2)
+    else:
+        raise ValueError(
+            f"Failed to query installed modules after retries; database may be restarting. {last_error}"
+        )
+    installed = {line.strip() for line in (result.stdout or "").splitlines() if line.strip()}
+    if not installed:
+        return ()
+    local_modules = set(discover_local_modules(settings.environment, settings.repo_root))
+    return tuple(sorted(installed & local_modules))
 
 
 def run_health_check(settings: StackSettings, remote: bool, timeout_seconds: int) -> None:

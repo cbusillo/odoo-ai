@@ -3,6 +3,7 @@
     <option name="myName" value="Project Default" />
     <option name="scopesOrder">
       <list>
+        <option value="Tests" />
         <option value="Docs" />
         <option value="Conf" />
         <option value="All Changed Files" />
@@ -16,6 +17,9 @@
     </inspection_tool>
     <inspection_tool class="CssUnusedSymbol" enabled="true" level="WARNING" enabled_by_default="false">
       <scope name="Odoo SCSS" level="WARNING" enabled="false" />
+    </inspection_tool>
+    <inspection_tool class="DuplicatedCode" enabled="true" level="WEAK WARNING" enabled_by_default="true">
+      <scope name="Tests" level="WEAK WARNING" enabled="false" />
     </inspection_tool>
     <inspection_tool class="EmptyDirectory" enabled="true" level="WARNING" enabled_by_default="true" />
     <inspection_tool class="JsonSchemaCompliance" enabled="true" level="WARNING" enabled_by_default="true">
@@ -73,7 +77,7 @@
       <scope name="Docs" level="WARNING" enabled="false" />
     </inspection_tool>
     <inspection_tool class="PyUnreachableCodeInspection" enabled="true" level="WARNING" enabled_by_default="true">
-      <scope name="Docs" level="WARNING" enabled="false" />
+      <scope name="Docs" level="WARNING" enabled="false" editorAttributes="NOT_USED_ELEMENT_ATTRIBUTES" />
     </inspection_tool>
     <inspection_tool class="PyUnresolvedReferencesInspection" enabled="true" level="WARNING" enabled_by_default="true">
       <scope name="Docs" level="WARNING" enabled="false" />

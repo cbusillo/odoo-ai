@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import time
-import xml.etree.ElementTree as element_tree
+import xml.etree.ElementTree as ElementTree
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -171,13 +171,13 @@ def _junit_counts(counters: dict[str, Any], entries: list[dict[str, Any]]) -> tu
     return tests, fail_count, err_count, skipped
 
 
-def _append_junit_failures(suite: element_tree.Element, entries: list[dict[str, Any]]) -> None:
+def _append_junit_failures(suite: ElementTree.Element, entries: list[dict[str, Any]]) -> None:
     for entry in entries:
         name = entry.get("test") or entry.get("fingerprint") or "unknown"
-        tc = element_tree.SubElement(suite, "testcase", attrib={"name": str(name)})
+        tc = ElementTree.SubElement(suite, "testcase", attrib={"name": str(name)})
         mapped = _map_failure_type_to_junit(str(entry.get("type", "")))
         message = entry.get("message") or entry.get("type") or ""
-        el = element_tree.SubElement(tc, mapped, attrib={"message": str(message)})
+        el = ElementTree.SubElement(tc, mapped, attrib={"message": str(message)})
         tb = entry.get("traceback")
         if tb:
             el.text = str(tb)
@@ -198,7 +198,7 @@ def write_junit_for_phase(session_dir: Path, phase: str) -> Path | None:
     counters = agg.get("counters") or {}
     tests, fail_count, err_count, skipped = _junit_counts(counters, failure_entries)
 
-    suite = element_tree.Element(
+    suite = ElementTree.Element(
         "testsuite",
         attrib={
             "name": f"{phase}",
@@ -210,23 +210,23 @@ def write_junit_for_phase(session_dir: Path, phase: str) -> Path | None:
     )
     _append_junit_failures(suite, failure_entries)
 
-    tree = element_tree.ElementTree(suite)
+    tree = ElementTree.ElementTree(suite)
     out = phase_dir / "junit.xml"
     tree.write(out, encoding="utf-8", xml_declaration=True)
     return out
 
 
 def write_junit_root(session_dir: Path) -> Path:
-    suites = element_tree.Element("testsuites")
+    suites = ElementTree.Element("testsuites")
     total_tests = total_fail = total_err = total_skip = 0
     for phase in ("unit", "js", "integration", "tour"):
         junit_path = session_dir / phase / "junit.xml"
         if not junit_path.exists():
             continue
         try:
-            tree = element_tree.parse(str(junit_path))
+            tree = ElementTree.parse(str(junit_path))
             suite = tree.getroot()
-        except (OSError, element_tree.ParseError) as exc:
+        except (OSError, ElementTree.ParseError) as exc:
             _logger.debug("reporter: failed to parse junit %s (%s)", junit_path, exc)
             continue
         suites.append(suite)
@@ -244,7 +244,7 @@ def write_junit_root(session_dir: Path) -> Path:
         }
     )
     out = session_dir / "junit.xml"
-    element_tree.ElementTree(suites).write(out, encoding="utf-8", xml_declaration=True)
+    ElementTree.ElementTree(suites).write(out, encoding="utf-8", xml_declaration=True)
     return out
 
 
@@ -256,7 +256,7 @@ def write_junit_for_shard(summary_file: Path, log_file: Path) -> Path | None:
     failures = parse_failures(log_file)
     tests, fail_count, err_count, skipped = _junit_counts(counters, failures)
 
-    suite = element_tree.Element(
+    suite = ElementTree.Element(
         "testsuite",
         attrib={
             "name": Path(summary_file).stem.replace(".summary", ""),
@@ -269,7 +269,7 @@ def write_junit_for_shard(summary_file: Path, log_file: Path) -> Path | None:
     _append_junit_failures(suite, failures)
 
     out = summary_file.with_suffix("").with_suffix(".junit.xml")
-    element_tree.ElementTree(suite).write(out, encoding="utf-8", xml_declaration=True)
+    ElementTree.ElementTree(suite).write(out, encoding="utf-8", xml_declaration=True)
     return out
 
 

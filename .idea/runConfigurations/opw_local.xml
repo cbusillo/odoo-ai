@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Generate Schema" type="PythonConfigurationType" factoryName="Python">
+  <configuration default="false" name="opw-local" type="PythonConfigurationType" factoryName="Python">
     <module name="odoo-ai" />
-    <option name="ENV_FILES" value="$PROJECT_DIR$/.env" />
+    <option name="ENV_FILES" value="$USER_HOME$/odoo-ai/opw-local/.compose.env" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
     <envs>
@@ -15,13 +15,15 @@
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
     <option name="RUN_TOOL" value="" />
-    <option name="SCRIPT_NAME" value="$PROJECT_DIR$/docker/scripts/generate_shopify_models.py" />
-    <option name="PARAMETERS" value="" />
+    <option name="SCRIPT_NAME" value="/odoo/odoo-bin" />
+    <option name="PARAMETERS" value="--dev=all --log-level=warn" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />
     <option name="REDIRECT_INPUT" value="false" />
     <option name="INPUT_FILE" value="" />
-    <method v="2" />
+    <method v="2">
+      <option name="ToolBeforeRunTask" enabled="true" actionId="Tool_External Tools_opw-local update" />
+    </method>
   </configuration>
 </component>

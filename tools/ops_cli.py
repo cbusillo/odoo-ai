@@ -37,7 +37,7 @@ console = Console()
 
 ALL_TARGET = "all"
 ENVS = ("local", "dev", "testing", "prod")
-LOCAL_ACTIONS = ("up", "down", "init", "restore", "restart", "upgrade")
+LOCAL_ACTIONS = ("up", "down", "init", "restore", "restart", "upgrade", "doctor")
 POST_SHIP_ACTIONS = ("none", "restore", "init")
 SHIP_ACTIONS = ("ship",)
 GATE_ACTIONS = ("gate",)
@@ -632,6 +632,10 @@ def _run_local_action(
             _run_local_compose(settings, ["down"], dry_run=dry_run)
             console.print(f"{entry} local down complete")
             continue
+        if action == "doctor":
+            settings = load_stack_settings(stack, env_file_path)
+            _print_local_doctor(entry, settings)
+            continue
         if action == "restart":
             settings = load_stack_settings(stack, env_file_path)
             _run_local_restart(settings, dry_run=dry_run)
@@ -806,6 +810,18 @@ def _run_status(target: str, env: str, *, wait: bool, interval: float, timeout: 
             _wait_for_status(entry, env, app_ref, interval=interval, timeout=timeout)
         else:
             _print_status(entry, env, app_ref)
+
+
+def _print_local_doctor(entry: str, settings: StackSettings) -> None:
+    console.print(f"Local stack: [bold]{entry}[/bold]")
+    console.print(f"  name: {settings.name}")
+    console.print(f"  env file: {settings.env_file}")
+    console.print(f"  state root: {settings.state_root}")
+    console.print(f"  compose project: {settings.compose_project}")
+    console.print(f"  compose files: {', '.join(str(path) for path in settings.compose_files)}")
+    console.print(f"  services: {', '.join(settings.services)}")
+    console.print(f"  script runner: {settings.script_runner_service}")
+    console.print(f"  registry image: {settings.registry_image}")
 
 
 def _prompt_choice(label: str, choices: Iterable[str], default: str) -> str:

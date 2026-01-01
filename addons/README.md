@@ -50,7 +50,6 @@ Each addon should follow Odoo's standard structure:
 
 ```text
 my_addon/
-├── __init__.py
 ├── __manifest__.py
 ├── models/
 ├── views/

@@ -1,8 +1,8 @@
 # Docker Config Layering (Local Dev)
 
-This directory holds local stack overlays used by `uv run stack` and ad-hoc
-`docker compose` commands. Coolify deployments ignore these files and use the
-repo's `docker-compose.yml` only.
+This directory holds local stack overlays used by `uv run ops local ...` and
+ad-hoc `docker compose` commands. Coolify deployments ignore these files and
+use the repo's `docker-compose.yml` only.
 
 ## Layer order
 
@@ -38,7 +38,7 @@ docker-compose.yml
 2. Run the stack:
 
    ```bash
-   uv run stack up --stack opw-local
+   uv run ops local up opw --build
    ```
 
 ## Notes
@@ -48,5 +48,5 @@ docker-compose.yml
   repo for live-editing (see `docs/workflows/multi-project.md`).
 - Local-only overrides live in the env files (for example `ODOO_WEB_COMMAND`
   and host port mappings).
-- Restore runs (`uv run stack up --restore`) automatically include the
+- Restore runs (`uv run ops local restore <target>`) automatically include the
   `_restore_ssh_volume.yaml` overlay so the container can reach upstream hosts.

@@ -54,6 +54,7 @@ class OpsState:
     deploy: bool = True
     build: bool = False
     no_cache: bool = False
+    serial: bool = False
 
 
 @dataclass(frozen=True)
@@ -135,6 +136,7 @@ def _normalize_history(history: object) -> list[dict[str, object]]:
         deploy = item.get("deploy", False)
         build = item.get("build", False)
         no_cache = item.get("no_cache", False)
+        serial = item.get("serial", False)
         if target not in valid_targets or env not in ENVS or action not in valid_actions:
             continue
         if env == "local" and action not in LOCAL_ACTIONS:
@@ -150,6 +152,7 @@ def _normalize_history(history: object) -> list[dict[str, object]]:
             "deploy": bool(deploy),
             "build": bool(build),
             "no_cache": bool(no_cache),
+            "serial": bool(serial),
             "ts": item.get("ts"),
         })
     return entries
@@ -170,6 +173,7 @@ def _update_payload_with_state(payload: dict[str, object], state: OpsState) -> d
         "deploy": state.deploy,
         "build": state.build,
         "no_cache": state.no_cache,
+        "serial": state.serial,
     })
     return updated
 
@@ -192,7 +196,9 @@ def _load_state() -> OpsState:
     build = bool(build_raw)
     no_cache_raw = payload.get("no_cache", OpsState.no_cache)
     no_cache = bool(no_cache_raw)
-    return OpsState(target=target, env=env, action=action, deploy=deploy, build=build, no_cache=no_cache)
+    serial_raw = payload.get("serial", OpsState.serial)
+    serial = bool(serial_raw)
+    return OpsState(target=target, env=env, action=action, deploy=deploy, build=build, no_cache=no_cache, serial=serial)
 
 
 def _save_state(state: OpsState) -> None:
@@ -212,6 +218,7 @@ def _record_history(state: OpsState) -> None:
         "deploy": state.deploy,
         "build": state.build,
         "no_cache": state.no_cache,
+        "serial": state.serial,
         "ts": datetime.now(timezone.utc).isoformat(),
     }
     updated["history"] = [entry, *history][:HISTORY_LIMIT]
@@ -223,7 +230,7 @@ def _favorite_states(limit: int = 3) -> list[OpsState]:
     history = _normalize_history(payload.get("history"))
     if not history:
         return []
-    scores: dict[tuple[str, str, str, bool, bool, bool], float] = {}
+    scores: dict[tuple[str, str, str, bool, bool, bool, bool], float] = {}
     for index, entry in enumerate(history):
         weight = 1.0 / (index + 1)
         key = (
@@ -233,13 +240,14 @@ def _favorite_states(limit: int = 3) -> list[OpsState]:
             bool(entry.get("deploy", False)),
             bool(entry.get("build", False)),
             bool(entry.get("no_cache", False)),
+            bool(entry.get("serial", False)),
         )
         scores[key] = scores.get(key, 0.0) + weight
     ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
     favorites: list[OpsState] = []
-    for (target, env, action, deploy, build, no_cache), _score in ranked[:limit]:
+    for (target, env, action, deploy, build, no_cache, serial), _score in ranked[:limit]:
         favorites.append(
-            OpsState(target=target, env=env, action=action, deploy=deploy, build=build, no_cache=no_cache)
+            OpsState(target=target, env=env, action=action, deploy=deploy, build=build, no_cache=no_cache, serial=serial)
         )
     return favorites
 
@@ -248,6 +256,8 @@ def _favorite_label(state: OpsState) -> str:
     label = f"{state.target} {state.env} {state.action}"
     if state.action == "ship" and state.env in ("dev", "testing") and state.deploy:
         label = f"{label} +deploy"
+    if state.action == "ship" and state.env in ("dev", "testing") and state.serial:
+        label = f"{label} +serial"
     if state.env == "local" and state.action in ("up", "init", "restore"):
         if state.build:
             label = f"{label} +build"
@@ -640,6 +650,7 @@ def _run_ship(
     *,
     deploy: bool,
     wait_deploy: bool,
+    serial: bool,
     post_action: str | None,
     dry_run: bool,
     skip_tests: bool,
@@ -696,36 +707,66 @@ def _run_ship(
             )
             post_apps.append(app_ref)
 
-    for entry in _targets_for(target):
-        branch = _resolve_branch(entry, env)
-        _run(["git", "push", "origin", f"HEAD:{branch}"], dry_run=dry_run, display=True)
-    if deploy and env in ("dev", "testing"):
-        for entry in _targets_for(target):
-            app_ref = _resolve_coolify_app(entry, env)
-            if not app_ref:
-                console.print(f"No Coolify app ref for {entry} {env}; skipping deploy.")
-                continue
-            _coolify_deploy(app_ref, dry_run=dry_run)
+    entries = _targets_for(target)
+    if serial and env in ("dev", "testing"):
+        for entry in entries:
+            branch = _resolve_branch(entry, env)
+            _run(["git", "push", "origin", f"HEAD:{branch}"], dry_run=dry_run, display=True)
+            if deploy:
+                app_ref = _resolve_coolify_app(entry, env)
+                if not app_ref:
+                    console.print(f"No Coolify app ref for {entry} {env}; skipping deploy.")
+                else:
+                    _coolify_deploy(app_ref, dry_run=dry_run)
+            if wait_enabled:
+                app_ref = _resolve_coolify_app(entry, env)
+                if not app_ref:
+                    console.print(f"No Coolify app ref for {entry} {env}; skipping wait.")
+                    continue
+                expected = before_keys.get(entry)
+                success = _wait_for_status(
+                    entry,
+                    env,
+                    app_ref,
+                    interval=STATUS_INTERVAL_DEFAULT,
+                    timeout=STATUS_TIMEOUT_DEFAULT,
+                    expected_key=expected,
+                )
+                if success:
+                    console.print(f"{entry} {env}: [green]deploy succeeded[/green]")
+                else:
+                    raise click.ClickException(f"{entry} {env} deploy failed.")
+    else:
+        for entry in entries:
+            branch = _resolve_branch(entry, env)
+            _run(["git", "push", "origin", f"HEAD:{branch}"], dry_run=dry_run, display=True)
+        if deploy and env in ("dev", "testing"):
+            for entry in entries:
+                app_ref = _resolve_coolify_app(entry, env)
+                if not app_ref:
+                    console.print(f"No Coolify app ref for {entry} {env}; skipping deploy.")
+                    continue
+                _coolify_deploy(app_ref, dry_run=dry_run)
 
-    if wait_enabled:
-        for entry in _targets_for(target):
-            app_ref = _resolve_coolify_app(entry, env)
-            if not app_ref:
-                console.print(f"No Coolify app ref for {entry} {env}; skipping wait.")
-                continue
-            expected = before_keys.get(entry)
-            success = _wait_for_status(
-                entry,
-                env,
-                app_ref,
-                interval=STATUS_INTERVAL_DEFAULT,
-                timeout=STATUS_TIMEOUT_DEFAULT,
-                expected_key=expected,
-            )
-            if success:
-                console.print(f"{entry} {env}: [green]deploy succeeded[/green]")
-            else:
-                raise click.ClickException(f"{entry} {env} deploy failed.")
+        if wait_enabled:
+            for entry in entries:
+                app_ref = _resolve_coolify_app(entry, env)
+                if not app_ref:
+                    console.print(f"No Coolify app ref for {entry} {env}; skipping wait.")
+                    continue
+                expected = before_keys.get(entry)
+                success = _wait_for_status(
+                    entry,
+                    env,
+                    app_ref,
+                    interval=STATUS_INTERVAL_DEFAULT,
+                    timeout=STATUS_TIMEOUT_DEFAULT,
+                    expected_key=expected,
+                )
+                if success:
+                    console.print(f"{entry} {env}: [green]deploy succeeded[/green]")
+                else:
+                    raise click.ClickException(f"{entry} {env} deploy failed.")
 
     if post_apps:
         for app_ref in post_apps:
@@ -792,6 +833,7 @@ def _interactive(*, dry_run: bool, remember: bool, wait_deploy: bool) -> None:
 
         build = False
         no_cache = False
+        serial = False
         post_action = "none"
         if favorite:
             target = favorite.target
@@ -800,6 +842,7 @@ def _interactive(*, dry_run: bool, remember: bool, wait_deploy: bool) -> None:
             deploy = favorite.deploy
             build = favorite.build
             no_cache = favorite.no_cache
+            serial = favorite.serial
         else:
             target = _prompt_choice("Target", _target_choices(), state.target)
             env = _prompt_choice("Env", ENVS, state.env)
@@ -816,6 +859,7 @@ def _interactive(*, dry_run: bool, remember: bool, wait_deploy: bool) -> None:
             deploy = state.deploy
             if action == "ship" and env in ("dev", "testing"):
                 deploy = Confirm.ask("Trigger Coolify deploy after push?", default=state.deploy)
+                serial = Confirm.ask("Deploy serially?", default=state.serial)
                 post_action = _prompt_choice("After deploy", POST_SHIP_ACTIONS, "none")
             if env == "local" and action in ("up", "init", "restore"):
                 if questionary and sys.stdin.isatty():
@@ -834,7 +878,15 @@ def _interactive(*, dry_run: bool, remember: bool, wait_deploy: bool) -> None:
                     else:
                         no_cache = Confirm.ask("Use --no-cache?", default=False)
 
-        current = OpsState(target=target, env=env, action=action, deploy=deploy, build=build, no_cache=no_cache)
+        current = OpsState(
+            target=target,
+            env=env,
+            action=action,
+            deploy=deploy,
+            build=build,
+            no_cache=no_cache,
+            serial=serial,
+        )
         if remember:
             _save_state(current)
 
@@ -844,6 +896,7 @@ def _interactive(*, dry_run: bool, remember: bool, wait_deploy: bool) -> None:
             action,
             deploy=deploy,
             wait_deploy=wait_deploy,
+            serial=serial,
             build=build,
             no_cache=no_cache,
             post_action=post_action,
@@ -863,6 +916,7 @@ def _execute(
     *,
     deploy: bool,
     wait_deploy: bool,
+    serial: bool,
     build: bool,
     no_cache: bool,
     post_action: str | None,
@@ -890,6 +944,7 @@ def _execute(
                     deploy=deploy,
                     build=build,
                     no_cache=no_cache,
+                    serial=serial,
                 )
             )
         return
@@ -900,19 +955,20 @@ def _execute(
             env,
             deploy=deploy,
             wait_deploy=wait_deploy,
+            serial=serial,
             post_action=post_action,
             dry_run=dry_run,
             skip_tests=skip_tests,
             require_confirm=require_confirm,
         )
         if record_history:
-            _record_history(OpsState(target=target, env=env, action=action, deploy=deploy))
+            _record_history(OpsState(target=target, env=env, action=action, deploy=deploy, serial=serial))
         return
 
     if action == "gate":
         _run_gate(target, dry_run=dry_run, skip_tests=skip_tests, require_confirm=require_confirm)
         if record_history:
-            _record_history(OpsState(target=target, env=env, action=action, deploy=deploy))
+            _record_history(OpsState(target=target, env=env, action=action, deploy=deploy, serial=serial))
         return
 
     raise click.ClickException(f"Unknown action: {action}")
@@ -924,6 +980,7 @@ def _execute(
 @click.option("--action", default=None)
 @click.option("--deploy/--no-deploy", default=True, help="Trigger Coolify deploy after ship")
 @click.option("--wait/--no-wait", default=True, help="Wait for Coolify deploy to finish")
+@click.option("--serial/--parallel", default=False, help="Deploy one target at a time when shipping")
 @click.option("--build/--no-build", default=False, help="Build image before local actions")
 @click.option("--no-cache", is_flag=True, help="Build without cache for local actions")
 @click.option("--skip-tests", is_flag=True, help="Skip prod gate tests")
@@ -937,6 +994,7 @@ def main(
     action: str | None,
     deploy: bool,
     wait: bool,
+    serial: bool,
     build: bool,
     no_cache: bool,
     skip_tests: bool,
@@ -956,6 +1014,7 @@ def main(
         action,
         deploy=deploy,
         wait_deploy=wait,
+        serial=serial,
         build=build if env_name == "local" else False,
         no_cache=no_cache if env_name == "local" else False,
         post_action=None,
@@ -979,6 +1038,7 @@ def local_command(action: str, target: str, build: bool, no_cache: bool, dry_run
         action,
         deploy=False,
         wait_deploy=False,
+        serial=False,
         build=build,
         no_cache=no_cache,
         post_action=None,
@@ -994,6 +1054,7 @@ def local_command(action: str, target: str, build: bool, no_cache: bool, dry_run
 @click.argument("target")
 @click.option("--deploy/--no-deploy", default=True)
 @click.option("--wait/--no-wait", default=True, help="Wait for Coolify deploy to finish")
+@click.option("--serial/--parallel", default=False, help="Deploy one target at a time")
 @click.option("--after", type=click.Choice(("none", "restore", "init"), case_sensitive=False), default="none")
 @click.option("--skip-tests", is_flag=True)
 @click.option("--dry-run", is_flag=True)
@@ -1003,6 +1064,7 @@ def ship_command(
     target: str,
     deploy: bool,
     wait: bool,
+    serial: bool,
     after: str,
     skip_tests: bool,
     dry_run: bool,
@@ -1017,6 +1079,7 @@ def ship_command(
         "ship",
         deploy=deploy,
         wait_deploy=wait,
+        serial=serial,
         build=False,
         no_cache=False,
         post_action=after if after != "none" else None,
@@ -1041,6 +1104,7 @@ def gate_command(target: str, skip_tests: bool, dry_run: bool, confirm: bool) ->
         "gate",
         deploy=False,
         wait_deploy=False,
+        serial=False,
         build=False,
         no_cache=False,
         post_action=None,

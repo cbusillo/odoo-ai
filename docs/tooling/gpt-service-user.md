@@ -2,7 +2,6 @@
 title: GPT Service Users
 ---
 
-
 ## Purpose
 
 - Provide deterministic service accounts for GPT/Codex automation against
@@ -19,9 +18,9 @@ title: GPT Service Users
 
 ## Accounts
 
-| Login       | Display Name     | Password   | API Key Plaintext  | Groups |
-|:------------|:-----------------|:-----------|:-------------------|:-------|
-| `gpt`       | GPT Service User | `ODOO_KEY` | `ODOO_KEY`         | `base.group_user` |
+| Login       | Display Name     | Password   | API Key Plaintext  | Groups              |
+|:------------|:-----------------|:-----------|:-------------------|:--------------------|
+| `gpt`       | GPT Service User | `ODOO_KEY` | `ODOO_KEY`         | `base.group_user`   |
 | `gpt-admin` | GPT Admin User   | `ODOO_KEY` | `admin-<ODOO_KEY>` | `base.group_system` |
 
 When using HTTP RPC, provide the eight-character key index followed by the key

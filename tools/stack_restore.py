@@ -1,15 +1,10 @@
-#!/usr/bin/env python3
-
-import argparse
 import logging
 import os
 import re
-import sys
+from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
-from collections.abc import Sequence
 
-from tools.deployer.helpers import get_git_commit, get_git_remote_url
 from tools.deployer.command import CommandError, run_process
 from tools.deployer.compose_ops import local_compose_command, local_compose_env, remote_compose_command
 from tools.deployer.deploy import (
@@ -19,6 +14,7 @@ from tools.deployer.deploy import (
     push_env_to_remote,
     write_env_file,
 )
+from tools.deployer.helpers import get_git_commit, get_git_remote_url
 from tools.deployer.remote import run_remote
 from tools.deployer.settings import StackSettings, load_stack_settings
 
@@ -38,9 +34,7 @@ def _ensure_stack_env(settings: StackSettings, stack_name: str) -> None:
 
 def _handle_restore_exit(error: CommandError) -> None:
     if error.returncode == 10:
-        _logger.warning(
-            "restore_from_upstream exited with code 10; continuing because bootstrap completed successfully"
-        )
+        _logger.warning("restore_from_upstream exited with code 10; continuing because bootstrap completed successfully")
         return
     raise error
 
@@ -103,7 +97,7 @@ def restore_stack(
             return raw[1:-1]
         return raw
 
-    pattern = re.compile(r"\$\{([^}]+)\}")
+    pattern = re.compile(r"\$\{([^}]+)}")
     cache: dict[str, str] = {}
 
     def _resolve_expr(expr: str, seen: set[str]) -> str:
@@ -222,32 +216,3 @@ def restore_stack(
 
     _logger.info("Restore completed for stack %s", stack_name)
     return 0
-
-
-def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Restore database and filestore from upstream backups")
-    parser.add_argument(
-        "--stack",
-        default="local",
-        help="Stack name to restore (default: local)",
-    )
-    parser.add_argument(
-        "--bootstrap-only",
-        action="store_true",
-        help="Only bootstrap the stack (skip full upstream restore)",
-    )
-    parser.add_argument(
-        "--no-sanitize",
-        action="store_true",
-        help="Skip sanitize steps during restore",
-    )
-    return parser.parse_args(argv)
-
-
-def main(argv: Sequence[str] | None = None) -> int:
-    args = parse_args(argv)
-    return restore_stack(args.stack, bootstrap_only=args.bootstrap_only, no_sanitize=args.no_sanitize)
-
-
-if __name__ == "__main__":  # pragma: no cover
-    sys.exit(main())

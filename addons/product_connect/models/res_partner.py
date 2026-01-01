@@ -27,3 +27,10 @@ class ResPartner(models.Model):
     def _compute_ebay_profile_url(self) -> None:
         for partner in self:
             partner.ebay_profile_url = f"https://www.ebay.com/usr/{partner.ebay_username}" if partner.ebay_username else False
+
+    @api.onchange("property_supplier_payment_term_id", "buyer_id", "property_outbound_payment_method_line_id")
+    def _onchange_payment_terms_and_buyer(self) -> None:
+        for partner in self:
+            if partner.supplier_rank < 1:
+                if partner.property_supplier_payment_term_id or partner.buyer_id or partner.property_outbound_payment_method_line_id:
+                    partner._increase_rank("supplier_rank")

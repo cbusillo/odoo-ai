@@ -177,7 +177,7 @@ def _update_payload_with_state(payload: dict[str, object], state: OpsState) -> d
 def _load_state() -> OpsState:
     config = _load_ops_config()
     default_target = sorted(config.targets.keys())[0]
-    default_deploy = not config.coolify_auto_deploy
+    default_deploy = True
     payload = _load_state_payload()
     valid_targets = set(config.targets.keys()) | {ALL_TARGET}
     target_raw = payload.get("target")
@@ -815,10 +815,7 @@ def _interactive(*, dry_run: bool, remember: bool, wait_deploy: bool) -> None:
             action = _prompt_choice("Action", action_choices, action_default)
             deploy = state.deploy
             if action == "ship" and env in ("dev", "testing"):
-                if _load_ops_config().coolify_auto_deploy:
-                    deploy = False
-                else:
-                    deploy = Confirm.ask("Trigger Coolify deploy after push?", default=state.deploy)
+                deploy = Confirm.ask("Trigger Coolify deploy after push?", default=state.deploy)
                 post_action = _prompt_choice("After deploy", POST_SHIP_ACTIONS, "none")
             if env == "local" and action in ("up", "init", "restore"):
                 if questionary and sys.stdin.isatty():
@@ -925,7 +922,7 @@ def _execute(
 @click.option("--target", default=None)
 @click.option("--env", "env_name", default=None)
 @click.option("--action", default=None)
-@click.option("--deploy/--no-deploy", default=False, help="Trigger Coolify deploy after ship")
+@click.option("--deploy/--no-deploy", default=True, help="Trigger Coolify deploy after ship")
 @click.option("--wait/--no-wait", default=True, help="Wait for Coolify deploy to finish")
 @click.option("--build/--no-build", default=False, help="Build image before local actions")
 @click.option("--no-cache", is_flag=True, help="Build without cache for local actions")
@@ -995,7 +992,7 @@ def local_command(action: str, target: str, build: bool, no_cache: bool, dry_run
 @main.command("ship")
 @click.argument("env", type=click.Choice(("dev", "testing", "prod"), case_sensitive=False))
 @click.argument("target")
-@click.option("--deploy/--no-deploy", default=False)
+@click.option("--deploy/--no-deploy", default=True)
 @click.option("--wait/--no-wait", default=True, help="Wait for Coolify deploy to finish")
 @click.option("--after", type=click.Choice(("none", "restore", "init"), case_sensitive=False), default="none")
 @click.option("--skip-tests", is_flag=True)

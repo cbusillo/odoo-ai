@@ -18,10 +18,17 @@ title: GPT Service Users
 
 ## Accounts
 
-| Login       | Display Name     | Password   | API Key Plaintext  | Groups              |
-|:------------|:-----------------|:-----------|:-------------------|:--------------------|
-| `gpt`       | GPT Service User | `ODOO_KEY` | `ODOO_KEY`         | `base.group_user`   |
-| `gpt-admin` | GPT Admin User   | `ODOO_KEY` | `admin-<ODOO_KEY>` | `base.group_system` |
+`gpt` (GPT Service User)
+
+- Password: `ODOO_KEY`
+- API key: `ODOO_KEY`
+- Groups: `base.group_user`
+
+`gpt-admin` (GPT Admin User)
+
+- Password: `ODOO_KEY`
+- API key: `admin-<ODOO_KEY>`
+- Groups: `base.group_system`
 
 When using HTTP RPC, provide the eight-character key index followed by the key
 itself (standard Odoo API key format). The admin API key intentionally starts
@@ -31,11 +38,11 @@ with `admin-` to ensure a unique key index.
 
 - Provisioning is skipped if `ODOO_KEY` is blank or unset.
 - To rotate credentials, update `ODOO_KEY` and rerun
-  `uv run stack up --stack <stack> --restore`. The script regenerates both passwords
+  `uv run ops local restore <target>`. The script regenerates both passwords
   and API keys.
 - Remove access by clearing `ODOO_KEY` and running the restore task again or
   deleting the users/keys in Odoo Settings.
 
 ## Related Commands
 
-- `uv run stack up --stack <stack> --restore`
+- `uv run ops local restore <target>`

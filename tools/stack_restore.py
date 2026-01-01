@@ -9,7 +9,7 @@ from dataclasses import replace
 from pathlib import Path
 from collections.abc import Sequence
 
-from tools.deployer.cli import get_git_commit, get_git_remote_url
+from tools.deployer.helpers import get_git_commit, get_git_remote_url
 from tools.deployer.command import CommandError, run_process
 from tools.deployer.compose_ops import local_compose_command, local_compose_env, remote_compose_command
 from tools.deployer.deploy import (
@@ -85,8 +85,14 @@ def _add_toggle_args(command: list[str], *, bootstrap_only: bool, no_sanitize: b
         command.append("--no-sanitize")
 
 
-def restore_stack(stack_name: str, *, bootstrap_only: bool = False, no_sanitize: bool = False) -> int:
-    settings = load_stack_settings(stack_name)
+def restore_stack(
+    stack_name: str,
+    *,
+    env_file: Path | None = None,
+    bootstrap_only: bool = False,
+    no_sanitize: bool = False,
+) -> int:
+    settings = load_stack_settings(stack_name, env_file)
     _ensure_stack_env(settings, stack_name)
     restore_settings = _settings_for_restore(settings)
     image_reference = _current_image_reference(restore_settings)

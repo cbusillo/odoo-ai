@@ -57,7 +57,7 @@ class OpsState:
     deploy: bool = True
     build: bool = False
     no_cache: bool = False
-    serial: bool = False
+    serial: bool = False  # runtime flag; intentionally not persisted
 
 
 @dataclass(frozen=True)
@@ -139,7 +139,6 @@ def _normalize_history(history: object) -> list[dict[str, object]]:
         deploy = item.get("deploy", False)
         build = item.get("build", False)
         no_cache = item.get("no_cache", False)
-        serial = item.get("serial", False)
         if target not in valid_targets or env not in ENVS or action not in valid_actions:
             continue
         if env == "local" and action not in LOCAL_ACTIONS:
@@ -156,7 +155,6 @@ def _normalize_history(history: object) -> list[dict[str, object]]:
                 "deploy": bool(deploy),
                 "build": bool(build),
                 "no_cache": bool(no_cache),
-                "serial": bool(serial),
                 "ts": item.get("ts"),
             }
         )
@@ -171,6 +169,7 @@ def _write_state_payload(payload: dict[str, object]) -> None:
 
 def _update_payload_with_state(payload: dict[str, object], state: OpsState) -> dict[str, object]:
     updated = dict(payload)
+    updated.pop("serial", None)
     updated.update(
         {
             "target": state.target,
@@ -179,7 +178,6 @@ def _update_payload_with_state(payload: dict[str, object], state: OpsState) -> d
             "deploy": state.deploy,
             "build": state.build,
             "no_cache": state.no_cache,
-            "serial": state.serial,
         }
     )
     return updated
@@ -203,9 +201,7 @@ def _load_state() -> OpsState:
     build = bool(build_raw)
     no_cache_raw = payload.get("no_cache", OpsState.no_cache)
     no_cache = bool(no_cache_raw)
-    serial_raw = payload.get("serial", OpsState.serial)
-    serial = bool(serial_raw)
-    return OpsState(target=target, env=env, action=action, deploy=deploy, build=build, no_cache=no_cache, serial=serial)
+    return OpsState(target=target, env=env, action=action, deploy=deploy, build=build, no_cache=no_cache)
 
 
 def _save_state(state: OpsState) -> None:
@@ -225,7 +221,6 @@ def _record_history(state: OpsState) -> None:
         "deploy": state.deploy,
         "build": state.build,
         "no_cache": state.no_cache,
-        "serial": state.serial,
         "ts": datetime.now(UTC).isoformat(),
     }
     updated["history"] = [entry, *history][:HISTORY_LIMIT]
@@ -237,7 +232,7 @@ def _favorite_states(limit: int = 3) -> list[OpsState]:
     history = _normalize_history(payload.get("history"))
     if not history:
         return []
-    scores: dict[tuple[str, str, str, bool, bool, bool, bool], float] = {}
+    scores: dict[tuple[str, str, str, bool, bool, bool], float] = {}
     for index, entry in enumerate(history):
         weight = 1.0 / (index + 1)
         key = (
@@ -247,14 +242,13 @@ def _favorite_states(limit: int = 3) -> list[OpsState]:
             bool(entry.get("deploy", False)),
             bool(entry.get("build", False)),
             bool(entry.get("no_cache", False)),
-            bool(entry.get("serial", False)),
         )
         scores[key] = scores.get(key, 0.0) + weight
     ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
     favorites: list[OpsState] = []
-    for (target, env, action, deploy, build, no_cache, serial), _score in ranked[:limit]:
+    for (target, env, action, deploy, build, no_cache), _score in ranked[:limit]:
         favorites.append(
-            OpsState(target=target, env=env, action=action, deploy=deploy, build=build, no_cache=no_cache, serial=serial)
+            OpsState(target=target, env=env, action=action, deploy=deploy, build=build, no_cache=no_cache)
         )
     return favorites
 
@@ -263,8 +257,6 @@ def _favorite_label(state: OpsState) -> str:
     label = f"{state.target} {state.env} {state.action}"
     if state.action == "ship" and state.env in ("dev", "testing") and state.deploy:
         label = f"{label} +deploy"
-    if state.action == "ship" and state.env in ("dev", "testing") and state.serial:
-        label = f"{label} +serial"
     if state.env == "local" and state.action in ("up", "init", "restore"):
         if state.build:
             label = f"{label} +build"
@@ -854,7 +846,7 @@ def _interactive(*, dry_run: bool, remember: bool, wait_deploy: bool) -> None:
             deploy = favorite.deploy
             build = favorite.build
             no_cache = favorite.no_cache
-            serial = favorite.serial
+            serial = False
         else:
             target = _prompt_choice("Target", _target_choices(), state.target)
             env = _prompt_choice("Env", ENVS, state.env)
@@ -871,7 +863,7 @@ def _interactive(*, dry_run: bool, remember: bool, wait_deploy: bool) -> None:
             deploy = state.deploy
             if action == "ship" and env in ("dev", "testing"):
                 deploy = Confirm.ask("Trigger Coolify deploy after push?", default=state.deploy)
-                serial = Confirm.ask("Deploy serially?", default=state.serial)
+                serial = Confirm.ask("Deploy serially?", default=False)
                 post_action = _prompt_choice("After deploy", POST_SHIP_ACTIONS, "none")
             if env == "local" and action in ("up", "init", "restore"):
                 if questionary and sys.stdin.isatty():

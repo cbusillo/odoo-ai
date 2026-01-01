@@ -720,7 +720,6 @@ def doctor_cmd(json_out: bool) -> None:
     # Shard guardrails
     # noinspection PyArgumentList
     st = TestSettings()
-    suggested_max_shards = 0
     try:
         suggested_max_shards = max(1, (max_conn - active - int(st.conn_reserve)) // max(1, int(st.conn_per_shard)))
     except (TypeError, ValueError, ZeroDivisionError):
@@ -731,7 +730,11 @@ def doctor_cmd(json_out: bool) -> None:
         "db": {"max_connections": max_conn, "active": active},
         "disk": {"free_percent": free_pct},
         "cpu": {"count": cpu},
-        "guardrails": {"conn_per_shard": st.conn_per_shard, "reserve": st.conn_reserve, "suggested_max_shards": suggested_max_shards},
+        "guardrails": {
+            "conn_per_shard": st.conn_per_shard,
+            "reserve": st.conn_reserve,
+            "suggested_max_shards": suggested_max_shards,
+        },
     }
     if json_out:
         print(json.dumps(payload))

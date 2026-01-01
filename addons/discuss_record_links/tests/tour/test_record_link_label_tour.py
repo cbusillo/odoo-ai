@@ -1,7 +1,6 @@
-from odoo.tests import tagged
-
 from odoo.addons.product_connect.tests.base_types import TOUR_TAGS
 from odoo.addons.product_connect.tests.fixtures.base import TourTestCase
+from odoo.tests import tagged
 
 
 @tagged(*TOUR_TAGS)
@@ -13,7 +12,7 @@ class TestRecordLinkLabelTour(TourTestCase):
         Product = cls.env["product.product"].with_context(skip_sku_check=True)
         prod = Product.search([("default_code", "=", "WIDGET-E2E")], limit=1)
         if not prod:
-            prod = Product.create({"name": "Widget E2E", "default_code": "WIDGET-E2E"})
+            Product.create({"name": "Widget E2E", "default_code": "WIDGET-E2E"})
 
         model_product = cls.env["ir.model"].search([("model", "=", "product.product")], limit=1)
         f_name = cls.env["ir.model.fields"].search([("model_id", "=", model_product.id), ("name", "=", "name")], limit=1)

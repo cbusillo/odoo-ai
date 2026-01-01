@@ -17,6 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "questionary",
     "ruff",
     "rich",
 ]
@@ -29,6 +30,7 @@ test = "tools.testkit.cli:main"  # example: uv run test unit --json
 test-validate = "tools.testkit.validate:main"
 prod-gate = "tools.prod_gate:main"
 stack = "tools.stack_cli:main"
+ops = "tools.ops_cli:main"
 
 [tool.uv]
 preview = true

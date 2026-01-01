@@ -1,13 +1,13 @@
-# CM project-level compose overlay.
+# OPW local compose overlay.
 # Applied after docker/config/base.yaml and before variant overlays.
 
 services:
   web:
     env_file:
-      - docker/config/cm.env
+      - docker/config/opw-local.env
   script-runner:
     env_file:
-      - docker/config/cm.env
+      - docker/config/opw-local.env
   database:
     env_file:
-      - docker/config/cm.env
+      - docker/config/opw-local.env

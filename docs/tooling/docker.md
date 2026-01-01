@@ -34,12 +34,13 @@ Tips
 ## Environment Variable Quick Reference
 
 - `DEPLOY_COMPOSE_FILES` accepts colon- or comma-delimited values. Example:
-  `DEPLOY_COMPOSE_FILES=docker/config/base.yaml:docker/config/opw.yaml`.
-- `ODOO_UPDATE_MODULES=AUTO` discovers modules under `LOCAL_ADDONS_DIRS` or
-  `ODOO_ADDONS_PATH`; set `LOCAL_ADDONS_DIRS=/volumes/addons/opw:/volumes/enterprise`
-  (colon/comma delimited) to control the search.
+  `DEPLOY_COMPOSE_FILES=docker/config/base.yaml:docker/config/opw-local.yaml`.
+- `ODOO_UPDATE_MODULES` accepts a comma/colon list of modules to upgrade.
+- `ODOO_AUTO_MODULES=AUTO` enables auto-upgrade based on local addons; set
+  `LOCAL_ADDONS_DIRS=/volumes/addons` (colon/comma delimited) to control the
+  search roots.
 - `ODOO_ADDON_REPOSITORIES` accepts a comma-separated list of addon repos
-  (cloned into `/volumes/extra_addons/<repo>`). These are cloned with
+  (cloned into `/opt/extra_addons/<repo>`). These are cloned with
   `GITHUB_TOKEN`.
 
 ## Layered Compose Configuration
@@ -61,8 +62,8 @@ assembles the correct file order automatically.
   (`filestore/`, `postgres/`, `logs/` subdirectories) before writing the merged
   `.env` that Compose and Pydantic consume. The merged compose env is stored at
   `${ODOO_STATE_ROOT}/.compose.env`. Stack env sources live in
-  `docker/config/<stack>.env` (create them locally; they're git-ignored). If
-  the state root is not writable (remote stacks), the CLI falls back to
+  `docker/config/<project>-local.env` (tracked, non-secret). If the state root is
+  not writable (remote stacks), the CLI falls back to
   `~/.odoo-ai/stack-env/<stack>.env`. If `ODOO_STATE_ROOT` is omitted (e.g.,
   local dev), the CLI defaults to `~/odoo-ai/${ODOO_PROJECT_NAME}/...`.
 - Keep `ODOO_LOGFILE` pointed inside `/volumes/logs/` (e.g.

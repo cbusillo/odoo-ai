@@ -14,21 +14,30 @@ unset SKIP_VENDOR_INSTALL
 UV_SYNC_EXTRAS=dev /volumes/scripts/install_prod_requirements.sh
 
 # Then install dev-specific requirements
-cd /volumes/addons
-for addon in */ ; do
-  # Install dev requirements.txt if present
-  if [ -f "${addon}requirements-dev.txt" ]; then
-    echo "Installing ${addon} dev requirements..."
-    uv pip install -r "${addon}requirements-dev.txt"
+install_addon_dev_requirements() {
+  local base_dir="$1"
+  if [ ! -d "$base_dir" ]; then
+    return
   fi
-  
-  # Install dev dependencies from pyproject.toml
-  if [ -f "${addon}pyproject.toml" ]; then
-    echo "Installing ${addon} dev dependencies from pyproject.toml..."
-    cd "${addon}"
-    uv pip install ".[dev]"
-    cd ..
-  fi
-done
+  cd "$base_dir"
+  for addon in */ ; do
+    # Install dev requirements.txt if present
+    if [ -f "${addon}requirements-dev.txt" ]; then
+      echo "Installing ${addon} dev requirements..."
+      uv pip install -r "${addon}requirements-dev.txt"
+    fi
+
+    # Install dev dependencies from pyproject.toml
+    if [ -f "${addon}pyproject.toml" ]; then
+      echo "Installing ${addon} dev dependencies from pyproject.toml..."
+      cd "${addon}"
+      uv pip install ".[dev]"
+      cd ..
+    fi
+  done
+}
+
+install_addon_dev_requirements /volumes/addons
+install_addon_dev_requirements /opt/extra_addons
 
 cd /volumes/addons

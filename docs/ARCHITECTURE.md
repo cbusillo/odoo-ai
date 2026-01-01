@@ -8,12 +8,12 @@ Coolify-managed environments.
 
 ## Runtime Topology
 
-| Environment     | Location         | Deployment                            |
-|-----------------|------------------|---------------------------------------|
-| OPW local       | developer laptop | `uv run stack up --stack opw-local`   |
-| CM local        | developer laptop | `uv run stack up --stack cm-local`    |
-| OPW dev/testing | Coolify + Docker | Coolify UI                            |
-| CM dev/testing  | Coolify + Docker | Coolify UI                            |
+| Environment     | Location         | Deployment                          |
+|-----------------|------------------|-------------------------------------|
+| OPW local       | developer laptop | `uv run stack up --stack opw-local` |
+| CM local        | developer laptop | `uv run stack up --stack cm-local`  |
+| OPW dev/testing | Coolify + Docker | Coolify UI                          |
+| CM dev/testing  | Coolify + Docker | Coolify UI                          |
 
 ## Key points
 
@@ -36,8 +36,8 @@ Coolify-managed environments.
 ## Application layers
 
 - Base Odoo: `ghcr.io/adomi-io/odoo:18.0`
-- Custom addons: `/volumes/addons` (repo), `/volumes/extra_addons`
-  (`ODOO_ADDON_REPOSITORIES`), and `/volumes/enterprise` (private mirror)
+- Custom addons: `/volumes/addons` (repo) and `/opt/extra_addons`
+  (`ODOO_ADDON_REPOSITORIES`, including the enterprise addons)
 - Integrations: Shopify active
 
 ## References

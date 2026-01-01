@@ -1191,8 +1191,6 @@ with registry.cursor() as cr:
             normalized = str(base)
             if "/odoo/addons" in normalized or "/odoo/odoo/addons" in normalized:
                 continue
-            if "/enterprise" in normalized:
-                continue
             if not base.is_dir():
                 continue
             if base not in resolved_dirs:
@@ -1255,7 +1253,7 @@ with registry.cursor() as cr:
                 Path("/volumes/addons"),
                 Path("/opt/project/addons"),
                 Path("/odoo/addons"),
-                Path("/volumes/enterprise"),
+                Path("/opt/extra_addons"),
             ]
         if getattr(self, "_auto_addon_dirs", None):
             for auto_dir in self._auto_addon_dirs:

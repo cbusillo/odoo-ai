@@ -11,7 +11,6 @@ Environment files (later overrides earlier):
 ```text
 .env
 → docker/config/base.env
-→ docker/config/{project}.env
 → docker/config/{project}-local.env
 ```
 
@@ -21,7 +20,7 @@ Compose overlays (most generic → most specific):
 docker-compose.yml
 → docker-compose.override.yml (local-only)
 → docker/config/base.yaml
-→ docker/config/{project}.yaml
+→ docker/config/{project}-local.yaml
 → optional extras (used by restore flows)
 ```
 
@@ -34,15 +33,9 @@ docker-compose.yml
 
 1. Copy the templates you need:
 
-   ```bash
-   cp docker/config/base.env.example docker/config/base.env
-   cp docker/config/opw.env.example docker/config/opw.env        # or cm.env
-   cp docker/config/opw-local.env.example docker/config/opw-local.env
-   ```
+   Edit the target env file (for example `docker/config/opw-local.env`).
 
-2. Fill in real values (DB credentials, API tokens, ports, etc.).
-
-3. Run the stack:
+2. Run the stack:
 
    ```bash
    uv run stack up --stack opw-local
@@ -50,7 +43,7 @@ docker-compose.yml
 
 ## Notes
 
-- Real `*.env` files are untracked; keep secrets out of git.
+- Keep secrets in `.env` (untracked); tracked env files should stay non-secret.
 - Create a local `docker-compose.override.yml` to expose ports and mount the
   repo for live-editing (see `docs/workflows/multi-project.md`).
 - Local-only overrides live in the env files (for example `ODOO_WEB_COMMAND`

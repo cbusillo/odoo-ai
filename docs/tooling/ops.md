@@ -28,6 +28,7 @@ Quick start
 
   uv run ops ship testing opw
   uv run ops ship testing all
+  uv run ops ship testing all --serial
   uv run ops ship prod opw --confirm
   uv run ops ship testing opw --after restore
 
@@ -81,10 +82,10 @@ Behavior notes
 - Prod ship runs the prod gate first using `uv run prod-gate backup`.
 - Prod actions require an explicit confirmation (interactive prompt or
   `--confirm` for non-interactive usage).
-- For dev/testing, `ops ship` can optionally trigger Coolify deploys if
-  `COOLIFY_TOKEN` is available in `.env` (default is off, since Coolify can
-  auto-deploy on branch updates). Deploy waits are on by default; use `--no-wait`
-  to skip.
+- For dev/testing, `ops ship` triggers a Coolify deploy by default (use
+  `--no-deploy` to skip). Deploy waits are on by default; use `--no-wait` to
+  skip.
+- Use `--serial` to deploy one target at a time when shipping `all`.
 - `ops status` uses the Coolify API and requires `COOLIFY_TOKEN` (waits by
   default; use `--no-wait`).
 - For interactive runs, `uv run ops --no-wait` skips deploy waiting.

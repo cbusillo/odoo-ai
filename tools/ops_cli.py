@@ -450,9 +450,11 @@ def _coolify_latest_deployment(app_ref: str) -> dict[str, object] | None:
     if isinstance(payload, list):
         deployments = [item for item in payload if isinstance(item, dict)]
     elif isinstance(payload, dict):
-        data = payload.get("data")
-        if isinstance(data, list):
-            deployments = [item for item in data if isinstance(item, dict)]
+        for key in ("data", "deployments"):
+            data = payload.get(key)
+            if isinstance(data, list):
+                deployments = [item for item in data if isinstance(item, dict)]
+                break
     if not deployments:
         return None
 

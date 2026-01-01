@@ -3,7 +3,6 @@ ARG ODOO_VERSION=18.0
 FROM postgres:17-bullseye AS pg17
 
 FROM alpine/git AS addon_sources
-ARG ODOO_ENTERPRISE_REPOSITORY
 ARG ODOO_ADDON_REPOSITORIES
 ARG GITHUB_TOKEN
 ARG ODOO_VERSION
@@ -17,7 +16,6 @@ ARG ODOO_VERSION
 USER root
 # bring in PostgreSQL 17 client tools
 COPY --from=pg17 /usr/lib/postgresql/17/bin/pg_restore /usr/local/bin/pg_restore
-COPY --from=pg17 /usr/lib/postgresql/17/bin/psql       /usr/local/bin/psql
 COPY --from=pg17 /usr/lib/postgresql/17/bin/pg_dump      /usr/local/bin/pg_dump
 
 ARG PYTHON_VERSION
@@ -44,23 +42,10 @@ RUN cp /root/.local/bin/uv* /usr/local/bin/
 RUN uv pip install --target=/opt/odoo-upgrade git+https://github.com/odoo/upgrade-util \
     && uv pip install --target=/opt/odoo-stubs git+https://github.com/odoo-ide/odoo-stubs@18.0
 
-RUN python3 - <<'PY'
-import site
-from pathlib import Path
-
-site_packages = Path(site.getsitepackages()[0])
-(site_packages / "odoo_local.pth").write_text("/odoo\n")
-(site_packages / "odoo_enterprise.pth").write_text("/volumes/enterprise\n")
-(site_packages / "upgrade_utils.pth").write_text("/opt/odoo-upgrade\n")
-(site_packages / "odoostubs.pth").write_text("/opt/odoo-stubs\n")
-PY
-
-COPY --from=addon_sources /enterprise /volumes/enterprise
 COPY /docker/config /volumes/config
 COPY /docker/scripts /volumes/scripts
 COPY /addons /volumes/addons
-COPY --from=addon_sources /addons /volumes/addons
-COPY --from=addon_sources /extra_addons /volumes/extra_addons
+COPY --from=addon_sources /extra_addons /opt/extra_addons
 COPY /pyproject.toml /volumes/pyproject.toml
 COPY /uv.lock /volumes/uv.lock
 

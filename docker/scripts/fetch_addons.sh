@@ -5,33 +5,63 @@ log() {
 	printf '%s\n' "$*"
 }
 
-mkdir -p /enterprise /addons /extra_addons
+mkdir -p /addons /extra_addons
 
-if [ -n "${ODOO_ENTERPRISE_REPOSITORY:-}" ]; then
-	if [ -z "${GITHUB_TOKEN:-}" ]; then
-		echo "GITHUB_TOKEN missing; cannot clone enterprise" >&2
-		exit 1
-	fi
-	log "Cloning Enterprise Addons from ${ODOO_ENTERPRISE_REPOSITORY} branch ${ODOO_VERSION}"
-	if ! git clone --branch "${ODOO_VERSION}" --single-branch --depth 1 \
-		"https://${GITHUB_TOKEN}@github.com/${ODOO_ENTERPRISE_REPOSITORY}" /enterprise; then
-		echo "Failed to clone enterprise repo ${ODOO_ENTERPRISE_REPOSITORY}." >&2
-		exit 1
-	fi
-	rm -rf /enterprise/.git
-else
-	log "ODOO_ENTERPRISE_REPOSITORY is empty; skipping clone."
-fi
+addons_repos="${ODOO_ADDON_REPOSITORIES:-}"
 
-if [ -n "${ODOO_ADDON_REPOSITORIES:-}" ]; then
+link_modules() {
+	repo_root="$1"
+	root_dir="$2"
+	if [ -f "${repo_root}/__manifest__.py" ] || [ -f "${repo_root}/__openerp__.py" ]; then
+		return
+	fi
+	scan_roots=""
+	if [ -d "${repo_root}/enterprise" ]; then
+		scan_roots="${scan_roots} ${repo_root}/enterprise"
+	fi
+	if [ -d "${repo_root}/addons" ]; then
+		scan_roots="${scan_roots} ${repo_root}/addons"
+	fi
+	if [ -d "${repo_root}/odoo/addons" ]; then
+		scan_roots="${scan_roots} ${repo_root}/odoo/addons"
+	fi
+	if [ -z "$scan_roots" ]; then
+		scan_roots="${repo_root}"
+	fi
+	for scan_root in ${scan_roots}; do
+		for module_dir in "${scan_root}"/*; do
+			[ -d "$module_dir" ] || continue
+			if [ ! -f "${module_dir}/__manifest__.py" ] && [ ! -f "${module_dir}/__openerp__.py" ]; then
+				continue
+			fi
+			module_name="$(basename "$module_dir")"
+			link_path="${root_dir}/${module_name}"
+			if [ -e "$link_path" ]; then
+				if [ "$(readlink "$link_path" 2>/dev/null)" != "$module_dir" ]; then
+					echo "Module ${module_name} already exists in ${root_dir}; skipping link." >&2
+				fi
+				continue
+			fi
+			relative_target="$module_dir"
+			case "$module_dir" in
+			"${root_dir}"/*)
+				relative_target="${module_dir#"$root_dir"/}"
+				;;
+			esac
+			ln -s "$relative_target" "$link_path"
+		done
+	done
+}
+
+if [ -n "$addons_repos" ]; then
 	if [ -z "${GITHUB_TOKEN:-}" ]; then
 		echo "GITHUB_TOKEN missing; cannot clone addons." >&2
 		exit 1
 	fi
-	log "Cloning addon repositories: ${ODOO_ADDON_REPOSITORIES}"
+	log "Cloning addon repositories: ${addons_repos}"
 	old_ifs="$IFS"
 	IFS=','
-	for raw in ${ODOO_ADDON_REPOSITORIES}; do
+	for raw in ${addons_repos}; do
 		repo="$(echo "$raw" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
 		if [ -z "$repo" ]; then
 			continue
@@ -53,6 +83,7 @@ if [ -n "${ODOO_ADDON_REPOSITORIES:-}" ]; then
 			exit 1
 		fi
 		rm -rf "${target_root}/${name}/.git"
+		link_modules "${target_root}/${name}" "$target_root"
 	done
 	IFS="$old_ifs"
 else

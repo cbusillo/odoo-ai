@@ -42,9 +42,10 @@ Use path+anchor “handles” when sharing docs between sessions, for example:
     - docs/tooling/runtime-baselines.md — where Python/runtime versions live
         - docs/tooling/inspection.md — changed/git/full scopes, result schema
         - docs/tooling/odoo-intelligence.md — model/field queries, module updates
-        - docs/tooling/testing-cli.md — uv test phases and flags
-        - docs/tooling/docker.md — container operations
-        - docs/tooling/coolify.md — Coolify app logs/envs
+    - docs/tooling/testing-cli.md — uv test phases and flags
+    - docs/tooling/docker.md — container operations
+    - docs/tooling/ops.md — unified local/ship/prod helper
+    - docs/tooling/coolify.md — Coolify app logs/envs
             - docs/TESTING.md — testing overview and pointers
 - Odoo Canon
     - docs/odoo/orm.md — ORM sources of truth

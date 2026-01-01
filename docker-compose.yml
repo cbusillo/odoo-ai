@@ -10,25 +10,28 @@ x-odoo-base: &odoo-base
   # If registry push ever needed: refactor Dockerfile to use BuildKit secrets
   image: ${DOCKER_IMAGE:-odoo-ai}:latest
   pull_policy: never
-  build:
-    dockerfile: docker/Dockerfile
-    args:
-      PYTHON_VERSION: ${PYTHON_VERSION:-3.13}
-      ODOO_VERSION: ${ODOO_VERSION:-18.0}
-      ODOO_ENTERPRISE_REPOSITORY: ${ODOO_ENTERPRISE_REPOSITORY:-}
-      ODOO_ADDON_REPOSITORIES: ${ODOO_ADDON_REPOSITORIES:-}
-      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
-    target: ${COMPOSE_BUILD_TARGET:-development}
   env_file:
     - .env
   volumes:
     - odoo_data:/volumes/data
     - odoo_logs:/volumes/logs
 
+x-odoo-build: &odoo-build
+  build:
+    dockerfile: docker/Dockerfile
+    args:
+      PYTHON_VERSION: ${PYTHON_VERSION:-3.13}
+      ODOO_VERSION: ${ODOO_VERSION:-18.0}
+      ODOO_ADDON_REPOSITORIES: ${ODOO_ADDON_REPOSITORIES:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    target: ${COMPOSE_BUILD_TARGET:-development}
+
 x-odoo-env: &odoo-env
   ODOO_DB_HOST: database
   ODOO_DB_PORT: "5432"
-  ODOO_ADDONS_PATH: ${ODOO_ADDONS_PATH:-/opt/project/addons,/odoo/addons,/volumes/enterprise}
+  ODOO_ADDONS_PATH: /opt/project/addons,/odoo/addons
+  IMAGE_ODOO_ENTERPRISE_LOCATION: /volumes/enterprise_disabled
+  IMAGE_EXTRA_ADDONS_LOCATION: /opt/extra_addons
 
 x-healthcheck-defaults: &healthcheck-defaults
   interval: 30s
@@ -37,7 +40,7 @@ x-healthcheck-defaults: &healthcheck-defaults
 name: ${ODOO_PROJECT_NAME:-odoo}
 services:
   web:
-    <<: *odoo-base
+    <<: [*odoo-base, *odoo-build]
     command: /odoo/odoo-bin
     environment:
       <<: *odoo-env

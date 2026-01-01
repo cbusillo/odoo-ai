@@ -15,7 +15,7 @@ title: TODO / Optimization Ideas
 ## Coolify Rollout Cleanup
 
 - Decide whether to use Coolify shared variables for build-time values
-  (GITHUB_TOKEN, ODOO_ENTERPRISE_REPOSITORY, ODOO_ADDON_REPOSITORIES).
+  (GITHUB_TOKEN, ODOO_ADDON_REPOSITORIES).
 - Add Docker Hub login on the Coolify build host to avoid pull stalls.
 - Verify cm-testing stability (restart loops) and capture root cause.
 - Prune uv scripts that are no longer used (keep restore/sanitize/init helpers).

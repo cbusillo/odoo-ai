@@ -9,10 +9,10 @@ Coolify and do not use the overlays in `docker/config/`.
 
 ## Local stacks
 
-| Stack | Purpose | Ports | Config source |
-| --- | --- | --- | --- |
-| `opw-local` | OPW dev | 8069/8072/15432 | `opw-local.env` |
-| `cm-local` | CM isolation | 9069/9072/9432 | `cm-local.env` |
+| Stack       | Purpose      | Ports           | Config source   |
+|-------------|--------------|-----------------|-----------------|
+| `opw-local` | OPW dev      | 8069/8072/15432 | `opw-local.env` |
+| `cm-local`  | CM isolation | 9069/9072/9432  | `cm-local.env`  |
 
 ## Quick flow
 

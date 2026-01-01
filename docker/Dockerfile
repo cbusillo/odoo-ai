@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.6
 ARG ODOO_VERSION=18.0
 
 FROM postgres:17-bullseye AS pg17
@@ -21,7 +22,9 @@ COPY --from=pg17 /usr/lib/postgresql/17/bin/pg_dump      /usr/local/bin/pg_dump
 ARG PYTHON_VERSION
 ENV DEBIAN_FRONTEND=noninteractive
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN apt-get update \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update \
     && apt-get install -y --no-install-recommends \
       ca-certificates \
       curl \
@@ -34,12 +37,14 @@ RUN apt-get update \
 # Install uv for modern Python package management
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
+ENV UV_CACHE_DIR=/root/.cache/uv
 
 # Make uv available for ubuntu user too
 RUN cp /root/.local/bin/uv* /usr/local/bin/
 
 # Use uv for faster package installations
-RUN uv pip install --target=/opt/odoo-upgrade git+https://github.com/odoo/upgrade-util \
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --target=/opt/odoo-upgrade git+https://github.com/odoo/upgrade-util \
     && uv pip install --target=/opt/odoo-stubs git+https://github.com/odoo-ide/odoo-stubs@18.0
 
 COPY /docker/config /volumes/config
@@ -54,7 +59,8 @@ RUN mkdir -p /opt && ln -sfn /volumes /opt/project
 # Production build stage - only prod dependencies
 FROM base AS production
 WORKDIR /volumes/addons
-RUN /volumes/scripts/install_prod_requirements.sh
+RUN --mount=type=cache,target=/root/.cache/uv \
+    /volumes/scripts/install_prod_requirements.sh
 
 # Common final steps
 ENV HOOK_SETUP_FILE=/volumes/scripts/hook_setup
@@ -69,7 +75,9 @@ USER ubuntu
 # Development build stage - prod + dev dependencies
 FROM base AS development
 WORKDIR /volumes/addons
-RUN apt-get update \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update \
     && apt-get install -y --no-install-recommends \
       software-properties-common \
     && add-apt-repository -y ppa:xtradeb/apps \
@@ -83,7 +91,8 @@ RUN apt-get update \
 # allow Odoo’s HttpCase to locate the browser
 ENV CHROME_BIN=/usr/bin/chromium
 
-RUN /volumes/scripts/install_dev_requirements.sh
+RUN --mount=type=cache,target=/root/.cache/uv \
+    /volumes/scripts/install_dev_requirements.sh
 
 # Apply development patches for --dev mode issues
 COPY patches/fix_dev_mode_validation.patch /tmp/

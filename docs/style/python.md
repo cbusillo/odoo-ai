@@ -10,7 +10,7 @@ Purpose
 Targets & Tooling
 
 - Python version and runtime baselines come from repo config (not this doc);
-  see @docs/tooling/runtime-baselines.md.
+  see @docs/tooling/runtime-baselines.md for details.
 - Lint/format with Ruff: run `uv run ruff format .` then `uv run ruff check --fix`.
 - Line length: 133 chars max (to match AGENTS.md).
 

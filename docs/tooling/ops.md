@@ -25,6 +25,7 @@ Quick start
   uv run ops local restart opw
   uv run ops local upgrade opw
   uv run ops local doctor opw
+  uv run ops local info opw --json
   uv run ops local up opw --build --no-cache
 
   uv run ops ship testing opw
@@ -70,6 +71,8 @@ Behavior notes
 
 - Local actions run deployer helpers directly and use the stack env files
   (`docker/config/opw-local.env`, `docker/config/cm-local.env`).
+- `ops local info` prints machine-readable stack metadata (paths + identifiers
+  only; no secrets) derived from `load_stack_settings()`.
 - `ops local restart` performs a fast `docker compose restart web` for the
   target stack.
 - `ops local upgrade` runs module upgrades using the stack's configured module

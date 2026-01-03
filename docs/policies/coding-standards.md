@@ -9,7 +9,7 @@ Core Rules
 - Use `uv run` for all tests; never run Python directly.
 - Container paths: host `./` maps to container `/volumes/`.
 - Runtime baselines (Python/etc.) are defined by repo config, not docs; see
-  @docs/tooling/runtime-baselines.md.
+  @docs/tooling/runtime-baselines.md for details.
 - Type hints are required at API boundaries (function signatures + public data
   shapes). Prefer local inference when clear.
 - Zero‑warning acceptance gate; use JetBrains `noinspection` only when narrowly justified

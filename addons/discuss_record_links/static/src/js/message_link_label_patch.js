@@ -4,28 +4,31 @@ import { Message } from "@mail/core/common/message"
 function parseInternalUrl(href) {
     try {
         const url = new URL(href, window.location.origin)
-        if (url.hash?.startsWith('#')) {
+        if (url.hash?.startsWith("#")) {
             const params = new URLSearchParams(url.hash.slice(1))
-            const id = Number(params.get('id') || params.get('fid'))
-            const model = params.get('model')
+            const id = Number(params.get("id") || params.get("fid"))
+            const model = params.get("model")
             if (id && model) return { id, model }
         }
-        const parts = url.pathname.split('/').filter(Boolean)
-        const idx = parts.indexOf('odoo')
+        const parts = url.pathname.split("/").filter(Boolean)
+        const idx = parts.indexOf("odoo")
         if (idx >= 0 && parts.length >= idx + 3) {
             const model = decodeURIComponent(parts[idx + 1])
             const id = Number(parts[idx + 2])
             if (id && model) return { id, model }
         }
-    } catch {
-    }
+    } catch {}
     return {}
 }
 
 function linkifyInternalUrls(root) {
     try {
-        const re = /(https?:\/\/[^\s]+\/(?:web#|odoo(?:#|\/))[^\s]*)/gi
-        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null)
+        const re = /(https?:\/\/\S+\/(?:web#|odoo[#/])\S*)/gi
+        const walker = document.createTreeWalker(
+            root,
+            NodeFilter.SHOW_TEXT,
+            null,
+        )
         const toProcess = []
         let node
         while ((node = walker.nextNode())) {
@@ -45,10 +48,12 @@ function linkifyInternalUrls(root) {
                 const start = m.index
                 const end = start + url.length
                 if (start > lastIndex) {
-                    frag.appendChild(document.createTextNode(txt.slice(lastIndex, start)))
+                    frag.appendChild(
+                        document.createTextNode(txt.slice(lastIndex, start)),
+                    )
                 }
-                const a = document.createElement('a')
-                a.setAttribute('href', url)
+                const a = document.createElement("a")
+                a.setAttribute("href", url)
                 a.textContent = url
                 frag.appendChild(a)
                 lastIndex = end
@@ -58,7 +63,8 @@ function linkifyInternalUrls(root) {
             }
             textNode.parentNode.replaceChild(frag, textNode)
         }
-    } catch { /* best effort */
+    } catch {
+        /* best effort */
     }
 }
 
@@ -67,27 +73,36 @@ patch(Message.prototype, {
         try {
             // Test-only guard: allow disabling labeler via URL param for red/green runs
             try {
-                const q = new URLSearchParams(window.location.search || '')
-                if (q.get('drl_disable') === '1') {
-                    return super.prepareMessageBody ? super.prepareMessageBody(...arguments) : undefined
+                const q = new URLSearchParams(window.location.search || "")
+                if (q.get("drl_disable") === "1") {
+                    return super.prepareMessageBody
+                        ? super.prepareMessageBody(...arguments)
+                        : undefined
                 }
-            } catch {
-            }
+            } catch {}
             if (super.prepareMessageBody) {
                 super.prepareMessageBody(...arguments)
             }
             // Fallback: if core didn't linkify, attempt to convert bare URLs to anchors
-            if (!bodyEl.querySelector('a[href*="/web#"], a[href*="/odoo#"], a[href*="/odoo/"]')) {
+            if (
+                !bodyEl.querySelector(
+                    'a[href*="/web#"], a[href*="/odoo#"], a[href*="/odoo/"]',
+                )
+            ) {
                 linkifyInternalUrls(bodyEl)
             }
-            const anchors = Array.from(bodyEl.querySelectorAll('a[href*="/web#"], a[href*="/odoo#"], a[href*="/odoo/"]'))
+            const anchors = Array.from(
+                bodyEl.querySelectorAll(
+                    'a[href*="/web#"], a[href*="/odoo#"], a[href*="/odoo/"]',
+                ),
+            )
             if (!anchors.length) return
             const rpc = this.env.services.rpc
             const orm = this.env.services.orm
             const byModel = new Map()
             const targets = []
             for (const a of anchors) {
-                const href = a.getAttribute('href') || ''
+                const href = a.getAttribute("href") || ""
                 const { id, model } = parseInternalUrl(href)
                 if (!id || !model) continue
                 targets.push([a, model, id])
@@ -100,28 +115,37 @@ patch(Message.prototype, {
                 for (const id of idSet) payload.push({ model, id })
             }
             const applyLabels = (rows) => {
-                const map = new Map((rows || []).map(r => [`${r.model}:${r.id}`, r.label]))
+                const map = new Map(
+                    (rows || []).map((r) => [`${r.model}:${r.id}`, r.label]),
+                )
                 for (const [a, model, id] of targets) {
                     const label = map.get(`${model}:${id}`)
                     if (!label) continue
                     a.textContent = label
-                    a.setAttribute('data-oe-id', String(id))
-                    a.setAttribute('data-oe-model', model)
+                    a.setAttribute("data-oe-id", String(id))
+                    a.setAttribute("data-oe-model", model)
                 }
             }
-            rpc('/discuss_record_links/labels', { targets: payload })
+            rpc("/discuss_record_links/labels", { targets: payload })
                 .then((rows) => {
-                    if (!rows || !rows.length) throw new Error('empty')
+                    if (!rows || !rows.length) throw new Error("empty")
                     applyLabels(rows)
                 })
                 .catch(() => {
                     // Fallback: display_name
                     for (const [model, idSet] of byModel.entries()) {
                         const ids = Array.from(idSet)
-                        orm.call(model, 'read', [ids, ['display_name']], {})
-                            .then(rr => applyLabels(rr.map(r => ({ model, id: r.id, label: r.display_name }))))
-                            .catch(() => {
-                            })
+                        orm.call(model, "read", [ids, ["display_name"]], {})
+                            .then((rr) =>
+                                applyLabels(
+                                    rr.map((r) => ({
+                                        model,
+                                        id: r.id,
+                                        label: r.display_name,
+                                    })),
+                                ),
+                            )
+                            .catch(() => {})
                     }
                 })
         } catch (e) {

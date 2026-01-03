@@ -101,5 +101,5 @@ git push origin main
 
 1. **Version Control**: Tag stable versions of your addons
 2. **Documentation**: Include README.md in each addon
-3. **Testing**: Write tests for your addons (see docs/testing.md)
+3. **Testing**: Write tests for your addons (see docs/TESTING.md)
 4. **Dependencies**: Document addon dependencies in `__manifest__.py`

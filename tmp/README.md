@@ -17,7 +17,7 @@ tmp/
 The `tmp/` directory is used for:
 
 1. **Test Results** (`test-logs/`)
-   - Output from `uv run test *` (see `docs/testing.md`)
+   - Output from `uv run test *` (see `docs/TESTING.md`)
    - Testkit keeps the latest JSON summaries under `tmp/test-logs/latest/`
    - Older runs live in timestamped folders for diffing or provenance
 

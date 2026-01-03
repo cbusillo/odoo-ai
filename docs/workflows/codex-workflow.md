@@ -11,7 +11,7 @@ When
 
 - Before any code change and again before merge.
 
-Working Loop
+## Working Loop
 
 1) Plan: define smallest next change and acceptance.
 2) Patch: minimal diffs only.

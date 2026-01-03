@@ -3,6 +3,14 @@ title: Coding Standards (Top‑Level)
 ---
 
 
+Purpose
+
+- Define the project-wide coding rules and guardrails.
+
+When
+
+- Before implementing changes or refactors.
+
 Core Rules
 
 - Prefer MCP tools when available in this repo (Inspection, Odoo, Docker).

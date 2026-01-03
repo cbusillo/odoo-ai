@@ -2,8 +2,14 @@
 title: PostgreSQL Tuning for Parallel Test Runs
 ---
 
+Purpose
 
-Goal: enable high parallelism (dozens of Odoo test containers) without the DB being the bottleneck.
+- Enable high parallelism (dozens of Odoo test containers) without the DB
+  becoming the bottleneck.
+
+When
+
+- When running large parallel test grids.
 
 Recommended docker-compose override (server profile):
 

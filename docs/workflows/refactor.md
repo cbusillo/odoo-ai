@@ -7,6 +7,10 @@ Purpose
 
 - Provide a safe, repeatable workflow for refactors.
 
+When
+
+- Before large refactors or structural changes.
+
 Phases
 
 1) Analysis: identify hotpaths, deprecated patterns, and cross-file impacts.

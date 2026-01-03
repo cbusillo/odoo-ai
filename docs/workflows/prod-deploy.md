@@ -2,11 +2,16 @@
 title: Production Deploy Gate
 ---
 
+Purpose
 
-This workflow keeps production deploys deliberate: run tests, take a full
-Proxmox backup + snapshot, then deploy via Coolify. Rollbacks use snapshots.
+- Keep production deploys deliberate: run tests, take a full Proxmox backup and
+  snapshot, then deploy via Coolify. Rollbacks use snapshots.
 
-## Required environment variables
+When
+
+- Before production deploys.
+
+Required environment variables
 
 Set these in your `.env` or shell before running the gate (prefix per client):
 
@@ -27,7 +32,7 @@ Example for OPW (commented):
 # OPW_PROD_SNAPSHOT_PREFIX=opw-predeploy
 ```
 
-## Deploy flow (OPW example)
+Deploy flow (OPW example)
 
 1) Run tests + backup gate:
    - `uv run prod-gate backup --target opw --run-tests`
@@ -38,7 +43,7 @@ Example for OPW (commented):
    - `uv run prod-gate list --target opw`
    - `uv run prod-gate rollback --target opw --snapshot <snapshot-name>`
 
-## Notes
+Notes
 
 - `vzdump` provides the full CT backup (PBS). `pct snapshot` gives fast rollback.
 - The gate intentionally does not auto-deploy; prod deploy stays manual.

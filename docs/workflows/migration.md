@@ -2,14 +2,21 @@
 title: Migration Patterns (Odoo 18)
 ---
 
+Purpose
+
+- Capture the Odoo 18 migration rules and workflow.
+
+When
+
+- When updating legacy views or frontend code to Odoo 18 patterns.
 
 Key changes
 
 - List views: use `<list>` (not `<tree>`) as the root element for list views.
-- View attrs/states: replaced by direct attributes `invisible`, `readonly`, `required`; use `column_invisible` for list
-  columns.
-- JavaScript: prefer native ES modules; avoid adding new `odoo.define` modules; do not add `/** @odoo-module */` to new
-  ESM files.
+- View attrs/states: replaced by direct attributes `invisible`, `readonly`,
+  `required`; use `column_invisible` for list columns.
+- JavaScript: prefer native ES modules; avoid adding new `odoo.define` modules;
+  do not add `/** @odoo-module */` to new ESM files.
 
 Process
 

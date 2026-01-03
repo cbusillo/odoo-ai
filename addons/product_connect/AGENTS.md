@@ -18,7 +18,8 @@ Key Areas
 
 Sync Patterns
 
-- Use context flag `skip_shopify_sync=True` to prevent loops when writing synced records.
+- Use context flag `skip_shopify_sync=True` to prevent loops when writing
+  synced records.
 - Prefer incremental sync; reserve full sync for initialization.
 
 Testing
@@ -28,4 +29,7 @@ Testing
 
 References
 
-- @docs/integrations/graphql.md, @docs/integrations/shopify-sync.md, @docs/integrations/webhooks.md
+- @docs/integrations/shopify.md#graphql
+- @docs/integrations/shopify.md#sync
+- @docs/integrations/shopify.md#webhooks
+- @docs/odoo/security.md#http-controllers

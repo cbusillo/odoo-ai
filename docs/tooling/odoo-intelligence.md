@@ -15,7 +15,8 @@ When
 
 When not to use
 
-- Only for emergency debugging when ORM cannot boot or data is corrupted.
+- If the ORM cannot boot or the database is corrupted; use raw `docker exec` or
+  SQL for emergency debugging.
 
 Tool order
 

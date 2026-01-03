@@ -19,3 +19,9 @@ Scope and order
 
 1. Loop: `changed`, then `git` before commit.
 2. Gate: `full` (or all touched modules) before merge.
+
+Scopes
+
+- changed — current edits and nearby lines.
+- git — files changed since base (e.g., HEAD or origin/branch).
+- full — project or modules.

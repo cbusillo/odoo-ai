@@ -79,5 +79,5 @@ grep -r "type \|match \|case " addons/product_connect/
 docker exec ${ODOO_PROJECT_NAME}-database-1 psql -U odoo -c "SELECT version();"
 
 # Search Shopify schema for specific types
-grep -A10 "^type Product" addons/product_connect/graphql/schema/shopify_schema_2025-04.sdl
+grep -A10 "^type Product" addons/product_connect/graphql/schema/shopify_schema_2025-07.sdl
 ```

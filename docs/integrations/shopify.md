@@ -25,6 +25,34 @@ jump into the real code and avoid duplicating behavior here.
 - `addons/product_connect/services/shopify/gql/` — generated client and models
     (do not edit).
 
+## Sync
+
+- `addons/product_connect/models/shopify_sync.py` — state machine, health
+  checks, and async execution.
+- `addons/product_connect/services/shopify/helpers.py` — `SyncMode` and resource
+  metadata.
+- `addons/product_connect/services/shopify/sync/` — importers, exporters, and
+  deleters.
+
+## Webhooks
+
+- `addons/product_connect/controllers/shopify_webhook.py` — entry point, topic
+  routing, and signature verification.
+- `docs/odoo/security.md#http-controllers` — controller security patterns.
+
+## GraphQL
+
+- `addons/product_connect/graphql/shopify/*.graphql` — hand-edited operations
+  and fragments.
+- `addons/product_connect/services/shopify/gql/` — generated client and models
+  (do not edit).
+
+Regenerate generated code from the repo root:
+
+```bash
+uv run python docker/scripts/generate_shopify_models.py
+```
+
 ## Configuration (System Parameters)
 
 - `shopify.shop_url_key`
@@ -37,7 +65,4 @@ See `addons/product_connect/services/shopify/service.py` and
 
 ## Related Guides
 
-- `docs/integrations/graphql.md` — GraphQL sources of truth.
-- `docs/integrations/shopify-sync.md` — sync sources of truth.
-- `docs/integrations/webhooks.md` — webhook sources of truth.
 - `docs/odoo/security.md#http-controllers` — controller security patterns.

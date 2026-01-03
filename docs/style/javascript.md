@@ -26,10 +26,29 @@ Patterns
 - Use ES imports; avoid RequireJS.
 - Prefer JSDoc for hints when helpful; keep files small and cohesive.
 
+Owl Sources of Truth
+
+- `addons/*/static/src/` — real components, services, and patterns in this repo.
+- Use existing components as the primary reference; avoid inventing new
+  patterns without a real precedent.
+
+Service Layer Patterns
+
+- Keep service usage aligned with code under `addons/*/static/src/`.
+- Prefer small, single-purpose services and reuse existing utilities.
+
+Troubleshooting
+
+- If assets fail to refresh, use container tooling to rebuild/restart; see
+  `docs/tooling/docker.md`.
+
 Formatting
 
-- Quotes: single quotes by default; template literals for interpolation.
+- Quotes: double quotes by default; template literals for interpolation.
+- Indentation: 4 spaces; no tabs.
 - Trailing commas: enabled in multi-line arrays/objects/params.
-- Descriptive naming: camelCase for variables/functions, PascalCase for classes/components; prefer intention‑revealing
-  names. If you need a comment to explain “what”, rename or refactor instead.
-- DRY: extract utilities/hooks for shared logic; avoid duplicating selectors or event wiring.
+- Descriptive naming: camelCase for variables/functions, PascalCase for classes/components;
+  prefer intention-revealing names. If you need a comment to explain "what", rename
+  or refactor instead.
+- DRY: extract utilities/hooks for shared logic; avoid duplicating selectors or
+  event wiring.

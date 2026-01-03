@@ -9,10 +9,8 @@ the linked docs, then keep prompts lean.
   instead of copying long excerpts.
 - Before changing code, open the matching style page (`docs/style/python.md`, `docs/style/javascript.md`,
   `docs/style/testing.md`).
-- Clarify your role expectations with the guides under `docs/roles/` (analyst,
-  engineer, tester, reviewer, maintainer).
-- Active migration doc: `docs/todo/NEW_ARCH.md` (living OPW/CM stack + addons
-  plan).
+- Clarify your role expectations with @docs/roles.md (analyst, engineer,
+  tester, reviewer, maintainer).
 
 ## Project Snapshot
 
@@ -48,17 +46,22 @@ the linked docs, then keep prompts lean.
   `docs/policies/acceptance-gate.md` and gate with `uv run test run --json`.
 - Respect `docs/policies/coding-standards.md` and
   `docs/policies/doc-style.md` for naming, formatting, and docs-as-code.
+- Naming guardrail: avoid abbreviations and 1–2 letter locals (e.g., `idx`,
+  `cfg`, `tmp`, `obj`, `val`, `res`, `ctx`). Allow only explicit, well-known
+  tokens (`id`, `db`, `api`, `orm`, `env`, `io`, `url`, `ui`, `ux`, `ip`,
+  `http`, `json`, `xml`, `sql`) and math-only contexts.
 - Update relevant docs in the same change when behavior shifts; link handles
   rather than pasting large snippets.
 - Preserve history (`git mv`, minimal diffs) and avoid destructive git actions
   unless the operator explicitly directs them.
+- Keep branch/worktree hygiene per @docs/roles.md (clean up Code-created
+  branches as you go).
 
 ## Workflow Loop
 
 - The working loop (plan → patch → inspect → targeted tests → iterate → gate)
   is spelled out in `docs/workflows/codex-workflow.md`.
-- Use `docs/workflows/testing-workflow.md` and `docs/TESTING.md` to scope and
-  shard tests via JSON summaries.
+- Use `docs/TESTING.md` to scope and shard tests via JSON summaries.
 - Large refactors, migrations, debugging, or performance work each have their
   own playbooks under `docs/workflows/`—open the relevant one before diving in.
 
@@ -70,7 +73,7 @@ the linked docs, then keep prompts lean.
   `docs/tooling/testing-cli.md` documents detached mode, sharding, and JSON
   outputs.
 - Python formatting and linting commands live in `docs/style/python.md`; JS/Owl
-  specifics live in `docs/style/javascript.md` and `docs/style/hoot-testing.md`.
+  specifics live in `docs/style/javascript.md` and `docs/style/testing.md`.
 
 ## Tooling Order
 
@@ -80,7 +83,8 @@ the linked docs, then keep prompts lean.
 - Mirror the design style and patterns already established in
   `addons/product_connect/`; align new modules and views with that reference
   before inventing new approaches.
-- Run JetBrains inspections on changed scope and then git scope before the gate (`docs/tooling/inspection.md`).
+- Run JetBrains inspections on changed scope and then git scope before the gate
+  (`docs/tooling/inspection.md`).
 - Use Codex built-ins for routine file reads/searches and `apply_patch`; reserve
   JetBrains automation for IDE-only tasks.
 - Sandbox/approval profiles are documented in `docs/tooling/codex-cli.md`.
@@ -93,11 +97,11 @@ the linked docs, then keep prompts lean.
   or access rules. Use `with_context(skip_shopify_sync=True)` when bulk
   operations risk syncing loops.
 - **Frontend & Tours**: Keep selectors simple and avoid jQuery-style filters. See
-  `docs/style/owl-components.md`, `docs/style/browser-automation.md`, and
-  `docs/style/tour-debugging.md`.
+  `docs/style/javascript.md`, `docs/style/browser-automation.md`, and
+  `docs/style/testing.md`.
 - **Integrations**: Shopify and GraphQL patterns live in
   `docs/integrations/`; service mocking is covered in
-  `docs/references/service-mocking.md`. Generated files stay untouched.
+  `docs/style/testing.md`. Generated files stay untouched.
 
 ## Addons & External Code
 
@@ -118,10 +122,9 @@ the linked docs, then keep prompts lean.
 
 - Architecture: `docs/ARCHITECTURE.md`, `docs/resources.md`
 - Testing patterns & advanced topics: `docs/style/testing.md`,
-  `docs/style/testing-advanced.md`, `docs/references/test-templates.md`
-- Performance & bulk operations: `docs/workflows/performance-review.md`,
-  `docs/workflows/bulk-operations.md`
-- Planning & estimation: `docs/workflows/planning.md`
+  `docs/TESTING.md`
+- Performance & bulk operations: `docs/odoo/performance.md`, `docs/odoo/orm.md`
+- Planning & estimation: `docs/workflows/codex-workflow.md`
 - Environment utilities: restore helpers in `tools/` (use `uv run restore`)
 
 Keep AGENTS.md thin: route deeper guidance to the linked pages so we maintain a

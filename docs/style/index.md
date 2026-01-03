@@ -14,21 +14,15 @@ Python
 JavaScript / Owl
 
 - @docs/style/javascript.md — ESM only, Owl 2, selectors/naming
-- @docs/style/owl-components.md — component patterns
-- @docs/style/owl-troubleshooting.md — troubleshooting guide
 
 Testing
 
-- @docs/style/testing.md — fundamentals, LLM‑friendly results
-- @docs/style/testing-advanced.md — advanced testing sources of truth
-- @docs/references/test-templates.md — test template sources of truth
-- @docs/style/hoot-testing.md — Hoot testing sources of truth
+- @docs/style/testing.md — fundamentals, test sources, tours, mocks
 
 Browser Automation / Tours
 
 - @docs/style/browser-automation.md — built-in browser tooling
-- @docs/style/tour-patterns.md — tour sources of truth
-- @docs/style/tour-debugging.md — tour debugging sources of truth
+- @docs/style/testing.md — tour sources and debugging pointers
 
 Odoo Canon
 

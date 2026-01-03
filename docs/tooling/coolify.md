@@ -20,7 +20,8 @@ Keep Coolify usage minimal and point to the real API docs when needed.
 
 ## Notes
 
-- Keep environment-specific details in a local note (git-ignored) if needed.
+- Keep environment-specific details in `docs/tooling/coolify.local.md`
+  (git-ignored).
   (gitignored).
 - Coolify is the source of truth for remote env vars. Local stacks use the
   layered env files under `docker/config/` and should not drift from Coolify.

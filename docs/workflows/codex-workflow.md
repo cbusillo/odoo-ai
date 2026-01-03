@@ -7,6 +7,10 @@ Purpose
 
 - Define the default loop for safe, minimal changes.
 
+When
+
+- Before any code change and again before merge.
+
 Working Loop
 
 1) Plan: define smallest next change and acceptance.

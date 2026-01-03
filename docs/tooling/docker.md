@@ -3,6 +3,14 @@ title: Docker Usage
 ---
 
 
+Purpose
+
+- Provide standard container operations for local Odoo stacks.
+
+When
+
+- Any time you need logs, restarts, or shell access to containers.
+
 Common operations (CLI)
 
 - Status: `docker ps --format 'table {{.Names}}\t{{.Status}}'`

@@ -7,6 +7,15 @@ title: Odoo ORM Performance Sources of Truth (18)
 
 Keep ORM performance guidance concise and tied to real workflows.
 
+## When
+
+- Any time you touch batch operations, queries, or performance-sensitive flows.
+
+## Sources of Truth
+
+- `docs/odoo/orm.md` — batching, recordsets, computed fields.
+- `docs/TESTING.md` — test guidance for perf regressions.
+
 ## Performance Review Workflow
 
 1. Identify the hot path (traceback, logs, or slow operation).
@@ -19,11 +28,6 @@ Keep ORM performance guidance concise and tied to real workflows.
 
 - `docs/tooling/db-tuning.md` — Postgres tuning for parallel test runs.
 - `docs/TESTING.md` — fast -> full test flow.
-
-## Sources of Truth
-
-- `docs/odoo/orm.md` — batching, recordsets, computed fields.
-- `docs/TESTING.md` — test guidance for perf regressions.
 
 ## Related Guides
 

@@ -8,6 +8,10 @@ title: Shopify Integration Guide
 This page keeps a short, accurate map of the Shopify integration. Use it to
 jump into the real code and avoid duplicating behavior here.
 
+## When
+
+- Any time you touch Shopify sync, webhooks, or GraphQL operations.
+
 ## Sources of Truth
 
 - `addons/product_connect/models/shopify_sync.py` — sync job model, queueing,

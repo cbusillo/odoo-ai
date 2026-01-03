@@ -2,9 +2,14 @@
 title: Architecture Overview
 ---
 
+Purpose
 
-This page captures the current runtime topology and how local stacks relate to
-Coolify-managed environments.
+- Capture runtime topology and how local stacks relate to Coolify-managed
+  environments.
+
+When
+
+- When diagnosing environment issues or onboarding.
 
 ## Runtime Topology
 

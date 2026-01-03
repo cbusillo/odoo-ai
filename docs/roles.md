@@ -7,6 +7,10 @@ Purpose
 
 - Define role expectations and outputs for Codex-driven work.
 
+When
+
+- At the start of a task to set expectations and outputs.
+
 ## Analyst (Research & Discovery)
 
 Purpose: find patterns and authoritative guidance; return concise evidence.

@@ -2,9 +2,13 @@
 title: 🔗 External Integrations Index
 ---
 
+Purpose
 
-Use these focused guides for platform-specific details. This page is an index
-only to avoid duplication.
+- Provide an index to integration guides without duplicating content.
+
+When
+
+- When touching external platform integrations.
 
 ## Shopify
 

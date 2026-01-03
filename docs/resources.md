@@ -2,11 +2,14 @@
 title: External Resources
 ---
 
+Purpose
 
-This document provides links to external documentation and API references for
-the technologies used in this project.
+- Provide external documentation and API references for the stack.
+- For project-specific docs, start with [docs/README.md](README.md).
 
-**For project-specific documentation, see [docs/README.md](README.md).**
+When
+
+- When you need canonical external references.
 
 ## External Documentation
 

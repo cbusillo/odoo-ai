@@ -7,6 +7,10 @@ Purpose
 
 - Define inspection scope and gate expectations.
 
+When
+
+- During development loops and before merge.
+
 Scopes
 
 - changed — current edits and nearby lines

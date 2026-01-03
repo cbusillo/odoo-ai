@@ -6,7 +6,7 @@ title: Project Documentation
 This repository is organized for Codex-driven development with small, focused
 documents that are easy to load by handle.
 
-Start with @docs/DOC_MAP.md for routing.
+Use this page for routing.
 
 Notes
 

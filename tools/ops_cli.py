@@ -32,14 +32,21 @@ from tools.deployer.compose_ops import local_compose_command, local_compose_env
 from tools.deployer.deploy import deploy_stack, execute_upgrade
 from tools.deployer.health import HealthcheckError
 from tools.deployer.helpers import get_git_commit
-from tools.deployer.settings import AUTO_INSTALLED_SENTINEL, StackSettings, discover_repo_root, load_stack_settings, parse_env_file
+from tools.deployer.settings import (
+    AUTO_INSTALLED_SENTINEL,
+    StackSettings,
+    discover_repo_root,
+    load_stack_settings,
+    parse_env_file,
+    resolve_addon_dirs,
+)
 from tools.stack_restore import restore_stack
 
 console = Console()
 
 ALL_TARGET = "all"
 ENVS = ("local", "dev", "testing", "prod")
-LOCAL_ACTIONS = ("up", "down", "init", "restore", "restart", "upgrade", "doctor")
+LOCAL_ACTIONS = ("up", "down", "init", "restore", "restart", "upgrade", "doctor", "info")
 POST_SHIP_ACTIONS = ("none", "restore", "init")
 SHIP_ACTIONS = ("ship",)
 GATE_ACTIONS = ("gate",)
@@ -47,6 +54,7 @@ STATUS_ENVS = ("dev", "testing")
 HISTORY_LIMIT = 50
 STATUS_INTERVAL_DEFAULT = 10.0
 STATUS_TIMEOUT_DEFAULT = 600.0
+LOCAL_INFO_SCHEMA_VERSION = 1
 
 OPS_CONFIG_PATH = Path("docker/config/ops.toml")
 
@@ -597,6 +605,58 @@ def _format_update_modules(modules: tuple[str, ...]) -> str:
     return ",".join(modules) if modules else "none"
 
 
+def _clean_optional_value(value: str | None) -> str | None:
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped or None
+
+
+def _local_info_payload(settings: StackSettings) -> dict[str, object]:
+    addons_dirs = resolve_addon_dirs(settings.environment, settings.repo_root)
+    addons_paths = [str(path) for path in addons_dirs]
+    project_name = _clean_optional_value(settings.environment.get("ODOO_PROJECT_NAME"))
+    db_name = _clean_optional_value(settings.environment.get("ODOO_DB_NAME"))
+    return {
+        "schema_version": LOCAL_INFO_SCHEMA_VERSION,
+        "repo_root": str(settings.repo_root),
+        "stack_name": settings.name,
+        "env_file": str(settings.env_file),
+        "source_env_file": str(settings.source_env_file),
+        "compose_files": [str(path) for path in settings.compose_files],
+        "compose_project": settings.compose_project,
+        "project_name": project_name,
+        "state_root": str(settings.state_root),
+        "db_name": db_name,
+        "addons_path": addons_paths,
+        "compose_command": list(settings.compose_command),
+        "docker_context": str(settings.docker_context),
+        "services": list(settings.services),
+        "script_runner_service": settings.script_runner_service,
+        "odoo_bin_path": settings.odoo_bin_path,
+        "image_variable_name": settings.image_variable_name,
+    }
+
+
+def _emit_local_info(payloads: list[dict[str, object]], *, json_output: bool) -> None:
+    if json_output:
+        output: object = payloads[0] if len(payloads) == 1 else payloads
+        click.echo(json.dumps(output, indent=2))
+        return
+    for payload in payloads:
+        stack_name = payload.get("stack_name")
+        if stack_name:
+            console.print(f"Local stack: [bold]{stack_name}[/bold]")
+        for key, value in payload.items():
+            if key == "stack_name":
+                continue
+            if isinstance(value, list):
+                rendered = ", ".join(str(item) for item in value)
+            else:
+                rendered = str(value)
+            console.print(f"  {key}: {rendered}")
+
+
 def _run_local_restart(settings: StackSettings, *, dry_run: bool) -> None:
     services = ["web"] if "web" in settings.services else list(settings.services)
     _run_local_compose(settings, ["restart", *services], dry_run=dry_run)
@@ -624,7 +684,17 @@ def _run_local_action(
     dry_run: bool,
     build: bool,
     no_cache: bool,
+    json_output: bool,
 ) -> None:
+    if action == "info":
+        payloads: list[dict[str, object]] = []
+        for entry in _targets_for(target):
+            stack = _resolve_local_stack(entry)
+            env_file_path = _resolve_local_env_file(entry)
+            settings = load_stack_settings(stack, env_file_path)
+            payloads.append(_local_info_payload(settings))
+        _emit_local_info(payloads, json_output=json_output)
+        return
     no_cache_used = False
     for entry in _targets_for(target):
         stack = _resolve_local_stack(entry)
@@ -1073,6 +1143,7 @@ def _execute(
     dry_run: bool,
     skip_tests: bool,
     require_confirm: bool,
+    json_output: bool = False,
     record_history: bool = False,
 ) -> None:
     valid_targets = set(_target_names()) | {ALL_TARGET}
@@ -1084,7 +1155,14 @@ def _execute(
     if action in LOCAL_ACTIONS:
         if env != "local":
             raise click.ClickException("Local actions are only valid for env=local.")
-        _run_local_action(target, action, dry_run=dry_run, build=build, no_cache=no_cache)
+        _run_local_action(
+            target,
+            action,
+            dry_run=dry_run,
+            build=build,
+            no_cache=no_cache,
+            json_output=json_output,
+        )
         if record_history:
             _record_history(
                 OpsState(
@@ -1180,8 +1258,18 @@ def main(
 @click.argument("target")
 @click.option("--build/--no-build", default=False, help="Build image before local actions")
 @click.option("--no-cache", is_flag=True, help="Build without cache")
+@click.option("--json", "json_output", is_flag=True, help="Output info as JSON (info action only)")
 @click.option("--dry-run", is_flag=True)
-def local_command(action: str, target: str, build: bool, no_cache: bool, dry_run: bool) -> None:
+def local_command(
+    action: str,
+    target: str,
+    build: bool,
+    no_cache: bool,
+    json_output: bool,
+    dry_run: bool,
+) -> None:
+    if json_output and action != "info":
+        raise click.ClickException("--json is only supported with the info action.")
     _execute(
         target,
         "local",
@@ -1195,6 +1283,7 @@ def local_command(action: str, target: str, build: bool, no_cache: bool, dry_run
         dry_run=dry_run,
         skip_tests=False,
         require_confirm=False,
+        json_output=json_output,
         record_history=True,
     )
 

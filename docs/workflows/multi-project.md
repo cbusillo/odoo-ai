@@ -2,19 +2,25 @@
 title: Multi-Project Configuration (Local Dev)
 ---
 
+Purpose
 
-This guide covers running multiple isolated stacks locally (OPW + Cell Mechanic)
-using layered Docker Compose configs. Remote environments are managed in
-Coolify and do not use the overlays in `docker/config/`.
+- Run multiple isolated stacks locally (OPW + Cell Mechanic) using layered
+  Docker Compose configs.
+- Remote environments are managed in Coolify and do not use the overlays in
+  `docker/config/`.
 
-## Local stacks
+When
+
+- When running multiple local stacks on the same host.
+
+Local stacks
 
 | Stack       | Purpose      | Ports           | Config source   |
 |-------------|--------------|-----------------|-----------------|
 | `opw-local` | OPW dev      | 8069/8072/15432 | `opw-local.env` |
 | `cm-local`  | CM isolation | 9069/9072/9432  | `cm-local.env`  |
 
-## Quick flow
+Quick flow
 
 1. Update the stack env file (`docker/config/opw-local.env`).
 
@@ -30,7 +36,7 @@ Coolify and do not use the overlays in `docker/config/`.
    uv run ops local restore opw
    ```
 
-## Notes
+Notes
 
 - Layer order and env merge rules are documented in `docker/config/README.md`.
 - Create a local `docker-compose.override.yml` to expose ports and mount the

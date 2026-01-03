@@ -2,11 +2,15 @@
 title: Runtime Baselines
 ---
 
+Purpose
 
-This repo avoids hardcoding runtime versions in prose. Prefer pointing at the
-configuration that actually controls the environment.
+- Avoid hardcoding runtime versions in prose; point at source config.
 
-## Python
+When
+
+- When updating Python/runtime baselines or CI/tooling assumptions.
+
+Python
 
 - Minimum supported Python version: `pyproject.toml` → `requires-python`.
 - Container/runtime Python version: `docker-compose.yml` → `PYTHON_VERSION` and

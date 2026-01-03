@@ -3,12 +3,12 @@ title: Shopify Integration Guide
 ---
 
 
-## Purpose
+Purpose
 
 This page keeps a short, accurate map of the Shopify integration. Use it to
 jump into the real code and avoid duplicating behavior here.
 
-## When
+When
 
 - Any time you touch Shopify sync, webhooks, or GraphQL operations.
 

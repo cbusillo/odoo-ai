@@ -1,5 +1,5 @@
 ---
-title: 🔗 External Integrations Index
+title: External Integrations Index
 ---
 
 Purpose

@@ -2,22 +2,26 @@
 title: Coolify Operations
 ---
 
-## Purpose
+Purpose
 
 Keep Coolify usage minimal and point to the real API docs when needed.
 
-## Inputs/Outputs
+When
 
-- Inputs: `COOLIFY_HOST`, `COOLIFY_TOKEN`, app UUID.
-- Outputs: logs, environment variables, app metadata.
+- When interacting with Coolify-managed environments.
 
-## Sources of Truth
+Sources of Truth
 
 - Coolify API docs (official).
 - `docs/ARCHITECTURE.md#runtime-topology` — environment layout.
 - `docs/tooling/docker.md` — local container operations.
 
-## Notes
+Inputs/Outputs
+
+- Inputs: `COOLIFY_HOST`, `COOLIFY_TOKEN`, app UUID.
+- Outputs: logs, environment variables, app metadata.
+
+Notes
 
 - Keep environment-specific details in a local note if needed.
 - Coolify is the source of truth for remote env vars. Local stacks use the

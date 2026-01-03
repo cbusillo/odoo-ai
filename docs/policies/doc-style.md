@@ -3,6 +3,14 @@ title: Documentation Standards
 ---
 
 
+Purpose
+
+- Define how documentation should be structured and linked.
+
+When
+
+- Any time documentation is added or updated.
+
 Goals
 
 - Small topic pages with stable anchors. Prefer linking by handle.
@@ -16,7 +24,8 @@ Structure
 
 Handles
 
-- Use path+anchor: @docs/odoo/orm.md#recordsets; avoid pasting large excerpts.
+- Use path+anchor: @docs/odoo/orm.md#batch-operations; avoid pasting large
+  excerpts.
 
 Maintenance
 

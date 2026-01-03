@@ -3,15 +3,15 @@ title: Odoo ORM Sources of Truth (18)
 ---
 
 
-## Purpose
+Purpose
 
 Keep ORM guidance accurate by pointing to real code and authoritative docs.
 
-## When
+When
 
 - Any time you touch Odoo models, recordsets, or ORM-heavy flows.
 
-## Sources of Truth
+Sources of Truth
 
 - `addons/*/models/*.py` — real ORM usage in this repo.
 - `docs/odoo/workflow.md` — module layout and container paths.

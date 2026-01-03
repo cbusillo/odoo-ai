@@ -8,6 +8,10 @@ Purpose
 - Use a practical, repeatable flow for diagnosing issues without relying on
   CLI-specific code blocks.
 
+When
+
+- When investigating errors, regressions, or flaky behavior.
+
 Core steps
 
 - Parse the traceback: identify model, method, field, and error type.

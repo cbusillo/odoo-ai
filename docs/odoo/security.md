@@ -3,16 +3,16 @@ title: Odoo Security Sources of Truth (18)
 ---
 
 
-## Purpose
+Purpose
 
 Keep security guidance tied to the real code and configuration. Use this page
 to jump to the authoritative locations.
 
-## When
+When
 
 - Any time you touch ACLs, record rules, or HTTP controllers.
 
-## Sources of Truth
+Sources of Truth
 
 - `addons/*/security/ir.model.access.csv` — model access rights.
 - `addons/*/security/*.xml` — record rules and security data.
@@ -28,7 +28,7 @@ reference implementation:
 
 - `addons/product_connect/controllers/shopify_webhook.py`
 
-## Related Guides
+Related Guides
 
 - `docs/odoo/orm.md` — access rules and recordset behavior.
 - `docs/odoo/workflow.md` — module layout and security file locations.

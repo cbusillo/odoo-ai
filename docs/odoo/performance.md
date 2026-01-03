@@ -7,14 +7,25 @@ title: Odoo ORM Performance Sources of Truth (18)
 
 Keep ORM performance guidance concise and tied to real workflows.
 
+## Performance Review Workflow
+
+1. Identify the hot path (traceback, logs, or slow operation).
+2. Locate the code in `addons/*/models` or `addons/*/services`.
+3. Check for N+1 patterns, repeated searches, or non-batched writes.
+4. Apply a minimal fix; verify with scoped tests.
+5. Run the full acceptance gate.
+
+## Related Tooling
+
+- `docs/tooling/db-tuning.md` — Postgres tuning for parallel test runs.
+- `docs/TESTING.md` — fast -> full test flow.
+
 ## Sources of Truth
 
 - `docs/odoo/orm.md` — batching, recordsets, computed fields.
-- `docs/workflows/performance-review.md` — performance review workflow.
-- `docs/workflows/bulk-operations.md` — bulk operation safety.
 - `docs/TESTING.md` — test guidance for perf regressions.
 
 ## Related Guides
 
 - `docs/odoo/workflow.md` — module layout and paths.
-- `docs/roles/reviewer.md` — performance review responsibilities.
+- `docs/roles.md` — review responsibilities and gate flow.

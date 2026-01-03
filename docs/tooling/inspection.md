@@ -10,6 +10,7 @@ Purpose
 When
 
 - During development loops and before merge.
+- Use the MCP tooling; avoid manual ad-hoc linting unless needed.
 
 When not to use
 

@@ -5,27 +5,17 @@ title: Inspections (JetBrains)
 
 Purpose
 
-- Define inspection scope and gate expectations.
+- Define inspection scope and zero-warning expectations.
 
 When
 
 - During development loops and before merge.
 
-Scopes
+When not to use
 
-- changed — current edits and nearby lines
-- git — files changed since base (e.g., HEAD or origin/branch)
-- full — project or modules
+- Never skip inspections for touched files.
 
-Workflow
+Scope and order
 
-- Loop: run `changed`, then `git` before commit.
-- Gate: run `full` (or all touched modules) before merge.
-
-Results Schema
-
-- id, severity, file:line, message, fixable
-
-Policy
-
-- Zero‑warning on touched files before full gate; narrow suppressions only.
+1. Loop: `changed`, then `git` before commit.
+2. Gate: `full` (or all touched modules) before merge.

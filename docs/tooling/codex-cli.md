@@ -7,6 +7,10 @@ Purpose
 
 - Run Codex sessions with explicit sandbox/approval and small, focused context.
 
+When
+
+- Before starting a Codex session or changing profiles.
+
 Profiles (local ~/.codex/config.toml)
 
 - quick (read-only)

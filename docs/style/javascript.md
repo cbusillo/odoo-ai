@@ -3,6 +3,20 @@ title: JavaScript Style
 ---
 
 
+Purpose
+
+- Define the JS and Owl rules for Odoo 18.
+
+When
+
+- Any time you edit JS, Owl components, or frontend tests.
+
+Sources of Truth
+
+- `addons/*/static/src/` — real components, services, and patterns in this repo.
+- Use existing components as the primary reference; avoid inventing new
+  patterns without a real precedent.
+
 Modules and Frameworks (Odoo 18)
 
 - Use native ES modules with imports from `@web/...` and Odoo namespaces.
@@ -25,12 +39,6 @@ Patterns
 - Components extend Owl Component; avoid legacy Widget.
 - Use ES imports; avoid RequireJS.
 - Prefer JSDoc for hints when helpful; keep files small and cohesive.
-
-Owl Sources of Truth
-
-- `addons/*/static/src/` — real components, services, and patterns in this repo.
-- Use existing components as the primary reference; avoid inventing new
-  patterns without a real precedent.
 
 Service Layer Patterns
 

@@ -3,6 +3,14 @@ title: Style Index
 ---
 
 
+Purpose
+
+- Provide entry points to language and testing style guides.
+
+When
+
+- Before changing code in a new area or language.
+
 Core
 
 - @docs/policies/coding-standards.md — coding rules, descriptive code, naming, docs-as-code

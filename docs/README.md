@@ -3,10 +3,13 @@ title: Project Documentation
 ---
 
 
-This repository is organized for Codex-driven development with small, focused
-documents that are easy to load by handle.
+Purpose
 
-Use this page for routing.
+- Provide the routing map for project documentation.
+
+When
+
+- At the start of any task to pick the right handles.
 
 Routing
 

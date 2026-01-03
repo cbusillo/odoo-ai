@@ -3,11 +3,17 @@ title: Odoo Intelligence Tools
 ---
 
 
-Why use them first
+Purpose
 
 - Open a managed Odoo environment without crafting `docker exec` heredocs.
-- Built-in helpers cover model discovery, field metadata, and ORM-powered read/writes.
-- Responses stream back as structured JSON, which keeps prompts short and repeatable.
+- Built-in helpers cover model discovery, field metadata, and ORM-powered
+  read/writes.
+- Responses stream back as structured JSON, which keeps prompts short and
+  repeatable.
+
+When
+
+- For model discovery, field metadata, and ORM-powered reads or writes.
 
 Recommended tool order
 

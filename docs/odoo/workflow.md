@@ -7,6 +7,10 @@ title: Odoo Workflow & Style
 
 Project-specific Odoo conventions and rules that are easy to drift from code.
 
+## When
+
+- Any time you touch Odoo models, views, or frontend assets.
+
 ## Field Naming (Custom Models)
 
 - Many2one: use object names without `_id` (e.g., `partner`).

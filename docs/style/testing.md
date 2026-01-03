@@ -7,13 +7,9 @@ Purpose
 
 - Consolidate testing conventions and pointers to real test sources.
 
-Basics
+When
 
-- Place Python tests under `addons/<module>/tests/` and JS/tours under
-  `addons/<module>/static/tests/`.
-- Use base classes and factory helpers; avoid ad hoc data creation where
-  possible.
-- Tag tests appropriately (unit/integration/tour) to keep runs predictable.
+- Any time you add or modify tests, fixtures, or tours.
 
 Sources of Truth
 
@@ -21,6 +17,14 @@ Sources of Truth
 - `addons/*/tests/fixtures/` — factories and shared fixtures.
 - `addons/*/static/tests/` — JS/Hoot/tour tests.
 - `addons/*/static/tests/helpers/` — shared JS helpers (when present).
+
+Basics
+
+- Place Python tests under `addons/<module>/tests/` and JS/tours under
+  `addons/<module>/static/tests/`.
+- Use base classes and factory helpers; avoid ad hoc data creation where
+  possible.
+- Tag tests appropriately (unit/integration/tour) to keep runs predictable.
 
 Hoot and JS Testing
 

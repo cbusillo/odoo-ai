@@ -8,6 +8,10 @@ title: Odoo Security Sources of Truth (18)
 Keep security guidance tied to the real code and configuration. Use this page
 to jump to the authoritative locations.
 
+## When
+
+- Any time you touch ACLs, record rules, or HTTP controllers.
+
 ## Sources of Truth
 
 - `addons/*/security/ir.model.access.csv` — model access rights.

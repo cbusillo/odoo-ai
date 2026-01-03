@@ -7,6 +7,10 @@ Purpose
 
 - Define our house style for Python used in Odoo 18 projects and utilities.
 
+When
+
+- Any time you edit Python in this repo.
+
 Targets & Tooling
 
 - Python version and runtime baselines come from repo config (not this doc);

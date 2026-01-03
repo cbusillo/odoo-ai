@@ -7,6 +7,15 @@ Purpose
 - Provide a single, UI-friendly command for the common OPW/CM workflows
   (local init/restore/up/down, branch shipping, prod gating).
 
+When
+
+- Local stack operations, shipping, or production gates.
+
+Sources of Truth
+
+- `tools/ops_cli.py` — command definitions and behavior.
+- `docker/config/ops.toml` — targets and Coolify host mapping.
+
 Quick start
 
 - Run the interactive menu:

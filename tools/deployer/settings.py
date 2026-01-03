@@ -117,6 +117,10 @@ def _resolve_addon_dirs(environment: dict[str, str], repo_root: Path) -> list[Pa
     return resolved
 
 
+def resolve_addon_dirs(environment: dict[str, str], repo_root: Path) -> tuple[Path, ...]:
+    return tuple(_resolve_addon_dirs(environment, repo_root))
+
+
 def _discover_modules_from_dirs(addon_dirs: Iterable[Path]) -> tuple[str, ...]:
     discovered: set[str] = set()
     for base in addon_dirs:

@@ -12,6 +12,7 @@ When
 
 - Use for model discovery, field metadata, and ORM-powered reads or writes.
 - Prefer before opening `odoo-bin shell` or raw SQL.
+- Check stack health first if calls fail (use `odoo_status`).
 
 When not to use
 

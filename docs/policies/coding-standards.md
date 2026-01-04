@@ -21,7 +21,7 @@ Core Rules
 - Type hints are required at API boundaries (function signatures + public data
   shapes). Prefer local inference when clear.
 - Zero‑warning acceptance gate; use JetBrains `noinspection` only when narrowly justified
-  (see @docs/style/python.md).
+  (prefer fixing root causes; see @docs/style/python.md).
 - Docs-as-code: keep docs accurate. When code behavior changes, update affected pages and cross‑references in the same
   PR.
 - Version guardrails: no legacy Odoo 16 view patterns (no `<tree>`, no

@@ -65,6 +65,17 @@ the linked docs, then keep prompts lean.
 - Large refactors, migrations, debugging, or performance work each have their
   own playbooks under `docs/workflows/`—open the relevant one before diving in.
 
+## Proactive Improvements
+
+- Proactively suggest small environment or tooling improvements when you notice
+  friction (scripts, config, runtime baselines); keep suggestions brief and
+  link to the relevant docs (e.g., `docs/tooling/ops.md`,
+  `docs/tooling/runtime-baselines.md`, `docs/tooling/coolify.md`).
+- Let the operator decide; don’t apply environment changes without explicit
+  approval.
+- If guidance is missing, suggest updates to the relevant docs instead of
+  expanding AGENTS.md.
+
 ## Testing & Scripts
 
 - Reuse the scripted helpers in `pyproject.toml` to run tests, lint, or

@@ -19,6 +19,7 @@ When
 | CM local        | developer laptop | `uv run ops local up cm --build`     |
 | OPW dev/testing | Coolify + Docker | Coolify UI                           |
 | CM dev/testing  | Coolify + Docker | Coolify UI                           |
+| OPW prod        | legacy host      | legacy (non-Docker)                  |
 
 ## Key points
 

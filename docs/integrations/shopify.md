@@ -41,9 +41,10 @@ When
 ## eBay Orders via Shopify
 
 Order import inspects the Shopify order `custom_attributes` for a
-`Note Attributes` entry. When eBay fields are present, it sets
-`source_platform` to `ebay`, uses `eBay Latest Delivery Date` for
-`commitment_date`, and appends eBay identifiers to `shopify_note`.
+`Note Attributes` entry. If `eBay Latest Delivery Date` is present, it is used
+for `commitment_date`. If an eBay sales record or order ID is present, the
+order `source_platform` becomes `ebay` and the identifiers are appended to
+`shopify_note`.
 
 See `addons/product_connect/services/shopify/sync/importers/order_importer.py`.
 

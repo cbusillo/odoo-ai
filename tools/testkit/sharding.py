@@ -18,20 +18,20 @@ def discover_modules_with(patterns: list[str], addons_root: Path | None = None) 
     for module_dir in addons.iterdir():
         if not module_dir.is_dir() or not (module_dir / "__manifest__.py").exists():
             continue
-        for pat in patterns:
-            if list(module_dir.glob(pat)):
+        for pattern in patterns:
+            if list(module_dir.glob(pattern)):
                 modules.append(module_dir.name)
                 break
     return modules
 
 
-def greedy_shards(items: list[str], n: int) -> list[list[str]]:
-    if n <= 1 or len(items) <= 1:
+def greedy_shards(items: list[str], shard_count: int) -> list[list[str]]:
+    if shard_count <= 1 or len(items) <= 1:
         return [items]
-    shards: list[list[str]] = [[] for _ in range(n)]
-    for i, item in enumerate(sorted(items)):
-        shards[i % n].append(item)
-    return [s for s in shards if s]
+    shards: list[list[str]] = [[] for _ in range(shard_count)]
+    for index, item in enumerate(sorted(items)):
+        shards[index % shard_count].append(item)
+    return [shard for shard in shards if shard]
 
 
 def compute_weights(modules: list[str], phase: str) -> dict[str, int]:
@@ -67,13 +67,13 @@ def compute_weights(modules: list[str], phase: str) -> dict[str, int]:
     except (OSError, json.JSONDecodeError) as exc:
         _logger.debug("sharding: failed to load weight cache (%s)", exc)
         cache = {}
-    ph_cache = cache.get(phase) or {}
+    phase_cache = cache.get(phase) or {}
     for name in list(weights.keys()):
-        rec = ph_cache.get(name)
-        if not rec:
+        record = phase_cache.get(name)
+        if not record:
             continue
-        secs = float(rec.get("avg_secs") or 0.0)
-        bucket = max(0, int(secs // SEC_PER_BUCKET))
+        seconds = float(record.get("avg_secs") or 0.0)
+        bucket = max(0, int(seconds // SEC_PER_BUCKET))
         weights[name] = max(1, int(weights[name]) + bucket)
     return weights
 
@@ -87,32 +87,38 @@ class ShardPlan:
     strategy: str = "lpt_v1"
 
 
-def lpt_shards(weights: dict[str, int], n: int) -> ShardPlan:
+def lpt_shards(weights: dict[str, int], shard_count: int) -> ShardPlan:
     """Longest Processing Time bin packing.
 
     Distributes modules into n shards by descending weight, always placing the
     next module onto the shard with the smallest current sum.
     """
-    if n <= 1 or len(weights) <= 1:
-        items = sorted(weights.items(), key=lambda kv: kv[0])
-        wsum = sum(w for _, w in items)
+    if shard_count <= 1 or len(weights) <= 1:
+        items = sorted(weights.items(), key=lambda entry: entry[0])
+        total_weight = sum(weight for _, weight in items)
         return ShardPlan(
             phase="unknown",
-            shards=[{"index": 0, "weight": wsum, "modules": [{"name": k, "weight": v} for k, v in items]}],
-            total_weight=wsum,
+            shards=[
+                {
+                    "index": 0,
+                    "weight": total_weight,
+                    "modules": [{"name": module_name, "weight": weight} for module_name, weight in items],
+                }
+            ],
+            total_weight=total_weight,
             shards_count=1,
         )
 
     # Initialize shard buckets
-    shards: list[dict] = [{"index": i, "weight": 0, "modules": []} for i in range(n)]
+    shards: list[dict] = [{"index": index, "weight": 0, "modules": []} for index in range(shard_count)]
     # Assign in descending weight order
-    for name, w in sorted(weights.items(), key=lambda kv: kv[1], reverse=True):
-        target = min(shards, key=lambda s: s["weight"])  # current lightest shard
-        target["modules"].append({"name": name, "weight": int(w)})
-        target["weight"] = int(target["weight"]) + int(w)
+    for module_name, weight in sorted(weights.items(), key=lambda entry: entry[1], reverse=True):
+        target = min(shards, key=lambda shard: shard["weight"])  # current lightest shard
+        target["modules"].append({"name": module_name, "weight": int(weight)})
+        target["weight"] = int(target["weight"]) + int(weight)
 
-    total = sum(s["weight"] for s in shards)
-    return ShardPlan(phase="unknown", shards=shards, total_weight=total, shards_count=len(shards))
+    total_weight = sum(shard["weight"] for shard in shards)
+    return ShardPlan(phase="unknown", shards=shards, total_weight=total_weight, shards_count=len(shards))
 
 
 def plan_shards_for_phase(modules: list[str], phase: str, n_shards: int) -> ShardPlan:
@@ -122,7 +128,7 @@ def plan_shards_for_phase(modules: list[str], phase: str, n_shards: int) -> Shar
     plan = lpt_shards(weights, max(1, n_shards))
     plan.phase = phase
     # Drop empty shards if any
-    plan.shards = [s for s in plan.shards if s.get("modules")]
+    plan.shards = [shard for shard in plan.shards if shard.get("modules")]
     plan.shards_count = len(plan.shards)
     return plan
 
@@ -141,10 +147,10 @@ def _test_classes_in_file(text: str) -> list[tuple[str, int]]:
     classes: list[tuple[str, int]] = []
     # noinspection RegExpSimplifiable  # Keep explicit groups for readability.
     class_iter = list(re.finditer(r"^\s*class\s+([A-Za-z_][\w]*)\s*\([^)]*\):", text, flags=re.M))
-    for i, m in enumerate(class_iter):
-        name = m.group(1)
-        start = m.end()
-        end = class_iter[i + 1].start() if i + 1 < len(class_iter) else len(text)
+    for index, match in enumerate(class_iter):
+        name = match.group(1)
+        start = match.end()
+        end = class_iter[index + 1].start() if index + 1 < len(class_iter) else len(text)
         block = text[start:end]
         tests = len(re.findall(r"^\s*def\s+test_", block, flags=re.M))
         if tests > 0:
@@ -154,37 +160,37 @@ def _test_classes_in_file(text: str) -> list[tuple[str, int]]:
 
 def discover_test_classes(modules: list[str], phase: str) -> list[ClassItem]:
     root = Path("addons")
-    out: list[ClassItem] = []
+    class_items: list[ClassItem] = []
     patterns = {
         "unit": "tests/unit/**/*.py",
         "integration": "tests/integration/**/*.py",
         "tour": "tests/tour/**/*.py",
     }
-    pat = patterns.get(phase)
-    if not pat:
-        return out
-    for mod in modules:
-        mdir = root / mod
-        for p in mdir.glob(pat):
-            if not p.is_file():
+    pattern = patterns.get(phase)
+    if not pattern:
+        return class_items
+    for module_name in modules:
+        module_dir = root / module_name
+        for path in module_dir.glob(pattern):
+            if not path.is_file():
                 continue
             try:
-                txt = p.read_text(errors="ignore")
+                content = path.read_text(errors="ignore")
             except OSError:
                 continue
-            for cname, wt in _test_classes_in_file(txt):
-                out.append(ClassItem(module=mod, cls=cname, weight=wt))
-    return out
+            for class_name, weight in _test_classes_in_file(content):
+                class_items.append(ClassItem(module=module_name, cls=class_name, weight=weight))
+    return class_items
 
 
-def plan_within_module_shards(modules: list[str], phase: str, n: int) -> list[list[ClassItem]]:
+def plan_within_module_shards(modules: list[str], phase: str, shard_count: int) -> list[list[ClassItem]]:
     items = discover_test_classes(modules, phase)
-    if not items or n <= 1:
+    if not items or shard_count <= 1:
         return [items] if items else []
-    shards: list[list[ClassItem]] = [[] for _ in range(n)]
-    weights = [0] * n
-    for it in sorted(items, key=lambda x: x.weight, reverse=True):
-        idx = min(range(n), key=lambda i: weights[i])
-        shards[idx].append(it)
-        weights[idx] += it.weight
-    return [s for s in shards if s]
+    shards: list[list[ClassItem]] = [[] for _ in range(shard_count)]
+    shard_weights = [0] * shard_count
+    for item in sorted(items, key=lambda entry: entry.weight, reverse=True):
+        target_index = min(range(shard_count), key=lambda index: shard_weights[index])
+        shards[target_index].append(item)
+        shard_weights[target_index] += item.weight
+    return [shard for shard in shards if shard]

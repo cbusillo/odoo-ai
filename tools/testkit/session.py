@@ -146,26 +146,26 @@ class TestSession:
 
     def _finish(self, outcomes: dict[str, PhaseOutcome]) -> int:
         assert self.session_dir and self.session_name
-        any_fail = any(o.return_code not in (None, 0) for o in outcomes.values())
+        any_fail = any(outcome.return_code not in (None, 0) for outcome in outcomes.values())
 
         # Source counts (definition counts)
         def _count_py(glob_pattern: str) -> int:
             total = 0
-            for p in Path("addons").glob(glob_pattern):
-                if p.is_file() and p.suffix == ".py":
+            for path in Path("addons").glob(glob_pattern):
+                if path.is_file() and path.suffix == ".py":
                     try:
-                        txt = p.read_text(errors="ignore")
-                        total += len(re.findall(r"^\s*def\s+test_", txt, flags=re.MULTILINE))
+                        content = path.read_text(errors="ignore")
+                        total += len(re.findall(r"^\s*def\s+test_", content, flags=re.MULTILINE))
                     except OSError as err:
                         _log_suppressed("read test file", err)
             return total
 
         def _count_js() -> int:
             total = 0
-            for p in Path("addons").rglob("*.test.js"):
+            for path in Path("addons").rglob("*.test.js"):
                 try:
-                    txt = p.read_text(errors="ignore")
-                    total += len(re.findall(r"\btest\s*\(", txt))
+                    content = path.read_text(errors="ignore")
+                    total += len(re.findall(r"\btest\s*\(", content))
                 except OSError as err:
                     _log_suppressed("read test file", err)
             return total
@@ -179,18 +179,18 @@ class TestSession:
 
         # Load per-phase aggregates into results when available
         summaries: dict[str, dict[str, object]] = {}
-        for ph in ("unit", "js", "integration", "tour"):
-            ph_dir = self.session_dir / ph if self.session_dir else None
+        for phase in ("unit", "js", "integration", "tour"):
+            phase_dir = self.session_dir / phase if self.session_dir else None
             agg = None
             try:
-                if ph_dir and (ph_dir / "all.summary.json").exists():
+                if phase_dir and (phase_dir / "all.summary.json").exists():
                     import json as _json
 
-                    agg = _json.loads((ph_dir / "all.summary.json").read_text())
+                    agg = _json.loads((phase_dir / "all.summary.json").read_text())
             except (OSError, ValueError) as exc:
                 _log_suppressed("read phase summary", exc)
                 agg = None
-            summaries[ph] = agg or {}
+            summaries[phase] = agg or {}
         retcodes = {k: o.return_code for k, o in outcomes.items()}
         aggregate = {
             "schema_version": SUMMARY_SCHEMA_VERSION,
@@ -202,18 +202,18 @@ class TestSession:
             "return_codes": retcodes,
             "success": not any_fail,
             "counters_source": source_counts,
-            "counters_source_total": sum(int(v or 0) for v in source_counts.values()),
+            "counters_source_total": sum(int(count_value or 0) for count_value in source_counts.values()),
         }
 
         # Merge per-phase aggregate counters if present (best-effort)
         def _sum_counter(key: str) -> int:
             total = 0
-            for k in ("unit", "js", "integration", "tour"):
-                s = summaries.get(k) or {}
-                counters_raw = s.get("counters")
-                c = counters_raw if isinstance(counters_raw, dict) else {}
+            for phase_key in ("unit", "js", "integration", "tour"):
+                summary = summaries.get(phase_key) or {}
+                counters_raw = summary.get("counters")
+                counters = counters_raw if isinstance(counters_raw, dict) else {}
                 try:
-                    total += int(c.get(key, 0))
+                    total += int(counters.get(key, 0))
                 except (TypeError, ValueError) as error:
                     _log_suppressed("sum counter", error)
             return total
@@ -234,8 +234,8 @@ class TestSession:
         update_latest_symlink(self.session_dir)
         # JUnit CI artifacts and weight cache update
         try:
-            for ph in ("unit", "js", "integration", "tour"):
-                write_junit_for_phase(self.session_dir, ph)
+            for phase_name in ("unit", "js", "integration", "tour"):
+                write_junit_for_phase(self.session_dir, phase_name)
             from .reporter import write_junit_root as _root
 
             _root(self.session_dir)
@@ -247,12 +247,12 @@ class TestSession:
 
         # Clear 'current'
         try:
-            cur = Path("tmp/test-logs") / "current"
-            if cur.exists() or cur.is_symlink():
-                cur.unlink()
-            cj = cur.with_suffix(".json")
-            if cj.exists():
-                cj.unlink()
+            current_path = Path("tmp/test-logs") / "current"
+            if current_path.exists() or current_path.is_symlink():
+                current_path.unlink()
+            current_json_path = current_path.with_suffix(".json")
+            if current_json_path.exists():
+                current_json_path.unlink()
         except OSError as exc:
             _log_suppressed("clear current pointer", exc)
 
@@ -263,10 +263,10 @@ class TestSession:
             return 0
 
         print("\n❌ Some categories failed")
-        for name, o in outcomes.items():
-            if o.return_code is None:
+        for name, outcome in outcomes.items():
+            if outcome.return_code is None:
                 status = "SKIPPED"
-            elif o.return_code == 0:
+            elif outcome.return_code == 0:
                 status = "OK"
             else:
                 status = "FAIL"
@@ -322,10 +322,10 @@ class TestSession:
                 with ThreadPoolExecutor(max_workers=2) as pool:
                     self._emit_event("phase_start", phase="unit")
                     self._emit_event("phase_start", phase="js")
-                    fu = pool.submit(self._run_unit_sharded, unit_modules, _timeout("unit", 600))
-                    fj = pool.submit(self._run_js_sharded, js_modules, _timeout("js", 1200))
-                    outcomes["unit"] = fu.result()
-                    outcomes["js"] = fj.result()
+                    unit_future = pool.submit(self._run_unit_sharded, unit_modules, _timeout("unit", 600))
+                    js_future = pool.submit(self._run_js_sharded, js_modules, _timeout("js", 1200))
+                    outcomes["unit"] = unit_future.result()
+                    outcomes["js"] = js_future.result()
                 try:
                     if self.session_dir:
                         aggregate_phase(self.session_dir, "unit")
@@ -338,13 +338,17 @@ class TestSession:
                     outcomes.setdefault("tour", PhaseOutcome("tour", None, None, None))
                     return self._finish(outcomes)
                 # Integration + Tour in parallel
-                with ThreadPoolExecutor(max_workers=2) as pool2:
+                with ThreadPoolExecutor(max_workers=2) as secondary_pool:
                     self._emit_event("phase_start", phase="integration")
                     self._emit_event("phase_start", phase="tour")
-                    fi = pool2.submit(self._run_integration_sharded, integration_modules, _timeout("integration", 900))
-                    ft = pool2.submit(self._run_tour_sharded, tour_modules, _timeout("tour", 1800))
-                    outcomes["integration"] = fi.result()
-                    outcomes["tour"] = ft.result()
+                    integration_future = secondary_pool.submit(
+                        self._run_integration_sharded,
+                        integration_modules,
+                        _timeout("integration", 900),
+                    )
+                    tour_future = secondary_pool.submit(self._run_tour_sharded, tour_modules, _timeout("tour", 1800))
+                    outcomes["integration"] = integration_future.result()
+                    outcomes["tour"] = tour_future.result()
                 try:
                     if self.session_dir:
                         aggregate_phase(self.session_dir, "integration")
@@ -395,6 +399,8 @@ class TestSession:
                 cleanup_filestores(root)
             except (OSError, RuntimeError, ValueError) as exc:
                 _log_suppressed("post-run cleanup", exc)
+
+        raise RuntimeError("test session finished without a return code")
 
     def _ensure_template_db(self) -> str:
         if self._template_db:
@@ -464,63 +470,67 @@ class TestSession:
 
     # ————— Discovery helpers —————
     def _discover_unit_modules(self) -> list[str]:
-        mods = self._manifest_modules(patterns=["**/tests/unit/**/*.py"]) or self._all_modules()
-        return self._apply_filters(mods, phase="unit")
+        modules = self._manifest_modules(patterns=["**/tests/unit/**/*.py"]) or self._all_modules()
+        return self._apply_filters(modules, phase="unit")
 
     def _discover_js_modules(self) -> list[str]:
-        mods = self._manifest_modules(patterns=["static/tests/**/*.test.js"]) or self._all_modules()
-        return self._apply_filters(mods, phase="js")
+        modules = self._manifest_modules(patterns=["static/tests/**/*.test.js"]) or self._all_modules()
+        return self._apply_filters(modules, phase="js")
 
     def _discover_integration_modules(self) -> list[str]:
-        mods = self._manifest_modules(patterns=["**/tests/integration/**/*.py"]) or self._all_modules()
-        return self._apply_filters(mods, phase="integration")
+        modules = self._manifest_modules(patterns=["**/tests/integration/**/*.py"]) or self._all_modules()
+        return self._apply_filters(modules, phase="integration")
 
     def _discover_tour_modules(self) -> list[str]:
-        mods = self._manifest_modules(patterns=["**/tests/tour/**/*.py"]) or self._all_modules()
-        return self._apply_filters(mods, phase="tour")
+        modules = self._manifest_modules(patterns=["**/tests/tour/**/*.py"]) or self._all_modules()
+        return self._apply_filters(modules, phase="tour")
 
     @staticmethod
     def _manifest_modules(patterns: list[str]) -> list[str]:
         return discover_modules_with(patterns)
 
     def _all_modules(self) -> list[str]:
-        addons = Path("addons")
-        mods: list[str] = []
-        if not addons.exists():
-            return mods
-        for p in addons.iterdir():
-            if p.is_dir() and (p / "__manifest__.py").exists():
-                name = p.name
-                low = name.lower()
-                if any(t in low for t in ("backup", "codex", "_bak", "~")):
+        addons_root = Path("addons")
+        modules: list[str] = []
+        if not addons_root.exists():
+            return modules
+        for addon_dir in addons_root.iterdir():
+            if addon_dir.is_dir() and (addon_dir / "__manifest__.py").exists():
+                name = addon_dir.name
+                lower_name = name.lower()
+                if any(marker in lower_name for marker in ("backup", "codex", "_bak", "~")):
                     continue
-                mods.append(name)
-        return self._apply_filters(mods, phase=None)
+                modules.append(name)
+        return self._apply_filters(modules, phase=None)
 
     def _apply_filters(self, modules: list[str], phase: str | None) -> list[str]:
         if not modules:
             return modules
-        items = modules
+        filtered_modules = modules
         if self._include:
-            items = [m for m in items if m in self._include]
+            filtered_modules = [module_name for module_name in filtered_modules if module_name in self._include]
         if self._exclude:
-            items = [m for m in items if m not in self._exclude]
+            filtered_modules = [module_name for module_name in filtered_modules if module_name not in self._exclude]
         if phase:
-            p_inc = self._p_include.get(phase) or set()
-            p_exc = self._p_exclude.get(phase) or set()
-            if p_inc:
-                items = [m for m in items if m in p_inc]
-            if p_exc:
-                items = [m for m in items if m not in p_exc]
+            phase_include = self._p_include.get(phase) or set()
+            phase_exclude = self._p_exclude.get(phase) or set()
+            if phase_include:
+                filtered_modules = [
+                    module_name for module_name in filtered_modules if module_name in phase_include
+                ]
+            if phase_exclude:
+                filtered_modules = [
+                    module_name for module_name in filtered_modules if module_name not in phase_exclude
+                ]
         # Keep original order but de-dup just in case
         seen: set[str] = set()
-        out: list[str] = []
-        for m in items:
-            if m in seen:
+        deduped: list[str] = []
+        for module_name in filtered_modules:
+            if module_name in seen:
                 continue
-            seen.add(m)
-            out.append(m)
-        return out
+            seen.add(module_name)
+            deduped.append(module_name)
+        return deduped
 
     # ————— Sharded runners —————
     def _run_unit_sharded(self, modules: list[str], timeout: int) -> PhaseOutcome:
@@ -561,8 +571,8 @@ class TestSession:
     def _compute_shards(self, modules: list[str], default_auto: int, env_value: int, phase: str | None = None) -> list[list[str]]:
         if not modules:
             return [[]]
-        n = env_value
-        if n <= 0:
+        shard_count = env_value
+        if shard_count <= 0:
             # very rough auto selection; can be tuned later
             try:
                 import os as _os
@@ -571,8 +581,8 @@ class TestSession:
             except (AttributeError, OSError, ValueError) as exc:
                 _log_suppressed("detect cpu", exc)
                 cpu = os.cpu_count() or 4
-            n = max(1, min(cpu, default_auto))
-        n = max(1, min(n, len(modules)))
+            shard_count = max(1, min(cpu, default_auto))
+        shard_count = max(1, min(shard_count, len(modules)))
         # Soft cap by DB connections (dynamic)
         try:
             from .db import db_capacity
@@ -581,17 +591,21 @@ class TestSession:
             per_shard = max(1, int(self.settings.conn_per_shard))
             reserve = int(self.settings.conn_reserve)
             allowed = max(1, (max_conn - active - reserve) // per_shard)
-            if n > allowed:
+            if shard_count > allowed:
                 print(
-                    f"⚠️  Reducing shards from {n} to {allowed} due to DB connection guardrail (max={max_conn}, active={active}, per_shard={per_shard})"
+                    "⚠️  Reducing shards from "
+                    f"{shard_count} to {allowed} due to DB connection guardrail "
+                    f"(max={max_conn}, active={active}, per_shard={per_shard})"
                 )
-                n = allowed
+                shard_count = allowed
         except (OSError, RuntimeError, ValueError) as exc:
             _log_suppressed("db capacity guardrail", exc)
         if phase:
-            plan = plan_shards_for_phase(modules, phase, n)
-            return [[m["name"] for m in shard["modules"]] for shard in plan.shards]
-        return greedy_shards(modules, n)
+            plan = plan_shards_for_phase(modules, phase, shard_count)
+            return [
+                [module_entry["name"] for module_entry in shard["modules"]] for shard in plan.shards
+            ]
+        return greedy_shards(modules, shard_count)
 
     @staticmethod
     def _compute_within_shards(modules: list[str], within: int, *, phase: str) -> list[list[dict]]:
@@ -599,11 +613,13 @@ class TestSession:
 
         shards = plan_within_module_shards(modules, phase, max(1, within))
         out: list[list[dict]] = []
-        for s in shards:
-            out.append([{"module": it.module, "class": it.cls, "weight": it.weight} for it in s])
+        for shard in shards:
+            out.append([
+                {"module": item.module, "class": item.cls, "weight": item.weight} for item in shard
+            ])
         return out
 
-    def _cap_by_db_guardrail(self, n: int) -> int:
+    def _cap_by_db_guardrail(self, shard_count: int) -> int:
         try:
             from .db import db_capacity
 
@@ -611,67 +627,79 @@ class TestSession:
             per_shard = max(1, int(self.settings.conn_per_shard))
             reserve = int(self.settings.conn_reserve)
             allowed = max(1, (max_conn - active - reserve) // per_shard)
-            return max(1, min(n, allowed))
+            return max(1, min(shard_count, allowed))
         except (OSError, RuntimeError, ValueError) as exc:
             _log_suppressed("db guardrail", exc)
-            return max(1, n)
+            return max(1, shard_count)
 
     @staticmethod
     def _aggregate_futures(futures: dict) -> int:
         from concurrent.futures import as_completed
 
-        rc_agg = 0
-        for fut in as_completed(futures):
-            rc = fut.result()
-            if rc != 0:
-                rc_agg = rc_agg or rc
-        return rc_agg
+        aggregate_return_code = 0
+        for future in as_completed(futures):
+            return_code = future.result()
+            if return_code != 0:
+                aggregate_return_code = aggregate_return_code or return_code
+        return aggregate_return_code
 
     @staticmethod
-    def _run_parallel(items: list[_T], max_workers: int, fn: Callable[[_T], int]) -> int:
+    def _run_parallel(items: list[_T], max_workers: int, runner: Callable[[_T], int]) -> int:
         from concurrent.futures import ThreadPoolExecutor
 
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            futures = {pool.submit(fn, item): item for item in items}
+            futures = {pool.submit(runner, item): item for item in items}
             return TestSession._aggregate_futures(futures)
 
-    def _run_fanout(self, session_dir: Path, phase: str, shards: list[_T], max_workers: int, fn: Callable[[_T], int]) -> PhaseOutcome:
-        rc_agg = self._run_parallel(shards, max_workers, fn)
-        return PhaseOutcome(phase, 0 if rc_agg == 0 else rc_agg, session_dir / phase, None)
+    def _run_fanout(
+        self,
+        session_dir: Path,
+        phase: str,
+        shards: list[_T],
+        max_workers: int,
+        runner: Callable[[_T], int],
+    ) -> PhaseOutcome:
+        aggregate_return_code = self._run_parallel(shards, max_workers, runner)
+        return PhaseOutcome(
+            phase,
+            0 if aggregate_return_code == 0 else aggregate_return_code,
+            session_dir / phase,
+            None,
+        )
 
-    def _fanout_shards(self, phase: str, shards: list[_T], fn: Callable[[_T], int]) -> PhaseOutcome:
+    def _fanout_shards(self, phase: str, shards: list[_T], runner: Callable[[_T], int]) -> PhaseOutcome:
         assert self.session_dir is not None
         max_workers = int(self.settings.max_procs) if self.settings.max_procs else min(8, len(shards))
-        return self._run_fanout(self.session_dir, phase, shards, max_workers, fn)
+        return self._run_fanout(self.session_dir, phase, shards, max_workers, runner)
 
-    def _fanout_method(self, phase: str, modules: list[str], timeout: int, n: int) -> PhaseOutcome:
+    def _fanout_method(self, phase: str, modules: list[str], timeout: int, slice_count: int) -> PhaseOutcome:
         from concurrent.futures import ThreadPoolExecutor, as_completed
         from .executor import OdooExecutor
 
         assert self.session_dir is not None
         session_dir = self.session_dir
-        n = self._cap_by_db_guardrail(max(1, int(n)))
-        print(f"▶️  Phase {phase} with {n} method-slice shard(s)")
+        slice_count = self._cap_by_db_guardrail(max(1, int(slice_count)))
+        print(f"▶️  Phase {phase} with {slice_count} method-slice shard(s)")
 
-        def _run(idx: int) -> int:
-            ex = OdooExecutor(session_dir, phase)
+        def _run(slice_index: int) -> int:
+            executor = OdooExecutor(session_dir, phase)
             is_js = phase == "js"
             is_tour = phase == "tour"
             use_prod = phase in {"integration", "tour"}
             base_tag = "js_test" if is_js else ("tour_test" if is_tour else ("integration_test" if use_prod else "unit_test"))
             tag_expr = base_tag
             db_base = f"{self.settings.db_name}_test_{phase}"
-            db_name = f"{db_base}_m{idx:03d}"
+            db_name = f"{db_base}_m{slice_index:03d}"
             template_db = self._ensure_template_db() if use_prod else None
             extra_env = {
                 "OAI_TEST_SLICER": "1",
-                "TEST_SLICE_TOTAL": str(n),
-                "TEST_SLICE_INDEX": str(idx),
+                "TEST_SLICE_TOTAL": str(slice_count),
+                "TEST_SLICE_INDEX": str(slice_index),
                 "TEST_SLICE_PHASE": phase,
                 "TEST_SLICE_MODULES": ",".join(modules),
                 "PYTHONPATH": "/volumes/tools/testkit:$PYTHONPATH",
             }
-            return ex.run(
+            return executor.run(
                 test_tags=tag_expr,
                 db_name=db_name,
                 modules_to_install=modules,
@@ -681,18 +709,23 @@ class TestSession:
                 use_production_clone=use_prod,
                 template_db=template_db,
                 extra_env=extra_env,
-                shard_label=f"ms{idx:03d}",
+                shard_label=f"ms{slice_index:03d}",
             ).returncode
 
-        max_workers = int(self.settings.max_procs) if self.settings.max_procs else min(8, n)
-        rc_agg = 0
+        max_workers = int(self.settings.max_procs) if self.settings.max_procs else min(8, slice_count)
+        aggregate_return_code = 0
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            futures = {pool.submit(_run, i): i for i in range(n)}
-            for fut in as_completed(futures):
-                rc = fut.result()
-                if rc != 0:
-                    rc_agg = rc_agg or rc
-        return PhaseOutcome(phase, 0 if rc_agg == 0 else rc_agg, self.session_dir / phase, None)
+            futures = {pool.submit(_run, slice_index): slice_index for slice_index in range(slice_count)}
+            for future in as_completed(futures):
+                return_code = future.result()
+                if return_code != 0:
+                    aggregate_return_code = aggregate_return_code or return_code
+        return PhaseOutcome(
+            phase,
+            0 if aggregate_return_code == 0 else aggregate_return_code,
+            self.session_dir / phase,
+            None,
+        )
 
     def _fanout(self, phase: str, shards: list[list[str]], timeout: int) -> PhaseOutcome:
         from .executor import OdooExecutor
@@ -701,22 +734,22 @@ class TestSession:
         session_dir = self.session_dir
         print(f"▶️  Phase {phase} with {len(shards)} shard(s)")
 
-        def _run(mods: list[str]) -> int:
-            if not mods:
+        def _run(shard_modules: list[str]) -> int:
+            if not shard_modules:
                 return 0
-            ex = OdooExecutor(session_dir, phase)
+            executor = OdooExecutor(session_dir, phase)
             # Use per-module prefix to create separate log files when shard is single module
-            use_prefix = len(mods) == 1
+            use_prefix = len(shard_modules) == 1
             is_js = phase == "js"
             is_tour = phase == "tour"
             use_prod = phase in {"integration", "tour"}
             tags = "js_test" if is_js else ("tour_test,-js_test" if is_tour else ("integration_test" if use_prod else "unit_test"))
             db = f"{self.settings.db_name}_test_{phase}"
             template_db = self._ensure_template_db() if use_prod else None
-            return ex.run(
+            return executor.run(
                 test_tags=tags,
-                db_name=db if len(shards) == 1 else f"{db}_{abs(hash('-'.join(mods))) % 10_000}",
-                modules_to_install=mods,
+                db_name=db if len(shards) == 1 else f"{db}_{abs(hash('-'.join(shard_modules))) % 10_000}",
+                modules_to_install=shard_modules,
                 timeout=timeout,
                 is_tour_test=is_tour,
                 is_js_test=is_js,
@@ -734,22 +767,22 @@ class TestSession:
         session_dir = self.session_dir
         print(f"▶️  Phase {phase} with {len(shards)} class-shard(s)")
 
-        def _run(items: list[dict]) -> int:
-            if not items:
+        def _run(class_items: list[dict]) -> int:
+            if not class_items:
                 return 0
             is_js = phase == "js"
             is_tour = phase == "tour"
             use_prod = phase in {"integration", "tour"}
             base_tag = "js_test" if is_js else ("tour_test" if is_tour else ("integration_test" if use_prod else "unit_test"))
-            modules = sorted({i["module"] for i in items})
-            parts = [f"{base_tag}/{i['module']}:{i['class']}" for i in items]
+            modules = sorted({item["module"] for item in class_items})
+            parts = [f"{base_tag}/{item['module']}:{item['class']}" for item in class_items]
             if is_tour:
                 parts.append("-js_test")
             tag_expr = ",".join(parts)
-            ex = OdooExecutor(session_dir, phase)
+            executor = OdooExecutor(session_dir, phase)
             db = f"{self.settings.db_name}_test_{phase}"
             template_db = self._ensure_template_db() if use_prod else None
-            return ex.run(
+            return executor.run(
                 test_tags=tag_expr,
                 db_name=f"{db}_{abs(hash('::'.join(parts))) % 10_000}",
                 modules_to_install=modules,

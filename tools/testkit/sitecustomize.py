@@ -12,51 +12,51 @@ def _enabled() -> bool:
 
 
 def _parse_modules() -> set[str]:
-    raw = os.environ.get("TEST_SLICE_MODULES", "").strip()
-    if not raw:
+    raw_value = os.environ.get("TEST_SLICE_MODULES", "").strip()
+    if not raw_value:
         return set()
-    return {m.strip() for m in raw.split(",") if m.strip()}
+    return {module_name.strip() for module_name in raw_value.split(",") if module_name.strip()}
 
 
 def _bucket_of(name: str, total: int) -> int:
     if total <= 1:
         return 0
-    h = hashlib.sha1(name.encode()).hexdigest()
-    return int(h[:8], 16) % total
+    hash_value = hashlib.sha1(name.encode()).hexdigest()
+    return int(hash_value[:8], 16) % total
 
 
 def _matches_target_module(py_module: str, targets: Iterable[str]) -> bool:
     if not targets:
         return True
     # Typical Odoo test module path: odoo.addons.<module>....
-    for t in targets:
-        needle = f".addons.{t}."
-        if needle in py_module or py_module.endswith(f".addons.{t}") or py_module.startswith(f"{t}."):
+    for target in targets:
+        needle = f".addons.{target}."
+        if needle in py_module or py_module.endswith(f".addons.{target}") or py_module.startswith(f"{target}."):
             return True
     return False
 
 
 def _install_loader_patch(total: int, index: int, only_modules: set[str]) -> None:
-    orig_get = unittest.TestLoader.getTestCaseNames
+    original_getter = unittest.TestLoader.getTestCaseNames
 
     def sliced_get(self: unittest.TestLoader, test_case_class: type[unittest.TestCase]):  # type: ignore[override]
-        names = orig_get(self, test_case_class)
+        names = original_getter(self, test_case_class)
         # Only slice targeted addon modules; otherwise leave untouched
-        py_mod = getattr(test_case_class, "__module__", "")
-        if not _matches_target_module(py_mod, only_modules):
+        python_module = getattr(test_case_class, "__module__", "")
+        if not _matches_target_module(python_module, only_modules):
             return names
 
-        out: list[str] = []
-        cls = getattr(test_case_class, "__name__", "Test")
-        for n in names:
-            if not n.startswith("test"):
+        selected_names: list[str] = []
+        class_name = getattr(test_case_class, "__name__", "Test")
+        for test_name in names:
+            if not test_name.startswith("test"):
                 # don’t slice non-tests
-                out.append(n)
+                selected_names.append(test_name)
                 continue
-            key = f"{py_mod}.{cls}.{n}"
-            if _bucket_of(key, total) == index:
-                out.append(n)
-        return out
+            bucket_key = f"{python_module}.{class_name}.{test_name}"
+            if _bucket_of(bucket_key, total) == index:
+                selected_names.append(test_name)
+        return selected_names
 
     unittest.TestLoader.getTestCaseNames = sliced_get  # type: ignore[assignment]
 

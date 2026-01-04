@@ -221,11 +221,11 @@ def create_template_from_production(template_db: str) -> None:
         return
     # Clone from production
     production_db = get_production_db_name()
-    cmd = (
+    dump_command = (
         f"set -o pipefail; pg_dump -Fc -U {db_user} {production_db} | "
         f"pg_restore -U {db_user} -d {template_db} --no-owner --role={db_user}"
     )
-    compose_exec(get_database_service(), ["bash", "-lc", cmd])
+    compose_exec(get_database_service(), ["bash", "-lc", dump_command])
 
 
 def template_reuse_candidate(_base_db: str, ttl_sec: int) -> str | None:
@@ -236,11 +236,11 @@ def template_reuse_candidate(_base_db: str, ttl_sec: int) -> str | None:
     """
     from time import time
 
-    meta = Path("tmp/test-logs/template.json")
-    if not meta.exists():
+    metadata_path = Path("tmp/test-logs/template.json")
+    if not metadata_path.exists():
         return None
     try:
-        data = json.loads(meta.read_text())
+        data = json.loads(metadata_path.read_text())
         name = data.get("name")
         created = float(data.get("created", 0))
         if not name:
@@ -258,9 +258,9 @@ def template_reuse_candidate(_base_db: str, ttl_sec: int) -> str | None:
 def record_template(template_db: str) -> None:
     from time import time
 
-    p = Path("tmp/test-logs/template.json")
+    metadata_path = Path("tmp/test-logs/template.json")
     try:
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps({"name": template_db, "created": time()}))
+        metadata_path.parent.mkdir(parents=True, exist_ok=True)
+        metadata_path.write_text(json.dumps({"name": template_db, "created": time()}))
     except OSError as exc:
         _logger.debug("db: failed to record template metadata (%s)", exc)

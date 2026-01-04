@@ -16,13 +16,13 @@ def get_database_service() -> str:
 
 
 def compose_exec(service: str, args: list[str], capture_output: bool = True) -> subprocess.CompletedProcess:
-    cmd = ["docker", "compose", "exec", "-T", service] + args
-    return subprocess.run(cmd, capture_output=capture_output, text=True)
+    command = ["docker", "compose", "exec", "-T", service] + args
+    return subprocess.run(command, capture_output=capture_output, text=True)
 
 
 def ensure_services_up(services: list[str]) -> None:
-    for s in services:
-        subprocess.run(["docker", "compose", "up", "-d", s], capture_output=True)
+    for service_name in services:
+        subprocess.run(["docker", "compose", "up", "-d", service_name], capture_output=True)
 
 
 def project_root() -> Path:

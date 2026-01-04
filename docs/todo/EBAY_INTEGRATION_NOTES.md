@@ -3,14 +3,8 @@ title: eBay Integration Notes
 ---
 
 
-## Current State
-
-We're currently extracting eBay order information from Shopify orders (via the
-Note Attributes field), which includes:
-
-- eBay Sales Record Number
-- eBay Order ID
-- Delivery dates
+Current order-import behavior (via Shopify note attributes) is documented at
+@docs/integrations/shopify.md#ebay-orders-via-shopify.
 
 ## Future Enhancements
 

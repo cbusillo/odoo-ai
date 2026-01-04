@@ -14,18 +14,9 @@ title: TODO / Optimization Ideas
 
 ## Coolify Rollout Cleanup
 
-- Decide whether to use Coolify shared variables for build-time values
-  (GITHUB_TOKEN, ODOO_ADDON_REPOSITORIES).
-- Add Docker Hub login on the Coolify build host to avoid pull stalls.
 - Verify cm-testing stability (restart loops) and capture root cause.
 - Prune uv scripts that are no longer used (keep restore/sanitize/init helpers).
 
 ## DX Cleanup + Workflow Hardening
 
 - Decide auto-deploy triggers for dev/testing vs manual prod promotion.
-
-## Completed (Recent)
-
-- Swept stale docs/scripts after monorepo shift; removed/updated.
-- Added one-button restore/init wrappers (dev/testing).
-- Added prod deploy gate workflow + CLI (backup/list/rollback).

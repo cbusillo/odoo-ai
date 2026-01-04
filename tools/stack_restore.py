@@ -8,9 +8,9 @@ from pathlib import Path
 from tools.deployer.command import CommandError, run_process
 from tools.deployer.compose_ops import local_compose_command, local_compose_env, remote_compose_command
 from tools.deployer.deploy import (
+    _wait_for_local_service,
     build_updated_environment,
     ensure_local_bind_mounts,
-    _wait_for_local_service,
     prepare_remote_stack,
     push_env_to_remote,
     write_env_file,

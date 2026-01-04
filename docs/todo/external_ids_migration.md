@@ -3,6 +3,8 @@ title: External IDs Migration — Candidates and Seeding
 ---
 
 
+Status: blocked — awaiting migration decision and timeline.
+
 This doc lists model fields we can migrate into the `external_ids` framework
 and the systems/templates to seed.
 
@@ -26,12 +28,6 @@ and the systems/templates to seed.
 ## product.image (via ImageMixin)
 
 - `shopify_media_id` → system `shopify`, resource Media (product.image model)
-
-## hr.employee (requested systems)
-
-- `repairshopr` → Employee/User ID
-- `discord` → User ID (typically numeric snowflake)
-- `timeclock` → Employee ID
 
 ## Notes
 

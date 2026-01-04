@@ -64,7 +64,8 @@ def bulk_create(vals: 'ProductTemplatesVals') -> None:
 JetBrains `noinspection` Policy
 
 - Zero‑warning gate on touched files. Add `noinspection` only when 100% appropriate:
-    - Prefer fixing code over suppressing warnings.
+    - Always fix the root cause before suppressing. Use `noinspection` only for
+      confirmed tool false positives that cannot be resolved in code.
     - Scope narrowly (single line or the smallest block possible).
     - Include a one‑line justification and a reference link if helpful.
     - Never add broad or file‑level blanket suppressions.

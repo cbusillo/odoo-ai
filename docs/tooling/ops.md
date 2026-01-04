@@ -84,6 +84,8 @@ Behavior notes
   only; no secrets) derived from `load_stack_settings()`.
 - `ops local restart` performs a fast `docker compose restart web` for the
   target stack.
+- `ops local down` removes orphaned containers and anonymous volumes for the
+  target stack while preserving named volumes.
 - `ops local upgrade` runs module upgrades using the stack's configured module
   list (AUTO by default) without rebuilding the image.
 - `--no-cache` forces a clean local build; for `all`, only the first target

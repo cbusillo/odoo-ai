@@ -596,6 +596,153 @@ def _run_local_compose(settings: StackSettings, extra: Sequence[str], *, dry_run
     run_process(command, cwd=settings.repo_root, env=local_compose_env(settings))
 
 
+def _docker_command_prefix(settings: StackSettings) -> list[str]:
+    compose_command = list(settings.compose_command)
+    if not compose_command:
+        return ["docker"]
+    if "compose" in compose_command:
+        compose_index = compose_command.index("compose")
+        if compose_index > 0:
+            return compose_command[:compose_index]
+    binary_name = Path(compose_command[0]).name
+    if binary_name == "podman-compose":
+        return ["podman"]
+    return ["docker"]
+
+
+def _docker_command(settings: StackSettings, extra: Sequence[str]) -> list[str]:
+    command = _docker_command_prefix(settings)
+    command += list(extra)
+    return command
+
+
+def _compose_project_container_ids(settings: StackSettings) -> list[str]:
+    try:
+        result = run_process(
+            local_compose_command(settings, ["ps", "--all", "-q"]),
+            cwd=settings.repo_root,
+            env=local_compose_env(settings),
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        return []
+    return [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
+
+
+def _volume_names_for_container_ids(settings: StackSettings, container_ids: Sequence[str]) -> set[str]:
+    if not container_ids:
+        return set()
+    try:
+        inspect_result = run_process(
+            _docker_command(settings, ["inspect", *container_ids]),
+            env=local_compose_env(settings),
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        return set()
+    if inspect_result.returncode != 0 or not inspect_result.stdout:
+        return set()
+    try:
+        container_data = json.loads(inspect_result.stdout)
+    except json.JSONDecodeError:
+        return set()
+    if not isinstance(container_data, list):
+        return set()
+    volume_names: set[str] = set()
+    for container in container_data:
+        if not isinstance(container, dict):
+            continue
+        mounts = container.get("Mounts")
+        if not isinstance(mounts, list):
+            continue
+        for mount in mounts:
+            if not isinstance(mount, dict):
+                continue
+            if mount.get("Type") != "volume":
+                continue
+            volume_name = mount.get("Name")
+            if isinstance(volume_name, str) and volume_name:
+                volume_names.add(volume_name)
+    return volume_names
+
+
+def _anonymous_volume_names(settings: StackSettings, volume_names: Iterable[str]) -> list[str]:
+    anonymous_volume_names: set[str] = set()
+    for volume_name in sorted(set(volume_names)):
+        try:
+            inspect_result = run_process(
+                _docker_command(settings, ["volume", "inspect", volume_name]),
+                env=local_compose_env(settings),
+                capture_output=True,
+                check=False,
+            )
+        except OSError:
+            break
+        if inspect_result.returncode != 0 or not inspect_result.stdout:
+            continue
+        try:
+            volume_data = json.loads(inspect_result.stdout)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(volume_data, list):
+            continue
+        for volume in volume_data:
+            if not isinstance(volume, dict):
+                continue
+            name = volume.get("Name")
+            if not isinstance(name, str) or not name:
+                continue
+            labels = volume.get("Labels")
+            if not isinstance(labels, dict):
+                continue
+            if "com.docker.volume.anonymous" in labels:
+                anonymous_volume_names.add(name)
+    return sorted(anonymous_volume_names)
+
+
+def _project_labeled_anonymous_volumes(settings: StackSettings) -> set[str]:
+    try:
+        list_result = run_process(
+            _docker_command(
+                settings,
+                [
+                    "volume",
+                    "ls",
+                    "-q",
+                    "--filter",
+                    f"label=com.docker.compose.project={settings.compose_project}",
+                    "--filter",
+                    "label=com.docker.volume.anonymous",
+                ],
+            ),
+            env=local_compose_env(settings),
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        return set()
+    return {line.strip() for line in (list_result.stdout or "").splitlines() if line.strip()}
+
+
+def _remove_anonymous_volumes(settings: StackSettings, candidate_volume_names: set[str]) -> None:
+    volume_names = set(candidate_volume_names)
+    volume_names.update(_project_labeled_anonymous_volumes(settings))
+    if not volume_names:
+        return
+    removable = _anonymous_volume_names(settings, volume_names)
+    if removable:
+        try:
+            run_process(
+                _docker_command(settings, ["volume", "rm", *removable]),
+                env=local_compose_env(settings),
+                check=False,
+            )
+        except OSError:
+            return
+
+
 def _format_update_modules(modules: tuple[str, ...]) -> str:
     if modules == (AUTO_INSTALLED_SENTINEL,):
         return "AUTO"
@@ -698,7 +845,14 @@ def _run_local_action(
         env_file_path = _resolve_local_env_file(entry)
         if action == "down":
             settings = load_stack_settings(stack, env_file_path)
-            _run_local_compose(settings, ["down"], dry_run=dry_run)
+            if dry_run:
+                _run_local_compose(settings, ["down", "--remove-orphans"], dry_run=True)
+                console.print(f"[dry-run] {entry} local down cleanup (anonymous volumes)")
+                continue
+            container_ids = _compose_project_container_ids(settings)
+            candidate_volume_names = _volume_names_for_container_ids(settings, container_ids)
+            _run_local_compose(settings, ["down", "--remove-orphans"], dry_run=False)
+            _remove_anonymous_volumes(settings, candidate_volume_names)
             console.print(f"{entry} local down complete")
             continue
         if action == "doctor":
@@ -732,11 +886,6 @@ def _run_local_action(
             build_args = ["build"]
             if no_cache and not no_cache_used:
                 build_args.append("--no-cache")
-            services = [service for service in ("script-runner", "web") if service in settings.services]
-            if services:
-                build_args.append(services[0])
-            else:
-                build_args.extend(settings.services)
             _run_local_compose(settings, build_args, dry_run=False)
             if no_cache and not no_cache_used:
                 no_cache_used = True
@@ -926,12 +1075,21 @@ def _print_local_doctor(entry: str, settings: StackSettings) -> None:
             console.print(f"  compose binary: missing ({compose_binary})")
         else:
             console.print(f"  compose binary: {compose_path}")
-            if compose_binary == "docker":
-                result = run_process(["docker", "info"], capture_output=True, check=False)
-                if result.returncode == 0:
-                    console.print("  docker daemon: ok")
-                else:
+            if Path(compose_binary).name == "docker":
+                try:
+                    result = run_process(
+                        _docker_command(settings, ["info"]),
+                        env=local_compose_env(settings),
+                        capture_output=True,
+                        check=False,
+                    )
+                except OSError:
                     console.print("  docker daemon: unavailable")
+                else:
+                    if result.returncode == 0:
+                        console.print("  docker daemon: ok")
+                    else:
+                        console.print("  docker daemon: unavailable")
 
     health_status = _check_healthcheck_url(settings.healthcheck_url)
     if health_status:
@@ -1034,8 +1192,8 @@ def _print_compose_health(settings: StackSettings) -> None:
         if not container_id:
             console.print(f"    - {service}: not running")
             continue
-        state = _inspect_container_state(container_id)
-        health = _inspect_container_health(container_id)
+        state = _inspect_container_state(settings, container_id)
+        health = _inspect_container_health(settings, container_id)
         if health is None:
             console.print(f"    - {service}: {state}")
             continue
@@ -1057,22 +1215,30 @@ def _compose_container_id(settings: StackSettings, service: str) -> str | None:
     return container_id or None
 
 
-def _inspect_container_state(container_id: str) -> str:
-    result = run_process(
-        ["docker", "inspect", "-f", "{{.State.Status}}", container_id],
-        capture_output=True,
-        check=False,
-    )
+def _inspect_container_state(settings: StackSettings, container_id: str) -> str:
+    try:
+        result = run_process(
+            _docker_command(settings, ["inspect", "-f", "{{.State.Status}}", container_id]),
+            env=local_compose_env(settings),
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        return "unknown"
     state = (result.stdout or "").strip() if result.returncode == 0 else "unknown"
     return state or "unknown"
 
 
-def _inspect_container_health(container_id: str) -> str | None:
-    result = run_process(
-        ["docker", "inspect", "-f", "{{.State.Health.Status}}", container_id],
-        capture_output=True,
-        check=False,
-    )
+def _inspect_container_health(settings: StackSettings, container_id: str) -> str | None:
+    try:
+        result = run_process(
+            _docker_command(settings, ["inspect", "-f", "{{.State.Health.Status}}", container_id]),
+            env=local_compose_env(settings),
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        return None
     if result.returncode != 0:
         return None
     health = (result.stdout or "").strip()

@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 import argparse
+import ast
 import json
-import time
 import logging
 import os
 import re
-import sys
 import shlex
 import shutil
 import subprocess
+import sys
 import textwrap
+import time
 from contextlib import suppress
 from dataclasses import dataclass
 from enum import Enum, IntEnum
@@ -47,6 +48,7 @@ class ExitCode(IntEnum):
     RESTORE_FAILED_BOOTSTRAP_SUCCESS = 10
     BOOTSTRAP_FAILED = 20
     INVALID_ARGS = 30
+    RESTORE_FAILED = 40
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
@@ -112,9 +114,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             restorer.restore_from_upstream(do_sanitize=not no_sanitize)
             return ExitCode.SUCCESS
         except (OdooRestorerError, OdooDatabaseUpdateError) as restore_error:
-            _logger.warning("Upstream restore failed (%s). Falling back to bootstrap.", restore_error)
-            restorer.bootstrap_database(do_sanitize=not no_sanitize)
-            return ExitCode.RESTORE_FAILED_BOOTSTRAP_SUCCESS
+            _logger.error(
+                "Upstream restore failed (%s). Not bootstrapping; data left intact.",
+                restore_error,
+            )
+            return ExitCode.RESTORE_FAILED
     except (OdooRestorerError, OdooDatabaseUpdateError) as bootstrap_error:
         _logger.error("Bootstrap failed: %s", bootstrap_error)
         return ExitCode.BOOTSTRAP_FAILED
@@ -237,6 +241,7 @@ class LocalServerSettings(BaseSettings):
     disable_cron: bool = Field(True, alias="SANITIZE_DISABLE_CRON")
     project_name: str = Field("odoo", alias="ODOO_PROJECT_NAME")
     addons_path: str | None = Field(None, alias="ODOO_ADDONS_PATH")
+    addon_repositories: str | None = Field(None, alias="ODOO_ADDON_REPOSITORIES")
     update_modules: str | None = Field(None, alias="ODOO_UPDATE_MODULES")
     update_modules_legacy: str | None = Field(None, alias="ODOO_UPDATE")
     local_addons_dirs: str | None = Field(None, alias="LOCAL_ADDONS_DIRS")
@@ -250,6 +255,7 @@ class LocalServerSettings(BaseSettings):
         "filestore_owner",
         "base_url",
         "addons_path",
+        "addon_repositories",
         "update_modules",
         "update_modules_legacy",
         "local_addons_dirs",
@@ -410,22 +416,24 @@ class OdooUpstreamRestorer:
             )
         return parts
 
-    def overwrite_filestore(self, target_owner: str | None) -> subprocess.Popen:
+    def overwrite_filestore(self, target_owner: str | None) -> subprocess.Popen[bytes]:
         upstream = self._require_upstream()
         _logger.info("Overwriting filestore...")
         self.local.filestore_path.mkdir(parents=True, exist_ok=True)
-        remote_raw = f"{upstream.user}@{upstream.host}:{upstream.filestore_path}"
-        remote_path = shlex.quote(f"{remote_raw.rstrip('/')}/")
-        local_raw = str(self.local.filestore_path)
-        local_path = shlex.quote(f"{local_raw.rstrip('/')}/")
+        remote_root = str(upstream.filestore_path).rstrip("/")
+        local_root = str(self.local.filestore_path).rstrip("/")
         chown_option = f"--chown={target_owner}" if target_owner else ""
         ssh_parts = self._build_ssh_command()
         ssh_command = shlex.join(ssh_parts)
-        rsync_parts = ["rsync", "-az", "--delete"]
+        rsync_parts = ["rsync", "-a", "--whole-file", "--delete"]
         if chown_option:
             rsync_parts.append(chown_option)
-        rsync_parts.extend(["-e", shlex.quote(ssh_command), remote_path, local_path])
-        rsync_command = " ".join(rsync_parts)
+        rsync_parts.extend(["-e", shlex.quote(ssh_command)])
+
+        remote_raw = f"{upstream.user}@{upstream.host}:{remote_root}/"
+        local_raw = f"{local_root}/"
+        rsync_command = " ".join((*rsync_parts, shlex.quote(remote_raw), shlex.quote(local_raw)))
+        _logger.info("Starting filestore sync using a single rsync command")
         return subprocess.Popen(rsync_command, shell=True, env=self.os_env)
 
     def normalize_filestore_permissions(self, target_owner: str | None) -> None:
@@ -933,15 +941,18 @@ with registry.cursor() as cr:
     if not company:
         raise ValueError("Unable to locate a company record for GPT user provisioning.")
 
+    partner_model = env["res.partner"].sudo()
     partner_defaults = {
         "autopost_bills": "ask",
         "type": "contact",
         "active": True,
     }
+    if "autopost_bills" not in partner_model._fields:
+        partner_defaults.pop("autopost_bills", None)
 
     for user_data in payload["users"]:
         partner_vals = {**partner_defaults, "name": user_data["name"], "company_id": company.id}
-        partner = env["res.partner"].sudo().search([
+        partner = partner_model.search([
             ("name", "=", user_data["name"]),
             ("company_id", "=", company.id),
         ], limit=1)
@@ -1148,6 +1159,11 @@ with registry.cursor() as cr:
 
     def compute_update_module_list(self) -> list[str]:
         """Return sorted addon names discovered from local addon directories."""
+        return sorted(self._resolve_local_module_paths().keys())
+
+    def _resolve_local_module_paths(self) -> dict[str, Path]:
+        """Return mapping of local module names to their filesystem paths."""
+        excluded_roots = self._resolve_excluded_addon_roots()
 
         def _extend_from_raw(raw: str | None) -> None:
             if not raw:
@@ -1161,6 +1177,8 @@ with registry.cursor() as cr:
         candidate_dirs: list[str] = []
         _extend_from_raw(self.local.local_addons_dirs)
         _extend_from_raw(self.local.addons_path)
+        if "/opt/extra_addons" not in candidate_dirs:
+            candidate_dirs.append("/opt/extra_addons")
 
         if not candidate_dirs:
             generated_conf = Path("/volumes/config/_generated.conf")
@@ -1179,7 +1197,7 @@ with registry.cursor() as cr:
                 "/opt/project/addons",
             ]
 
-        discovered: set[str] = set()
+        discovered: dict[str, Path] = {}
         resolved_dirs: list[Path] = []
         for raw_dir in candidate_dirs:
             try:
@@ -1200,14 +1218,104 @@ with registry.cursor() as cr:
                 if not child.is_dir():
                     continue
                 if (child / "__manifest__.py").exists() or (child / "__openerp__.py").exists():
-                    discovered.add(child.name)
+                    try:
+                        resolved_child = child.resolve()
+                    except OSError:
+                        resolved_child = child
+                    if any(resolved_child.is_relative_to(root) for root in excluded_roots):
+                        continue
+                    discovered.setdefault(child.name, child)
 
         self._auto_addon_dirs = resolved_dirs
-        return sorted(discovered)
+        return discovered
+
+    def _resolve_excluded_addon_roots(self) -> tuple[Path, ...]:
+        candidates: list[Path] = []
+        raw_repositories = (self.local.addon_repositories or "").strip()
+        if raw_repositories:
+            for token in [item.strip() for item in raw_repositories.split(",") if item.strip()]:
+                repository_spec = token.split("@", 1)[0]
+                repository_name = repository_spec.rsplit("/", 1)[-1]
+                candidates.append(Path("/opt/extra_addons") / repository_name)
+
+        extra_addons_root = Path("/opt/extra_addons")
+        if extra_addons_root.is_dir():
+            for child in extra_addons_root.iterdir():
+                if child.is_dir():
+                    candidates.append(child)
+
+        excluded: list[Path] = []
+        seen: set[Path] = set()
+        for candidate in candidates:
+            try:
+                resolved = candidate.resolve()
+            except OSError:
+                resolved = candidate
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            if self._is_enterprise_repository(resolved):
+                excluded.append(resolved)
+
+        if excluded:
+            _logger.info(
+                "Excluding enterprise addon repositories from auto-updates: %s",
+                ", ".join(str(path) for path in excluded),
+            )
+        return tuple(excluded)
+
+    def _is_enterprise_repository(self, repository_root: Path) -> bool:
+        license_paths = (repository_root / "LICENSE", repository_root / "COPYRIGHT")
+        for license_path in license_paths:
+            if not license_path.is_file():
+                continue
+            try:
+                content = license_path.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            if "Odoo Enterprise Edition" in content:
+                return True
+
+        for root in (repository_root, repository_root / "enterprise"):
+            if not root.is_dir():
+                continue
+            for manifest_name in ("__manifest__.py", "__openerp__.py"):
+                if (root / "web_enterprise" / manifest_name).exists():
+                    return True
+        return False
+
+    def _load_manifest_dependencies(self, addon_path: Path) -> list[str]:
+        manifest_path = addon_path / "__manifest__.py"
+        if not manifest_path.exists():
+            manifest_path = addon_path / "__openerp__.py"
+        if not manifest_path.exists():
+            return []
+        try:
+            raw_content = manifest_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            return []
+        try:
+            manifest_data = ast.literal_eval(raw_content)
+        except (SyntaxError, ValueError):
+            return []
+        if not isinstance(manifest_data, dict):
+            return []
+        dependencies = manifest_data.get("depends", [])
+        if not isinstance(dependencies, list):
+            return []
+        return [dependency for dependency in dependencies if isinstance(dependency, str)]
+
+    def _installed_modules(self) -> set[str]:
+        self.connect_to_db()
+        with self.local.db_conn.cursor() as cursor:
+            cursor.execute(
+                "select name from ir_module_module where state in ('installed','to upgrade','to install')"
+            )
+            return {row[0] for row in cursor.fetchall()}
 
     def _default_modules_for_project(self) -> list[str]:
         raw = (self.local.auto_modules_raw or "").strip()
-        if not raw:
+        if not raw or raw.upper() == "AUTO":
             return []
         separator = "," if "," in raw else ":"
         modules = [item.strip() for item in raw.split(separator) if item.strip()]
@@ -1216,6 +1324,7 @@ with registry.cursor() as cr:
     def update_addons(self) -> None:
         mods_env = (self.local.update_modules or "").strip()
         desired: list[str]
+        local_module_paths: dict[str, Path] | None = None
         if not mods_env or mods_env.upper() == "AUTO":
             project_defaults = self._default_modules_for_project()
             if project_defaults:
@@ -1226,16 +1335,48 @@ with registry.cursor() as cr:
                     ", ".join(desired),
                 )
             else:
-                desired = self.compute_update_module_list()
-                if not desired:
-                    _logger.info("ODOO_UPDATE_MODULES unset/AUTO and no modules detected; skipping addon update.")
+                local_module_paths = self._resolve_local_module_paths()
+                local_modules = set(local_module_paths)
+                if not local_modules:
+                    _logger.info("ODOO_UPDATE_MODULES unset/AUTO and no local modules detected; skipping addon update.")
+                    return
+                installed_modules = self._installed_modules()
+                installed_local_modules = sorted(local_modules & installed_modules)
+                if not installed_local_modules:
+                    _logger.info(
+                        "ODOO_UPDATE_MODULES unset/AUTO and no installed local modules detected; skipping addon update."
+                    )
                     return
                 mode_label = mods_env.upper() if mods_env else "AUTO"
-                _logger.info(
-                    "ODOO_UPDATE_MODULES=%s; auto-detected modules: %s",
-                    mode_label,
-                    ", ".join(desired),
-                )
+                desired_set = set(installed_local_modules)
+                pending = list(installed_local_modules)
+                while pending:
+                    module_name = pending.pop()
+                    addon_path = local_module_paths.get(module_name)
+                    if not addon_path:
+                        continue
+                    for dependency_name in self._load_manifest_dependencies(addon_path):
+                        if dependency_name not in local_modules:
+                            continue
+                        if dependency_name not in desired_set:
+                            desired_set.add(dependency_name)
+                            pending.append(dependency_name)
+                missing_dependencies = sorted(name for name in desired_set if name not in installed_modules)
+                if missing_dependencies:
+                    _logger.info(
+                        "ODOO_UPDATE_MODULES=%s; auto-detected %d installed local modules; "
+                        "will install missing local deps: %s",
+                        mode_label,
+                        len(installed_local_modules),
+                        ", ".join(missing_dependencies),
+                    )
+                else:
+                    _logger.info(
+                        "ODOO_UPDATE_MODULES=%s; auto-detected %d installed local modules for upgrade.",
+                        mode_label,
+                        len(installed_local_modules),
+                    )
+                desired = sorted(desired_set)
         else:
             desired = [m.strip() for m in mods_env.split(",") if m.strip()]
             if not desired:
@@ -1265,15 +1406,22 @@ with registry.cursor() as cr:
         )
         found: set[str] = set()
         missing_fs: list[str] = []
-        for name in desired:
-            present = False
-            for base in addons_paths:
-                if (base / name).is_dir():
+        if local_module_paths is not None:
+            for name in desired:
+                if name in local_module_paths:
                     found.add(name)
-                    present = True
-                    break
-            if not present:
-                missing_fs.append(name)
+                else:
+                    missing_fs.append(name)
+        else:
+            for name in desired:
+                present = False
+                for base in addons_paths:
+                    if (base / name).is_dir():
+                        found.add(name)
+                        present = True
+                        break
+                if not present:
+                    missing_fs.append(name)
 
         if missing_fs:
             _logger.warning(
@@ -1330,11 +1478,17 @@ with registry.cursor() as cr:
         self._require_upstream()
         target_owner = self._resolve_filestore_owner()
         _logger.info("Resolved filestore owner: %s", target_owner or "<default>")
-        filestore_proc = self.overwrite_filestore(target_owner)
-        self.overwrite_database()
-        filestore_proc.wait()
-        if filestore_proc.returncode != 0:
-            raise OdooRestorerError("Filestore rsync failed.")
+        filestore_process = self.overwrite_filestore(target_owner)
+        try:
+            self.overwrite_database()
+        except Exception:
+            filestore_returncode = filestore_process.wait()
+            if filestore_returncode != 0:
+                _logger.warning("Filestore rsync failed (code %s).", filestore_returncode)
+            raise
+        filestore_returncode = filestore_process.wait()
+        if filestore_returncode != 0:
+            raise OdooRestorerError(f"Filestore rsync failed with code {filestore_returncode}")
         _logger.info("Filestore overwrite completed.")
         self.normalize_filestore_permissions(target_owner)
         if do_sanitize:

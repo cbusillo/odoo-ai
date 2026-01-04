@@ -49,6 +49,10 @@ Tips
 - `ODOO_ADDON_REPOSITORIES` accepts a comma-separated list of addon repos
   (cloned into `/opt/extra_addons/<repo>`). These are cloned with
   `GITHUB_TOKEN`.
+  - Restore auto-updates skip enterprise addon repositories detected by the
+    Odoo Enterprise Edition license (or a `web_enterprise` module under the
+    repo root or `enterprise/` folder) inside `/opt/extra_addons`. Use
+    `ODOO_UPDATE_MODULES` to explicitly include them if needed.
 
 ## Layered Compose Configuration
 

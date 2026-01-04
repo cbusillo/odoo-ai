@@ -10,6 +10,7 @@ from tools.deployer.compose_ops import local_compose_command, local_compose_env,
 from tools.deployer.deploy import (
     build_updated_environment,
     ensure_local_bind_mounts,
+    _wait_for_local_service,
     prepare_remote_stack,
     push_env_to_remote,
     write_env_file,
@@ -177,14 +178,37 @@ def restore_stack(
         ensure_local_bind_mounts(restore_settings)
         write_env_file(restore_settings.env_file, env_values)
 
+        stack_started = False
+
+        def _ensure_stack_running() -> None:
+            nonlocal stack_started
+            if stack_started:
+                return
+            _run_local_compose(
+                restore_settings,
+                ["up", "-d", "--remove-orphans", *restore_settings.services],
+                check=False,
+            )
+            stack_started = True
+
         if "database" in restore_settings.services:
             _run_local_compose(restore_settings, ["up", "-d", "--remove-orphans", "database"], check=False)
+            try:
+                _wait_for_local_service(restore_settings, "database", timeout_seconds=60)
+            except ValueError:
+                _ensure_stack_running()
+                _wait_for_local_service(restore_settings, "database", timeout_seconds=60)
 
         _run_local_compose(
             restore_settings,
             ["up", "-d", "--remove-orphans", restore_settings.script_runner_service],
             check=False,
         )
+        try:
+            _wait_for_local_service(restore_settings, restore_settings.script_runner_service, timeout_seconds=60)
+        except ValueError:
+            _ensure_stack_running()
+            _wait_for_local_service(restore_settings, restore_settings.script_runner_service, timeout_seconds=60)
         _run_local_compose(restore_settings, ["stop", "web"], check=False)
         exec_extra = [
             "exec",

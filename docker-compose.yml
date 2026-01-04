@@ -20,7 +20,7 @@ x-odoo-build: &odoo-build
   build:
     dockerfile: docker/Dockerfile
     args:
-      PYTHON_VERSION: ${PYTHON_VERSION:-3.13}
+      PYTHON_VERSION: ${PYTHON_VERSION:-3.14}
       ODOO_VERSION: ${ODOO_VERSION:-18.0}
       ODOO_ADDON_REPOSITORIES: ${ODOO_ADDON_REPOSITORIES:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
@@ -40,7 +40,7 @@ x-healthcheck-defaults: &healthcheck-defaults
 name: ${ODOO_PROJECT_NAME:-odoo}
 services:
   web:
-    <<: [*odoo-base, *odoo-build]
+    <<: [ *odoo-base, *odoo-build ]
     command: /odoo/odoo-bin
     environment:
       <<: *odoo-env

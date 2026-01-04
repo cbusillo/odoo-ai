@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "product_connect"
 version = "0.0.0"  # Real version in __manifest__.py
 description = "Core business module for motors and Shopify sync"
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
     "printnodeapi @ git+https://github.com/cbusillo/PrintNode-Python@master",
     "shopifyapi",
@@ -43,7 +43,7 @@ managed = false
 
 [tool.ruff]
 line-length = 133
-target-version = "py314"
+target-version = "py313"
 exclude = [
     "services/shopify/gql/",
     "graphql/schema/",

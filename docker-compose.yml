@@ -29,7 +29,7 @@ x-odoo-build: &odoo-build
 x-odoo-env: &odoo-env
   ODOO_DB_HOST: database
   ODOO_DB_PORT: "5432"
-  ODOO_ADDONS_PATH: /opt/project/addons,/odoo/addons
+  ODOO_ADDONS_PATH: /opt/project/addons,/opt/extra_addons,/odoo/addons
   IMAGE_ODOO_ENTERPRISE_LOCATION: /volumes/enterprise_disabled
   IMAGE_EXTRA_ADDONS_LOCATION: /opt/extra_addons
 

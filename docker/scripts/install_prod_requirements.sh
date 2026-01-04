@@ -44,7 +44,7 @@ fi
 
 # Install shared project dependencies declared in pyproject.toml (production extras only)
 if [ -f "/volumes/pyproject.toml" ]; then
-  UV_SYNC_ARGS=("--frozen" "--python" "/venv/bin/python3")
+  UV_SYNC_ARGS=("--frozen")
   UV_SYNC_LABEL="Syncing project dependencies"
   if [ -n "${UV_SYNC_EXTRAS:-}" ]; then
     OLD_IFS=$IFS
@@ -74,7 +74,7 @@ install_addon_requirements() {
     return
   fi
   cd "$base_dir"
-  for addon in */ ; do
+  for addon in */; do
     if [ -f "${addon}requirements.txt" ]; then
       echo "Installing ${addon} production requirements..."
       uv pip install -r "${addon}requirements.txt"

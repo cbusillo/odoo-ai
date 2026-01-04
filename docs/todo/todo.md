@@ -17,9 +17,3 @@ title: TODO / Optimization Ideas
 - Draft OPW prod cutover checklist and validate the prod gate.
 - Create `opw_custom` addon as OPW prime layer; migrate OPW-only logic from
   `product_connect` over time.
-
-## Local Env Hygiene
-
-- Decide whether `ODOO_ADMIN_PASSWORD` should live only in `.env` (untracked)
-  and remove it from `docker/config/cm-local.env`, or confirm the tracked local
-  default is intentional.

@@ -240,11 +240,11 @@ def compute_compose_files(name: str, repo_root: Path, config: StackConfig) -> tu
 
     # De-duplicate while preserving order
     seen: set[Path] = set()
-    for p in ordered_candidates:
-        rp = p.resolve()
-        if rp not in seen:
-            layered_files.append(rp)
-            seen.add(rp)
+    for path in ordered_candidates:
+        resolved_path = path.resolve()
+        if resolved_path not in seen:
+            layered_files.append(resolved_path)
+            seen.add(resolved_path)
 
     if not layered_files:
         raise ValueError(f"no compose files resolved for {name}")

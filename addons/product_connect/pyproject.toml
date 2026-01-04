@@ -43,7 +43,7 @@ managed = false
 
 [tool.ruff]
 line-length = 133
-target-version = "py313"
+target-version = "py314"
 exclude = [
     "services/shopify/gql/",
     "graphql/schema/",
@@ -64,4 +64,5 @@ ignore = [
     "ARG002", # Unused method argument - PyCharm handles this better with context awareness
     "ANN201", # Missing type annotation for function - PyCharm handles this better with context awareness
     "ANN202", # Missing type annotation for function - PyCharm handles this better with context awareness
+    "ANN206", # Missing return type annotation for classmethod - common in test setup helpers
 ]

@@ -20,6 +20,7 @@ dev = [
     "questionary",
     "ruff",
     "rich",
+    "mypy",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -56,6 +57,8 @@ ignore = [
     "ARG001", # Unused function argument - PyCharm handles this better with context awareness
     "ARG002", # Unused method argument - PyCharm handles this better with context awareness
     "ANN201", # Missing type annotation for function - PyCharm handles this better with context awareness
+    "ANN206", # Missing return type annotation for classmethod - common in test setup helpers
+    "UP037", # Quoted annotations are common for Odoo plugin types without future imports
 ]
 
 [tool.ruff.lint.isort]

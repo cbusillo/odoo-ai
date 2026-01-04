@@ -968,27 +968,33 @@ with registry.cursor() as cr:
             partner = env["res.partner"].sudo().create(partner_vals)
 
         group_ids: list[int] = []
+        user_model_base = env["res.users"]
+        group_field_name = "groups_id"
+        if "group_ids" in user_model_base._fields:
+            group_field_name = "group_ids"
 
         def add_group(group_id: int) -> None:
             if group_id not in group_ids:
                 group_ids.append(group_id)
 
         if user_data.get("inherit_superuser_groups"):
-            superuser = env['res.users'].browse(SUPERUSER_ID)
+            superuser = user_model_base.browse(SUPERUSER_ID)
             exclude_xmlids = set(user_data.get("inherit_superuser_exclude_xmlids", []))
             category_keywords = {
                 keyword.lower()
                 for keyword in user_data.get("inherit_superuser_category_exclude_keywords", [])
                 if keyword
             }
-            for group in superuser.groups_id:
+            for group in getattr(superuser, group_field_name):
                 xmlid = group.get_external_id().get(group.id)
                 if xmlid and xmlid in exclude_xmlids:
                     continue
-                if category_keywords and group.category_id:
-                    category_name = (group.category_id.display_name or group.category_id.name or "").lower()
-                    if any(keyword in category_name for keyword in category_keywords):
-                        continue
+                if category_keywords:
+                    category_record = getattr(group, "category_id", None)
+                    if category_record:
+                        category_name = (category_record.display_name or category_record.name or "").lower()
+                        if any(keyword in category_name for keyword in category_keywords):
+                            continue
                 add_group(group.id)
 
         for xmlid in user_data.get("groups", []):
@@ -998,7 +1004,7 @@ with registry.cursor() as cr:
                 raise ValueError(f"Unable to locate group xmlid '{xmlid}' for GPT user provisioning.") from exc
 
         ctx = {**env.context, "no_reset_password": True}
-        user_model = env["res.users"].with_context(ctx).sudo()
+        user_model = user_model_base.with_context(ctx).sudo()
         user = user_model.search([("login", "=", user_data["login"])], limit=1)
 
         common_vals = {
@@ -1009,8 +1015,11 @@ with registry.cursor() as cr:
             "notification_type": "email",
             "share": False,
             "active": True,
-            "groups_id": [Command.set(group_ids)],
         }
+        common_vals[group_field_name] = [Command.set(group_ids)]
+        for key in list(common_vals):
+            if key not in user_model_base._fields:
+                common_vals.pop(key)
 
         if user:
             user.write(common_vals)

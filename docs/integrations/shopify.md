@@ -38,6 +38,15 @@ When
 - `addons/product_connect/services/shopify/sync/` — importers, exporters, and
   deleters.
 
+## eBay Orders via Shopify
+
+Order import inspects the Shopify order `custom_attributes` for a
+`Note Attributes` entry. When eBay fields are present, it sets
+`source_platform` to `ebay`, uses `eBay Latest Delivery Date` for
+`commitment_date`, and appends eBay identifiers to `shopify_note`.
+
+See `addons/product_connect/services/shopify/sync/importers/order_importer.py`.
+
 ## Webhooks
 
 - `addons/product_connect/controllers/shopify_webhook.py` — entry point, topic

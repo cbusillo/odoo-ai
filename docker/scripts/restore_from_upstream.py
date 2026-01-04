@@ -657,13 +657,15 @@ class OdooUpstreamRestorer:
             )
 
         _logger.info("Sanitizing database...")
+        # noinspection PyUnresolvedReferences  # call_odoo_sql exists on this class; PyCharm false positive.
+        call_odoo_sql = self.call_odoo_sql
         for sql_call in sql_calls:
             _logger.debug(f"Executing SQL call: {sql_call}")
-            self.call_odoo_sql(sql_call, SqlCallType.UPDATE)
+            call_odoo_sql(sql_call, SqlCallType.UPDATE)
 
         # If we asked to disable crons, verify no active cron remains
         if disable_cron:
-            active_crons = self.call_odoo_sql(SqlCall("ir.cron", where=KeyValuePair("active", True)), SqlCallType.SELECT)
+            active_crons = call_odoo_sql(SqlCall("ir.cron", where=KeyValuePair("active", True)), SqlCallType.SELECT)
             if active_crons:
                 errors = "\n".join(f"- {cron[7]} (id: {cron[0]})" for cron in active_crons)
                 raise OdooDatabaseUpdateError(f"Error: The following cron jobs are still active after sanitization:\n{errors}")
@@ -695,9 +697,11 @@ class OdooUpstreamRestorer:
         settings.shop_url_key = shop_url_key
         settings.validate_safe_environment()
         production_indicators = settings.production_indicators
+        # noinspection PyUnresolvedReferences  # call_odoo_sql exists on this class; PyCharm false positive.
+        call_odoo_sql = self.call_odoo_sql
 
         # Log what we're doing for transparency
-        current_shop_url_key = self.call_odoo_sql(
+        current_shop_url_key = call_odoo_sql(
             SqlCall("ir.config_parameter", KeyValuePair("value"), KeyValuePair("key", "shopify.shop_url_key")),
             SqlCallType.SELECT,
         )
@@ -739,13 +743,13 @@ class OdooUpstreamRestorer:
         for sql_call in sql_calls:
             _logger.debug(f"Executing SQL call: {sql_call}")
             try:
-                self.call_odoo_sql(sql_call, SqlCallType.UPDATE)
+                call_odoo_sql(sql_call, SqlCallType.UPDATE)
             except psycopg2.Error as error:
                 raise OdooDatabaseUpdateError(f"Failed to update Shopify configuration: {error}") from error
 
         legacy_keys = ("shopify.shop_url", "shopify.store_url")
         for key in legacy_keys:
-            result = self.call_odoo_sql(
+            result = call_odoo_sql(
                 SqlCall("ir.config_parameter", KeyValuePair("value"), KeyValuePair("key", key)),
                 SqlCallType.SELECT,
             )
@@ -762,7 +766,7 @@ class OdooUpstreamRestorer:
 
         sanitized_keys = ["shopify.shop_url_key"]
         for key in sanitized_keys:
-            result = self.call_odoo_sql(
+            result = call_odoo_sql(
                 SqlCall("ir.config_parameter", KeyValuePair("value"), KeyValuePair("key", key)),
                 SqlCallType.SELECT,
             )
@@ -811,7 +815,9 @@ class OdooUpstreamRestorer:
             if field in existing_fields:
                 sql_call = SqlCall("product.product", KeyValuePair(field))
                 try:
-                    self.call_odoo_sql(sql_call, SqlCallType.UPDATE)
+                    # noinspection PyUnresolvedReferences  # call_odoo_sql exists on this class; PyCharm false positive.
+                    call_odoo_sql = self.call_odoo_sql
+                    call_odoo_sql(sql_call, SqlCallType.UPDATE)
                 except psycopg2.Error as error:
                     raise OdooDatabaseUpdateError(f"Failed to clear Shopify ID {field}: {error}") from error
             else:
@@ -1264,7 +1270,8 @@ with registry.cursor() as cr:
             )
         return tuple(excluded)
 
-    def _is_enterprise_repository(self, repository_root: Path) -> bool:
+    @staticmethod
+    def _is_enterprise_repository(repository_root: Path) -> bool:
         license_paths = (repository_root / "LICENSE", repository_root / "COPYRIGHT")
         for license_path in license_paths:
             if not license_path.is_file():
@@ -1284,7 +1291,8 @@ with registry.cursor() as cr:
                     return True
         return False
 
-    def _load_manifest_dependencies(self, addon_path: Path) -> list[str]:
+    @staticmethod
+    def _load_manifest_dependencies(addon_path: Path) -> list[str]:
         manifest_path = addon_path / "__manifest__.py"
         if not manifest_path.exists():
             manifest_path = addon_path / "__openerp__.py"
@@ -1378,7 +1386,7 @@ with registry.cursor() as cr:
                     )
                 desired = sorted(desired_set)
         else:
-            desired = [m.strip() for m in mods_env.split(",") if m.strip()]
+            desired = [module_name.strip() for module_name in mods_env.split(",") if module_name.strip()]
             if not desired:
                 _logger.info("ODOO_UPDATE_MODULES is empty after parsing; skipping.")
                 return
@@ -1387,8 +1395,8 @@ with registry.cursor() as cr:
         addons_paths: list[Path] = []
         if addons_env:
             sep = "," if "," in addons_env else ":"
-            for raw in [p.strip() for p in addons_env.split(sep) if p.strip()]:
-                addons_paths.append(Path(raw))
+            for raw_path in [path_entry.strip() for path_entry in addons_env.split(sep) if path_entry.strip()]:
+                addons_paths.append(Path(raw_path))
         if not addons_paths:
             addons_paths = [
                 Path("/volumes/addons"),
@@ -1402,7 +1410,7 @@ with registry.cursor() as cr:
                     addons_paths.append(auto_dir)
         _logger.info(
             "Using addons search paths: %s",
-            ", ".join(str(p) for p in addons_paths),
+            ", ".join(str(path) for path in addons_paths),
         )
         found: set[str] = set()
         missing_fs: list[str] = []

@@ -35,9 +35,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv for modern Python package management
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+RUN rm -rf /venv && curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
 ENV UV_CACHE_DIR=/root/.cache/uv
+ENV UV_PROJECT_ENVIRONMENT=/venv
+RUN uv venv /venv --python $PYTHON_VERSION
 
 # Make uv available for ubuntu user too
 RUN cp /root/.local/bin/uv* /usr/local/bin/

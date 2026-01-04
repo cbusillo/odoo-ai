@@ -25,8 +25,6 @@ title: Stack Migration & Addon Modularization (Living Doc)
 
 ## Next actions
 
-1. Validate OPW dev/testing stability in Coolify.
-2. Stabilize cm-testing (restart loops) if still present.
-3. Draft OPW prod cutover checklist when ready.
-4. Create `opw_custom` addon as OPW prime layer; migrate OPW-only logic from
+1. Draft OPW prod cutover checklist when ready.
+2. Create `opw_custom` addon as OPW prime layer; migrate OPW-only logic from
    `product_connect` over time.

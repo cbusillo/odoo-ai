@@ -145,8 +145,7 @@ class ClassItem:
 
 def _test_classes_in_file(text: str) -> list[tuple[str, int]]:
     classes: list[tuple[str, int]] = []
-    # noinspection RegExpSimplifiable  # Keep explicit groups for readability.
-    class_iter = list(re.finditer(r"^\s*class\s+([A-Za-z_][\w]*)\s*\([^)]*\):", text, flags=re.M))
+    class_iter = list(re.finditer(r"^\s*class\s+([A-Za-z_]\w*)\s*\([^)]*\):", text, flags=re.M))
     for index, match in enumerate(class_iter):
         name = match.group(1)
         start = match.end()

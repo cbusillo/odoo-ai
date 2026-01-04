@@ -230,11 +230,20 @@ def _installed_local_modules(settings: StackSettings) -> tuple[str, ...]:
     if db_password:
         env["PGPASSWORD"] = db_password
     last_error = ""
-    for attempt in range(10):
+    attempt = 0
+    max_attempts = 10
+    while attempt < max_attempts:
         result = run_process(command, capture_output=True, check=False, env=env)
         if result.returncode == 0:
             break
         last_error = (result.stderr or "").strip()
+        attempt += 1
+        logging.getLogger("deploy.workflow").debug(
+            "Module query failed (attempt %s/%s): %s",
+            attempt,
+            max_attempts,
+            last_error or "<no stderr>",
+        )
         time.sleep(2)
     else:
         raise ValueError(f"Failed to query installed modules after retries; database may be restarting. {last_error}")

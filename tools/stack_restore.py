@@ -194,10 +194,10 @@ def restore_stack(
         if "database" in restore_settings.services:
             _run_local_compose(restore_settings, ["up", "-d", "--remove-orphans", "database"], check=False)
             try:
-                _wait_for_local_service(restore_settings, "database", timeout_seconds=60)
+                _wait_for_local_service(restore_settings, "database")
             except ValueError:
                 _ensure_stack_running()
-                _wait_for_local_service(restore_settings, "database", timeout_seconds=60)
+                _wait_for_local_service(restore_settings, "database")
 
         _run_local_compose(
             restore_settings,
@@ -205,10 +205,10 @@ def restore_stack(
             check=False,
         )
         try:
-            _wait_for_local_service(restore_settings, restore_settings.script_runner_service, timeout_seconds=60)
+            _wait_for_local_service(restore_settings, restore_settings.script_runner_service)
         except ValueError:
             _ensure_stack_running()
-            _wait_for_local_service(restore_settings, restore_settings.script_runner_service, timeout_seconds=60)
+            _wait_for_local_service(restore_settings, restore_settings.script_runner_service)
         _run_local_compose(restore_settings, ["stop", "web"], check=False)
         exec_extra = [
             "exec",

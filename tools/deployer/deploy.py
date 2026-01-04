@@ -164,7 +164,7 @@ def _run_upgrade_with_retry(settings: StackSettings, upgrade_subcommand: list[st
                 raise
             if attempt == max_attempts - 1:
                 raise
-            _wait_for_local_service(settings, settings.script_runner_service, timeout_seconds=60)
+            _wait_for_local_service(settings, settings.script_runner_service)
             time.sleep(2)
 
 
@@ -192,14 +192,14 @@ def execute_upgrade(settings: StackSettings, modules: tuple[str, ...], remote: b
         _run_compose(settings, ["stop", "web"], remote)
         try:
             _run_compose(settings, ["up", "-d", settings.script_runner_service], remote)
-            _wait_for_local_service(settings, settings.script_runner_service, timeout_seconds=60)
+            _wait_for_local_service(settings, settings.script_runner_service)
             _run_upgrade_with_retry(settings, upgrade_subcommand, remote=remote)
         finally:
             _run_compose(settings, ["up", "-d", "web"], remote)
         return
     if not remote:
         _run_compose(settings, ["up", "-d", settings.script_runner_service], remote)
-        _wait_for_local_service(settings, settings.script_runner_service, timeout_seconds=60)
+        _wait_for_local_service(settings, settings.script_runner_service)
     _run_upgrade_with_retry(settings, upgrade_subcommand, remote=remote)
 
 

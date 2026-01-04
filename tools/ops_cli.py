@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import time
@@ -915,15 +914,14 @@ def _print_local_doctor(entry: str, settings: StackSettings) -> None:
     if missing_env:
         console.print(f"  missing env: {', '.join(missing_env)}")
 
-    missing_files = [path for path in settings.compose_files if not path.exists()]
     missing_files = [path for path in (settings.env_file, settings.source_env_file) if not path.exists()]
     missing_files.extend(path for path in settings.compose_files if not path.exists())
     if missing_files:
         console.print(f"  missing files: {', '.join(str(path) for path in missing_files)}")
 
-    compose_binary = settings.compose_command[0] if settings.compose_command else ""
+    compose_binary = str(settings.compose_command[0]) if settings.compose_command else ""
     if compose_binary:
-        compose_path = shutil.which(compose_binary)
+        compose_path = _resolve_command_path(compose_binary)
         if compose_path is None:
             console.print(f"  compose binary: missing ({compose_binary})")
         else:
@@ -956,6 +954,74 @@ def _check_healthcheck_url(url: str) -> str | None:
         return f"error {error.code}"
     except (OSError, TimeoutError, urllib.error.URLError) as error:
         return f"unreachable {error}"
+
+
+_WIN_DEFAULT_PATHEXT = ".COM;.EXE;.BAT;.CMD;.VBS;.JS;.WS;.MSC"
+
+
+def _access_check(path_name: str, mode: int) -> bool:
+    return os.path.exists(path_name) and os.access(path_name, mode) and not os.path.isdir(path_name)
+
+
+def _win_path_needs_curdir(command: str, mode: int) -> bool:
+    if not (mode & os.X_OK):
+        return True
+    try:
+        import _winapi  # type: ignore[attr-defined]
+    except ImportError:
+        return False
+    return _winapi.NeedCurrentDirectoryForExePath(os.fsdecode(command))
+
+
+def _resolve_command_path(command: str) -> str | None:
+    if not command:
+        return None
+
+    mode = os.F_OK | os.X_OK
+    directory_name, command_name = os.path.split(command)
+    if directory_name:
+        search_paths = [directory_name]
+    else:
+        path_value = os.environ.get("PATH")
+        if path_value is None:
+            try:
+                path_value = os.confstr("CS_PATH")
+            except (AttributeError, ValueError):
+                path_value = os.defpath
+
+        if not path_value:
+            return None
+
+        path_value = os.fsdecode(path_value)
+        search_paths = path_value.split(os.pathsep)
+
+        if sys.platform == "win32" and _win_path_needs_curdir(command_name, mode):
+            search_paths.insert(0, os.curdir)
+
+    if sys.platform == "win32":
+        pathext_source = os.getenv("PATHEXT") or _WIN_DEFAULT_PATHEXT
+        path_extensions = [extension.rstrip(".") for extension in pathext_source.split(os.pathsep) if extension]
+        candidates = [f"{command_name}{extension}" for extension in path_extensions]
+
+        normalized_command = command_name.upper()
+        if not (mode & os.X_OK) or any(
+            normalized_command.endswith(extension.upper()) for extension in path_extensions
+        ):
+            candidates.insert(0, command_name)
+    else:
+        candidates = [command_name]
+
+    seen_directories: set[str] = set()
+    for directory in search_paths:
+        normalized_directory = os.path.normcase(directory)
+        if normalized_directory in seen_directories:
+            continue
+        seen_directories.add(normalized_directory)
+        for candidate_name in candidates:
+            candidate_path = os.path.join(directory, candidate_name)
+            if _access_check(candidate_path, mode):
+                return candidate_path
+    return None
 
 
 def _print_compose_health(settings: StackSettings) -> None:

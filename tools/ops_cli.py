@@ -257,9 +257,7 @@ def _favorite_states(limit: int = 3) -> list[OpsState]:
     ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
     favorites: list[OpsState] = []
     for (target, env, action, deploy, build, no_cache), _score in ranked[:limit]:
-        favorites.append(
-            OpsState(target=target, env=env, action=action, deploy=deploy, build=build, no_cache=no_cache)
-        )
+        favorites.append(OpsState(target=target, env=env, action=action, deploy=deploy, build=build, no_cache=no_cache))
     return favorites
 
 
@@ -1362,3 +1360,7 @@ def gate_command(target: str, skip_tests: bool, dry_run: bool, confirm: bool) ->
 @click.option("--timeout", type=float, default=STATUS_TIMEOUT_DEFAULT, help="Timeout in seconds")
 def status_command(env: str, target: str, wait: bool, interval: float, timeout: float) -> None:
     _run_status(target, env, wait=wait, interval=interval, timeout=timeout)
+
+
+if __name__ == "__main__":
+    main()

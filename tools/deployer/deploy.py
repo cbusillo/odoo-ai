@@ -172,6 +172,11 @@ def execute_upgrade(settings: StackSettings, modules: tuple[str, ...], remote: b
     resolved_modules = modules
     if modules == (AUTO_INSTALLED_SENTINEL,):
         resolved_modules = _installed_local_modules(settings)
+        if not resolved_modules:
+            logging.getLogger("deploy.workflow").info(
+                "auto module upgrade skipped because no installed local modules were detected.",
+            )
+            return
     if not resolved_modules:
         raise ValueError("no modules configured for upgrade")
     module_argument = ",".join(dict.fromkeys(resolved_modules))
@@ -274,7 +279,24 @@ def deploy_stack(
     execute_compose_pull(settings, remote)
     execute_compose_up(settings, remote)
     if not skip_upgrade:
-        execute_upgrade(settings, settings.update_modules, remote)
+        update_modules = settings.update_modules
+        if update_modules == (AUTO_INSTALLED_SENTINEL,):
+            try:
+                update_modules = _installed_local_modules(settings)
+            except ValueError as error:
+                logging.getLogger("deploy.workflow").warning(
+                    "auto module upgrade skipped because installed local modules could not be determined: %s",
+                    error,
+                )
+            else:
+                if update_modules:
+                    execute_upgrade(settings, update_modules, remote)
+                else:
+                    logging.getLogger("deploy.workflow").info(
+                        "auto module upgrade skipped because no installed local modules were detected.",
+                    )
+        else:
+            execute_upgrade(settings, update_modules, remote)
     if skip_health_check:
         return
     run_health_check(settings, remote, health_timeout_seconds)

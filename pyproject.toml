@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "odoo-ai"
 version = "0.0.0"
 description = "AI-powered Odoo 18 Enterprise development framework"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 
 dependencies = [
     "psutil==5.9.8",
@@ -42,7 +42,7 @@ js = 1200
 
 [tool.ruff]
 line-length = 133
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["ANN", "UP", "B", "I"]
@@ -62,5 +62,5 @@ ignore = [
 known-first-party = ["tools"]
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.14"
 plugins = ["pydantic.mypy"]

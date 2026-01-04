@@ -13,9 +13,9 @@ def parse_failures(log_path: Path) -> list[dict]:
     hoot_entries: list[dict] = []
     if not log_path.exists():
         return []
-    cur: dict | None = None
+    current_entry: dict | None = None
     collecting_tb = False
-    tb_lines: list[str] = []
+    traceback_lines: list[str] = []
     collecting_hoot = False
     hoot_lines: list[str] = []
     hoot_test: str | None = None
@@ -37,40 +37,40 @@ def parse_failures(log_path: Path) -> list[dict]:
         hoot_test = None
         collecting_hoot = False
 
-    with open(log_path, errors="ignore") as f:
-        for raw in f:
-            line = raw.rstrip("\n")
+    with open(log_path, errors="ignore") as log_handle:
+        for raw_line in log_handle:
+            line = raw_line.rstrip("\n")
             stripped_line = line.strip()
             lowered_line = stripped_line.lower()
             # Python traceback capture
             if stripped_line.startswith("Traceback (most recent call last):"):
                 collecting_tb = True
-                tb_lines = [stripped_line]
-                if cur is None:
-                    cur = {"type": "error", "message": "", "test": None}
+                traceback_lines = [stripped_line]
+                if current_entry is None:
+                    current_entry = {"type": "error", "message": "", "test": None}
                 continue
             if collecting_tb:
-                if not stripped_line and tb_lines:
-                    cur = cur or {"type": "error", "message": "", "test": None}
-                    tb = "\n".join(tb_lines)
-                    cur["traceback"] = tb
-                    cur["fingerprint"] = _hash_text(tb)
-                    entries.append(cur)
-                    cur = None
-                    tb_lines = []
+                if not stripped_line and traceback_lines:
+                    current_entry = current_entry or {"type": "error", "message": "", "test": None}
+                    traceback_text = "\n".join(traceback_lines)
+                    current_entry["traceback"] = traceback_text
+                    current_entry["fingerprint"] = _hash_text(traceback_text)
+                    entries.append(current_entry)
+                    current_entry = None
+                    traceback_lines = []
                     collecting_tb = False
                 else:
-                    tb_lines.append(stripped_line)
+                    traceback_lines.append(stripped_line)
                 continue
 
             # HOOT per-test failure lines
-            m_hoot = re.search(r"\[HOOT] Test \"(?P<name>.+?)\" failed:", stripped_line)
-            if m_hoot:
+            hoot_match = re.search(r"\[HOOT] Test \"(?P<name>.+?)\" failed:", stripped_line)
+            if hoot_match:
                 if collecting_hoot and hoot_lines:
                     _append_hoot_entry()
                 collecting_hoot = True
                 hoot_lines = [stripped_line]
-                hoot_test = m_hoot.group("name")
+                hoot_test = hoot_match.group("name")
                 continue
             if collecting_hoot:
                 if re.match(r"^\d{4}-\d{2}-\d{2} ", stripped_line):
@@ -81,13 +81,17 @@ def parse_failures(log_path: Path) -> list[dict]:
             # Unittest-style headers (heuristic)
             if lowered_line.startswith(("fail:", "error:")):
                 parts = stripped_line.split(maxsplit=1)
-                typ = parts[0].rstrip(":").lower()
-                rest = parts[1] if len(parts) > 1 else ""
-                rest_l = rest.lower()
-                if "test" not in rest_l:
+                failure_type = parts[0].rstrip(":").lower()
+                rest_text = parts[1] if len(parts) > 1 else ""
+                rest_lower = rest_text.lower()
+                if "test" not in rest_lower:
                     continue
-                test_id = rest
-                cur = {"type": "fail" if typ == "fail" else "error", "test": test_id, "message": ""}
+                test_id = rest_text
+                current_entry = {
+                    "type": "fail" if failure_type == "fail" else "error",
+                    "test": test_id,
+                    "message": "",
+                }
 
     # Flush dangling blocks
     if collecting_hoot and hoot_lines:

@@ -35,17 +35,17 @@ def _normalize(line: str) -> str:
 def _detect_repetitive(recent_lines: list[str], seen: dict[str, int], min_occ: int = 5) -> tuple[bool, str]:
     if len(recent_lines) < min_occ:
         return False, ""
-    for l in recent_lines:
-        n = _normalize(l)
-        if n and len(n) > 20:
-            seen[n] = seen.get(n, 0) + 1
+    for recent_line in recent_lines:
+        normalized_line = _normalize(recent_line)
+        if normalized_line and len(normalized_line) > 20:
+            seen[normalized_line] = seen.get(normalized_line, 0) + 1
     if not seen:
         return False, ""
-    pattern, count = max(seen.items(), key=lambda x: x[1])
-    recent_norm = [_normalize(l) for l in recent_lines]
-    ratio = sum(1 for n in recent_norm if n == pattern) / len(recent_norm)
+    pattern, count = max(seen.items(), key=lambda item: item[1])
+    recent_normalized = [_normalize(recent_line) for recent_line in recent_lines]
+    ratio = sum(1 for normalized_line in recent_normalized if normalized_line == pattern) / len(recent_normalized)
     if count >= min_occ and ratio > 0.7:
-        sample = next((l for l in recent_lines if _normalize(l) == pattern), "")
+        sample = next((recent_line for recent_line in recent_lines if _normalize(recent_line) == pattern), "")
         sample = sample[:100] + "..." if len(sample) > 100 else sample
         return True, f"Repetitive pattern detected ({count} times, {ratio:.1%}): {sample}"
     return False, ""
@@ -69,9 +69,9 @@ class OdooExecutor:
         self._events = EventStream((self.session_dir / "events.ndjson"), echo=self.settings.events_stdout)
 
     def _phase_dir(self) -> Path:
-        d = self.session_dir / self.category
-        d.mkdir(parents=True, exist_ok=True)
-        return d
+        phase_dir = self.session_dir / self.category
+        phase_dir.mkdir(parents=True, exist_ok=True)
+        return phase_dir
 
     def run(
         self,
@@ -102,28 +102,31 @@ class OdooExecutor:
                 must = "integration_test"
             else:
                 must = "unit_test"
-            parts = []
+            tag_parts: list[str] = []
             if must and must not in test_tags_override:
-                parts.append(must)
-            parts.append(test_tags_override)
-            test_tags_final = ",".join(p for p in parts if p)
+                tag_parts.append(must)
+            tag_parts.append(test_tags_override)
+            test_tags_final = ",".join(tag_part for tag_part in tag_parts if tag_part)
             use_module_prefix = False
             print(f"🎯 Using TEST_TAGS override: {test_tags_final}")
         else:
             if not test_tags:
-                test_tags_final = ",".join([f"/{m}" for m in modules_to_install])
+                test_tags_final = ",".join([f"/{module_name}" for module_name in modules_to_install])
             elif not use_module_prefix:
                 test_tags_final = test_tags
             else:
-                parts = [p.strip() for p in test_tags.split(",") if p.strip()]
-                if len(parts) == 1 and not parts[0].startswith("-"):
-                    tag = parts[0]
-                    test_tags_final = ",".join([f"{tag}/{m}" for m in modules_to_install])
+                tag_parts = [tag_part.strip() for tag_part in test_tags.split(",") if tag_part.strip()]
+                if len(tag_parts) == 1 and not tag_parts[0].startswith("-"):
+                    tag = tag_parts[0]
+                    test_tags_final = ",".join([f"{tag}/{module_name}" for module_name in modules_to_install])
                 else:
-                    primary = next((p for p in reversed(parts) if not p.startswith("-")), parts[-1])
-                    scoped = [f"{primary}/{m}" for m in modules_to_install]
-                    keep = [p for p in parts if p != primary]
-                    test_tags_final = ",".join(keep + scoped)
+                    primary_tag = next(
+                        (tag_part for tag_part in reversed(tag_parts) if not tag_part.startswith("-")),
+                        tag_parts[-1],
+                    )
+                    scoped_tags = [f"{primary_tag}/{module_name}" for module_name in modules_to_install]
+                    kept_tags = [tag_part for tag_part in tag_parts if tag_part != primary_tag]
+                    test_tags_final = ",".join(kept_tags + scoped_tags)
 
         print(f"🏷️  Final test tags: {test_tags_final}")
 
@@ -155,25 +158,25 @@ class OdooExecutor:
 
         module_flag = "-u" if use_production_clone else "-i"
 
-        cmd = ["docker", "compose", "run", "--rm"]
+        command = ["docker", "compose", "run", "--rm"]
         # Per-shard environment injection (for slicer etc.)
         if extra_env:
-            for k, v in extra_env.items():
-                if v is None:
+            for env_key, env_value in extra_env.items():
+                if env_value is None:
                     continue
-                cmd.extend(["-e", f"{k}={v}"])
+                command.extend(["-e", f"{env_key}={env_value}"])
         # pass-through debug/timeouts
-        for var in ("JS_PRECHECK", "JS_DEBUG", "TOUR_TIMEOUT"):
-            val = os.environ.get(var)
-            if val:
-                cmd.extend(["-e", f"{var}={val}"])
+        for env_var in ("JS_PRECHECK", "JS_DEBUG", "TOUR_TIMEOUT"):
+            env_value = os.environ.get(env_var)
+            if env_value:
+                command.extend(["-e", f"{env_var}={env_value}"])
 
         if is_tour_test or is_js_test:
             tour_workers_default = int(self.settings.tour_workers)
             js_workers_default = int(self.settings.js_workers)
             if is_tour_test or is_js_test:
-                cmd.extend(["-e", f"TOUR_WARMUP={self.settings.tour_warmup}"])
-            cmd.extend(
+                command.extend(["-e", f"TOUR_WARMUP={self.settings.tour_warmup}"])
+            command.extend(
                 [
                     script_runner_service,
                     "/odoo/odoo-bin",
@@ -194,9 +197,9 @@ class OdooExecutor:
                 ]
             )
             if is_tour_test:
-                cmd.append("--dev=assets")
+                command.append("--dev=assets")
         else:
-            cmd.extend(
+            command.extend(
                 [
                     script_runner_service,
                     "/odoo/odoo-bin",
@@ -218,38 +221,38 @@ class OdooExecutor:
 
         phase_dir = self._phase_dir()
 
-        def _shard_base(mods: list[str]) -> str:
-            if use_module_prefix and len(mods) == 1:
-                return mods[0]
-            key = ",".join(sorted(mods))
+        def _shard_base(module_names: list[str]) -> str:
+            if use_module_prefix and len(module_names) == 1:
+                return module_names[0]
+            module_key = ",".join(sorted(module_names))
             import hashlib
 
-            hid = hashlib.sha1(key.encode()).hexdigest()[:8]
-            return f"shard-{hid}"
+            hash_prefix = hashlib.sha1(module_key.encode()).hexdigest()[:8]
+            return f"shard-{hash_prefix}"
 
-        base = _shard_base(modules_to_install)
+        shard_base = _shard_base(modules_to_install)
         if shard_label:
-            base = f"{base}-{shard_label}"
-        log_file = phase_dir / f"{base}.log"
-        summary_file = phase_dir / f"{base}.summary.json"
+            shard_base = f"{shard_base}-{shard_label}"
+        log_file = phase_dir / f"{shard_base}.log"
+        summary_file = phase_dir / f"{shard_base}.summary.json"
 
         # redacted echo
         redacted = []
-        i = 0
+        index = 0
         secret_prefixes = ("ODOO_TEST_PASSWORD=", "PASSWORD=", "TOKEN=", "KEY=")
-        while i < len(cmd):
-            part = cmd[i]
-            if part == "-e" and i + 1 < len(cmd):
-                env_pair = cmd[i + 1]
-                for pref in secret_prefixes:
-                    if env_pair.startswith(pref):
-                        env_pair = pref + "***"
+        while index < len(command):
+            part = command[index]
+            if part == "-e" and index + 1 < len(command):
+                env_pair = command[index + 1]
+                for secret_prefix in secret_prefixes:
+                    if env_pair.startswith(secret_prefix):
+                        env_pair = secret_prefix + "***"
                         break
                 redacted.extend([part, env_pair])
-                i += 2
+                index += 2
                 continue
             redacted.append(part)
-            i += 1
+            index += 1
 
         # Secret hygiene: redaction already applied; avoid echoing any naked env pairs in logs
         print(f"🚀 Command: {' '.join(redacted)}")
@@ -260,7 +263,7 @@ class OdooExecutor:
         summary = {
             "schema_version": SUMMARY_SCHEMA_VERSION,
             "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
-            "command": cmd,
+            "command": command,
             "test_type": "tour" if is_tour_test else ("js" if is_js_test else "unit/integration"),
             "category": self.category,
             "database": db_name,
@@ -274,11 +277,11 @@ class OdooExecutor:
         }
 
         try:
-            with open(log_file, "w") as lf:
-                lf.write(f"Command: {' '.join(redacted)}\n")
-                lf.write(f"Started: {datetime.now()}\n")
-                lf.write("=" * 80 + "\n\n")
-                lf.flush()
+            with open(log_file, "w") as log_handle:
+                log_handle.write(f"Command: {' '.join(redacted)}\n")
+                log_handle.write(f"Started: {datetime.now()}\n")
+                log_handle.write("=" * 80 + "\n\n")
+                log_handle.flush()
                 try:
                     self._events.emit(
                         "shard_started",
@@ -289,53 +292,59 @@ class OdooExecutor:
                     )
                 except OSError as exc:
                     _logger.debug("executor: failed to emit shard_started (%s)", exc)
-                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+                process = subprocess.Popen(
+                    command,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                )
                 assert process.stdout is not None
                 stdout = process.stdout
 
-                last_out = time.time()
-                recent: list[str] = []
-                seen: dict[str, int] = {}
+                last_output_time = time.time()
+                recent_lines: list[str] = []
+                seen_patterns: dict[str, int] = {}
                 stall_threshold = 60
 
-                for raw in iter(stdout.readline, ""):
-                    line = raw.rstrip("\n")
-                    lf.write(line + "\n")
+                for raw_line in iter(stdout.readline, ""):
+                    line = raw_line.rstrip("\n")
+                    log_handle.write(line + "\n")
                     # counters heuristic from Odoo test output
                     if "Ran " in line and " tests in " in line:
-                        m = re.search(r"Ran (\d+) tests", line)
-                        if m:
-                            counters["tests_run"] = int(m.group(1))
+                        match = re.search(r"Ran (\d+) tests", line)
+                        if match:
+                            counters["tests_run"] = int(match.group(1))
                     if line.startswith("FAIL:"):
                         counters["failures"] = int(counters.get("failures", 0)) + 1
                     if line.startswith("ERROR:"):
                         counters["errors"] = int(counters.get("errors", 0)) + 1
                     # repetitive detection
-                    recent.append(line)
-                    if len(recent) > 20:
-                        recent.pop(0)
-                    now = time.time()
-                    if now - last_out > stall_threshold:
-                        stalled, msg = _detect_repetitive(recent, seen)
-                        if stalled:
-                            summary["repetitive_pattern"] = msg
-                    last_out = now
+                    recent_lines.append(line)
+                    if len(recent_lines) > 20:
+                        recent_lines.pop(0)
+                    current_time = time.time()
+                    if current_time - last_output_time > stall_threshold:
+                        is_stalled, message = _detect_repetitive(recent_lines, seen_patterns)
+                        if is_stalled:
+                            summary["repetitive_pattern"] = message
+                    last_output_time = current_time
                 process.wait()
-                rc = int(process.returncode or 0)
+                return_code = int(process.returncode or 0)
 
-        except (OSError, subprocess.SubprocessError) as e:
+        except (OSError, subprocess.SubprocessError) as error:
             summary.update(
                 {
                     "end_time": time.time(),
                     "elapsed_seconds": time.time() - start_time,
                     "returncode": 1,
                     "success": False,
-                    "error": str(e),
+                    "error": str(error),
                 }
             )
-            _logger.error("executor: test execution failed (%s)", e)
-            with open(summary_file, "w") as f:
-                json.dump(summary, f, indent=2, default=str)
+            _logger.error("executor: test execution failed (%s)", error)
+            with open(summary_file, "w") as summary_handle:
+                json.dump(summary, summary_handle, indent=2, default=str)
             return ExecResult(1, log_file, summary_file)
 
         elapsed = time.time() - start_time
@@ -343,12 +352,12 @@ class OdooExecutor:
             {
                 "end_time": time.time(),
                 "elapsed_seconds": elapsed,
-                "returncode": rc,
-                "success": rc == 0,
+                "returncode": return_code,
+                "success": return_code == 0,
             }
         )
-        with open(summary_file, "w") as f:
-            json.dump(summary, f, indent=2, default=str)
+        with open(summary_file, "w") as summary_handle:
+            json.dump(summary, summary_handle, indent=2, default=str)
         try:
             write_junit_for_shard(summary_file, log_file)
         except (OSError, ValueError) as exc:
@@ -359,9 +368,9 @@ class OdooExecutor:
                 phase=self.category,
                 modules=modules_to_install,
                 db=db_name,
-                rc=rc,
+                rc=return_code,
                 elapsed=elapsed,
             )
         except OSError as exc:
             _logger.debug("executor: failed to emit shard_finished (%s)", exc)
-        return ExecResult(rc, log_file, summary_file)
+        return ExecResult(return_code, log_file, summary_file)

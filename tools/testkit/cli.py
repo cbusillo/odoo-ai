@@ -16,40 +16,41 @@ from .sharding import plan_shards_for_phase
 
 
 def _emit_bottomline(latest: Path, as_json: bool) -> int:
-    p = latest / "summary.json"
-    if not p.exists():
+    summary_path = latest / "summary.json"
+    if not summary_path.exists():
         if as_json:
             print(json.dumps({"status": "no_summary"}))
         else:
             click.echo("no_summary")
         return 2
-    data = load_json(p)
+    data = load_json(summary_path)
     if data is None:
         if as_json:
             print(json.dumps({"status": "invalid"}))
         else:
             click.echo("invalid")
         return 3
-    ok = bool(data.get("success"))
+    is_success = bool(data.get("success"))
     total = data.get("counters_total") or {}
-    rcodes = data.get("return_codes") or {}
-    out = {
-        "success": ok,
+    return_codes = data.get("return_codes") or {}
+    payload = {
+        "success": is_success,
         "tests_run": total.get("tests_run"),
         "failures": total.get("failures"),
         "errors": total.get("errors"),
         "skips": total.get("skips"),
-        "return_codes": rcodes,
+        "return_codes": return_codes,
         "session": data.get("session"),
-        "summary": str(p.resolve()),
+        "summary": str(summary_path.resolve()),
     }
     if as_json:
-        print(json.dumps(out))
+        print(json.dumps(payload))
     else:
         click.echo(
-            f"success={out['success']} tests_run={out['tests_run']} failures={out['failures']} errors={out['errors']} skips={out['skips']} session={out['session']}"
+            "success={success} tests_run={tests_run} failures={failures} "
+            "errors={errors} skips={skips} session={session}".format(**payload)
         )
-    return 0 if ok else 1
+    return 0 if is_success else 1
 
 
 @click.group(help="Unified test runner with parallel sharding")
@@ -59,10 +60,10 @@ def test() -> None:  # pragma: no cover - CLI entry
 
 def _parse_multi(values: tuple[str, ...]) -> list[str]:
     items: list[str] = []
-    for v in values:
-        if not v:
+    for value in values:
+        if not value:
             continue
-        parts = [p.strip() for p in v.split(",") if p.strip()]
+        parts = [part.strip() for part in value.split(",") if part.strip()]
         items.extend(parts)
     return items
 
@@ -121,15 +122,15 @@ def _phase_outcomes(focus_phase: PhaseName, outcome: PhaseOutcome) -> dict[str, 
     return placeholders
 
 
-def _run_phase_and_exit(ts: TestSession, phase: PhaseName, timeout: int, json_out: bool) -> None:
-    ts.start()
-    modules = ts.discover_modules(phase)
-    outcome = ts.run_phase(phase, modules, timeout)
+def _run_phase_and_exit(test_session: TestSession, phase: PhaseName, timeout: int, json_out: bool) -> None:
+    test_session.start()
+    modules = test_session.discover_modules(phase)
+    outcome = test_session.run_phase(phase, modules, timeout)
     outcomes = _phase_outcomes(phase, outcome)
-    rc = ts.finish(outcomes)
+    return_code = test_session.finish(outcomes)
     if json_out:
         _emit_bottomline(Path("tmp/test-logs/latest"), True)
-    sys.exit(rc)
+    sys.exit(return_code)
 
 
 @test.command("run")
@@ -198,70 +199,79 @@ def run_all(
     omit = _parse_multi(exclude)
     if detached and not os.environ.get("DETACHED_SPAWNED"):
         # Rebuild command without --detached and spawn
-        cmd = ["nohup", "env", "DETACHED_SPAWNED=1", "TEST_DETACHED=1", "uv", "run", "test", "run"]
+        detached_command = [
+            "nohup",
+            "env",
+            "DETACHED_SPAWNED=1",
+            "TEST_DETACHED=1",
+            "uv",
+            "run",
+            "test",
+            "run",
+        ]
         if unit_shards is not None:
-            cmd += ["--unit-shards", str(unit_shards)]
+            detached_command += ["--unit-shards", str(unit_shards)]
         if js_shards is not None:
-            cmd += ["--js-shards", str(js_shards)]
+            detached_command += ["--js-shards", str(js_shards)]
         if integration_shards is not None:
-            cmd += ["--integration-shards", str(integration_shards)]
+            detached_command += ["--integration-shards", str(integration_shards)]
         if tour_shards is not None:
-            cmd += ["--tour-shards", str(tour_shards)]
-        for m in include:
-            cmd += ["--modules", m]
-        for x in omit:
-            cmd += ["--exclude", x]
-        for m in _parse_multi(unit_modules):
-            cmd += ["--unit-modules", m]
-        for x in _parse_multi(unit_exclude):
-            cmd += ["--unit-exclude", x]
-        for m in _parse_multi(js_modules):
-            cmd += ["--js-modules", m]
-        for x in _parse_multi(js_exclude):
-            cmd += ["--js-exclude", x]
-        for m in _parse_multi(integration_modules):
-            cmd += ["--integration-modules", m]
-        for x in _parse_multi(integration_exclude):
-            cmd += ["--integration-exclude", x]
-        for m in _parse_multi(tour_modules):
-            cmd += ["--tour-modules", m]
-        for x in _parse_multi(tour_exclude):
-            cmd += ["--tour-exclude", x]
+            detached_command += ["--tour-shards", str(tour_shards)]
+        for module_name in include:
+            detached_command += ["--modules", module_name]
+        for excluded_module in omit:
+            detached_command += ["--exclude", excluded_module]
+        for module_name in _parse_multi(unit_modules):
+            detached_command += ["--unit-modules", module_name]
+        for excluded_module in _parse_multi(unit_exclude):
+            detached_command += ["--unit-exclude", excluded_module]
+        for module_name in _parse_multi(js_modules):
+            detached_command += ["--js-modules", module_name]
+        for excluded_module in _parse_multi(js_exclude):
+            detached_command += ["--js-exclude", excluded_module]
+        for module_name in _parse_multi(integration_modules):
+            detached_command += ["--integration-modules", module_name]
+        for excluded_module in _parse_multi(integration_exclude):
+            detached_command += ["--integration-exclude", excluded_module]
+        for module_name in _parse_multi(tour_modules):
+            detached_command += ["--tour-modules", module_name]
+        for excluded_module in _parse_multi(tour_exclude):
+            detached_command += ["--tour-exclude", excluded_module]
         if skip_filestore_integration:
-            cmd += ["--skip-filestore-integration"]
+            detached_command += ["--skip-filestore-integration"]
         if skip_filestore_tour:
-            cmd += ["--skip-filestore-tour"]
+            detached_command += ["--skip-filestore-tour"]
         from subprocess import Popen
 
-        out = Path("tmp/test-logs/launcher.out")
-        out.parent.mkdir(parents=True, exist_ok=True)
-        with out.open("ab", buffering=0) as f:
-            Popen(cmd, stdout=f, stderr=f)
+        launcher_log = Path("tmp/test-logs/launcher.out")
+        launcher_log.parent.mkdir(parents=True, exist_ok=True)
+        with launcher_log.open("ab", buffering=0) as log_handle:
+            Popen(detached_command, stdout=log_handle, stderr=log_handle)
         # Try to identify session quickly
         session = None
-        cur = Path("tmp/test-logs/current")
-        cur_json = cur.with_suffix(".json")
-        import time as _t
+        current_pointer = Path("tmp/test-logs/current")
+        current_json = current_pointer.with_suffix(".json")
+        import time as time_module
 
         for _ in range(30):  # ~3s
-            if cur.exists():
+            if current_pointer.exists():
                 try:
-                    session = Path(os.readlink(cur)).name
+                    session = Path(os.readlink(current_pointer)).name
                 except OSError:
-                    session = cur.name
+                    session = current_pointer.name
                 break
-            if cur_json.exists():
-                data = load_json(cur_json)
+            if current_json.exists():
+                data = load_json(current_json)
                 if data:
                     session = Path(data.get("current", "")).name or None
                     if session:
                         break
-            _t.sleep(0.1)
+            time_module.sleep(0.1)
         payload = {"status": "running", "session": session}
         print(json.dumps(payload))
         sys.exit(0)
 
-    rc = _build_session(
+    return_code = _build_session(
         include=include,
         omit=omit,
         unit_modules=unit_modules,
@@ -276,7 +286,7 @@ def run_all(
     if json_out:
         latest = Path("tmp/test-logs/latest")
         _emit_bottomline(latest, True)
-    sys.exit(rc)
+    sys.exit(return_code)
 
 
 @test.command("unit")
@@ -298,14 +308,14 @@ def run_unit(
         os.environ["UNIT_SHARDS"] = str(shards)
     include = _parse_multi(modules)
     omit = _parse_multi(exclude)
-    ts = TestSession(
+    test_session = TestSession(
         keep_going=True,
         include_modules=include or None,
         exclude_modules=omit or None,
         unit_modules=_parse_multi(unit_modules) or None,
         unit_exclude=_parse_multi(unit_exclude) or None,
     )
-    _run_phase_and_exit(ts, "unit", 600, json_out)
+    _run_phase_and_exit(test_session, "unit", 600, json_out)
 
 
 @test.command("js")
@@ -330,34 +340,43 @@ def run_js(
     include = _parse_multi(modules)
     omit = _parse_multi(exclude)
     if detached and not os.environ.get("DETACHED_SPAWNED"):
-        cmd = ["nohup", "env", "DETACHED_SPAWNED=1", "TEST_DETACHED=1", "uv", "run", "test", "js"]
+        detached_command = [
+            "nohup",
+            "env",
+            "DETACHED_SPAWNED=1",
+            "TEST_DETACHED=1",
+            "uv",
+            "run",
+            "test",
+            "js",
+        ]
         if shards is not None:
-            cmd += ["--shards", str(shards)]
-        for m in include:
-            cmd += ["--modules", m]
-        for x in omit:
-            cmd += ["--exclude", x]
-        for m in _parse_multi(js_modules):
-            cmd += ["--js-modules", m]
-        for x in _parse_multi(js_exclude):
-            cmd += ["--js-exclude", x]
+            detached_command += ["--shards", str(shards)]
+        for module_name in include:
+            detached_command += ["--modules", module_name]
+        for excluded_module in omit:
+            detached_command += ["--exclude", excluded_module]
+        for module_name in _parse_multi(js_modules):
+            detached_command += ["--js-modules", module_name]
+        for excluded_module in _parse_multi(js_exclude):
+            detached_command += ["--js-exclude", excluded_module]
         from subprocess import Popen
 
-        out = Path("tmp/test-logs/launcher.out")
-        out.parent.mkdir(parents=True, exist_ok=True)
-        with out.open("ab", buffering=0) as f:
-            Popen(cmd, stdout=f, stderr=f)
+        launcher_log = Path("tmp/test-logs/launcher.out")
+        launcher_log.parent.mkdir(parents=True, exist_ok=True)
+        with launcher_log.open("ab", buffering=0) as log_handle:
+            Popen(detached_command, stdout=log_handle, stderr=log_handle)
         print(json.dumps({"status": "running"}))
         sys.exit(0)
 
-    ts = TestSession(
+    test_session = TestSession(
         keep_going=True,
         include_modules=include or None,
         exclude_modules=omit or None,
         js_modules=_parse_multi(js_modules) or None,
         js_exclude=_parse_multi(js_exclude) or None,
     )
-    _run_phase_and_exit(ts, "js", 1200, json_out)
+    _run_phase_and_exit(test_session, "js", 1200, json_out)
 
 
 @test.command("integration")
@@ -383,14 +402,14 @@ def run_integration(
     omit = _parse_multi(exclude)
     if skip_filestore:
         os.environ["SKIP_FILESTORE_INTEGRATION"] = "1"
-    ts = TestSession(
+    test_session = TestSession(
         keep_going=True,
         include_modules=include or None,
         exclude_modules=omit or None,
         integration_modules=_parse_multi(integration_modules) or None,
         integration_exclude=_parse_multi(integration_exclude) or None,
     )
-    _run_phase_and_exit(ts, "integration", 900, json_out)
+    _run_phase_and_exit(test_session, "integration", 900, json_out)
 
 
 @test.command("tour")
@@ -417,35 +436,44 @@ def run_tour(
     include = _parse_multi(modules)
     omit = _parse_multi(exclude)
     if detached and not os.environ.get("DETACHED_SPAWNED"):
-        cmd = ["nohup", "env", "DETACHED_SPAWNED=1", "TEST_DETACHED=1", "uv", "run", "test", "tour"]
+        detached_command = [
+            "nohup",
+            "env",
+            "DETACHED_SPAWNED=1",
+            "TEST_DETACHED=1",
+            "uv",
+            "run",
+            "test",
+            "tour",
+        ]
         if shards is not None:
-            cmd += ["--shards", str(shards)]
-        for m in include:
-            cmd += ["--modules", m]
-        for x in omit:
-            cmd += ["--exclude", x]
-        for m in _parse_multi(tour_modules):
-            cmd += ["--tour-modules", m]
-        for x in _parse_multi(tour_exclude):
-            cmd += ["--tour-exclude", x]
+            detached_command += ["--shards", str(shards)]
+        for module_name in include:
+            detached_command += ["--modules", module_name]
+        for excluded_module in omit:
+            detached_command += ["--exclude", excluded_module]
+        for module_name in _parse_multi(tour_modules):
+            detached_command += ["--tour-modules", module_name]
+        for excluded_module in _parse_multi(tour_exclude):
+            detached_command += ["--tour-exclude", excluded_module]
         if skip_filestore:
-            cmd += ["--skip-filestore"]
+            detached_command += ["--skip-filestore"]
         from subprocess import DEVNULL, Popen
 
-        Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)
+        Popen(detached_command, stdout=DEVNULL, stderr=DEVNULL)
         print(json.dumps({"status": "running"}))
         sys.exit(0)
 
     if skip_filestore:
         os.environ["SKIP_FILESTORE_TOUR"] = "1"
-    ts = TestSession(
+    test_session = TestSession(
         keep_going=True,
         include_modules=include or None,
         exclude_modules=omit or None,
         tour_modules=_parse_multi(tour_modules) or None,
         tour_exclude=_parse_multi(tour_exclude) or None,
     )
-    _run_phase_and_exit(ts, "tour", 1800, json_out)
+    _run_phase_and_exit(test_session, "tour", 1800, json_out)
 
 
 @test.command("plan")
@@ -489,7 +517,7 @@ def plan_cmd(
 
     include = _parse_multi(modules)
     omit = _parse_multi(exclude)
-    ts = _build_session(
+    test_session = _build_session(
         include=include,
         omit=omit,
         unit_modules=unit_modules,
@@ -503,29 +531,29 @@ def plan_cmd(
     )
 
     def _phase_plan(name: PhaseName, shards: int | None) -> dict:
-        mods = ts.discover_modules(name)
+        module_names = test_session.discover_modules(name)
         if name == "unit":
-            n = shards if shards is not None else ts.settings.unit_shards
+            shard_count = shards if shards is not None else test_session.settings.unit_shards
         elif name == "js":
-            n = shards if shards is not None else ts.settings.js_shards
+            shard_count = shards if shards is not None else test_session.settings.js_shards
         elif name == "integration":
-            n = shards if shards is not None else ts.settings.integration_shards
+            shard_count = shards if shards is not None else test_session.settings.integration_shards
         else:
-            n = shards if shards is not None else ts.settings.tour_shards
+            shard_count = shards if shards is not None else test_session.settings.tour_shards
         # Resolve auto value if <=0 using session heuristics
-        if not mods:
-            n_effective = 1
+        if not module_names:
+            effective_shards = 1
         else:
-            if (n or 0) <= 0:
+            if (shard_count or 0) <= 0:
                 try:
-                    cpu = len(os.sched_getaffinity(0))  # type: ignore[attr-defined]
+                    cpu_count = len(os.sched_getaffinity(0))  # type: ignore[attr-defined]
                 except (AttributeError, OSError):
-                    cpu = os.cpu_count() or 4
+                    cpu_count = os.cpu_count() or 4
                 default_auto = 4 if name == "unit" else 2
-                n_effective = max(1, min(cpu, default_auto, len(mods)))
+                effective_shards = max(1, min(cpu_count, default_auto, len(module_names)))
             else:
-                n_effective = max(1, min(n, len(mods)))  # type: ignore[arg-type]
-        plan = plan_shards_for_phase(mods, name, n_effective)
+                effective_shards = max(1, min(shard_count, len(module_names)))  # type: ignore[arg-type]
+        plan = plan_shards_for_phase(module_names, name, effective_shards)
         return {
             "phase": name,
             "shards": plan.shards,
@@ -536,11 +564,16 @@ def plan_cmd(
 
     phases: list[PhaseName] = list(_PHASES) if phase == "all" else [cast(PhaseName, phase)]
     payload = {"schema": "plan.v1", "phases": {}}
-    for ph in phases:
-        payload["phases"][ph] = _phase_plan(
-            ph,
-            unit_shards if ph == "unit" else js_shards if ph == "js" else integration_shards if ph == "integration" else tour_shards,
-        )
+    for phase_name in phases:
+        if phase_name == "unit":
+            phase_shards = unit_shards
+        elif phase_name == "js":
+            phase_shards = js_shards
+        elif phase_name == "integration":
+            phase_shards = integration_shards
+        else:
+            phase_shards = tour_shards
+        payload["phases"][phase_name] = _phase_plan(phase_name, phase_shards)
 
     output = json.dumps(payload, indent=2)
     if json_out:
@@ -562,22 +595,22 @@ def rerun_failures(json_out: bool) -> None:
         print(json.dumps({"status": "no_latest"}) if json_out else "no_latest")
         sys.exit(2)
     phases = {"unit": [], "js": [], "integration": [], "tour": []}
-    for ph in phases.keys():
-        ph_dir = base / ph
-        if not ph_dir.exists():
+    for phase_name in phases.keys():
+        phase_dir = base / phase_name
+        if not phase_dir.exists():
             continue
-        for sf in ph_dir.glob("*.summary.json"):
-            data = load_json(sf)
+        for summary_file in phase_dir.glob("*.summary.json"):
+            data = load_json(summary_file)
             if data is None:
                 continue
-            rc = int(data.get("returncode") or 0)
-            if rc != 0:
-                for m in data.get("modules") or []:
-                    phases[ph].append(m)
+            return_code = int(data.get("returncode") or 0)
+            if return_code != 0:
+                for module_name in data.get("modules") or []:
+                    phases[phase_name].append(module_name)
     # Deduplicate
-    for k, v in phases.items():
-        phases[k] = sorted(set(v))
-    payload = {k: v for k, v in phases.items() if v}
+    for phase_name, module_names in phases.items():
+        phases[phase_name] = sorted(set(module_names))
+    payload = {phase_name: module_names for phase_name, module_names in phases.items() if module_names}
     if not payload:
         print(json.dumps({"status": "nothing_to_rerun"}) if json_out else "nothing_to_rerun")
         sys.exit(0)
@@ -585,14 +618,14 @@ def rerun_failures(json_out: bool) -> None:
         print(json.dumps({"phases": payload}))
     # Build flags
     args: list[str] = ["uv", "run", "test", "run"]
-    for m in payload.get("unit", []):
-        args += ["--unit-modules", m]
-    for m in payload.get("js", []):
-        args += ["--js-modules", m]
-    for m in payload.get("integration", []):
-        args += ["--integration-modules", m]
-    for m in payload.get("tour", []):
-        args += ["--tour-modules", m]
+    for module_name in payload.get("unit", []):
+        args += ["--unit-modules", module_name]
+    for module_name in payload.get("js", []):
+        args += ["--js-modules", module_name]
+    for module_name in payload.get("integration", []):
+        args += ["--integration-modules", module_name]
+    for module_name in payload.get("tour", []):
+        args += ["--tour-modules", module_name]
     from subprocess import call
 
     sys.exit(call(args))
@@ -619,30 +652,30 @@ def main() -> None:  # pragma: no cover
 @click.option("--session", default=None, help="Specific session dir name (e.g., test-YYYYMMDD_HHMMSS)")
 @click.option("--json", "json_out", is_flag=True, help="Emit JSON output")
 def status_cmd(session: str | None, json_out: bool) -> None:
-    base = Path("tmp/test-logs")
+    base_dir = Path("tmp/test-logs")
     if session:
-        latest = base / session
+        latest = base_dir / session
     else:
-        cur = base / "current"
-        if cur.exists():
-            latest = cur
+        current_pointer = base_dir / "current"
+        if current_pointer.exists():
+            latest = current_pointer
         else:
-            latest = base / "latest"
-    p = latest / "summary.json"
-    if not p.exists():
-        out = {"status": "running"}
-        print(json.dumps(out) if json_out else "running")
+            latest = base_dir / "latest"
+    summary_path = latest / "summary.json"
+    if not summary_path.exists():
+        payload = {"status": "running"}
+        print(json.dumps(payload) if json_out else "running")
         sys.exit(2)
-    data = load_json(p)
+    data = load_json(summary_path)
     if data is None:
         print(json.dumps({"status": "invalid"}) if json_out else "invalid")
         sys.exit(3)
-    ok = bool(data.get("success"))
+    is_success = bool(data.get("success"))
     if json_out:
-        print(json.dumps({"success": ok, "summary": str(p.resolve())}))
+        print(json.dumps({"success": is_success, "summary": str(summary_path.resolve())}))
     else:
-        print("success" if ok else "failed")
-    sys.exit(0 if ok else 1)
+        print("success" if is_success else "failed")
+    sys.exit(0 if is_success else 1)
 
 
 @test.command("wait")
@@ -651,29 +684,29 @@ def status_cmd(session: str | None, json_out: bool) -> None:
 @click.option("--interval", type=int, default=10, help="Poll interval seconds")
 @click.option("--json", "json_out", is_flag=True, help="Emit JSON output")
 def wait_cmd(session: str | None, timeout: int, interval: int, json_out: bool) -> None:
-    import time as _t
+    import time as time_module
 
-    base = Path("tmp/test-logs")
+    base_dir = Path("tmp/test-logs")
     if session:
-        latest = base / session
+        latest = base_dir / session
     else:
-        cur = base / "current"
-        latest = cur if cur.exists() else base / "latest"
-    start = _t.time()
+        current_pointer = base_dir / "current"
+        latest = current_pointer if current_pointer.exists() else base_dir / "latest"
+    start_time = time_module.time()
     while True:
-        p = latest / "summary.json"
-        if p.exists():
-            data = load_json(p)
-            ok = bool((data or {}).get("success"))
+        summary_path = latest / "summary.json"
+        if summary_path.exists():
+            data = load_json(summary_path)
+            is_success = bool((data or {}).get("success"))
             if json_out:
-                print(json.dumps({"success": ok, "summary": str(p.resolve())}))
+                print(json.dumps({"success": is_success, "summary": str(summary_path.resolve())}))
             else:
-                print("success" if ok else "failed")
-            sys.exit(0 if ok else 1)
-        if timeout and (_t.time() - start) > timeout:
+                print("success" if is_success else "failed")
+            sys.exit(0 if is_success else 1)
+        if timeout and (time_module.time() - start_time) > timeout:
             print(json.dumps({"status": "timeout"}) if json_out else "timeout")
             sys.exit(2)
-        _t.sleep(max(1, interval))
+        time_module.sleep(max(1, interval))
 
 
 @test.command("doctor")
@@ -683,23 +716,26 @@ def doctor_cmd(json_out: bool) -> None:
     # Docker services
     import subprocess
 
-    services = []
+    services: list[str] = []
     try:
-        res = subprocess.run(["docker", "compose", "ps", "--services"], capture_output=True, text=True)
-        if res.returncode == 0:
-            services = [s for s in res.stdout.strip().split("\n") if s]
+        result = subprocess.run(["docker", "compose", "ps", "--services"], capture_output=True, text=True)
+        if result.returncode == 0:
+            services = [service_name for service_name in result.stdout.strip().split("\n") if service_name]
     except OSError:
         services = []
-    svc_ok = {}
-    for s in ("database", "script-runner"):
-        ok = False
-        if s in services:
+    service_statuses: dict[str, bool] = {}
+    for service_name in ("database", "script-runner"):
+        is_service_ok = False
+        if service_name in services:
             try:
-                r = subprocess.run(["docker", "compose", "exec", "-T", s, "true"], capture_output=True)
-                ok = r.returncode == 0
+                command_result = subprocess.run(
+                    ["docker", "compose", "exec", "-T", service_name, "true"],
+                    capture_output=True,
+                )
+                is_service_ok = command_result.returncode == 0
             except OSError:
-                ok = False
-        svc_ok[s] = ok
+                is_service_ok = False
+        service_statuses[service_name] = is_service_ok
 
     # DB capacity
     try:
@@ -709,30 +745,37 @@ def doctor_cmd(json_out: bool) -> None:
 
     # Disk
     try:
-        du = disk_usage(".")
-        free_pct = round(du.free / du.total * 100, 1)
+        disk_usage_info = disk_usage(".")
+        free_pct = round(disk_usage_info.free / disk_usage_info.total * 100, 1)
     except OSError:
         free_pct = -1.0
 
     # CPU
-    cpu = os.cpu_count() or 1
+    cpu_count = os.cpu_count() or 1
 
     # Shard guardrails
     # noinspection PyArgumentList
-    st = TestSettings()
+    settings = TestSettings()
     try:
-        suggested_max_shards = max(1, (max_conn - active - int(st.conn_reserve)) // max(1, int(st.conn_per_shard)))
+        suggested_max_shards = max(
+            1,
+            (max_conn - active - int(settings.conn_reserve)) // max(1, int(settings.conn_per_shard)),
+        )
     except (TypeError, ValueError, ZeroDivisionError):
         suggested_max_shards = 0
 
     payload = {
-        "docker": {"services": services, "database_ok": svc_ok.get("database"), "script_runner_ok": svc_ok.get("script-runner")},
+        "docker": {
+            "services": services,
+            "database_ok": service_statuses.get("database"),
+            "script_runner_ok": service_statuses.get("script-runner"),
+        },
         "db": {"max_connections": max_conn, "active": active},
         "disk": {"free_percent": free_pct},
-        "cpu": {"count": cpu},
+        "cpu": {"count": cpu_count},
         "guardrails": {
-            "conn_per_shard": st.conn_per_shard,
-            "reserve": st.conn_reserve,
+            "conn_per_shard": settings.conn_per_shard,
+            "reserve": settings.conn_reserve,
             "suggested_max_shards": suggested_max_shards,
         },
     }
@@ -743,7 +786,7 @@ def doctor_cmd(json_out: bool) -> None:
         click.echo(f"database ok={payload['docker']['database_ok']} script-runner ok={payload['docker']['script_runner_ok']}")
         click.echo(f"DB connections: max={max_conn} active={active} suggested_max_shards={suggested_max_shards}")
         click.echo(f"Disk free: {free_pct}%")
-        click.echo(f"CPUs: {cpu}")
+        click.echo(f"CPUs: {cpu_count}")
     sys.exit(0)
 
 
@@ -753,5 +796,5 @@ def doctor_cmd(json_out: bool) -> None:
 def validate_cmd(session: str | None, json_out: bool) -> None:
     from .validate import validate
 
-    rc = validate(session=session, json_out=json_out)
-    raise SystemExit(rc)
+    return_code = validate(session=session, json_out=json_out)
+    raise SystemExit(return_code)

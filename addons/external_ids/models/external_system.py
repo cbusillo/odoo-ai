@@ -1,4 +1,4 @@
-from odoo import models, fields, api
+from odoo import api, fields, models
 from odoo.exceptions import ValidationError
 
 
@@ -22,7 +22,7 @@ class ExternalSystem(models.Model):
         "system_id",
         "model_id",
         string="Applies To Models",
-        help=("Optional: limit where this system is selectable. If empty, the system is available for all models."),
+        help="Optional: limit where this system is selectable. If empty, the system is available for all models.",
     )
     # Legacy template fields removed; use url_templates instead
     external_ids = fields.One2many("external.id", "system_id", string="External IDs")

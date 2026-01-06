@@ -161,7 +161,11 @@ class MotorTest(models.Model):
             elif test.result_type == "text":
                 test.computed_result = test.text_result
             elif test.result_type == "selection":
-                test.computed_result = test.selection_result
+                test.computed_result = (
+                    test.selection_result.display_value
+                    or test.selection_result_value
+                    or ""
+                )
             elif test.result_type == "file":
                 test.computed_result = "File Uploaded" if test.file_result else ""
 

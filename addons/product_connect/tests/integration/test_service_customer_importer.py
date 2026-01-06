@@ -128,7 +128,7 @@ class TestCustomerImporter(IntegrationTestCase):
             first_name="Marketing",
             last_name="OptOut",
             email="optout@example.com",
-            phone="+1-212-555-0199",
+            phone="+1-415-867-5310",
         )
 
         customer_data["defaultEmailAddress"]["marketingState"] = "UNSUBSCRIBED"
@@ -142,8 +142,10 @@ class TestCustomerImporter(IntegrationTestCase):
         partner = self.env["res.partner"].search([("shopify_customer_id", "=", "666")])
         self.assertTrue(partner)
         self.assertTrue(partner.is_blacklisted)
-        self.assertTrue(partner.phone_blacklisted)
-        self.assertTrue(partner.mobile_blacklisted)
+        if "phone_sanitized_blacklisted" in partner._fields:
+            self.assertTrue(partner.phone_sanitized_blacklisted)
+        elif "phone_blacklisted" in partner._fields:
+            self.assertTrue(partner.phone_blacklisted)
 
     def test_import_customer_with_addresses(self) -> None:
         billing_address = create_shopify_address_response(
@@ -392,15 +394,21 @@ class TestCustomerImporter(IntegrationTestCase):
             self.env,
             name="Previously Blacklisted",
             shopify_customer_id="5555",
-            phone_blacklisted=True,
-            mobile_blacklisted=True,
+            phone="+1-415-867-5311",
         )
+        if "phone_blacklisted" in partner._fields:
+            partner._phone_set_blacklisted()
+            partner.invalidate_recordset()
+            if "phone_sanitized_blacklisted" in partner._fields:
+                self.assertTrue(partner.phone_sanitized_blacklisted)
+            else:
+                self.assertTrue(partner.phone_blacklisted)
 
         customer_data = create_shopify_customer_response(
             gid="gid://shopify/Customer/5555",
             first_name="Now",
             last_name="Subscribed",
-            phone="+1-212-555-0111",
+            phone="+1-415-867-5311",
         )
 
         customer_data["defaultPhoneNumber"]["marketingState"] = "SUBSCRIBED"
@@ -411,8 +419,10 @@ class TestCustomerImporter(IntegrationTestCase):
         self.assertTrue(result)
 
         partner.invalidate_recordset()
-        self.assertFalse(partner.phone_blacklisted)
-        self.assertFalse(partner.mobile_blacklisted)
+        if "phone_sanitized_blacklisted" in partner._fields:
+            self.assertFalse(partner.phone_sanitized_blacklisted)
+        elif "phone_blacklisted" in partner._fields:
+            self.assertFalse(partner.phone_blacklisted)
 
     def test_import_customer_removes_email_blacklist_if_subscribed(self) -> None:
         partner = PartnerFactory.create(
@@ -739,7 +749,16 @@ class TestCustomerImporter(IntegrationTestCase):
             self.assertTrue(result)
             partner = self.env["res.partner"].search([("shopify_customer_id", "=", str(i + 1000))])
             self.assertTrue(partner)
-            self.assertTrue(partner.phone or partner.mobile)
+            if hasattr(partner, "_phone_get_number_fields"):
+                phone_field_names = partner._phone_get_number_fields()
+            else:
+                phone_field_names = ["phone"]
+            phone_values = [
+                partner[field_name]
+                for field_name in phone_field_names
+                if field_name in partner._fields and partner[field_name]
+            ]
+            self.assertTrue(phone_values)
 
     def test_import_customer_with_default_address_in_list(self) -> None:
         default_address = create_shopify_address_response(

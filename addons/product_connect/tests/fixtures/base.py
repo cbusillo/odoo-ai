@@ -202,6 +202,8 @@ class TourTestCase(MultiWorkerHttpCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
+        cls.env["ir.config_parameter"].sudo().set_param("ir_attachment.location", "db")
+        cls.env["ir.attachment"].sudo().search([("url", "ilike", "/web/assets/")]).unlink()
         cls._setup_test_user()
         cls._cleanup_browser_processes()
 
@@ -246,7 +248,7 @@ class TourTestCase(MultiWorkerHttpCase):
                     "email": "tour_test@example.com",
                     "password": cls.test_password,
                     # Ensure the user can access features used by tours; 'stock' is optional
-                    "groups_id": [(6, 0, group_ids)],
+                    "group_ids": [(6, 0, group_ids)],
                     "active": True,
                 }
             )
@@ -266,12 +268,12 @@ class TourTestCase(MultiWorkerHttpCase):
             except Exception:
                 stock_manager = None
             to_add = []
-            if system_group not in test_user.groups_id:
+            if system_group not in test_user.group_ids:
                 to_add.append(system_group.id)
-            if stock_manager and stock_manager not in test_user.groups_id:
+            if stock_manager and stock_manager not in test_user.group_ids:
                 to_add.append(stock_manager.id)
             if to_add:
-                test_user.sudo().write({"groups_id": [(4, gid) for gid in to_add]})
+                test_user.sudo().write({"group_ids": [(4, gid) for gid in to_add]})
             _logger.info("Updated existing tour test user with new secure password")
 
         cls.test_user = test_user
@@ -282,6 +284,16 @@ class TourTestCase(MultiWorkerHttpCase):
         if hasattr(self, "test_user") and self.test_user:
             return self.test_user.login
         return "tour_test_user"
+
+    def _with_db_param(self, url: str) -> str:
+        if "db=" in url:
+            return url
+        from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
+
+        parts = urlsplit(url)
+        query = dict(parse_qsl(parts.query, keep_blank_values=True))
+        query["db"] = self.env.cr.dbname
+        return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
     def setUp(self) -> None:
         super().setUp()
@@ -317,9 +329,9 @@ class TourTestCase(MultiWorkerHttpCase):
                         time.sleep(delay)
 
                 # Warm minimal endpoints first, then the JS tests harness to avoid 20s DevTools navigate timeouts
-                warm(base + "/odoo")
+                warm(base + self._with_db_param("/web"))
                 # Preload the hoot/QUnit test harness & assets for our module
-                warm(base + "/odoo/tests?headless=1&filter=product_connect")
+                warm(base + self._with_db_param("/web/tests?headless=1&filter=product_connect"))
             except Exception as outer:
                 _logger.warning(f"Warm-up setup skipped due to error: {outer}")
 
@@ -375,7 +387,7 @@ class TourTestCase(MultiWorkerHttpCase):
 
                     port = self.http_port()
                     base = f"http://127.0.0.1:{port}"
-                    for path in ("/odoo",):
+                    for path in ("/web",):
                         warm_url = base + path
                         _logger.info(f"Warming up server with GET {warm_url}")
                         requests.get(warm_url, timeout=30)
@@ -383,7 +395,8 @@ class TourTestCase(MultiWorkerHttpCase):
                     _logger.warning(f"Warm-up request failed (will proceed anyway): {warm_err}")
 
             # Use Odoo's built-in implementation with timeout handling
-            super().start_tour(url, tour_name, login=login, timeout=timeout, step_delay=step_delay)
+            url_with_db = self._with_db_param(url)
+            super().start_tour(url_with_db, tour_name, login=login, timeout=timeout, step_delay=step_delay)
 
         except Exception as e:
             _logger.error(f"Tour '{tour_name}' failed: {e}")

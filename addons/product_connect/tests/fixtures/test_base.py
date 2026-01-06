@@ -291,7 +291,7 @@ class ProductConnectHttpCase(HttpCase):
             name=name,
             login=login,
             password=secure_password,
-            groups_id=[
+            group_ids=[
                 (
                     6,
                     0,
@@ -452,7 +452,7 @@ class ProductConnectTourCase(HttpCase):
             name="Tour Test User",
             login=login,
             password=password,
-            groups_id=[
+            group_ids=[
                 (
                     6,
                     0,

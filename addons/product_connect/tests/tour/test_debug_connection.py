@@ -49,7 +49,7 @@ class TestDebugConnection(TourTestCase):
         # Check if we can curl the server
         for host in hosts_to_try:
             # noinspection HttpUrlsUsage
-            url = f"http://{host}:{port}/odoo/webclient/version_info"
+            url = f"http://{host}:{port}/web/webclient/version_info"
             try:
                 result = subprocess.run(
                     ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", url],

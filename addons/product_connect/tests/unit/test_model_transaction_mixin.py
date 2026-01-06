@@ -1,6 +1,7 @@
 from typing import Any
 
 from psycopg2.errors import InFailedSqlTransaction
+from odoo.modules import module as odoo_module
 from ..common_imports import tagged, patch, UNIT_TAGS
 
 from ..fixtures.base import UnitTestCase
@@ -25,7 +26,7 @@ class TestTransactionMixin(UnitTestCase):
     def test_safe_commit_outside_test_mode(self) -> None:
         from odoo.tools import config
 
-        with patch.object(self.test_model.env.registry, "in_test_mode", return_value=False):
+        with patch.object(odoo_module, "current_test", False):
             with patch.object(config, "get", return_value=False):
                 with patch.object(self.test_model.env.cr, "commit") as mock_commit:
                     self.test_model._safe_commit()
@@ -34,7 +35,7 @@ class TestTransactionMixin(UnitTestCase):
     def test_safe_rollback_outside_test_mode(self) -> None:
         from odoo.tools import config
 
-        with patch.object(self.test_model.env.registry, "in_test_mode", return_value=False):
+        with patch.object(odoo_module, "current_test", False):
             with patch.object(config, "get", return_value=False):
                 with patch.object(self.test_model.env.cr, "rollback") as mock_rollback:
                     self.test_model._safe_rollback()
@@ -43,14 +44,14 @@ class TestTransactionMixin(UnitTestCase):
     def test_is_test_mode_detection_methods(self) -> None:
         from odoo.tools import config
 
-        registry_test_mode = self.test_model.env.registry.in_test_mode()
-        config_test_enable = config.get("test_enable")
+        module_test_mode = bool(odoo_module.current_test)
+        config_test_enable = bool(config.get("test_enable"))
         is_test_mode = self.test_model._is_test_mode()
 
-        any_test_mode = registry_test_mode or config_test_enable
+        any_test_mode = module_test_mode or config_test_enable
         self.assertTrue(
             any_test_mode,
-            f"At least one test detection method should work. Registry: {registry_test_mode}, Config: {config_test_enable}",
+            f"At least one test detection method should work. Module: {module_test_mode}, Config: {config_test_enable}",
         )
 
         self.assertTrue(is_test_mode, "_is_test_mode() should return True during tests")

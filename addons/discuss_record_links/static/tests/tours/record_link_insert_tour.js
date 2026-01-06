@@ -4,7 +4,7 @@ import { registry } from "@web/core/registry"
 
 registry.category("web_tour.tours").add("drl_record_link_insert", {
     test: true,
-    url: "/odoo",
+    url: "/web",
     steps: () => [
         {
             content: "Wait for web client",
@@ -46,4 +46,3 @@ registry.category("web_tour.tours").add("drl_record_link_insert", {
         },
     ],
 })
-

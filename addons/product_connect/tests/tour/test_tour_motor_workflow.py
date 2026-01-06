@@ -6,4 +6,4 @@ from ..fixtures.base import TourTestCase
 class TestMotorWorkflowTour(TourTestCase):
     def test_motor_workflow_to_enabled_product_tour(self) -> None:
         # Land directly on the Motor action so the tour can find the control panel
-        self.start_tour("/odoo#action=product_connect.action_motor_form", "motor_workflow_to_enabled_product_tour")
+        self.start_tour("/web#action=product_connect.action_motor_form", "motor_workflow_to_enabled_product_tour")

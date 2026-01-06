@@ -33,4 +33,4 @@ class TestRecordLinkLabelTour(TourTestCase):
             )
 
     def test_record_link_label_tour(self) -> None:
-        self.start_tour("/odoo", "drl_record_link_label", login=self._get_test_login(), timeout=180)
+        self.start_tour("/web", "drl_record_link_label", login=self._get_test_login(), timeout=180)

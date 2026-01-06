@@ -125,7 +125,7 @@ def create_shopify_address_response(
     province: str | None = "New York",
     country_code: str = "US",
     zip_code: str | None = "10001",
-    phone: str | None = "+1-555-123-4567",
+    phone: str | None = "+1-415-867-5309",
     **overrides: Any,
 ) -> dict[str, Any]:
     base_response = {
@@ -151,7 +151,7 @@ def create_shopify_customer_response(
     first_name: str | None = "John",
     last_name: str | None = "Doe",
     email: str | None = "john.doe@example.com",
-    phone: str | None = "+1-555-123-4567",
+    phone: str | None = "+1-415-867-5309",
     tax_exempt: bool = False,
     tags: list[str] | None = None,
     created_at: str | None = None,

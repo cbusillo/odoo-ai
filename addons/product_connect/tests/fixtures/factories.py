@@ -533,7 +533,7 @@ class ResUsersFactory:
             "login": f"test_user_{timestamp}_{secrets.token_hex(4)}",
             "password": secrets.token_urlsafe(32),
             "email": f"test_{timestamp}@example.com",
-            "groups_id": [(6, 0, [env.ref("base.group_user").id])],
+            "group_ids": [(6, 0, [env.ref("base.group_user").id])],
         }
         defaults.update(kwargs)
         return env["res.users"].create(defaults)

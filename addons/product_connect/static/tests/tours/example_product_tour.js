@@ -14,23 +14,6 @@ registry.category("web_tour.tours").add("example_product_tour", {
         {
             content: "Wait for web client to be ready",
             trigger: ".o_web_client",
-            run() {
-                // Ensure we are on the intended action route. In some environments the
-                // webclient may auto-navigate to a default app (e.g., CRM) on first load.
-                const target = "/web#action=product_connect.action_product_template_list_edit"
-                if (window.location.hash.indexOf("product_connect.action_product_template_list_edit") === -1) {
-                    window.location.href = target
-                }
-                // Also force via the Action service to be robust to routing races
-                try {
-                    const svc = odoo?.__DEBUG__?.services?.action
-                    if (svc && typeof svc.doAction === 'function') {
-                        svc.doAction("product_connect.action_product_template_list_edit")
-                    }
-                } catch (e) {
-                    // non-fatal
-                }
-            },
         },
         {
             content: "Wait for control panel (action loaded)",

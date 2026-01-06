@@ -22,12 +22,12 @@ class TestExampleProductTour(TourTestCase):
     def test_example_product_tour(self) -> None:
         """Run the example product tour test.
 
-        This test starts at the /odoo URL and runs through the
+        This test starts at the /web URL and runs through the
         'example_product_tour' tour defined in the JavaScript file.
         """
         # Use the fixed start_tour method with proper completion detection
         self.start_tour(
-            "/odoo#action=product_connect.action_product_template_list_edit", "example_product_tour", login=self._get_test_login()
+            "/web#action=product_connect.action_product_template_list_edit", "example_product_tour", login=self._get_test_login()
         )
 
     def test_product_navigation(self) -> None:
@@ -37,5 +37,5 @@ class TestExampleProductTour(TourTestCase):
         """
         # You could create another tour or reuse the same one with different parameters
         self.start_tour(
-            "/odoo#action=product_connect.action_product_template_list_edit", "example_product_tour", login=self._get_test_login()
+            "/web#action=product_connect.action_product_template_list_edit", "example_product_tour", login=self._get_test_login()
         )

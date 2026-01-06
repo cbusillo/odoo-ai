@@ -75,6 +75,49 @@ class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
         except UserError as error:
             _logger.warning(f"Failed to geolocalize partner {partner.name} (ID: {partner.id}): {str(error)}", exc_info=True)
 
+    def _sync_phone_blacklist(self, partner: "odoo.model.res_partner", should_blacklist: bool) -> bool:
+        if "phone_sanitized" not in partner._fields:
+            return False
+
+        if hasattr(partner, "_phone_get_number_fields"):
+            phone_field_names = partner._phone_get_number_fields()
+        else:
+            phone_field_names = ["phone"]
+
+        phone_numbers = [
+            partner[field_name]
+            for field_name in phone_field_names
+            if field_name in partner._fields and partner[field_name]
+        ]
+        if not phone_numbers:
+            return False
+
+        if "phone.blacklist" not in self.env:
+            return False
+
+        phone_sanitized = partner.phone_sanitized or ""
+        if not phone_sanitized and hasattr(partner, "_phone_format"):
+            phone_sanitized = partner._phone_format(number=phone_numbers[0], raise_exception=False) or ""
+        if not phone_sanitized:
+            return False
+
+        phone_blacklist = self.env["phone.blacklist"].sudo()
+        existing_blacklist = phone_blacklist.search(
+            [("number", "=", phone_sanitized), ("active", "=", True)],
+            limit=1,
+        )
+
+        if should_blacklist:
+            if existing_blacklist:
+                return False
+            phone_blacklist._add([phone_sanitized])
+            return True
+
+        if not existing_blacklist:
+            return False
+        phone_blacklist._remove([phone_sanitized])
+        return True
+
     def import_customer(self, shopify_customer: CustomerFields) -> bool:
         shopify_customer_id = parse_shopify_id_from_gid(shopify_customer.id)
         tags = [t.strip().lower() for t in shopify_customer.tags]
@@ -93,16 +136,22 @@ class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
             shopify_phone = None
         shopify_phone = shopify_phone.strip() if shopify_phone else ""
 
-        partner = self.env["res.partner"].search([("shopify_customer_id", "=", shopify_customer_id)], limit=1)
+        partner_model = self.env["res.partner"]
+        partner = partner_model.search([("shopify_customer_id", "=", shopify_customer_id)], limit=1)
         if not partner and shopify_email:
-            partner = self.env["res.partner"].search([("email", "ilike", shopify_email)], limit=1)
+            partner = partner_model.search([("email", "ilike", shopify_email)], limit=1)
         if not partner and shopify_phone:
             formatted_phone = self._format_phone_number(shopify_phone)
             if formatted_phone:
-                partner = self.env["res.partner"].search(
-                    ["|", ("phone", "=", formatted_phone), ("mobile", "=", formatted_phone)],
-                    limit=1,
-                )
+                if "phone_mobile_search" in partner_model._fields:
+                    partner = partner_model.search([("phone_mobile_search", "=", formatted_phone)], limit=1)
+                elif "mobile" in partner_model._fields:
+                    partner = partner_model.search(
+                        ["|", ("phone", "=", formatted_phone), ("mobile", "=", formatted_phone)],
+                        limit=1,
+                    )
+                else:
+                    partner = partner_model.search([("phone", "=", formatted_phone)], limit=1)
 
         email = shopify_email or (partner.email if partner else "")
         phone = self._format_phone_number(shopify_phone) or (partner.phone if partner else "")
@@ -141,8 +190,6 @@ class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
             "shopify_customer_id": shopify_customer_id,
             "name": name,
             "ebay_username": ebay_username or False,
-            "phone_blacklisted": sms_blacklisted_flag,
-            "mobile_blacklisted": sms_blacklisted_flag,
             "property_account_position_id": fiscal_position.id if fiscal_position else False,
         }
         if email:
@@ -188,9 +235,7 @@ class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
             partner.property_account_position_id = False
 
         # Update phone blacklist status based on marketing opt-out
-        if sms_blacklisted_flag != partner.phone_blacklisted:
-            partner.phone_blacklisted = sms_blacklisted_flag
-            partner.mobile_blacklisted = sms_blacklisted_flag
+        if self._sync_phone_blacklist(partner, sms_blacklisted_flag):
             changed = True
 
         # Manage email blacklist via mail.blacklist model
@@ -232,7 +277,19 @@ class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
             state = self.env["res.country.state"].search(domain, limit=1)
 
         formatted_phone = self._format_phone_number(address.phone) if address.phone else ""
-        existing_numbers = {normalize_phone(p) for p in (partner.phone, partner.mobile) if p}
+
+        def get_phone_numbers(target_partner: "odoo.model.res_partner") -> set[str]:
+            if hasattr(target_partner, "_phone_get_number_fields"):
+                phone_field_names = target_partner._phone_get_number_fields()
+            else:
+                phone_field_names = ["phone"]
+            return {
+                normalize_phone(target_partner[field_name])
+                for field_name in phone_field_names
+                if field_name in target_partner._fields and target_partner[field_name]
+            }
+
+        existing_numbers = get_phone_numbers(partner)
         phone_mismatch = bool(formatted_phone and existing_numbers and normalize_phone(formatted_phone) not in existing_numbers)
         existing_address = self.env["res.partner"].search([("shopify_address_id", "=", shopify_address_id)], limit=1)
 
@@ -264,7 +321,7 @@ class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
             def phone_matches(child_address: "odoo.model.res_partner") -> bool:
                 if not formatted_phone:
                     return True  # No phone to match, consider it a match based on other fields
-                existing_phones = {normalize_phone(p) for p in (child_address.phone, child_address.mobile) if p}
+                existing_phones = get_phone_numbers(child_address)
                 if not existing_phones:
                     return True  # Existing address has no phone, still consider it a match
                 return normalize_phone(formatted_phone) in existing_phones

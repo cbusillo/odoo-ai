@@ -98,7 +98,7 @@
                 <!-- Group By Options -->
                 <group name="group_by">
                     <filter string="Processed Date" name="groupby_processed_date"
-                            context="{'group_by': 'is_ready_for_sale_last_enabled_date'}"/>
+                            context="{'group_by': 'is_ready_for_sale_last_enabled_date:day'}"/>
                     <filter string="Source" name="groupby_source" context="{'group_by': 'source'}"/>
                     <filter string="Part Type" name="groupby_part_type" context="{'group_by': 'part_type'}"/>
                 </group>

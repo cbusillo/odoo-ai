@@ -98,7 +98,7 @@
                 <filter name="filter_shopify_error_input" string="Shopify Input Error"
                         domain="[('error_shopify_input','!=',False)]"/>
                 <filter name="filter_create_date" date="create_date"/>
-                <group expand="0" string="Group By">
+                <group name="group_by">
                     <filter name="g_state" string="State" domain="[]" context="{'group_by':'state'}"/>
                     <filter name="g_user" string="User" domain="[]" context="{'group_by':'user'}"/>
                     <filter name="g_mode" string="Mode" domain="[]" context="{'group_by':'mode'}"/>

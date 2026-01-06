@@ -33,7 +33,7 @@
                 <filter string="Huge Image &gt; 500kB" name="filter_very_large_image"
                         domain="[('image_1920_file_size', '&gt;', 1024 * 500)]"/>
                 <separator/>
-                <group string="Group By">
+                <group name="group_by">
                     <filter string="Product" name="groupby_product" context="{'group_by': 'product_tmpl_id'}"/>
                 </group>
                 <separator/>

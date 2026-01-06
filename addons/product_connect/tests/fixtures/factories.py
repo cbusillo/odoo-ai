@@ -16,6 +16,12 @@ from ..test_helpers import (
 class ProductFactory:
     @staticmethod
     def create(env: Environment, **kwargs: OdooValue) -> "odoo.model.product_template":
+        category_id = kwargs.get("categ_id")
+        if not category_id:
+            root_category = env["product.category"].search([("parent_id", "=", False)], limit=1)
+            if not root_category:
+                root_category = env["product.category"].create({"name": "All"})
+            category_id = root_category.id
         defaults = {
             "name": generate_unique_name("Test Product"),
             "default_code": generate_unique_sku(),
@@ -25,9 +31,8 @@ class ProductFactory:
             "standard_price": 50.0,
             "sale_ok": True,
             "purchase_ok": True,
-            "categ_id": env.ref("product.product_category_all").id,
+            "categ_id": category_id,
             "uom_id": env.ref("uom.product_uom_unit").id,
-            "uom_po_id": env.ref("uom.product_uom_unit").id,
             "invoice_policy": "order",
             "website_description": "Test product description",
         }
@@ -167,6 +172,13 @@ class MotorFactory:
 
         motor = env["motor"].create(motor_vals)
 
+        category_id = product_kwargs.get("categ_id")
+        if not category_id:
+            root_category = env["product.category"].search([("parent_id", "=", False)], limit=1)
+            if not root_category:
+                root_category = env["product.category"].create({"name": "All"})
+            category_id = root_category.id
+
         defaults = {
             "name": product_kwargs.get("name") or generate_unique_name("Test Motor"),
             "default_code": motor_vals["motor_number"],
@@ -175,7 +187,7 @@ class MotorFactory:
             "standard_price": 1500.0,
             "weight": 150.0,
             "volume": 0.5,
-            "categ_id": env.ref("product.product_category_all").id,
+            "categ_id": category_id,
             "motor": motor.id,
             "source": "motor",
         }

@@ -140,7 +140,7 @@
                         domain="['|', ('year_from', '!=', False), ('year_to', '!=', False)]"/>
                 <filter string="All Years" name="all_years"
                         domain="[('year_from', '=', False), ('year_to', '=', False)]"/>
-                <group expand="0" string="Group By">
+                <group name="group_by">
                     <filter string="Part Type" name="group_part_type" context="{'group_by':'part_type'}"/>
                 </group>
             </search>

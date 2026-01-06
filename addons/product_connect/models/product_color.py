@@ -11,7 +11,7 @@ class ProductColorTag(models.Model):
 class ProductColor(models.Model):
     _name = "product.color"
     _description = "Product Color"
-    _sql_constraints = [("name_uniq", "unique (name)", "Product Color name already exists !")]
+    _name_uniq = models.Constraint("unique (name)", "Product Color name already exists !")
 
     name = fields.Char(required=True)
     color_code = fields.Char(help="The HEX color code, e.g., #FFFFFF for white.")

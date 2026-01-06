@@ -96,7 +96,7 @@
                 <separator/>
 
                 <!-- Group By Options -->
-                <group expand="1" string="Group By">
+                <group name="group_by">
                     <filter string="Processed Date" name="groupby_processed_date"
                             context="{'group_by': 'is_ready_for_sale_last_enabled_date'}"/>
                     <filter string="Source" name="groupby_source" context="{'group_by': 'source'}"/>

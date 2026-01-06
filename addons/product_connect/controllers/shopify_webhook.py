@@ -16,16 +16,17 @@ class ShopifyWebhook(http.Controller):
     STATE_DOMAIN = ("state", "in", ["queued", "running"])
     SHOPIFY_LOGIN = "shopify@outboardpartswarehouse.com"
 
-    @http.route("/shopify/webhook", type="json", auth="public", csrf=False, methods=["POST"])
+    @http.route("/shopify/webhook", type="http", auth="public", csrf=False, methods=["POST"])
     def webhook(self) -> Response:
+        raw_body = http.request.httprequest.get_data()
         secret = http.request.env["ir.config_parameter"].sudo().get_param("shopify.webhook_key") or ""
         digest = hmac.new(
             secret.encode(),
-            http.request.httprequest.data,
+            raw_body,
             hashlib.sha256,
         ).digest()
-        hmac_header = http.request.httprequest.headers.get("X-Shopify-Hmac-Sha256")
-        if not hmac.compare_digest(base64.b64encode(digest).decode(), hmac_header or ""):
+        signature_header = http.request.httprequest.headers.get("X-Shopify-Hmac-Sha256", "")
+        if not hmac.compare_digest(base64.b64encode(digest).decode(), signature_header):
             raise Unauthorized()
 
         shopify_user = http.request.env["res.users"].sudo().search([("login", "=", self.SHOPIFY_LOGIN)], limit=1)
@@ -38,8 +39,11 @@ class ShopifyWebhook(http.Controller):
             raise exception
         env = http.request.env(user=shopify_user.id)
 
-        topic = http.request.httprequest.headers.get("X-Shopify-Topic")
-        payload = json.loads(http.request.httprequest.data)
+        topic = http.request.httprequest.headers.get("X-Shopify-Topic", "")
+        try:
+            payload = json.loads(raw_body)
+        except json.JSONDecodeError as decode_error:
+            raise BadRequest() from decode_error
         if not payload.get("id"):
             raise BadRequest()
 

@@ -1,6 +1,6 @@
 {
     "name": "Product Connect",
-    "version": "18.0.8.2",
+    "version": "19.0.8.2",
     "category": "Industries",
     "author": "Chris Busillo (Shiny Computers)",
     "maintainers": ["cbusillo"],

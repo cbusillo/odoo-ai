@@ -5,13 +5,10 @@ class MotorCylinder(models.Model):
     _name = "motor.cylinder"
     _description = "Motor Cylinder Data"
     _order = "cylinder_number"
-    _sql_constraints = [
-        (
-            "motor_cylinder_number_unique",
-            "unique(motor, cylinder_number)",
-            "Cylinder number must be unique per motor.",
-        )
-    ]
+    _motor_cylinder_number_unique = models.Constraint(
+        "unique(motor, cylinder_number)",
+        "Cylinder number must be unique per motor.",
+    )
 
     motor = fields.Many2one("motor", ondelete="cascade")
     cylinder_number = fields.Integer(index=True)

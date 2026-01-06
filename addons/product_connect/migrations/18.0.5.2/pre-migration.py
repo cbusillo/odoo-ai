@@ -1,7 +1,43 @@
-from odoo import api, SUPERUSER_ID
+import logging
 
+from odoo import api, SUPERUSER_ID
 from odoo.sql_db import Cursor
-from odoo.upgrade import util
+
+try:
+    from odoo.upgrade import util as upgrade_utils
+except ImportError:  # pragma: no cover - Odoo 19 upgrade path
+    upgrade_utils = None
+
+_logger = logging.getLogger(__name__)
+
+
+def _remove_columns(cr: Cursor) -> None:
+    if upgrade_utils is not None:
+        upgrade_utils.remove_column(cr, "motor", "technician")
+        upgrade_utils.remove_column(cr, "res_users", "is_technician")
+        return
+    try:
+        from openupgradelib import openupgrade
+    except ImportError:
+        _logger.warning("OpenUpgrade helpers unavailable; skipping column cleanup.")
+        return
+    openupgrade.drop_columns(cr, [("motor", "technician"), ("res_users", "is_technician")])
+
+
+def _remove_models(cr: Cursor) -> None:
+    models_to_remove = [
+        "product.import.image.wizard",
+        "product.import.image",
+        "motor.product.image",
+    ]
+    if upgrade_utils is not None:
+        for model_name in models_to_remove:
+            upgrade_utils.remove_model(cr, model_name)
+        return
+    _logger.warning(
+        "Upgrade helpers unavailable; skipping model cleanup for %s.",
+        ", ".join(models_to_remove),
+    )
 
 
 def migrate(cr: Cursor, version: str) -> None:
@@ -12,8 +48,5 @@ def migrate(cr: Cursor, version: str) -> None:
     if not env:
         return
 
-    util.remove_column(cr, "motor", "technician")
-    util.remove_column(cr, "res_users", "is_technician")
-    util.remove_model(cr, "product.import.image.wizard")
-    util.remove_model(cr, "product.import.image")
-    util.remove_model(cr, "motor.product.image")
+    _remove_columns(cr)
+    _remove_models(cr)

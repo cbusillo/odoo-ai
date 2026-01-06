@@ -70,11 +70,10 @@
                             domain="[('create_date', '>=', (context_today() - datetime.timedelta(days=90)).strftime('%Y-%m-%d'))]"/>
                 </filter>
                 <separator/>
-                <group expand="0" string="Group By">
+                <group name="group_by">
                     <filter string="Platform" name="group_platform" context="{'group_by':'source_platform'}"/>
                     <filter string="Carrier" name="group_carrier" context="{'group_by':'carrier_id'}"/>
                     <filter string="Customer" name="group_partner" context="{'group_by':'partner_id'}"/>
-                    <separator/>
                     <filter string="Order Date" name="group_date" context="{'group_by':'create_date'}"/>
                 </group>
             </search>

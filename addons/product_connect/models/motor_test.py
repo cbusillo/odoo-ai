@@ -19,7 +19,7 @@ class MotorTestTemplate(models.Model):
     _name = "motor.test.template"
     _description = "Motor Test Template"
     _order = "sequence, id"
-    _sql_constraints = [("unique_tag", "unique(tag)", "The tag must be unique.")]
+    _unique_tag = models.Constraint("unique(tag)", "The tag must be unique.")
 
     name = fields.Char("Test Name", required=True)
     tag = fields.Char()
@@ -91,7 +91,7 @@ class MotorTestSelection(models.Model):
     _name = "motor.test.selection"
     _description = "Motor Test Selection"
     _order = "sequence"
-    _sql_constraints = [("unique_selection_value", "unique(value)", "The value must be unique.")]
+    _unique_selection_value = models.Constraint("unique(value)", "The value must be unique.")
 
     name = fields.Char(required=True)
     sequence = fields.Integer(default=10, index=True)

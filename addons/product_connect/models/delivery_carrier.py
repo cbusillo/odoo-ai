@@ -5,10 +5,10 @@ from odoo import api, fields, models
 
 class DeliveryCarrier(models.Model):
     _inherit = "delivery.carrier"
-
-    _sql_constraints = [
-        ("name_company_unique", "unique(name, company_id)", "Carrier name must be unique per company"),
-    ]
+    _name_company_unique = models.Constraint(
+        "unique(name, company_id)",
+        "Carrier name must be unique per company",
+    )
 
     service_maps = fields.One2many("delivery.carrier.service.map", "carrier")
 
@@ -18,13 +18,10 @@ class DeliveryCarrierServiceMap(models.Model):
     _description = "External ↔ Odoo shipping-service map"
 
     _CARRIER_PUNCTUATION_PATTERN = re.compile(r"[^\w\s]")
-    _sql_constraints = [
-        (
-            "uniq_platform_service_name",
-            "unique(platform, platform_service_normalized_name)",
-            "Duplicate service name for this platform.",
-        )
-    ]
+    _uniq_platform_service_name = models.Constraint(
+        "unique(platform, platform_service_normalized_name)",
+        "Duplicate service name for this platform.",
+    )
 
     carrier = fields.Many2one(
         "delivery.carrier", required=True, ondelete="cascade", help="The Odoo delivery.carrier representing this service level."

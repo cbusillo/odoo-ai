@@ -4,6 +4,7 @@ from typing import Generator
 
 from psycopg2.errors import InFailedSqlTransaction
 from odoo import api, models
+from odoo.modules import module as odoo_module
 from odoo.tools import config
 
 _logger = logging.getLogger(__name__)
@@ -22,7 +23,9 @@ class TransactionMixin(models.AbstractModel):
             self.env.cr.rollback()
 
     def _is_test_mode(self) -> bool:
-        return self.env.registry.in_test_mode() or config.get("test_enable")
+        test_mode_from_module = bool(odoo_module.current_test)
+        test_mode_from_config = bool(config.get("test_enable"))
+        return test_mode_from_module or test_mode_from_config
 
     @contextmanager
     def _new_cursor_context(self, commit: bool = True) -> Generator[api.Environment, None, None]:

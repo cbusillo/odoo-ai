@@ -447,10 +447,10 @@ class OrderImporter(ShopifyBaseImporter[OrderFields]):
         }
 
         # Propagate tax from a product line with tax, if present
-        product_line_with_tax = odoo_order.order_line.filtered(lambda l: l.tax_id)[:1]
+        product_line_with_tax = odoo_order.order_line.filtered(lambda line: line.tax_ids)[:1]
         if product_line_with_tax:
             # ORM write format differs from type's read format for M2M fields
-            discount_vals["tax_id"] = [Command.set(product_line_with_tax.tax_id.ids)]  # type: ignore[assignment]
+            discount_vals["tax_ids"] = [Command.set(product_line_with_tax.tax_ids.ids)]  # type: ignore[assignment]
 
         if discount_lines:
             return write_if_changed(discount_lines[0], discount_vals)

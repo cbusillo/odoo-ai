@@ -13,6 +13,9 @@ def snapshot_filestore(test_db_name: str, production_db: str) -> None:
     test_filestore = f"{root}/filestore/{test_db_name}"
     service = get_script_runner_service()
     ensure_services_up([service])
+    exists = compose_exec(service, ["sh", "-c", f"[ -d '{production_filestore}' ] && echo 1 || echo 0"]).stdout.strip()
+    if not exists.endswith("1"):
+        return
     compose_exec(service, ["sh", "-c", f"rm -rf '{test_filestore}' || true"])
     # try hardlinks then rsync
     res = compose_exec(

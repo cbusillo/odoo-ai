@@ -13,6 +13,7 @@ from .reporter import load_json
 from .session import PhaseName, TestSession
 from .settings import TestSettings
 from .sharding import plan_shards_for_phase
+from .docker_api import compose_env
 
 
 def _emit_bottomline(latest: Path, as_json: bool) -> int:
@@ -718,7 +719,12 @@ def doctor_cmd(json_out: bool) -> None:
 
     services: list[str] = []
     try:
-        result = subprocess.run(["docker", "compose", "ps", "--services"], capture_output=True, text=True)
+        result = subprocess.run(
+            ["docker", "compose", "ps", "--services"],
+            capture_output=True,
+            text=True,
+            env=compose_env(),
+        )
         if result.returncode == 0:
             services = [service_name for service_name in result.stdout.strip().split("\n") if service_name]
     except OSError:
@@ -731,6 +737,7 @@ def doctor_cmd(json_out: bool) -> None:
                 command_result = subprocess.run(
                     ["docker", "compose", "exec", "-T", service_name, "true"],
                     capture_output=True,
+                    env=compose_env(),
                 )
                 is_service_ok = command_result.returncode == 0
             except OSError:

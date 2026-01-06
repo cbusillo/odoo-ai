@@ -95,12 +95,68 @@ export class MultigraphModel extends GraphModel {
         groupBy = Array.isArray(groupBy) ? groupBy : []
         orderBy = Array.isArray(orderBy) ? orderBy : []
 
+        const metaContextGroupBys = this.metaData?.context?.graph_groupbys
+        const contextGroupBys = Array.isArray(context.graph_groupbys)
+            ? context.graph_groupbys
+            : (Array.isArray(metaContextGroupBys) ? metaContextGroupBys : [])
+
+        const normalizedGroupBy = groupBy.map((groupByEntry) => {
+            if (typeof groupByEntry === "string") {
+                return groupByEntry
+            }
+
+            if (groupByEntry && typeof groupByEntry === "object") {
+                const fieldName = groupByEntry.fieldName || groupByEntry.field || groupByEntry.name
+                const interval = groupByEntry.interval || groupByEntry.granularity
+
+                if (fieldName && interval) {
+                    return `${fieldName}:${interval}`
+                }
+
+                if (fieldName) {
+                    return fieldName
+                }
+            }
+
+            return groupByEntry
+        })
+
+        groupBy = normalizedGroupBy
+
         // If no groupBy is specified but we have graph_groupbys in context, use that
-        if (groupBy.length === 0 && Array.isArray(context.graph_groupbys) && context.graph_groupbys.length > 0) {
-            groupBy = context.graph_groupbys
+        if (groupBy.length === 0 && contextGroupBys.length > 0) {
+            groupBy = contextGroupBys
         }
 
-        // Keep the original groupBy with intervals for webReadGroup
+        // Restore date/datetime granularity if the groupBy lost its interval.
+        if (groupBy.length > 0) {
+            const fieldDefinitions = this.metaData?.fields || {}
+
+            groupBy = groupBy.map((groupByEntry) => {
+                if (typeof groupByEntry !== "string" || groupByEntry.includes(":")) {
+                    return groupByEntry
+                }
+
+                const match = contextGroupBys.find((contextGroupBy) => {
+                    if (typeof contextGroupBy !== "string") {
+                        return false
+                    }
+                    return contextGroupBy.split(":")[0] === groupByEntry
+                })
+
+                if (match) {
+                    return match
+                }
+
+                const fieldDefinition = fieldDefinitions[groupByEntry]
+                if (fieldDefinition?.type === "date" || fieldDefinition?.type === "datetime") {
+                    return `${groupByEntry}:day`
+                }
+
+                return groupByEntry
+            })
+        }
+
         const measureFieldNames = (this.measures || []).map(m => m.fieldName)
         const fieldNamesOnly = groupBy.map(gb => {
             if (typeof gb === 'string' && gb.includes(':')) {
@@ -109,11 +165,25 @@ export class MultigraphModel extends GraphModel {
             return gb
         })
 
-        const readGroupFields = [...new Set([...fieldNamesOnly, ...measureFieldNames])]
+        const fieldDefinitions = this.metaData?.fields || {}
+        const aggregates = ["__count"]
+        measureFieldNames.forEach((measureFieldName) => {
+            const fieldDefinition = fieldDefinitions[measureFieldName] || {}
+            let aggregator = fieldDefinition.aggregator
+            if (!aggregator) {
+                aggregator = fieldDefinition.type === "many2one" ? "count_distinct" : "sum"
+            }
+
+            if (fieldDefinition.type === "monetary" && fieldDefinition.currency_field) {
+                aggregates.push(`${fieldDefinition.currency_field}:array_agg_distinct`)
+                aggregates.push(`${measureFieldName}:sum_currency`)
+                return
+            }
+
+            aggregates.push(`${measureFieldName}:${aggregator}`)
+        })
 
         const options = {
-            orderby: orderBy.length ? orderBy : false,
-            lazy: groupBy.length === 1,
             context,
         }
 
@@ -123,8 +193,8 @@ export class MultigraphModel extends GraphModel {
         const data = await this.orm.webReadGroup(
             this.metaData.resModel,
             domain,
-            readGroupFields,
             groupBy,
+            aggregates,
             options
         )
 

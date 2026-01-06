@@ -16,7 +16,7 @@ from .db import (
     drop_and_create_test_database,
     get_production_db_name,
 )
-from .docker_api import get_script_runner_service
+from .docker_api import compose_env, get_script_runner_service
 from .filestore import cleanup_single_test_filestore, filestore_exists, snapshot_filestore
 from .reporter import write_junit_for_shard
 from .settings import SUMMARY_SCHEMA_VERSION, TestSettings
@@ -298,6 +298,7 @@ class OdooExecutor:
                     stderr=subprocess.STDOUT,
                     text=True,
                     bufsize=1,
+                    env=compose_env(),
                 )
                 assert process.stdout is not None
                 stdout = process.stdout

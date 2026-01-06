@@ -1,4 +1,4 @@
-from .docker_api import compose_exec, ensure_services_up, get_script_runner_service
+from .docker_api import compose_env, compose_exec, ensure_services_up, get_script_runner_service
 
 
 def kill_browsers_and_zombies() -> None:
@@ -16,4 +16,4 @@ def restart_script_runner_with_orphan_cleanup() -> None:
     from subprocess import run
 
     service = get_script_runner_service()
-    run(["docker", "compose", "up", "-d", "--remove-orphans", service])
+    run(["docker", "compose", "up", "-d", "--remove-orphans", service], env=compose_env())

@@ -22,7 +22,7 @@ class TransportOrder(models.Model):
     name = fields.Char()
     state = fields.Selection(
         TRANSPORT_ORDER_STATES,
-        default=TRANSPORT_ORDER_STATES[0],
+        default=TRANSPORT_ORDER_STATES[0][0],
         tracking=True,
         required=True,
     )

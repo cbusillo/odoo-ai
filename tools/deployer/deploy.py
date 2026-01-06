@@ -116,6 +116,11 @@ def push_env_to_remote(settings: StackSettings, env_values: Mapping[str, str]) -
 
 
 def execute_compose_pull(settings: StackSettings, remote: bool) -> None:
+    # Avoid `docker compose pull` for local stacks. Local development commonly
+    # uses images already present (and/or custom built), and pulling can
+    # introduce flakiness when Docker Desktop is under load or behind proxies.
+    if not remote:
+        return
     _run_compose(settings, ["pull", *settings.services], remote)
 
 

@@ -33,6 +33,7 @@ Quick start
   uv run ops local down all
   uv run ops local restart opw
   uv run ops local upgrade opw
+  uv run ops local openupgrade opw
   uv run ops local doctor opw
   uv run ops local info opw --json
   uv run ops local up opw --build --no-cache
@@ -88,6 +89,9 @@ Behavior notes
   target stack while preserving named volumes.
 - `ops local upgrade` runs module upgrades using the stack's configured module
   list (AUTO by default) without rebuilding the image.
+- `ops local openupgrade` runs the OpenUpgrade pipeline against the current
+  database without restoring from upstream and resets module versions for
+  modules that have OpenUpgrade scripts so their scripts re-run.
 - `--no-cache` forces a clean local build; for `all`, only the first target
   uses `--no-cache` and the rest use normal cache.
 - Ship actions push to the correct branch:

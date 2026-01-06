@@ -240,12 +240,17 @@ class LocalServerSettings(BaseSettings):
     # Script/runtime toggles
     disable_cron: bool = Field(True, alias="SANITIZE_DISABLE_CRON")
     project_name: str = Field("odoo", alias="ODOO_PROJECT_NAME")
+    odoo_version: str | None = Field(None, alias="ODOO_VERSION")
     addons_path: str | None = Field(None, alias="ODOO_ADDONS_PATH")
     addon_repositories: str | None = Field(None, alias="ODOO_ADDON_REPOSITORIES")
     update_modules: str | None = Field(None, alias="ODOO_UPDATE_MODULES")
     update_modules_legacy: str | None = Field(None, alias="ODOO_UPDATE")
     local_addons_dirs: str | None = Field(None, alias="LOCAL_ADDONS_DIRS")
     auto_modules_raw: str | None = Field(None, alias="ODOO_AUTO_MODULES")
+    openupgrade_enabled: bool = Field(False, alias="OPENUPGRADE_ENABLED")
+    openupgrade_scripts_path: Path | None = Field(None, alias="OPENUPGRADE_SCRIPTS_PATH")
+    openupgrade_target_version: str | None = Field(None, alias="OPENUPGRADE_TARGET_VERSION")
+    openupgrade_skip_update_addons: bool = Field(True, alias="OPENUPGRADE_SKIP_UPDATE_ADDONS")
     odoo_key: SecretStr | None = Field(None, alias="ODOO_KEY")
     bootstrap_only: bool = Field(False, alias="BOOTSTRAP_ONLY")
     no_sanitize: bool = Field(False, alias="NO_SANITIZE")
@@ -254,17 +259,24 @@ class LocalServerSettings(BaseSettings):
     @field_validator(
         "filestore_owner",
         "base_url",
+        "odoo_version",
         "addons_path",
         "addon_repositories",
         "update_modules",
         "update_modules_legacy",
         "local_addons_dirs",
         "auto_modules_raw",
+        "openupgrade_target_version",
         mode="before",
     )
     @classmethod
     def _optional_str(cls, value: object) -> object:
         return _blank_to_none(value)
+
+    @field_validator("openupgrade_scripts_path", mode="before")
+    @classmethod
+    def _normalize_openupgrade_scripts_path(cls, value: object) -> object:
+        return _normalize_path(value)
 
     @model_validator(mode="after")
     def _merge_update_modules(self) -> "LocalServerSettings":
@@ -1330,6 +1342,39 @@ with registry.cursor() as cr:
             )
             return {row[0] for row in cursor.fetchall()}
 
+    def _resolve_addons_paths(self) -> list[Path]:
+        addons_env = (self.local.addons_path or "").strip()
+        addons_paths: list[Path] = []
+        if addons_env:
+            sep = "," if "," in addons_env else ":"
+            for raw_path in [path_entry.strip() for path_entry in addons_env.split(sep) if path_entry.strip()]:
+                addons_paths.append(Path(raw_path))
+        if not addons_paths:
+            generated_conf = Path("/volumes/config/_generated.conf")
+            if generated_conf.exists():
+                try:
+                    conf_text = generated_conf.read_text(encoding="utf-8", errors="ignore")
+                except OSError:
+                    conf_text = ""
+                match = re.search(r"^\s*addons_path\s*=\s*(.+)$", conf_text, re.MULTILINE)
+                if match:
+                    raw_paths = match.group(1).strip()
+                    sep = "," if "," in raw_paths else ":"
+                    for raw_path in [path_entry.strip() for path_entry in raw_paths.split(sep) if path_entry.strip()]:
+                        addons_paths.append(Path(raw_path))
+        if not addons_paths:
+            addons_paths = [
+                Path("/volumes/addons"),
+                Path("/opt/project/addons"),
+                Path("/odoo/addons"),
+                Path("/opt/extra_addons"),
+            ]
+        if getattr(self, "_auto_addon_dirs", None):
+            for auto_dir in self._auto_addon_dirs:
+                if auto_dir not in addons_paths:
+                    addons_paths.append(auto_dir)
+        return addons_paths
+
     def _default_modules_for_project(self) -> list[str]:
         raw = (self.local.auto_modules_raw or "").strip()
         if not raw or raw.upper() == "AUTO":
@@ -1400,23 +1445,7 @@ with registry.cursor() as cr:
                 _logger.info("ODOO_UPDATE_MODULES is empty after parsing; skipping.")
                 return
 
-        addons_env = (self.local.addons_path or "").strip()
-        addons_paths: list[Path] = []
-        if addons_env:
-            sep = "," if "," in addons_env else ":"
-            for raw_path in [path_entry.strip() for path_entry in addons_env.split(sep) if path_entry.strip()]:
-                addons_paths.append(Path(raw_path))
-        if not addons_paths:
-            addons_paths = [
-                Path("/volumes/addons"),
-                Path("/opt/project/addons"),
-                Path("/odoo/addons"),
-                Path("/opt/extra_addons"),
-            ]
-        if getattr(self, "_auto_addon_dirs", None):
-            for auto_dir in self._auto_addon_dirs:
-                if auto_dir not in addons_paths:
-                    addons_paths.append(auto_dir)
+        addons_paths = self._resolve_addons_paths()
         _logger.info(
             "Using addons search paths: %s",
             ", ".join(str(path) for path in addons_paths),
@@ -1491,6 +1520,130 @@ with registry.cursor() as cr:
         finally:
             self._reset_db_connection()
 
+    def _resolve_openupgrade_assets(self) -> tuple[list[Path], Path]:
+        addons_paths = self._resolve_addons_paths()
+        scripts_paths: list[Path] = []
+        explicit_scripts_path: Path | None = self.local.openupgrade_scripts_path
+        if explicit_scripts_path is not None:
+            if not explicit_scripts_path.is_dir():
+                raise OdooRestorerError(
+                    f"OPENUPGRADE_SCRIPTS_PATH not found: {explicit_scripts_path}"
+                )
+            scripts_paths.append(explicit_scripts_path)
+
+        framework_path: Path | None = None
+        candidate_scripts_paths: list[Path] = []
+        for base in addons_paths:
+            candidate_scripts_paths.append(base / "openupgrade_scripts_custom" / "scripts")
+            candidate_scripts_paths.append(base / "openupgrade_scripts" / "scripts")
+            candidate_framework = base / "openupgrade_framework"
+            if framework_path is None and candidate_framework.is_dir():
+                framework_path = candidate_framework
+
+            repo_candidate_paths = [base / "OpenUpgrade", base / "openupgrade"]
+            for repo_candidate in repo_candidate_paths:
+                candidate_scripts_paths.append(repo_candidate / "openupgrade_scripts_custom" / "scripts")
+                candidate_scripts_paths.append(repo_candidate / "openupgrade_scripts" / "scripts")
+                nested_framework = repo_candidate / "openupgrade_framework"
+                if framework_path is None and nested_framework.is_dir():
+                    framework_path = nested_framework
+
+        for candidate in candidate_scripts_paths:
+            if not candidate.is_dir():
+                continue
+            if candidate in scripts_paths:
+                continue
+            scripts_paths.append(candidate)
+
+        if not scripts_paths:
+            raise OdooRestorerError(
+                "OpenUpgrade scripts not found. Ensure openupgrade_scripts is in the addons path "
+                "or available under an OpenUpgrade repo directory.",
+            )
+        if framework_path is None:
+            raise OdooRestorerError(
+                "OpenUpgrade framework not found. Ensure openupgrade_framework is in the addons path.",
+            )
+        return scripts_paths, framework_path
+
+    def _collect_openupgrade_modules(self, scripts_path: Path) -> list[str]:
+        module_names: list[str] = []
+        for entry in scripts_path.iterdir():
+            if not entry.is_dir():
+                continue
+            if entry.name.startswith("."):
+                continue
+            if any(path.suffix == ".py" for path in entry.rglob("*.py")):
+                module_names.append(entry.name)
+        return sorted(module_names)
+
+    def reset_openupgrade_versions(self) -> list[str]:
+        scripts_paths, _ = self._resolve_openupgrade_assets()
+        module_names: list[str] = []
+        for scripts_path in scripts_paths:
+            module_names.extend(self._collect_openupgrade_modules(scripts_path))
+        module_names = sorted(set(module_names))
+        if not module_names:
+            _logger.info("No OpenUpgrade scripts detected; version reset skipped.")
+            return []
+        try:
+            conn = self.connect_to_db()
+        except psycopg2.Error as error:
+            raise OdooRestorerError(f"Failed to connect for OpenUpgrade reset: {error}") from error
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE ir_module_module SET latest_version = '0.0.0' WHERE name = ANY(%s)",
+                    (module_names,),
+                )
+            conn.commit()
+        except psycopg2.Error as error:
+            raise OdooRestorerError(f"Failed to reset module versions: {error}") from error
+        finally:
+            self._reset_db_connection()
+        _logger.info("Reset module versions for OpenUpgrade modules: %s", ", ".join(module_names))
+        return module_names
+
+
+
+    def run_openupgrade(self) -> None:
+        if not self.local.openupgrade_enabled:
+            return
+
+        scripts_paths, _ = self._resolve_openupgrade_assets()
+        target_version = (self.local.openupgrade_target_version or self.local.odoo_version or "").strip()
+        if target_version:
+            self.os_env["OPENUPGRADE_TARGET_VERSION"] = target_version
+
+        odoo_bin = "/odoo/odoo-bin"
+        if not Path(odoo_bin).exists():
+            odoo_bin = f"{Path('/opt/odoo/venv/bin/python')} /odoo/odoo-bin"
+
+        cmd_parts = [
+            odoo_bin,
+            "--stop-after-init",
+            "--no-http",
+            "-d",
+            self.local.db_name,
+            "--update",
+            "all",
+            "--load",
+            "base,web,openupgrade_framework",
+            "--upgrade-path",
+            ",".join(str(path) for path in scripts_paths),
+        ]
+
+        generated_config_path = "/volumes/config/_generated.conf"
+        if Path(generated_config_path).exists():
+            cmd_parts += ["--config", generated_config_path]
+
+        _logger.info(
+            "Running OpenUpgrade with upgrade paths %s",
+            ",".join(str(path) for path in scripts_paths),
+        )
+        self.run_command(" ".join(cmd_parts))
+        self._reset_db_connection()
+
     def restore_from_upstream(self, do_sanitize: bool = True) -> None:
         self._require_upstream()
         target_owner = self._resolve_filestore_owner()
@@ -1508,6 +1661,13 @@ with registry.cursor() as cr:
             raise OdooRestorerError(f"Filestore rsync failed with code {filestore_returncode}")
         _logger.info("Filestore overwrite completed.")
         self.normalize_filestore_permissions(target_owner)
+        if self.local.openupgrade_enabled:
+            try:
+                self.run_openupgrade()
+            except OdooRestorerError:
+                self.drop_database()
+                raise
+
         if do_sanitize:
             try:
                 self.sanitize_database()
@@ -1516,7 +1676,10 @@ with registry.cursor() as cr:
                 self.drop_database()
                 raise
 
-        self.update_addons()
+        if self.local.openupgrade_enabled and self.local.openupgrade_skip_update_addons:
+            _logger.info("OpenUpgrade enabled; skipping update_addons per OPENUPGRADE_SKIP_UPDATE_ADDONS.")
+        else:
+            self.update_addons()
         self.connect_to_db()
 
         if do_sanitize:

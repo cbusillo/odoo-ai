@@ -26,9 +26,9 @@ try:
 except ImportError:  # pragma: no cover - optional for arrow-key TUI
     questionary = None
 
-from tools.deployer.command import run_process
+from tools.deployer.command import CommandError, run_process
 from tools.deployer.compose_ops import local_compose_command, local_compose_env
-from tools.deployer.deploy import deploy_stack, execute_upgrade
+from tools.deployer.deploy import _wait_for_local_service, deploy_stack, execute_upgrade
 from tools.deployer.health import HealthcheckError
 from tools.deployer.helpers import get_git_commit
 from tools.deployer.settings import (
@@ -45,7 +45,7 @@ console = Console()
 
 ALL_TARGET = "all"
 ENVS = ("local", "dev", "testing", "prod")
-LOCAL_ACTIONS = ("up", "down", "init", "restore", "restart", "upgrade", "doctor", "info")
+LOCAL_ACTIONS = ("up", "down", "init", "restore", "restart", "upgrade", "openupgrade", "doctor", "info")
 POST_SHIP_ACTIONS = ("none", "restore", "init")
 SHIP_ACTIONS = ("ship",)
 GATE_ACTIONS = ("gate",)
@@ -821,6 +821,56 @@ def _run_local_upgrade(settings: StackSettings, *, dry_run: bool) -> None:
     execute_upgrade(settings, settings.update_modules, remote=False)
 
 
+def _run_local_openupgrade(settings: StackSettings, *, dry_run: bool) -> None:
+    def _run_compose_with_retry(arguments: list[str], *, attempts: int = 3) -> None:
+        last_error: CommandError | None = None
+        for attempt_number in range(1, max(1, attempts) + 1):
+            try:
+                _run_local_compose(settings, arguments, dry_run=False)
+                return
+            except CommandError as exc:
+                last_error = exc
+                if attempt_number >= attempts:
+                    raise
+                delay_seconds = 2 ** (attempt_number - 1)
+                console.print(
+                    f"Retrying docker compose command (attempt {attempt_number + 1}/{attempts}) after {delay_seconds}s due to transient failure...",
+                )
+                time.sleep(delay_seconds)
+        if last_error is None:
+            raise RuntimeError("compose retry exhausted without a captured error")
+        raise last_error
+
+    openupgrade_command = [
+        "exec",
+        "-T",
+        settings.script_runner_service,
+        "python3",
+        "/volumes/scripts/run_openupgrade.py",
+        "--force",
+        "--reset-versions",
+    ]
+    if dry_run:
+        console.print(f"$ {' '.join(local_compose_command(settings, openupgrade_command))}")
+        return
+    # Retrying OpenUpgrade execution itself is unsafe (non-idempotent). We only
+    # apply a small retry to the surrounding docker compose lifecycle commands
+    # because Docker Desktop can occasionally return transient 5xx errors.
+    _run_compose_with_retry(["up", "-d", settings.script_runner_service])
+    if "web" in settings.services:
+        _run_compose_with_retry(["stop", "web"])
+        try:
+            _run_compose_with_retry(["up", "-d", settings.script_runner_service])
+            _wait_for_local_service(settings, settings.script_runner_service)
+            _run_local_compose(settings, openupgrade_command, dry_run=False)
+        finally:
+            _run_compose_with_retry(["up", "-d", "web"])
+        return
+    _run_compose_with_retry(["up", "-d", settings.script_runner_service])
+    _wait_for_local_service(settings, settings.script_runner_service)
+    _run_local_compose(settings, openupgrade_command, dry_run=False)
+
+
 def _run_local_action(
     target: str,
     action: str,
@@ -868,6 +918,11 @@ def _run_local_action(
             settings = load_stack_settings(stack, env_file_path)
             _run_local_upgrade(settings, dry_run=dry_run)
             console.print(f"{entry} local upgrade complete")
+            continue
+        if action == "openupgrade":
+            settings = load_stack_settings(stack, env_file_path)
+            _run_local_openupgrade(settings, dry_run=dry_run)
+            console.print(f"{entry} local openupgrade complete")
             continue
         settings = load_stack_settings(stack, env_file_path)
         if dry_run:

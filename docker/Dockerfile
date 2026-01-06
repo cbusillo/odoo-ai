@@ -44,10 +44,6 @@ RUN uv venv /venv --python $PYTHON_VERSION
 # Make uv available for ubuntu user too
 RUN cp /root/.local/bin/uv* /usr/local/bin/
 
-# Use uv for faster package installations
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --target=/opt/odoo-upgrade git+https://github.com/odoo/upgrade-util \
-    && uv pip install --target=/opt/odoo-stubs git+https://github.com/odoo-ide/odoo-stubs@18.0
 
 COPY /docker/config /volumes/config
 COPY /docker/scripts /volumes/scripts

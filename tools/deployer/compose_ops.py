@@ -23,6 +23,10 @@ def local_compose_command(settings: StackSettings, extra: Sequence[str]) -> list
 def local_compose_env(settings: StackSettings) -> Mapping[str, str]:
     env = os.environ.copy()
     env.update(settings.environment)
+    # Disable interactive Docker Compose prompts (e.g. volume mismatch
+    # confirmations). Tooling and CI should fail fast instead of blocking on
+    # stdin.
+    env.setdefault("COMPOSE_INTERACTIVE_NO_CLI", "1")
     return env
 
 

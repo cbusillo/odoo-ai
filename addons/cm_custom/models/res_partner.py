@@ -52,6 +52,7 @@ class ResPartner(models.Model):
         "partner_account_move_rel",
         "partner_id",
         "move_id",
+        string="Customer Invoices",
         domain="[('move_type', 'in', ['out_invoice', 'out_refund'])]",
     )
 

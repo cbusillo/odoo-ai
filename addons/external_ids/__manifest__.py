@@ -1,6 +1,6 @@
 {
     "name": "External IDs Management",
-    "version": "18.0.1.0.1",
+    "version": "19.0.1.0.1",
     "category": "Technical",
     "summary": "Manage multiple external system IDs for employees, partners, and products.",
     "description": """

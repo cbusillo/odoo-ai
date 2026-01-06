@@ -101,7 +101,7 @@
                 <field name="code"/>
                 <filter string="Active" name="active" domain="[('active', '=', True)]"/>
                 <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
-                <group expand="0" string="Group By">
+                <group name="group_by">
                     <filter string="Active Status" name="group_active" context="{'group_by': 'active'}"/>
                 </group>
             </search>

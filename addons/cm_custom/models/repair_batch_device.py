@@ -40,10 +40,7 @@ class RepairBatchDevice(models.Model):
         "device_line_id",
     )
 
-    _sql_constraints = [
-        (
-            "repair_batch_device_unique",
-            "unique(batch_id, device_id)",
-            "A device can only appear once per repair batch.",
-        )
-    ]
+    _repair_batch_device_unique = models.Constraint(
+        "unique(batch_id, device_id)",
+        "A device can only appear once per repair batch.",
+    )

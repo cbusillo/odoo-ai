@@ -33,9 +33,7 @@ class DiscussRecordLinkConfig(models.Model):
     )
     limit = fields.Integer(default=8)
 
-    _sql_constraints = [
-        ("prefix_unique", "unique(prefix)", "Prefix must be unique."),
-    ]
+    _prefix_unique = models.Constraint("unique(prefix)", "Prefix must be unique.")
 
     @api.constrains("search_field_ids", "model_id")
     def _check_search_fields_model(self) -> None:

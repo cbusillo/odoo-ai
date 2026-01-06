@@ -1,6 +1,5 @@
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
-from odoo.osv import expression
 from ..tools.name import NameFormatter
 
 
@@ -112,7 +111,7 @@ class HrEmployee(models.Model):
         if name:
             fields_to_search = ("name", "first_name", "last_name", "nick_name")
             or_domain = [(f, operator, name) for f in fields_to_search]
-            args = expression.AND([args, expression.OR([[d] for d in or_domain])])
+            args = fields.Domain.AND([args, fields.Domain.OR([[condition] for condition in or_domain])])
         recs = self.search(args, limit=limit)
         return [(rec.id, rec.display_name or rec.name) for rec in recs]
 

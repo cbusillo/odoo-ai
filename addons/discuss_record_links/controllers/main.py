@@ -5,7 +5,7 @@ from ..models.config_util import load_config, extract_template_fields, render_te
 
 
 class DiscussRecordLinks(http.Controller):
-    @http.route("/discuss_record_links/search", type="json", auth="user", methods=["POST"])
+    @http.route("/discuss_record_links/search", type="jsonrpc", auth="user", methods=["POST"])
     def search(self, term: str = ""):
         env = request.env
         cfg = load_config(env)
@@ -52,7 +52,7 @@ class DiscussRecordLinks(http.Controller):
         # Return a single flat list; client groups by .group
         return {"suggestions": suggestions}
 
-    @http.route("/discuss_record_links/labels", type="json", auth="user", methods=["POST"])
+    @http.route("/discuss_record_links/labels", type="jsonrpc", auth="user", methods=["POST"])
     def labels(self, targets: list[dict] | None = None):
         """Return rendered labels for a list of {model, id} using configured templates.
 

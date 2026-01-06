@@ -1,14 +1,16 @@
 {
     "name": "Discuss: Smart Record Links",
-    "version": "18.0.1.0",
+    "version": "19.0.1.0",
     "category": "Productivity/Discuss",
     "summary": "Type [ to search and insert links to products and more in Discuss/Chatter",
+    "author": "Chris Busillo (Shiny Computers)",
+    "maintainers": ["cbusillo"],
     "depends": [
         "base",
         "mail",
         "stock",
         "web",
-        "web_editor",
+        "html_editor",
     ],
     "data": [
         "security/ir.model.access.csv",

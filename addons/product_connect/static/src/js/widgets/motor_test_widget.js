@@ -113,7 +113,7 @@ export class MotorTestWidget extends Component {
     }
 
     groupMotorTestsBySection(motorTests, missingParts) {
-        const groupedTests = groupBy(motorTests, (test) => test.data.section[1])
+        const groupedTests = groupBy(motorTests, (test) => this.getSectionLabel(test))
 
         return Object.entries(groupedTests).reduce((acc, [section, tests]) => {
             const filteredTests = tests.filter((test) => {
@@ -155,6 +155,31 @@ export class MotorTestWidget extends Component {
 
             return acc
         }, {})
+    }
+
+    getSectionLabel(test) {
+        const section = test.data.section
+        if (!section) {
+            return 'Unassigned'
+        }
+        if (Array.isArray(section)) {
+            return section[1] || 'Unassigned'
+        }
+        if (typeof section === 'object') {
+            if (section.display_name) {
+                return section.display_name
+            }
+            if (section.name) {
+                return section.name
+            }
+            if (section.data && section.data.display_name) {
+                return section.data.display_name
+            }
+            if (section.data && section.data.name) {
+                return section.data.name
+            }
+        }
+        return String(section)
     }
 
     evaluateTestApplicability(test, missingParts) {

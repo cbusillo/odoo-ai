@@ -21,6 +21,11 @@ install_addon_dev_requirements() {
   fi
   cd "$base_dir"
   for addon in */ ; do
+    case "$addon" in
+      openupgrade_framework/|openupgrade_scripts/)
+        continue
+        ;;
+    esac
     # Install dev requirements.txt if present
     if [ -f "${addon}requirements-dev.txt" ]; then
       echo "Installing ${addon} dev requirements..."

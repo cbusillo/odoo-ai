@@ -6,9 +6,18 @@ export UV_PROJECT_ENVIRONMENT=/venv
 install_vendor_requirements() {
   if [ -f "/odoo/requirements.txt" ]; then
     echo "Installing Odoo requirements..."
+    #    sed -i 's/libsass==0.22.0/libsass>=0.23.0/' /odoo/requirements.txt
+    #    sed -i 's/greenlet==3.1.1/greenlet>=3.3.0/' /odoo/requirements.txt
     uv pip install -r "/odoo/requirements.txt"
   fi
 
+}
+
+install_openupgrade_requirements() {
+  if [ -d "/opt/extra_addons/openupgrade_framework" ]; then
+    echo "Installing OpenUpgrade requirements..."
+    uv pip install "openupgradelib==3.12.0"
+  fi
 }
 
 write_odoo_pth() {
@@ -26,7 +35,6 @@ paths = [
     "/volumes/addons",
     "/opt/extra_addons",
     "/opt/odoo-upgrade",
-    "/opt/odoo-stubs",
 ]
 
 site_packages = Path(site.getsitepackages()[0])
@@ -66,6 +74,7 @@ fi
 if [ "${SKIP_VENDOR_INSTALL:-0}" != "1" ]; then
   install_vendor_requirements
 fi
+install_openupgrade_requirements
 
 # Install addon production dependencies only
 install_addon_requirements() {
@@ -75,6 +84,11 @@ install_addon_requirements() {
   fi
   cd "$base_dir"
   for addon in */; do
+    case "$addon" in
+      openupgrade_framework/|openupgrade_scripts/)
+        continue
+        ;;
+    esac
     if [ -f "${addon}requirements.txt" ]; then
       echo "Installing ${addon} production requirements..."
       uv pip install -r "${addon}requirements.txt"

@@ -18,4 +18,4 @@ class TestRecordLinkInsertTour(TourTestCase):
 
     def test_record_link_insert_tour(self) -> None:
         # Use Discuss root; the tour navigates from the Apps grid
-        self.start_tour("/odoo", "drl_record_link_insert", login=self._get_test_login())
+        self.start_tour("/web", "drl_record_link_insert", login=self._get_test_login())

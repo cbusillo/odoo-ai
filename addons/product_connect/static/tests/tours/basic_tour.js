@@ -4,7 +4,7 @@ import { registry } from "@web/core/registry";
 
 registry.category("web_tour.tours").add("test_basic_tour", {
     test: true,
-    url: "/odoo",
+    url: "/web",
     timeout: 60000, // 60 seconds timeout
     steps: () => [
         {

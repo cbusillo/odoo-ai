@@ -181,7 +181,7 @@ class TestMultigraphPython(UnitTestCase):
             {
                 "name": "Multigraph Test User",
                 "login": "multigraph_test",
-                "groups_id": [(6, 0, [self.env.ref("base.group_user").id])],
+                "group_ids": [(6, 0, [self.env.ref("base.group_user").id])],
             }
         )
 

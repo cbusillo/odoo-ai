@@ -16,7 +16,7 @@ class TestBasicTour(TourTestCase):
         timeout = 180  # seconds
         try:
             _logger.info(f"Starting tour 'test_basic_tour' with timeout {timeout}s")
-            self.start_tour("/odoo", "test_basic_tour", timeout=timeout)
+            self.start_tour("/web", "test_basic_tour", timeout=timeout)
             _logger.info("Tour completed successfully")
         except Exception as e:
             _logger.error(f"Tour failed: {e}")

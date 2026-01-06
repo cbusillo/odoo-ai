@@ -57,7 +57,7 @@ class TestWorkerConnectivity(TourTestCase):
                         "/dev/null",
                         "-w",
                         "%{http_code}",
-                        f"http://127.0.0.1:{port}/odoo/login",
+                        f"http://127.0.0.1:{port}/web/login",
                     ],
                     capture_output=True,
                     text=True,
@@ -65,9 +65,9 @@ class TestWorkerConnectivity(TourTestCase):
                 )
                 http_code = result.stdout.strip()
                 if http_code == "200":
-                    _logger.info(f"✓ HTTP 200 from /odoo/login on attempt {attempt + 1}")
+                    _logger.info(f"✓ HTTP 200 from /web/login on attempt {attempt + 1}")
                 else:
-                    _logger.warning(f"✗ HTTP {http_code} from /odoo/login on attempt {attempt + 1}")
+                    _logger.warning(f"✗ HTTP {http_code} from /web/login on attempt {attempt + 1}")
             except Exception as e:
                 _logger.error(f"Curl exception on attempt {attempt + 1}: {e}")
 

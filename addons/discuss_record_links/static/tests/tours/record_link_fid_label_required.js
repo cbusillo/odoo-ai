@@ -6,7 +6,7 @@ import { registry } from "@web/core/registry"
 // This should fail until the labeler is enabled (green run without the flag).
 registry.category("web_tour.tours").add("drl_record_link_fid_label_required", {
     test: true,
-    url: "/odoo?drl_disable=1",
+    url: "/web?drl_disable=1",
     steps: () => [
         { content: "Wait client", trigger: ".o_web_client", timeout: 20000 },
         { content: "Open Discuss", trigger: ".o_app[data-menu-xmlid='mail.mail_menu_root']", run: "click" },
@@ -40,4 +40,3 @@ registry.category("web_tour.tours").add("drl_record_link_fid_label_required", {
         },
     ],
 })
-

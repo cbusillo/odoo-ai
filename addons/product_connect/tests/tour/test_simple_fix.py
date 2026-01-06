@@ -46,14 +46,11 @@ class TestSimpleFix(TourTestCase):
         # Now try a minimal tour without JavaScript
         _logger.info("Server is ready, attempting simple navigation")
 
-        # Don't use start_tour, just verify server is accessible
-        import requests
-
+        # Don't use start_tour, just verify server is accessible via test client
         try:
-            # Use requests to check if we can reach the server
-            response = requests.get(f"http://127.0.0.1:{port}/odoo/login", timeout=5)
+            response = self.url_open("/web/login")
             _logger.info(f"Server response status: {response.status_code}")
-            self.assertEqual(response.status_code, 200, "Should get 200 response from /odoo/login")
+            self.assertEqual(response.status_code, 200, "Should get 200 response from /web/login")
         except Exception as e:
             _logger.error(f"Failed to reach server: {e}")
             self.fail(f"Could not reach server: {e}")

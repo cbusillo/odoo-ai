@@ -55,7 +55,7 @@ class TestTourCoverage(UnitTestCase):
             for tour_name, tour_file in missing_runners:
                 message += f"  - {tour_file}: tour '{tour_name}' has no test runner\n"
             message += "\nCreate a test class with:\n"
-            message += "  self.start_tour('/odoo', 'tour_name', login=self.test_user.login)\n"
+            message += "  self.start_tour('/web', 'tour_name', login=self.test_user.login)\n"
             self.fail(message)
 
         orphaned_runners = []

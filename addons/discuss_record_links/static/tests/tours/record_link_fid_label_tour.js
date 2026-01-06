@@ -4,7 +4,7 @@ import { registry } from "@web/core/registry"
 
 registry.category("web_tour.tours").add("drl_record_link_fid_label", {
     test: true,
-    url: "/odoo",
+    url: "/web",
     steps: () => [
         { content: "Wait client", trigger: ".o_web_client", timeout: 20000 },
         { content: "Open Discuss", trigger: ".o_app[data-menu-xmlid='mail.mail_menu_root']", run: "click" },
@@ -45,4 +45,3 @@ registry.category("web_tour.tours").add("drl_record_link_fid_label", {
         },
     ],
 })
-

@@ -21,7 +21,7 @@ class TestShippingAnalyticsTour(TourTestCase):
             user_group = cls.env.ref("base.group_user")
             test_user.sudo().write(
                 {
-                    "groups_id": [(4, sales_manager_group.id), (4, user_group.id)],
+                    "group_ids": [(4, sales_manager_group.id), (4, user_group.id)],
                 }
             )
 
@@ -61,4 +61,4 @@ class TestShippingAnalyticsTour(TourTestCase):
         )
 
     def test_shipping_analytics_tour(self) -> None:
-        self.start_tour("/odoo", "shipping_analytics_tour")
+        self.start_tour("/web", "shipping_analytics_tour")

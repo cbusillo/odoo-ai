@@ -17,4 +17,4 @@ class TestRecordLinkFidLabelRequired(TourTestCase):
     def test_record_link_fid_label_required(self) -> None:
         # This tour is expected to fail until labeler is enabled (red by design)
         # We run it to demonstrate the failing behavior; the CI harness will mark it as failure.
-        self.start_tour("/odoo?drl_disable=1", "drl_record_link_fid_label_required", login=self._get_test_login(), timeout=180)
+        self.start_tour("/web?drl_disable=1", "drl_record_link_fid_label_required", login=self._get_test_login(), timeout=180)

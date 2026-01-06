@@ -32,7 +32,7 @@ class TestMultigraphTour(TourTestCase):
         # Graph views can be slower to load on CI; give them a bit more time
         # Force initial view to pivot to avoid multigraph controller dev-only sample model path
         self.start_tour(
-            "/odoo#action=product_connect.action_product_processing_analytics&view_type=pivot",
+            "/web#action=product_connect.action_product_processing_analytics&view_type=pivot",
             "test_multigraph_view",
             timeout=180,
         )

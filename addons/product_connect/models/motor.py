@@ -1,15 +1,16 @@
 import base64
-import qrcode
 import re
 import shutil
 import tempfile
 import zipfile
 from datetime import datetime
 from io import BytesIO
-from odoo import api, fields, models
-from odoo.exceptions import ValidationError, UserError
 from pathlib import Path
-from typing import Self, cast, Literal
+from typing import Literal, Self, cast
+
+import qrcode
+from odoo import api, fields, models
+from odoo.exceptions import UserError, ValidationError
 
 from ..utils import constants
 
@@ -39,21 +40,17 @@ class MotorTag(models.Model):
     name = fields.Char(required=True)
     color = fields.Integer(string="Color Index")
 
-    _sql_constraints = [
-        ("name_uniq", "unique (name)", "Tag name already exists!"),
-    ]
+    _name_uniq = models.Constraint("unique (name)", "Tag name already exists!")
 
 
 class Motor(models.Model):
     _name = "motor"
     _rec_name = "motor_number"
-    _inherit = ["label.mixin", "mail.thread", "mail.activity.mixin", "mail.tracking.duration.mixin"]
+    _inherit = ["label.mixin", "mail.tracking.duration.mixin", "mail.activity.mixin"]
     _description = "Motor Information"
     _track_duration_field = "stage"
     _order = "motor_number desc"
-    _sql_constraints = [
-        ("motor_number_uniq", "unique (motor_number)", "Motor number already exists!"),
-    ]
+    _motor_number_uniq = models.Constraint("unique (motor_number)", "Motor number already exists!")
 
     stage = fields.Many2one(
         "motor.stage",

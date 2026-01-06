@@ -8,9 +8,7 @@ _logger = logging.getLogger(__name__)
 class ProductType(models.Model):
     _name = "product.type"
     _description = "Part Type"
-    _sql_constraints = [
-        ("name_uniq", "unique (name)", "Part Type name already exists !"),
-    ]
+    _name_uniq = models.Constraint("unique (name)", "Part Type name already exists !")
 
     name = fields.Char(required=True, index=True)
     ebay_category_id = fields.Integer(string="eBay Category ID", index=True)
@@ -21,7 +19,7 @@ class ProductType(models.Model):
 class ProductCondition(models.Model):
     _name = "product.condition"
     _description = "Product Condition"
-    _sql_constraints = [("name_uniq", "unique (name)", "Product Condition name already exists !")]
+    _name_uniq = models.Constraint("unique (name)", "Product Condition name already exists !")
 
     name = fields.Char(required=True, index=True)
     code = fields.Char(required=True, index=True, readonly=True)

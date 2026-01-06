@@ -103,12 +103,15 @@ class TestMultigraphPython(UnitTestCase):
         self.assertLess(total_price, all_total, "Filtered total should be less than all products total")
 
     def test_multigraph_multiple_groupby(self) -> None:
+        root_category = self.env["product.category"].search([("parent_id", "=", False)], limit=1)
+        if not root_category:
+            root_category = self.env["product.category"].create({"name": "All"})
+        secondary_category = self.env["product.category"].create({"name": "Test Category", "parent_id": root_category.id})
+
         for i, product in enumerate(self.products_with_metrics):
             product.write(
                 {
-                    "categ_id": self.env.ref("product.product_category_all").id
-                    if i % 2 == 0
-                    else self.env.ref("product.product_category_1").id
+                    "categ_id": root_category.id if i % 2 == 0 else secondary_category.id,
                 }
             )
 

@@ -1,10 +1,10 @@
 import { onWillStart, useState } from "@odoo/owl"
 import { useService } from "@web/core/utils/hooks"
-import { HtmlField, htmlField } from "@web_editor/js/backend/html_field"
+import { HtmlField, htmlField } from "@html_editor/fields/html_field"
 import { registry } from "@web/core/registry"
 
 export class HtmlTemplateWidget extends HtmlField {
-    static template = "web_editor.HtmlField"
+    static template = "html_editor.HtmlField"
     static props = {
         ...HtmlField.props,
         propTags: { type: Array, optional: true },

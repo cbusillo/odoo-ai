@@ -93,7 +93,7 @@
                 <field name="shopify_product_admin_url" widget="CopyClipboardURL"/>
 
             </field>
-            <xpath expr="//field[@name='create_repair']" position="after">
+            <xpath expr="//field[@name='description_sale']" position="after">
                 <field name="website_description"/>
             </xpath>
             <xpath expr="//group[@name='group_lots_and_weight']/div[@name='weight']" position="after">

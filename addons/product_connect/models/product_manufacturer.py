@@ -6,14 +6,11 @@ from odoo import api, fields, models
 class ProductManufacturer(models.Model):
     _name = "product.manufacturer"
     _description = "Product Manufacturer"
-    _sql_constraints = [
-        ("name_uniq", "unique (name)", "Product Manufacturer already exists !"),
-        (
-            "name_normalized_uniq",
-            "unique (name_normalized)",
-            "Product Manufacturer already exists !",
-        ),
-    ]
+    _name_uniq = models.Constraint("unique (name)", "Product Manufacturer already exists !")
+    _name_normalized_uniq = models.Constraint(
+        "unique (name_normalized)",
+        "Product Manufacturer already exists !",
+    )
 
     name = fields.Char(required=True, index=True)
     name_normalized = fields.Char(compute="_compute_name_normalized", store=True, readonly=True)

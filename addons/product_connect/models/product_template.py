@@ -15,10 +15,11 @@ class ProductTemplate(models.Model):
     _inherit = ["product.template", "label.mixin", "notification.manager.mixin", "transaction.mixin"]
     _description = "Product"
     _order = "create_date desc"
-    _sql_constraints = [
-        ("default_code_uniq", "unique(default_code)", "SKU must be unique."),
-        ("shopify_product_id_uniq", "unique(shopify_product_id)", "Shopify Product ID must be unique."),
-    ]
+    _default_code_uniq = models.Constraint("unique(default_code)", "SKU must be unique.")
+    _shopify_product_id_uniq = models.Constraint(
+        "unique(shopify_product_id)",
+        "Shopify Product ID must be unique.",
+    )
 
     source = fields.Selection(
         [("import", "Import Product"), ("motor", "Motor Product"), ("shopify", "Shopify Product"),
@@ -165,7 +166,7 @@ class ProductTemplate(models.Model):
     @api.model_create_multi
     def create(self, vals_list: list["odoo.values.product_template"]) -> Self:
         for vals in vals_list:
-            source = self._context.get("default_source") or vals.get("source")
+            source = self.env.context.get("default_source") or vals.get("source")
             if source:
                 vals["source"] = source
                 if source == "import":
@@ -303,7 +304,8 @@ class ProductTemplate(models.Model):
             raise_if_not_found=False,
         )
         if not template:
-            _logger.warning("Missing mail template product_connect.mail_template_repair_state_change")
+            if not self.env.context.get("install_mode"):
+                _logger.warning("Missing mail template product_connect.mail_template_repair_state_change")
             return result
         result["repair_state"] = (
             "product_connect.mail_template_repair_state_change",

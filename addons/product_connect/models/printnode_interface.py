@@ -11,13 +11,10 @@ class PrintNodeInterface(models.Model):
     _name = "printnode.interface"
     _inherit = ["notification.manager.mixin"]
     _description = "PrintNode Interface"
-    _sql_constraints = [
-        (
-            "user_id_print_job_type_unique",
-            "unique(user_id, print_job_type)",
-            "Printer already selected for this job type and user",
-        )
-    ]
+    _user_id_print_job_type_unique = models.Constraint(
+        "unique(user_id, print_job_type)",
+        "Printer already selected for this job type and user",
+    )
 
     printer_selection = fields.Selection(selection="get_printer_tuple", string="Printer")
     print_job_type = fields.Selection(

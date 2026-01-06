@@ -1,7 +1,6 @@
 from typing import Any
 
 from odoo import models, fields, api
-from odoo.osv import expression
 from odoo.exceptions import ValidationError
 
 
@@ -55,18 +54,14 @@ class ExternalId(models.Model):
         help="Company of the referenced record, if any.",
     )
 
-    _sql_constraints = [
-        (
-            "unique_record_per_system_resource",
-            "UNIQUE(res_model, res_id, system_id, resource)",
-            "Each record can have only one ID per external system and resource!",
-        ),
-        (
-            "unique_external_id_per_system_resource",
-            "UNIQUE(system_id, resource, external_id)",
-            "This external ID already exists for this system and resource!",
-        ),
-    ]
+    _unique_record_per_system_resource = models.Constraint(
+        "unique(res_model, res_id, system_id, resource)",
+        "Each record can have only one ID per external system and resource!",
+    )
+    _unique_external_id_per_system_resource = models.Constraint(
+        "unique(system_id, resource, external_id)",
+        "This external ID already exists for this system and resource!",
+    )
 
     @api.model
     def default_get(self, fields_list: list[str]) -> dict[str, Any]:
@@ -271,9 +266,15 @@ class ExternalId(models.Model):
             sys = sys_part.strip()
             ext = ext_part.strip()
             or_domain = [("system_id.name", "ilike", sys), ("system_id.code", "ilike", sys)]
-            dom = expression.AND([base, expression.OR([[d] for d in or_domain]), [("external_id", operator, ext)]])
+            dom = fields.Domain.AND(
+                [
+                    base,
+                    fields.Domain.OR([[condition] for condition in or_domain]),
+                    [("external_id", operator, ext)],
+                ]
+            )
         else:
-            dom = expression.AND([base, [("external_id", operator, name)]])
+            dom = fields.Domain.AND([base, [("external_id", operator, name)]])
 
         records = self.search(dom, limit=limit)
         return [(record.id, record.display_name or "") for record in records]

@@ -68,7 +68,7 @@
                 <filter string="Recently Synced" name="recent_sync"
                         domain="[('last_sync', '&gt;=', (context_today() - relativedelta(days=7)).strftime('%Y-%m-%d'))]"/>
                 <filter string="Never Synced" name="never_synced" domain="[('last_sync', '=', False)]"/>
-                <group expand="0" string="Group By">
+                <group name="group_by">
                     <filter string="System" name="group_system" context="{'group_by': 'system_id'}"/>
                     <filter string="Model" name="group_model" context="{'group_by': 'res_model'}"/>
                     <filter string="Active Status" name="group_active" context="{'group_by': 'active'}"/>

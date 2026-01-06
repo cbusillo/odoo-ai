@@ -28,13 +28,10 @@ class ExternalSystemUrl(models.Model):
         help=("URL template with tokens like {id}, {gid}, {model}, {name}, {code}, {base}. Example: {base}/admin/products/{id}"),
     )
 
-    _sql_constraints = [
-        (
-            "code_unique_per_system",
-            "unique(system_id, code, res_model_id)",
-            "URL code must be unique per system/model",
-        ),
-    ]
+    _code_unique_per_system = models.Constraint(
+        "unique(system_id, code, res_model_id)",
+        "URL code must be unique per system/model",
+    )
 
     # Helpers ---------------------------------------------------------------
     @staticmethod

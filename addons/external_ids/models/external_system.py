@@ -29,10 +29,8 @@ class ExternalSystem(models.Model):
     url_templates = fields.One2many("external.system.url", "system_id", string="URL Templates")
     external_id_count = fields.Integer(string="Number of Records", compute="_compute_external_id_count")
 
-    _sql_constraints = [
-        ("code_unique", "UNIQUE(code)", "System code must be unique!"),
-        ("name_unique", "UNIQUE(name)", "System name must be unique!"),
-    ]
+    _code_unique = models.Constraint("unique(code)", "System code must be unique!")
+    _name_unique = models.Constraint("unique(name)", "System name must be unique!")
 
     @api.depends("external_ids")
     def _compute_external_id_count(self) -> None:

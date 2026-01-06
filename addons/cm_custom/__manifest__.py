@@ -1,6 +1,6 @@
 {
     "name": "Cell Mechanic Custom",
-    "version": "18.0.0.1",
+    "version": "19.0.0.1",
     "category": "Industries",
     "summary": "Custom features for CellMechanic repair operations",
     "description": "Custom module for CellMechanic's phone repair business operations.",

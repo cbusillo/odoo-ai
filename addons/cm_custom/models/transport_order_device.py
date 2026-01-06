@@ -27,6 +27,7 @@ class TransportOrderDevice(models.Model):
     movement_type = fields.Selection(
         TRANSPORT_MOVEMENT_TYPES,
         required=True,
+        default=lambda self: self.env.context.get("default_movement_type"),
     )
 
     @api.onchange("verification_scan")

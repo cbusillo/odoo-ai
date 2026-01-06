@@ -14,7 +14,7 @@ class IntakeOrder(models.Model):
 
     state = fields.Selection(
         INTAKE_ORDER_STATES,
-        default=INTAKE_ORDER_STATES[0],
+        default=INTAKE_ORDER_STATES[0][0],
         tracking=True,
         required=True,
     )

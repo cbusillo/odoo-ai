@@ -19,7 +19,7 @@ class DiagnosticOrderDevice(models.Model):
     )
     state = fields.Selection(
         DIAGNOSTIC_ORDER_DEVICE_STATES,
-        default=DIAGNOSTIC_ORDER_DEVICE_STATES[0],
+        default=DIAGNOSTIC_ORDER_DEVICE_STATES[0][0],
         tracking=True,
         required=True,
     )

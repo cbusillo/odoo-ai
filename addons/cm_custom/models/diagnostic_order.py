@@ -16,7 +16,7 @@ class DiagnosticOrder(models.Model):
 
     state = fields.Selection(
         DIAGNOSTIC_ORDER_STATES,
-        default=DIAGNOSTIC_ORDER_STATES[0],
+        default=DIAGNOSTIC_ORDER_STATES[0][0],
         tracking=True,
         required=True,
     )

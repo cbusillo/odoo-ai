@@ -49,15 +49,35 @@
                         </group>
                     </group>
                     <notebook>
-                        <page string="Devices">
-                            <field name="devices">
+                        <page string="Inbound Devices">
+                            <field name="devices" domain="[('movement_type', '=', 'in')]"
+                                   context="{'default_movement_type': 'in'}">
                                 <list editable="bottom">
                                     <field name="device"/>
                                     <field name="movement_type"/>
                                     <field name="verification_scan"/>
                                     <field name="scan_date"/>
                                 </list>
-                                <form string="Transport Device">
+                                <form string="Inbound Device">
+                                    <group>
+                                        <field name="device"/>
+                                        <field name="movement_type"/>
+                                        <field name="verification_scan"/>
+                                        <field name="scan_date"/>
+                                    </group>
+                                </form>
+                            </field>
+                        </page>
+                        <page string="Outbound Devices">
+                            <field name="devices" domain="[('movement_type', '=', 'out')]"
+                                   context="{'default_movement_type': 'out'}">
+                                <list editable="bottom">
+                                    <field name="device"/>
+                                    <field name="movement_type"/>
+                                    <field name="verification_scan"/>
+                                    <field name="scan_date"/>
+                                </list>
+                                <form string="Outbound Device">
                                     <group>
                                         <field name="device"/>
                                         <field name="movement_type"/>

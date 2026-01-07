@@ -3,6 +3,35 @@ set -eux
 
 export UV_PROJECT_ENVIRONMENT=/venv
 
+filter_uv_sync_extras() {
+  if [ ! -x "/venv/bin/python3" ]; then
+    echo ""
+    return
+  fi
+  /venv/bin/python3 - <<'PY'
+import os
+from pathlib import Path
+import tomllib
+
+extras_raw = os.environ.get("UV_SYNC_EXTRAS", "")
+extras = [item.strip() for item in extras_raw.split(",") if item.strip()]
+if not extras:
+    print("")
+    raise SystemExit(0)
+
+pyproject_path = Path("/volumes/pyproject.toml")
+if not pyproject_path.exists():
+    print("")
+    raise SystemExit(0)
+
+data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+optional = data.get("project", {}).get("optional-dependencies", {}) or {}
+available = set(optional.keys())
+selected = [extra for extra in extras if extra in available]
+print(",".join(selected))
+PY
+}
+
 install_vendor_requirements() {
   if [ -f "/odoo/requirements.txt" ]; then
     echo "Installing Odoo requirements..."
@@ -55,16 +84,19 @@ if [ -f "/volumes/pyproject.toml" ]; then
   UV_SYNC_ARGS=("--frozen")
   UV_SYNC_LABEL="Syncing project dependencies"
   if [ -n "${UV_SYNC_EXTRAS:-}" ]; then
-    OLD_IFS=$IFS
-    IFS=','
-    for extra in ${UV_SYNC_EXTRAS}; do
-      trimmed=$(echo "$extra" | xargs)
-      if [ -n "$trimmed" ]; then
-        UV_SYNC_ARGS+=("--extra" "$trimmed")
-      fi
-    done
-    IFS=$OLD_IFS
-    UV_SYNC_LABEL+=" (extras: ${UV_SYNC_EXTRAS})"
+    filtered_extras=$(filter_uv_sync_extras)
+    if [ -n "$filtered_extras" ]; then
+      OLD_IFS=$IFS
+      IFS=','
+      for extra in ${filtered_extras}; do
+        trimmed=$(echo "$extra" | xargs)
+        if [ -n "$trimmed" ]; then
+          UV_SYNC_ARGS+=("--extra" "$trimmed")
+        fi
+      done
+      IFS=$OLD_IFS
+      UV_SYNC_LABEL+=" (extras: ${filtered_extras})"
+    fi
   fi
   echo "$UV_SYNC_LABEL..."
   (cd /volumes && uv sync "${UV_SYNC_ARGS[@]}")

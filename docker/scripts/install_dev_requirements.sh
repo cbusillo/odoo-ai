@@ -5,6 +5,26 @@ export UV_HTTP_TIMEOUT=${UV_HTTP_TIMEOUT:-120}
 
 export UV_PROJECT_ENVIRONMENT=/venv
 
+addon_has_dev_extra() {
+  local pyproject_path="$1"
+  if [ ! -x "/venv/bin/python3" ]; then
+    return 1
+  fi
+  PYPROJECT_PATH="$pyproject_path" /venv/bin/python3 - <<'PY'
+import os
+import sys
+from pathlib import Path
+import tomllib
+
+path = Path(os.environ["PYPROJECT_PATH"])
+if not path.exists():
+    raise SystemExit(1)
+data = tomllib.loads(path.read_text(encoding="utf-8"))
+optional = data.get("project", {}).get("optional-dependencies", {}) or {}
+raise SystemExit(0 if "dev" in optional else 1)
+PY
+}
+
 uv pip install docker
 
 # Ensure vendor requirements run even if the environment leaks skip flags
@@ -34,10 +54,12 @@ install_addon_dev_requirements() {
 
     # Install dev dependencies from pyproject.toml
     if [ -f "${addon}pyproject.toml" ]; then
-      echo "Installing ${addon} dev dependencies from pyproject.toml..."
-      cd "${addon}"
-      uv pip install ".[dev]"
-      cd ..
+      if addon_has_dev_extra "${addon}pyproject.toml"; then
+        echo "Installing ${addon} dev dependencies from pyproject.toml..."
+        cd "${addon}"
+        uv pip install ".[dev]"
+        cd ..
+      fi
     fi
   done
 }

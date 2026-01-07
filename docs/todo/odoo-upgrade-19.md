@@ -204,6 +204,7 @@ Snapshot: 2026-01-05.
     to duplicate `mail_link_preview.source_url` rows (Odoo 18 stored one row per
     message, Odoo 19 expects one row per URL).
   - web_editor models declared but not loadable (likely because web_editor is
+    missing).
 
 ## Test run notes (2026-01-06)
 
@@ -263,7 +264,11 @@ Snapshot: 2026-01-05.
   test-20260106_031050) passed after applying the order importer tax field
   update and phone blacklist sync changes.
 - No ambiguous failures; tracked in `docs/todo/confusing-test-failures.md`.
-    missing).
+- `uv run test run --json` (session test-20260106_140513) reported success
+  across all phases (return codes 0). Unit counters still showed 1 error with
+  no failure entries, which suggests the harness is flagging ERROR output even
+  though the run exited cleanly; track this as a follow-up to validate the
+  test harness and inspection gate before prod cutover.
 - Added custom OpenUpgrade hooks that mark missing-manifest modules (including
   `web_editor`) uninstalled and remove `web_editor.*` model metadata to prevent
   registry warnings.

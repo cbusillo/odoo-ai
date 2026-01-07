@@ -43,6 +43,33 @@ def _looks_like_transient_docker_api_failure(command: Sequence[str], stderr: str
     return bool(_DOCKER_TRANSIENT_ERROR_RE.search(stderr))
 
 
+def _run_process_with_streamed_stderr(
+    command: Sequence[str],
+    *,
+    cwd: Path | None,
+    env: Mapping[str, str] | None,
+) -> subprocess.CompletedProcess[str]:
+    stderr_chunks: list[str] = []
+    with subprocess.Popen(
+        list(command),
+        cwd=str(cwd) if cwd is not None else None,
+        env=dict(env) if env is not None else None,
+        stdout=None,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+    ) as process:
+        stderr_stream = process.stderr
+        if stderr_stream is not None:
+            for line in stderr_stream:
+                sys.stderr.write(line)
+                sys.stderr.flush()
+                stderr_chunks.append(line)
+        returncode = process.wait()
+    stderr_text = "".join(stderr_chunks) if stderr_chunks else None
+    return subprocess.CompletedProcess(list(command), returncode, stdout=None, stderr=stderr_text)
+
+
 def run_process(
     command: Sequence[str],
     cwd: Path | None = None,
@@ -67,24 +94,27 @@ def run_process(
                 text=True,
             )
         else:
-            # For docker commands, capture stderr so we can detect transient
-            # Docker Desktop API failures (HTTP 5xx) without changing stdout
-            # streaming behavior. Skip capture for exec so output streams live.
-            result = subprocess.run(
-                list(command),
-                cwd=str(cwd) if cwd is not None else None,
-                env=dict(env) if env is not None else None,
-                stdout=None,
-                stderr=None if is_docker_execute_command else (subprocess.PIPE if is_docker else None),
-                text=True,
-            )
+            if is_docker_execute_command:
+                result = _run_process_with_streamed_stderr(command, cwd=cwd, env=env)
+            else:
+                # For docker commands, capture stderr so we can detect transient
+                # Docker Desktop API failures (HTTP 5xx) without changing stdout
+                # streaming behavior.
+                result = subprocess.run(
+                    list(command),
+                    cwd=str(cwd) if cwd is not None else None,
+                    env=dict(env) if env is not None else None,
+                    stdout=None,
+                    stderr=subprocess.PIPE if is_docker else None,
+                    text=True,
+                )
 
-            # Preserve stderr visibility for docker commands. Docker CLI writes
-            # progress and warnings to stderr even on success; capturing it for
-            # retry detection must not silence it.
-            if is_docker and result.stderr:
-                sys.stderr.write(result.stderr)
-                sys.stderr.flush()
+                # Preserve stderr visibility for docker commands. Docker CLI writes
+                # progress and warnings to stderr even on success; capturing it for
+                # retry detection must not silence it.
+                if is_docker and result.stderr:
+                    sys.stderr.write(result.stderr)
+                    sys.stderr.flush()
         last_result = result
         if not (check and result.returncode != 0):
             return result

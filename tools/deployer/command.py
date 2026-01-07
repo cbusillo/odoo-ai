@@ -54,6 +54,7 @@ def run_process(
     logger.debug("$ %s", " ".join(shlex.quote(part) for part in command))
 
     is_docker = bool(command and command[0] == "docker")
+    is_docker_execute_command = is_docker and any(part == "exec" for part in command)
     attempts = 3 if is_docker else 1
     last_result: subprocess.CompletedProcess[str] | None = None
     for attempt_number in range(1, attempts + 1):
@@ -68,13 +69,13 @@ def run_process(
         else:
             # For docker commands, capture stderr so we can detect transient
             # Docker Desktop API failures (HTTP 5xx) without changing stdout
-            # streaming behavior.
+            # streaming behavior. Skip capture for exec so output streams live.
             result = subprocess.run(
                 list(command),
                 cwd=str(cwd) if cwd is not None else None,
                 env=dict(env) if env is not None else None,
                 stdout=None,
-                stderr=subprocess.PIPE if is_docker else None,
+                stderr=None if is_docker_execute_command else (subprocess.PIPE if is_docker else None),
                 text=True,
             )
 

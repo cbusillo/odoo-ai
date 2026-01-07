@@ -179,6 +179,8 @@ Snapshot: 2026-01-05.
 - OpenUpgrade runs after the upstream restore and before sanitize/update_addons.
 - OPENUPGRADE_SKIP_UPDATE_ADDONS defaults to 1 to avoid double-updating modules
   after OpenUpgrade runs with --update all.
+- When OPENUPGRADE_SKIP_UPDATE_ADDONS is set, the restore step still refreshes
+  the website module to align the website.snippets base view with Odoo 19.
 - Use uv run ops local openupgrade opw to re-run OpenUpgrade without restoring.
 
 ## OpenUpgrade run notes (2026-01-05)

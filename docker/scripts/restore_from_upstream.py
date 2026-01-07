@@ -1391,11 +1391,20 @@ with registry.cursor() as cr:
         modules = [item.strip() for item in raw.split(separator) if item.strip()]
         return modules
 
-    def update_addons(self) -> None:
+    def update_addons(self, explicit_modules: Sequence[str] | None = None, reason: str | None = None) -> None:
         mods_env = (self.local.update_modules or "").strip()
         desired: list[str]
         local_module_paths: dict[str, Path] | None = None
-        if not mods_env or mods_env.upper() == "AUTO":
+        if explicit_modules is not None:
+            desired = [module_name.strip() for module_name in explicit_modules if module_name.strip()]
+            if not desired:
+                _logger.info("No explicit modules provided; skipping addon update.")
+                return
+            if reason:
+                _logger.info("Updating addons for %s: %s", reason, ", ".join(desired))
+            else:
+                _logger.info("Updating addons: %s", ", ".join(desired))
+        elif not mods_env or mods_env.upper() == "AUTO":
             project_defaults = self._default_modules_for_project()
             if project_defaults:
                 desired = project_defaults
@@ -1652,6 +1661,13 @@ with registry.cursor() as cr:
         self.run_command(" ".join(cmd_parts))
         self._reset_db_connection()
 
+    def _should_refresh_website_after_openupgrade(self) -> bool:
+        target_version = (self.local.openupgrade_target_version or self.local.odoo_version or "").strip()
+        if not target_version:
+            return False
+        major_version = target_version.split(".", 1)[0]
+        return major_version == "19"
+
     def restore_from_upstream(self, do_sanitize: bool = True) -> None:
         self._require_upstream()
         target_owner = self._resolve_filestore_owner()
@@ -1687,6 +1703,11 @@ with registry.cursor() as cr:
 
         if self.local.openupgrade_enabled and self.local.openupgrade_skip_update_addons:
             _logger.info("OpenUpgrade enabled; skipping update_addons per OPENUPGRADE_SKIP_UPDATE_ADDONS.")
+            if self._should_refresh_website_after_openupgrade():
+                self.update_addons(
+                    explicit_modules=["website"],
+                    reason="OpenUpgrade 19 website refresh",
+                )
         else:
             self.update_addons()
         self.connect_to_db()

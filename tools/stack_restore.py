@@ -164,6 +164,7 @@ def restore_stack(
             [
                 restore_settings.script_runner_service,
                 "python3",
+                "-u",
                 RESTORE_SCRIPT,
             ]
         )
@@ -223,6 +224,7 @@ def restore_stack(
             [
                 restore_settings.script_runner_service,
                 "python3",
+                "-u",
                 RESTORE_SCRIPT,
             ]
         )

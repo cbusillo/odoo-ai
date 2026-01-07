@@ -251,7 +251,7 @@ def compute_compose_files(name: str, repo_root: Path, config: StackConfig) -> tu
 
     # Log the resolved compose files relative to repo root for readability
     pretty = _paths_relative_to_repo(layered_files, repo_root)
-    _logger.info("Compose files resolved: %s", ", ".join(pretty))
+    _logger.debug("Compose files resolved: %s", ", ".join(pretty))
 
     return tuple(layered_files)
 
@@ -481,7 +481,7 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
 
     # Log the resolved environment layering and important derived values
     chain_pretty = _paths_relative_to_repo(resolved_env_chain, repo_root)
-    _logger.info(
+    _logger.debug(
         "Env layering: %s -> merged at %s",
         " -> ".join(chain_pretty) if chain_pretty else "<none>",
         str(merged_env_path.relative_to(repo_root)) if merged_env_path.is_relative_to(repo_root) else str(

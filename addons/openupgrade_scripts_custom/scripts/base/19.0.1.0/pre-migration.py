@@ -1,6 +1,7 @@
 # Copyright 2026 Shiny Computers
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
+import json
 import re
 
 from odoo.modules.module import get_module_path
@@ -38,31 +39,63 @@ def _mark_missing_manifest_modules_uninstalled(env) -> None:
 def _clean_user_groups_view(env) -> None:
     """Normalize legacy user group fields before the 19.0 view update."""
 
-    view_record = env.ref("base.user_groups_view", raise_if_not_found=False)
-    if not view_record:
-        return
-    view_arch = view_record.arch_db or ""
-    if "groups_id" not in view_arch and "sel_groups_" not in view_arch and "in_group_" not in view_arch:
-        return
-    updated_arch = view_arch.replace('name="groups_id"', 'name="group_ids"')
-    updated_arch = updated_arch.replace("name='groups_id'", "name='group_ids'")
-    updated_arch = re.sub(r"<field[^>]+name=\"(sel_groups_|in_group_)[^\"]+\"[^>]*/>", "", updated_arch)
-    updated_arch = re.sub(r"<field[^>]+name='(sel_groups_|in_group_)[^']+'[^>]*/>", "", updated_arch)
-    updated_arch = re.sub(
-        r"<field[^>]+name=\"(sel_groups_|in_group_)[^\"]+\"[^>]*>\s*</field>",
-        "",
-        updated_arch,
-        flags=re.DOTALL,
+    env.cr.execute(
+        "SELECT res_id FROM ir_model_data "
+        "WHERE module = 'base' AND name = 'user_groups_view' AND model = 'ir.ui.view' "
+        "LIMIT 1",
     )
-    updated_arch = re.sub(
-        r"<field[^>]+name='(sel_groups_|in_group_)[^']+'[^>]*>\s*</field>",
-        "",
-        updated_arch,
-        flags=re.DOTALL,
-    )
-    if updated_arch == view_arch:
+    view_row = env.cr.fetchone()
+    if not view_row:
         return
-    view_record.write({"arch_db": updated_arch})
+    view_id = view_row[0]
+    env.cr.execute("SELECT arch_db FROM ir_ui_view WHERE id = %s", (view_id,))
+    arch_row = env.cr.fetchone()
+    if not arch_row:
+        return
+    view_arch = arch_row[0] or ""
+
+    def _normalize_view_text(view_text: str) -> str:
+        updated_text = view_text.replace('name="groups_id"', 'name="group_ids"')
+        updated_text = updated_text.replace("name='groups_id'", "name='group_ids'")
+        updated_text = re.sub(r"<field[^>]+name=\"(sel_groups_|in_group_)[^\"]+\"[^>]*/>", "", updated_text)
+        updated_text = re.sub(r"<field[^>]+name='(sel_groups_|in_group_)[^']+'[^>]*/>", "", updated_text)
+        updated_text = re.sub(
+            r"<field[^>]+name=\"(sel_groups_|in_group_)[^\"]+\"[^>]*>\s*</field>",
+            "",
+            updated_text,
+            flags=re.DOTALL,
+        )
+        updated_text = re.sub(
+            r"<field[^>]+name='(sel_groups_|in_group_)[^']+'[^>]*>\s*</field>",
+            "",
+            updated_text,
+            flags=re.DOTALL,
+        )
+        return updated_text
+
+    if isinstance(view_arch, dict):
+        updated_payload = {locale: _normalize_view_text(text) for locale, text in view_arch.items()}
+        if updated_payload == view_arch:
+            return
+        env.cr.execute("UPDATE ir_ui_view SET arch_db = %s WHERE id = %s", (json.dumps(updated_payload), view_id))
+        return
+
+    if isinstance(view_arch, str):
+        try:
+            parsed_payload = json.loads(view_arch)
+        except json.JSONDecodeError:
+            parsed_payload = None
+        if isinstance(parsed_payload, dict):
+            updated_payload = {locale: _normalize_view_text(text) for locale, text in parsed_payload.items()}
+            if updated_payload == parsed_payload:
+                return
+            env.cr.execute("UPDATE ir_ui_view SET arch_db = %s WHERE id = %s", (json.dumps(updated_payload), view_id))
+            return
+
+    updated_arch = _normalize_view_text(str(view_arch))
+    if updated_arch == str(view_arch):
+        return
+    env.cr.execute("UPDATE ir_ui_view SET arch_db = %s WHERE id = %s", (updated_arch, view_id))
 
 
 @openupgrade.migrate()

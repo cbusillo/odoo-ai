@@ -269,6 +269,12 @@ Snapshot: 2026-01-05.
   no failure entries, which suggests the harness is flagging ERROR output even
   though the run exited cleanly; track this as a follow-up to validate the
   test harness and inspection gate before prod cutover.
+- `uv run test run --json` (session test-20260107_113601) also reported success
+  (return codes 0) but unit counters still showed 1 error. The unit log shows
+  a PostgreSQL not-null error during
+  `TestProductTemplate.test_name_field_validation` in product_connect; confirm
+  whether the test should avoid DB-level errors or the harness should ignore
+  expected SQL errors.
 - Added custom OpenUpgrade hooks that mark missing-manifest modules (including
   `web_editor`) uninstalled and remove `web_editor.*` model metadata to prevent
   registry warnings.

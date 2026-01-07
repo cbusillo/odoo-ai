@@ -468,19 +468,27 @@ class OdooUpstreamRestorer:
         backup_path_quoted = shlex.quote(backup_path)
         ssh_parts = self._build_ssh_command()
         ssh_command = shlex.join(ssh_parts)
+        _logger.info(
+            "Starting upstream database dump and transfer from %s to %s",
+            upstream.host,
+            self.local.db_name,
+        )
         dump_cmd = (
             f"{ssh_command} {remote_user}@{remote_host} \"cd /tmp && sudo -u {upstream_db_user} "
             f"pg_dump -Fc {upstream_db_name}\" | gzip > {backup_path_quoted}"
         )
         self.run_command(dump_cmd)
+        _logger.info("Upstream database dump and transfer completed.")
         self.terminate_all_db_connections()
         self.run_command(f"dropdb --if-exists -h {local_host} -U {local_user} {local_db}")
         self.run_command(f"createdb -h {local_host} -U {local_user} {local_db}")
+        _logger.info("Restoring database into %s", self.local.db_name)
         restore_cmd = (
             f"gunzip < {backup_path_quoted} | pg_restore -d {local_db} -h {local_host} "
             f"-U {local_user} --no-owner --role={local_user}"
         )
         self.run_command(restore_cmd)
+        _logger.info("Database restore completed.")
         self.run_command(f"rm {backup_path_quoted}")
 
     def connect_to_db(self) -> connection:
@@ -1651,6 +1659,7 @@ with registry.cursor() as cr:
         filestore_process = self.overwrite_filestore(target_owner)
         try:
             self.overwrite_database()
+            _logger.info("Database overwrite completed.")
         except Exception:
             filestore_returncode = filestore_process.wait()
             if filestore_returncode != 0:

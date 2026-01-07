@@ -22,6 +22,7 @@ from .reporter import write_junit_for_shard
 from .settings import SUMMARY_SCHEMA_VERSION, TestSettings
 
 _logger = logging.getLogger(__name__)
+_UNITTEST_HEADER_RE = re.compile(r"^(FAIL|ERROR): .+\(.+\)$")
 
 
 def _normalize(line: str) -> str:
@@ -49,6 +50,13 @@ def _detect_repetitive(recent_lines: list[str], seen: dict[str, int], min_occ: i
         sample = sample[:100] + "..." if len(sample) > 100 else sample
         return True, f"Repetitive pattern detected ({count} times, {ratio:.1%}): {sample}"
     return False, ""
+
+
+def _match_unittest_header(line: str) -> str | None:
+    match = _UNITTEST_HEADER_RE.match(line)
+    if not match:
+        return None
+    return match.group(1).lower()
 
 
 @dataclass
@@ -167,9 +175,9 @@ class OdooExecutor:
                 command.extend(["-e", f"{env_key}={env_value}"])
         # pass-through debug/timeouts
         for env_var in ("JS_PRECHECK", "JS_DEBUG", "TOUR_TIMEOUT"):
-            env_value = os.environ.get(env_var)
-            if env_value:
-                command.extend(["-e", f"{env_var}={env_value}"])
+            override_value = os.environ.get(env_var)
+            if override_value:
+                command.extend(["-e", f"{env_var}={override_value}"])
 
         if is_tour_test or is_js_test:
             tour_workers_default = int(self.settings.tour_workers)
@@ -316,9 +324,10 @@ class OdooExecutor:
                         match = re.search(r"Ran (\d+) tests", line)
                         if match:
                             counters["tests_run"] = int(match.group(1))
-                    if line.startswith("FAIL:"):
+                    failure_type = _match_unittest_header(line)
+                    if failure_type == "fail":
                         counters["failures"] = int(counters.get("failures", 0)) + 1
-                    if line.startswith("ERROR:"):
+                    if failure_type == "error":
                         counters["errors"] = int(counters.get("errors", 0)) + 1
                     # repetitive detection
                     recent_lines.append(line)

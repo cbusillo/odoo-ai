@@ -275,6 +275,9 @@ Snapshot: 2026-01-05.
   `TestProductTemplate.test_name_field_validation` in product_connect; confirm
   whether the test should avoid DB-level errors or the harness should ignore
   expected SQL errors.
+- Test harness updated to only count unittest-style `FAIL:`/`ERROR:` headers,
+  which avoids false positives from expected SQL errors; unit run
+  `test-20260107_122740` now reports errors=0 for product_connect.
 - Added custom OpenUpgrade hooks that mark missing-manifest modules (including
   `web_editor`) uninstalled and remove `web_editor.*` model metadata to prevent
   registry warnings.

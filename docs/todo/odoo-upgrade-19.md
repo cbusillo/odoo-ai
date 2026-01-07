@@ -10,6 +10,10 @@ title: Odoo 19 Upgrade (OPW)
   and relations.
 - Timeline is flexible.
 
+## Post-upgrade cleanup
+
+- Follow @docs/todo/odoo-19-post-upgrade-cleanup.md after prod cutover.
+
 ## product_connect dependencies
 
 From `addons/product_connect/__manifest__.py` (version 19.0.8.2):

@@ -269,6 +269,8 @@ Snapshot: 2026-01-05.
   registry warnings.
 - Added a base post-migration hook that rewrites `base.user_groups_view`
   from `groups_id` to `group_ids` to avoid view render warnings in Odoo 19.
+- Added a base pre-migration hook that strips legacy `sel_groups_*` and
+  `in_group_*` fields from `base.user_groups_view` before the 19.0 upgrade.
 - As of 2026-01-06, added a custom OpenUpgrade hook in
   `addons/openupgrade_scripts_custom/scripts/mail/` that de-duplicates
   `mail_link_preview` and ensures the `mail_link_preview_unique_source_url`

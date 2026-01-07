@@ -1363,7 +1363,7 @@ def _interactive(*, dry_run: bool, remember: bool, wait_deploy: bool) -> None:
             action = _prompt_choice("Action", action_choices, action_default)
             deploy = state.deploy
             if action == "ship" and env in ("dev", "testing"):
-                deploy = Confirm.ask("Trigger Coolify deploy after push?", default=state.deploy)
+                deploy = Confirm.ask("Trigger Coolify deploy after push?", default=True)
                 serial = Confirm.ask("Deploy serially?", default=False)
                 post_action = _prompt_choice("After deploy", POST_SHIP_ACTIONS, "none")
             if env == "local" and action in ("up", "init", "restore"):

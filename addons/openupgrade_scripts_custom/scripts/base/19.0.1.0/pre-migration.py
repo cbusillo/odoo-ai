@@ -3,9 +3,13 @@
 
 import json
 import re
+from typing import TYPE_CHECKING
 
 from odoo.modules.module import get_module_path
 from openupgradelib import openupgrade
+
+if TYPE_CHECKING:
+    from odoo.api import Environment
 
 
 _MISSING_MANIFEST_MODULES = (
@@ -16,7 +20,7 @@ _MISSING_MANIFEST_MODULES = (
 )
 
 
-def _mark_missing_manifest_modules_uninstalled(env) -> None:
+def _mark_missing_manifest_modules_uninstalled(env: "Environment") -> None:
     """Avoid inconsistent module states for addons removed in 19.0.
 
     These modules can exist as installed records in the restored 18.0 database,
@@ -36,7 +40,7 @@ def _mark_missing_manifest_modules_uninstalled(env) -> None:
         )
 
 
-def _clean_user_group_views(env) -> None:
+def _clean_user_group_views(env: "Environment") -> None:
     """Normalize legacy user group fields before the 19.0 view update."""
 
     candidate_xmlids = ("user_groups_view", "view_users_form")
@@ -84,6 +88,41 @@ def _clean_user_group_views(env) -> None:
             updated_text,
             flags=re.DOTALL,
         )
+        updated_text = re.sub(
+            r"<label[^>]+for=\"user_group_warning\"[^>]*>\s*</label>",
+            "",
+            updated_text,
+            flags=re.DOTALL,
+        )
+        updated_text = re.sub(
+            r"<label[^>]+for='user_group_warning'[^>]*>\s*</label>",
+            "",
+            updated_text,
+            flags=re.DOTALL,
+        )
+        updated_text = re.sub(r"<label[^>]+for=\"user_group_warning\"[^>]*/>", "", updated_text)
+        updated_text = re.sub(r"<label[^>]+for='user_group_warning'[^>]*/>", "", updated_text)
+        updated_text = re.sub(
+            r"<label[^>]+for=\"(sel_groups_|in_group_)[^\"]+\"[^>]*>\s*</label>",
+            "",
+            updated_text,
+            flags=re.DOTALL,
+        )
+        updated_text = re.sub(
+            r"<label[^>]+for='(sel_groups_|in_group_)[^']+'[^>]*>\s*</label>",
+            "",
+            updated_text,
+            flags=re.DOTALL,
+        )
+        updated_text = re.sub(
+            r"<label[^>]+for=\"(sel_groups_|in_group_)[^\"]+\"[^>]*/>",
+            "",
+            updated_text,
+        )
+        updated_text = re.sub(r"<label[^>]+for='(sel_groups_|in_group_)[^']+'[^>]*/>", "", updated_text)
+        updated_text = re.sub(r"\buser_group_warning\b", "False", updated_text)
+        updated_text = re.sub(r"\bsel_groups_[0-9_]+\b", "False", updated_text)
+        updated_text = re.sub(r"\bin_group_[0-9_]+\b", "False", updated_text)
         return updated_text
 
     for xmlid_name in candidate_xmlids:
@@ -125,7 +164,7 @@ def _clean_user_group_views(env) -> None:
 
 
 @openupgrade.migrate()
-def migrate(env, version):
+def migrate(env: "Environment", version: str | None) -> None:
     """Pre-migration hook for base (19.0.1.0)."""
 
     _mark_missing_manifest_modules_uninstalled(env)

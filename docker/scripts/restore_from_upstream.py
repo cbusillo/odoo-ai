@@ -1486,13 +1486,31 @@ with registry.cursor() as cr:
                 if not present:
                     missing_fs.append(name)
 
-        if missing_fs:
-            _logger.warning(
-                f"Modules listed in ODOO_UPDATE_MODULES not found on disk and will be skipped: {', '.join(missing_fs)}"
-            )
+        if explicit_modules is not None:
+            modules_source_label = "explicit module list"
+            if reason:
+                modules_source_label = f"{modules_source_label} ({reason})"
+            if missing_fs:
+                _logger.warning(
+                    "Modules from %s not found on disk and will be skipped: %s",
+                    modules_source_label,
+                    ", ".join(missing_fs),
+                )
+            if not found:
+                _logger.info(
+                    "No valid modules from %s found on disk; skipping.",
+                    modules_source_label,
+                )
+        else:
+            if missing_fs:
+                _logger.warning(
+                    "Modules listed in ODOO_UPDATE_MODULES not found on disk and will be skipped: %s",
+                    ", ".join(missing_fs),
+                )
+            if not found:
+                _logger.info("No valid modules from ODOO_UPDATE_MODULES found on disk; skipping.")
 
         if not found:
-            _logger.info("No valid modules from ODOO_UPDATE_MODULES found on disk; skipping.")
             return
 
         self.connect_to_db()
@@ -1693,8 +1711,10 @@ with registry.cursor() as cr:
                 return
             if parent_module is None:
                 _logger.warning(
-                    "website.snippets parent view record missing; resetting inherit_id to allow upgrade."
+                    "website.snippets parent view has no XML ID; cannot confirm it is web_editor.snippets. "
+                    "Skipping inheritance reset to avoid clearing customizations."
                 )
+                return
             elif parent_module != "web_editor" or parent_name != "snippets":
                 _logger.info(
                     "website.snippets inherits %s.%s; leaving inheritance intact.",

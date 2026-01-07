@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -31,6 +32,7 @@ from tools.deployer.compose_ops import local_compose_command, local_compose_env
 from tools.deployer.deploy import _wait_for_local_service, deploy_stack, execute_upgrade
 from tools.deployer.health import HealthcheckError
 from tools.deployer.helpers import get_git_commit
+from tools.deployer.remote import run_remote
 from tools.deployer.settings import (
     AUTO_INSTALLED_SENTINEL,
     StackSettings,
@@ -50,6 +52,7 @@ POST_SHIP_ACTIONS = ("none", "restore", "init")
 SHIP_ACTIONS = ("ship",)
 GATE_ACTIONS = ("gate",)
 STATUS_ENVS = ("dev", "testing")
+COOLIFY_FIX_ENVS = ("dev", "testing")
 HISTORY_LIMIT = 50
 STATUS_INTERVAL_DEFAULT = 10.0
 STATUS_TIMEOUT_DEFAULT = 600.0
@@ -440,6 +443,43 @@ def _coolify_find_app_uuid(app_ref: str) -> str:
     uuid_str = str(uuid)
     _COOLIFY_APP_CACHE[app_ref] = uuid_str
     return uuid_str
+
+
+def _coolify_get_application(app_ref: str) -> tuple[str, dict[str, object]]:
+    app_uuid = _coolify_find_app_uuid(app_ref)
+    payload = _coolify_request(f"/api/v1/applications/{app_uuid}")
+    if not isinstance(payload, dict):
+        raise click.ClickException(f"Unexpected Coolify application response for {app_ref}.")
+    return app_uuid, payload
+
+
+def _coolify_destination_server(application_payload: dict[str, object]) -> tuple[str, str | None, int | None]:
+    destination = application_payload.get("destination")
+    if not isinstance(destination, dict):
+        raise click.ClickException("Coolify application is missing destination metadata.")
+    server = destination.get("server")
+    if not isinstance(server, dict):
+        raise click.ClickException("Coolify application is missing destination server details.")
+    host_value = server.get("ip") or server.get("host") or server.get("hostname")
+    if not isinstance(host_value, str) or not host_value.strip():
+        raise click.ClickException("Coolify destination server is missing a host or IP.")
+    user_value = server.get("user")
+    user = user_value.strip() if isinstance(user_value, str) and user_value.strip() else None
+    port_value = server.get("port")
+    port = int(port_value) if isinstance(port_value, int) else None
+    return host_value.strip(), user, port
+
+
+def _run_remote_capture(host: str, user: str | None, port: int | None, command: Sequence[str]) -> str:
+    quoted_command = " ".join(shlex.quote(part) for part in command)
+    arguments: list[str] = ["ssh"]
+    if port is not None:
+        arguments += ["-p", str(port)]
+    target = f"{user}@{host}" if user else host
+    arguments.append(target)
+    arguments.append(quoted_command)
+    result = run_process(arguments, capture_output=True, check=True)
+    return (result.stdout or "").strip()
 
 
 def _coolify_deploy(app_ref: str, *, dry_run: bool) -> None:
@@ -1085,6 +1125,39 @@ def _run_status(target: str, env: str, *, wait: bool, interval: float, timeout: 
             _print_status(entry, env, app_ref)
 
 
+def _run_fix_filestore_permissions(target: str, env: str, *, owner: str, dry_run: bool) -> None:
+    if env not in COOLIFY_FIX_ENVS:
+        raise click.ClickException("Filestore permission fix is only available for dev/testing.")
+    owner_value = owner.strip()
+    if not owner_value:
+        raise click.ClickException("Filestore owner cannot be blank.")
+    for entry in _targets_for(target):
+        application_ref = _resolve_coolify_app(entry, env)
+        if not application_ref:
+            console.print(f"No Coolify app ref for {entry} {env}; skipping.")
+            continue
+        application_uuid, application_payload = _coolify_get_application(application_ref)
+        host, user, port = _coolify_destination_server(application_payload)
+        volume_name = f"{application_uuid}_odoo-data"
+        if dry_run:
+            console.print(
+                f"[dry-run] Fix filestore perms on {host} ({volume_name}) for {entry} {env} -> {owner_value}",
+            )
+            continue
+        mountpoint = _run_remote_capture(
+            host,
+            user,
+            port,
+            ["docker", "volume", "inspect", volume_name, "--format", "{{.Mountpoint}}"],
+        )
+        if not mountpoint:
+            raise click.ClickException(f"Unable to resolve mountpoint for {volume_name} on {host}.")
+        filestore_path = f"{mountpoint}/filestore"
+        console.print(f"Fixing filestore perms on {host} ({volume_name}) -> {owner_value}")
+        run_remote(host, user, port, ["mkdir", "-p", filestore_path])
+        run_remote(host, user, port, ["chown", "-R", owner_value, filestore_path])
+
+
 def _print_local_doctor(entry: str, settings: StackSettings) -> None:
     required_env = ("ODOO_DB_NAME", "ODOO_DB_USER")
     visible_env = (
@@ -1647,6 +1720,15 @@ def gate_command(target: str, skip_tests: bool, dry_run: bool, confirm: bool) ->
 @click.option("--timeout", type=float, default=STATUS_TIMEOUT_DEFAULT, help="Timeout in seconds")
 def status_command(env: str, target: str, wait: bool, interval: float, timeout: float) -> None:
     _run_status(target, env, wait=wait, interval=interval, timeout=timeout)
+
+
+@main.command("fix-filestore")
+@click.argument("env", type=click.Choice(COOLIFY_FIX_ENVS, case_sensitive=False))
+@click.argument("target")
+@click.option("--owner", default="1000:1000", help="File owner to apply to filestore (uid:gid)")
+@click.option("--dry-run", is_flag=True)
+def fix_filestore_command(env: str, target: str, owner: str, dry_run: bool) -> None:
+    _run_fix_filestore_permissions(target, env, owner=owner, dry_run=dry_run)
 
 
 if __name__ == "__main__":

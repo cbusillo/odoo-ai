@@ -48,8 +48,6 @@ Quick start
 
   uv run ops status testing opw
   uv run ops status testing all --no-wait
-  uv run ops fix-filestore dev cm
-  uv run ops fix-filestore testing cm
   ```
 
 Remembered choices
@@ -109,6 +107,5 @@ Behavior notes
 - Use `--serial` to deploy one target at a time when shipping `all`.
 - `ops status` uses the Coolify API and requires `COOLIFY_TOKEN` (waits by
   default; use `--no-wait`).
-- `ops fix-filestore` repairs filestore permissions on Coolify hosts (dev/testing).
 - For interactive runs, `uv run ops --no-wait` skips deploy waiting.
 - Local actions default to `--no-build` for speed; pass `--build` to force a rebuild.

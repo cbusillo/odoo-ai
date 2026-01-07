@@ -57,7 +57,7 @@ Remembered choices
 - Favorites are derived from recent usage and shown as quick picks.
 - Interactive prompts use arrow keys when `questionary` is available; otherwise
   they fall back to typed prompts.
-- Install `rich` + `questionary` with `uv sync --extra dev`.
+- Install `rich` + `questionary` with `uv sync`.
 
 Configuration
 

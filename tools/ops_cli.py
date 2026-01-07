@@ -20,7 +20,7 @@ try:
     from rich.console import Console
     from rich.prompt import Confirm, Prompt
 except ModuleNotFoundError as exc:  # pragma: no cover - optional dependency
-    raise SystemExit("Missing 'rich'. Run: uv sync --extra dev") from exc
+    raise SystemExit("Missing 'rich'. Run: uv sync") from exc
 try:
     import questionary
 except ImportError:  # pragma: no cover - optional for arrow-key TUI

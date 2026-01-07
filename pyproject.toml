@@ -13,10 +13,6 @@ dependencies = [
     "click",
     "pydantic",
     "pydantic_settings",
-]
-
-[project.optional-dependencies]
-dev = [
     "questionary",
     "ruff",
     "rich",

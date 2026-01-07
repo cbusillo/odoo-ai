@@ -136,14 +136,10 @@ version = "0.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
+    { name = "mypy" },
     { name = "psutil" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "mypy" },
     { name = "questionary" },
     { name = "rich" },
     { name = "ruff" },
@@ -152,15 +148,14 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "click" },
-    { name = "mypy", marker = "extra == 'dev'" },
+    { name = "mypy" },
     { name = "psutil", specifier = "==5.9.8" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
-    { name = "questionary", marker = "extra == 'dev'" },
-    { name = "rich", marker = "extra == 'dev'" },
-    { name = "ruff", marker = "extra == 'dev'" },
+    { name = "questionary" },
+    { name = "rich" },
+    { name = "ruff" },
 ]
-provides-extras = ["dev"]
 
 [[package]]
 name = "pathspec"

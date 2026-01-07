@@ -1668,6 +1668,45 @@ with registry.cursor() as cr:
         major_version = target_version.split(".", 1)[0]
         return major_version == "19"
 
+    def _reset_website_snippets_inheritance(self) -> None:
+        try:
+            conn = self.connect_to_db()
+        except psycopg2.Error as error:
+            raise OdooRestorerError(f"Failed to connect for website snippets reset: {error}") from error
+
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT view.id, view.inherit_id, parent_data.module, parent_data.name "
+                "FROM ir_ui_view AS view "
+                "JOIN ir_model_data AS data ON data.model = 'ir.ui.view' AND data.res_id = view.id "
+                "LEFT JOIN ir_model_data AS parent_data "
+                "  ON parent_data.model = 'ir.ui.view' AND parent_data.res_id = view.inherit_id "
+                "WHERE data.module = 'website' AND data.name = 'snippets'",
+            )
+            row = cursor.fetchone()
+            if not row:
+                _logger.warning("website.snippets view not found; skipping inheritance reset.")
+                return
+            view_id, inherit_id, parent_module, parent_name = row
+            if not inherit_id:
+                _logger.info("website.snippets already has no parent view; no reset needed.")
+                return
+            if parent_module is None:
+                _logger.warning(
+                    "website.snippets parent view record missing; resetting inherit_id to allow upgrade."
+                )
+            elif parent_module != "web_editor" or parent_name != "snippets":
+                _logger.info(
+                    "website.snippets inherits %s.%s; leaving inheritance intact.",
+                    parent_module,
+                    parent_name,
+                )
+                return
+            cursor.execute("UPDATE ir_ui_view SET inherit_id = NULL WHERE id = %s", (view_id,))
+        conn.commit()
+        self._reset_db_connection()
+        _logger.info("Reset website.snippets inherit_id to base view before upgrade.")
+
     def restore_from_upstream(self, do_sanitize: bool = True) -> None:
         self._require_upstream()
         target_owner = self._resolve_filestore_owner()
@@ -1704,6 +1743,7 @@ with registry.cursor() as cr:
         if self.local.openupgrade_enabled and self.local.openupgrade_skip_update_addons:
             _logger.info("OpenUpgrade enabled; skipping update_addons per OPENUPGRADE_SKIP_UPDATE_ADDONS.")
             if self._should_refresh_website_after_openupgrade():
+                self._reset_website_snippets_inheritance()
                 self.update_addons(
                     explicit_modules=["website"],
                     reason="OpenUpgrade 19 website refresh",

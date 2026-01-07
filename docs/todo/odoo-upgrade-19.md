@@ -267,6 +267,8 @@ Snapshot: 2026-01-05.
 - Added custom OpenUpgrade hooks that mark missing-manifest modules (including
   `web_editor`) uninstalled and remove `web_editor.*` model metadata to prevent
   registry warnings.
+- Added a base post-migration hook that rewrites `base.user_groups_view`
+  from `groups_id` to `group_ids` to avoid view render warnings in Odoo 19.
 - As of 2026-01-06, added a custom OpenUpgrade hook in
   `addons/openupgrade_scripts_custom/scripts/mail/` that de-duplicates
   `mail_link_preview` and ensures the `mail_link_preview_unique_source_url`

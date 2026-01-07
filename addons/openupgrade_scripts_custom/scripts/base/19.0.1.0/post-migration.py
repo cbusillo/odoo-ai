@@ -111,9 +111,25 @@ def _fix_ir_rule_user_groups_field(env) -> None:
         return
 
 
+def _fix_user_groups_view_field(env) -> None:
+    """Align base.user_groups_view with the Odoo 19 `group_ids` field."""
+
+    view_record = env.ref("base.user_groups_view", raise_if_not_found=False)
+    if not view_record:
+        return
+    view_arch = view_record.arch_db or ""
+    if "name=\"groups_id\"" not in view_arch:
+        return
+    updated_arch = view_arch.replace("name=\"groups_id\"", "name=\"group_ids\"")
+    if updated_arch == view_arch:
+        return
+    view_record.write({"arch_db": updated_arch})
+
+
 @openupgrade.migrate()
 def migrate(env, version):
     """Post-migration hook for base (19.0.1.0)."""
 
     _fix_ir_rule_user_groups_field(env)
+    _fix_user_groups_view_field(env)
     _cleanup_web_editor_metadata(env)

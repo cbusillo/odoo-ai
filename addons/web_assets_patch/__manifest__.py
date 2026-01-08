@@ -10,7 +10,7 @@
             (
                 "before",
                 "web/static/lib/bootstrap/scss/_functions.scss",
-                "web/static/src/scss/pre_variables.scss",
+                "web_assets_patch/static/src/scss/bootstrap_pre_variables.scss",
             ),
         ],
     },

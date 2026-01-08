@@ -81,13 +81,6 @@ Handles inventory, repairs, and multi-channel sales for marine equipment.
         "views/shopify_sync_views.xml",
     ],
     "assets": {
-        "web._assets_helpers": [
-            (
-                "before",
-                "web/static/lib/bootstrap/scss/_functions.scss",
-                "web/static/src/scss/pre_variables.scss",
-            ),
-        ],
         "web.assets_backend": [
             "product_connect/static/src/scss/*",
             "product_connect/static/src/js/utils/*",

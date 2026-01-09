@@ -5,7 +5,7 @@ title: JavaScript Style
 
 Purpose
 
-- Define the JS and Owl rules for Odoo 18.
+- Define the JS and Owl rules for Odoo 19.
 
 When
 
@@ -17,7 +17,7 @@ Sources of Truth
 - Use existing components as the primary reference; avoid inventing new
   patterns without a real precedent.
 
-Modules and Frameworks (Odoo 18)
+Modules and Frameworks (Odoo 19)
 
 - Use native ES modules with imports from `@web/...` and Odoo namespaces.
 - Do not use AMD `odoo.define` modules in this project.

@@ -13,22 +13,22 @@ When
 
 ## External Documentation
 
-### Odoo 18 Enterprise
+### Odoo 19 Enterprise
 
-**Website**: [Odoo 18 Documentation](https://www.odoo.com/documentation/18.0/)
+**Website**: [Odoo 19 Documentation](https://www.odoo.com/documentation/19.0/)
 
 Key sections for development:
 
 - **Developer Guide**:
-  [Odoo Developer Documentation](https://www.odoo.com/documentation/18.0/developer.html)
+  [Odoo Developer Documentation](https://www.odoo.com/documentation/19.0/developer.html)
 - **ORM Reference**:
-  [ORM Reference](https://www.odoo.com/documentation/18.0/developer/reference/backend/orm.html)
+  [ORM Reference](https://www.odoo.com/documentation/19.0/developer/reference/backend/orm.html)
 - **View Architecture**:
-  [View Architecture](https://www.odoo.com/documentation/18.0/developer/reference/user_interface/view_architectures.html)
+  [View Architecture](https://www.odoo.com/documentation/19.0/developer/reference/user_interface/view_architectures.html)
 - **Frontend Framework**:
-  [Frontend Framework](https://www.odoo.com/documentation/18.0/developer/reference/frontend.html)
+  [Frontend Framework](https://www.odoo.com/documentation/19.0/developer/reference/frontend.html)
 - **Applications Guide**:
-  [Applications Guide](https://www.odoo.com/documentation/18.0/applications.html)
+  [Applications Guide](https://www.odoo.com/documentation/19.0/applications.html)
 
 ### Shopify GraphQL API
 

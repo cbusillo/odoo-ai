@@ -1,14 +1,14 @@
 ---
-title: Migration Patterns (Odoo 18)
+title: Migration Patterns (Odoo 19)
 ---
 
 Purpose
 
-- Capture the Odoo 18 migration rules and workflow.
+- Capture the Odoo 19 migration rules and workflow.
 
 When
 
-- When updating legacy views or frontend code to Odoo 18 patterns.
+- When updating legacy views or frontend code to Odoo 19 patterns.
 
 Key changes
 

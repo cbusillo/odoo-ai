@@ -47,7 +47,7 @@ When
 
 ## Application layers
 
-- Base Odoo: `ghcr.io/adomi-io/odoo:18.0`
+- Base Odoo: `ghcr.io/adomi-io/odoo:19.0`
 - Custom addons: `/volumes/addons` (repo) and `/opt/extra_addons`
   (`ODOO_ADDON_REPOSITORIES`, including the enterprise addons)
 - Integrations: Shopify active

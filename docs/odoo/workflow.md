@@ -33,14 +33,14 @@ Generated Files (Do Not Modify)
 - `addons/product_connect/services/shopify/gql/*` — generated GraphQL client.
 - `addons/product_connect/graphql/schema/*` — Shopify schema snapshots.
 
-Views (Odoo 18)
+Views (Odoo 19)
 
 - Use `<list>` for list views (do not add new `<tree>` roots).
 - Prefer `invisible`, `readonly`, `required` attributes over legacy
   `attrs`/`states`.
 - Use `column_invisible` to hide full columns in list views.
 
-Frontend (Odoo 18)
+Frontend (Odoo 19)
 
 - Use native ES modules (`@web/...`, `@odoo/...`).
 - Do not introduce AMD `odoo.define` modules.

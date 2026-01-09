@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.6
-ARG ODOO_VERSION=18.0
+ARG ODOO_VERSION=19.0
 
 FROM postgres:17-bullseye AS pg17
 

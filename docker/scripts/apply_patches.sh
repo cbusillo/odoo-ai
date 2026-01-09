@@ -21,8 +21,14 @@ for patch in "$patch_dir"/*.patch; do
     fi
     target_path="$root_dir/$target_rel"
     if [ ! -e "$target_path" ]; then
-        echo "Skipping patch (target missing): $(basename "$patch")"
-        continue
+        alt_rel="${target_rel%.orig}"
+        alt_path="$root_dir/$alt_rel"
+        if [ "$alt_rel" != "$target_rel" ] && [ -e "$alt_path" ]; then
+            target_path="$alt_path"
+        else
+            echo "Skipping patch (target missing): $(basename "$patch")"
+            continue
+        fi
     fi
     echo "Applying patch: $(basename "$patch")"
     patch_log="$(mktemp)"

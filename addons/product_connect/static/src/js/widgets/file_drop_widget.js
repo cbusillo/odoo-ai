@@ -68,7 +68,7 @@ export class FileDropWidget extends BinaryField {
                         if (!(file instanceof Blob)) {
                             throw new Error("The file is not a Blob.")
                         }
-                        return await resizeImage(file, 1920, 1920)
+                        return resizeImage(file, 1920, 1920)
                     })
                 )
                 const highestIndex = await this.getHighestIndex(this.props.record.resId);

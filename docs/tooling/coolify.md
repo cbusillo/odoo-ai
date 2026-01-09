@@ -26,5 +26,7 @@ Notes
 - Keep environment-specific details in a local note if needed.
 - Coolify is the source of truth for remote env vars. Local stacks use the
   layered env files under `docker/config/` and should not drift from Coolify.
+- API helper: app env vars are exposed by
+  `/api/v1/applications/{uuid}/envs`.
 - Coolify shows "No health check configured" if the UI health check is unset
   even when Docker health checks are healthy.

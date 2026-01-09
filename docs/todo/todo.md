@@ -24,3 +24,6 @@ title: TODO / Optimization Ideas
   - During cutover: restore new `opw-prod` from `opw-prod.shiny`, verify, then
     move `odoo.outboardpartswarehouse.com` to the new host.
   - After cutover: block restore tooling on live prod (guard env + script).
+  - After `opw-prod` promotion: clean up legacy LXC references in docs and
+    tooling (only after the Coolify `opw-prod` container replaces
+    `opw-prod.shiny`).

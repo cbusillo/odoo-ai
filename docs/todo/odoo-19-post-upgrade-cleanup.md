@@ -10,7 +10,8 @@ Purpose
 
 Context
 
-- Current production: single Odoo 18 environment.
+- Current live production: `opw-prod.shiny` (Odoo 18).
+  Coolify prod apps run Odoo 19 but are not cut over yet.
 - Upgrade assets (OpenUpgrade addon + upgrade docs) remain until cutover is
   complete.
 

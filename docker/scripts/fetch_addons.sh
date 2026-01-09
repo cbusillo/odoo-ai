@@ -10,14 +10,13 @@ mkdir -p /addons /extra_addons
 addons_repos="${ODOO_ADDON_REPOSITORIES:-}"
 openupgrade_repo="OCA/OpenUpgrade@${ODOO_VERSION:-19.0}"
 case ",${addons_repos}," in
-  *,OCA/OpenUpgrade@*,*|*,OCA/OpenUpgrade,*)
-    ;;
-  "",,)
-    addons_repos="${openupgrade_repo}"
-    ;;
-  *)
-    addons_repos="${addons_repos},${openupgrade_repo}"
-    ;;
+*,OCA/OpenUpgrade@*,* | *,OCA/OpenUpgrade,*) ;;
+"",,)
+	addons_repos="${openupgrade_repo}"
+	;;
+*)
+	addons_repos="${addons_repos},${openupgrade_repo}"
+	;;
 esac
 
 link_modules() {

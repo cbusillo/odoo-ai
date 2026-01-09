@@ -15,7 +15,7 @@ the linked docs, then keep prompts lean.
 ## Project Snapshot
 
 - Custom addons live under `./addons/`; host `./` maps to container `/volumes/`.
-- We target Odoo 18 Enterprise. Never edit generated GraphQL artifacts
+- We target Odoo 19 Enterprise. Never edit generated GraphQL artifacts
   (`addons/product_connect/services/shopify/gql/*`,
   `addons/product_connect/graphql/schema/*`).
 - Always go through `uv run ...`; the Odoo environment must bootstrap every
@@ -32,7 +32,7 @@ the linked docs, then keep prompts lean.
   `uv run python tmp/scripts/<name>.py` so the `uv run` sandbox bypass applies
   and you can iterate without heredocs.
 
-## Version Guardrails (Odoo 18 + Owl 2)
+## Version Guardrails (Odoo 19 + Owl 2)
 
 - Views: use `<list>` roots, not `<tree>`.
 - Views: use `invisible`/`readonly`/`required` and `column_invisible`; avoid

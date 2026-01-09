@@ -5,7 +5,7 @@ title: Python Style
 
 Purpose
 
-- Define our house style for Python used in Odoo 18 projects and utilities.
+- Define our house style for Python used in Odoo 19 projects and utilities.
 
 When
 

@@ -27,8 +27,8 @@ Odoo-specific
   `docker exec ${ODOO_PROJECT_NAME}-script-runner-1 /odoo/odoo-bin -u <module> --stop-after-init`
 - Restore data: `uv run ops local restore <target>`
   - Targets: `opw`, `cm` (local stack names default to `opw-local`, `cm-local`)
-  - Ensure the stack mounts an SSH directory (`RESTORE_SSH_DIR`) so the
-    container can reach the upstream host
+  - Ensure `RESTORE_SSH_DIR` points at a host SSH directory so the base compose
+    mounts it into the container for upstream access
   - When an upstream dump is unavailable, bootstrap with
     `uv run ops local init <target>`
 

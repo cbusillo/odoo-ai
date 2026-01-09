@@ -36,9 +36,8 @@ When
 - `docker/scripts/install_prod_requirements.sh` and
   `docker/scripts/install_dev_requirements.sh` use `uv sync` with
   `/volumes/pyproject.toml` and `/volumes/uv.lock`.
-- Use `docker/config/_restore_ssh_volume.yaml` when running
-  `uv run ops local restore <target>` locally so the container can reach
-  upstream.
+- Restore flows rely on `RESTORE_SSH_DIR` so the base compose mounts the SSH
+  directory for upstream access during `uv run ops local restore <target>`.
 
 ## Local deploy/restore
 

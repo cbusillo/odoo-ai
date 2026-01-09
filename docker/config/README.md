@@ -21,7 +21,6 @@ docker-compose.yml
 → docker-compose.override.yml (local-only)
 → docker/config/base.yaml
 → docker/config/{project}-local.yaml
-→ optional extras (used by restore flows)
 ```
 
 ## Local stacks
@@ -48,5 +47,5 @@ docker-compose.yml
   repo for live-editing (see `docs/workflows/multi-project.md`).
 - Local-only overrides live in the env files (for example `ODOO_WEB_COMMAND`
   and host port mappings).
-- Restore runs (`uv run ops local restore <target>`) automatically include the
-  `_restore_ssh_volume.yaml` overlay so the container can reach upstream hosts.
+- Restore runs (`uv run ops local restore <target>`) rely on `RESTORE_SSH_DIR`
+  being set so the base compose mounts the SSH directory for upstream access.

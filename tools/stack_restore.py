@@ -23,7 +23,6 @@ logging.basicConfig(level=logging.INFO)
 _logger = logging.getLogger(__name__)
 
 RESTORE_SCRIPT = "/volumes/scripts/restore_from_upstream.py"
-RESTORE_SSH_OVERLAY = Path("docker/config/_restore_ssh_volume.yaml")
 
 
 def _ensure_stack_env(settings: StackSettings, stack_name: str) -> None:
@@ -57,13 +56,7 @@ def _current_image_reference(settings: StackSettings) -> str:
 
 
 def _settings_for_restore(settings: StackSettings) -> StackSettings:
-    restore_dir = (settings.environment.get("RESTORE_SSH_DIR") or "").strip()
-    if not restore_dir:
-        return settings
-    overlay = settings.repo_root / RESTORE_SSH_OVERLAY
-    if overlay in settings.compose_files:
-        return settings
-    return replace(settings, compose_files=(*settings.compose_files, overlay))
+    return settings
 
 
 def _add_toggle_env_flags(command: list[str], *, bootstrap_only: bool, no_sanitize: bool) -> None:

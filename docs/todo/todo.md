@@ -27,3 +27,5 @@ title: TODO / Optimization Ideas
   - After `opw-prod` promotion: clean up legacy LXC references in docs and
     tooling (only after the Coolify `opw-prod` container replaces
     `opw-prod.shiny`).
+  - After Odoo 19 cutover + `opw-prod` promotion: remove `OPENUPGRADE_ENABLED`
+    from opw apps (dev/testing/prod) once upgrades are complete.

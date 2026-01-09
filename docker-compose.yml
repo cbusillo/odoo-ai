@@ -70,6 +70,11 @@ services:
       start_period: 10s
   script-runner:
     <<: *odoo-base
+    volumes:
+      - odoo_data:/volumes/data
+      - odoo_logs:/volumes/logs
+      - ${RESTORE_SSH_DIR:-/home/ubuntu/.ssh}:/home/ubuntu/.ssh:ro
+      - ${RESTORE_SSH_DIR:-/home/ubuntu/.ssh}:/root/.ssh:ro
     command: tail -f /dev/null
     working_dir: /opt/project
     restart: unless-stopped

@@ -42,7 +42,7 @@ install_addon_dev_requirements() {
   cd "$base_dir"
   for addon in */ ; do
     case "$addon" in
-      openupgrade_framework/|openupgrade_scripts/)
+      OpenUpgrade/|openupgrade_framework/|openupgrade_scripts/)
         continue
         ;;
     esac

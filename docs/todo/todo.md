@@ -29,3 +29,8 @@ title: TODO / Optimization Ideas
     `opw-prod.shiny`).
   - After Odoo 19 cutover + `opw-prod` promotion: remove `OPENUPGRADE_ENABLED`
     from opw apps (dev/testing/prod) once upgrades are complete.
+  - After `opw-prod` promotion: remove `OPENUPGRADE_TARGET_VERSION` and
+    `OCA/OpenUpgrade@19.0` from `ODOO_ADDON_REPOSITORIES` on opw apps if no
+    longer needed.
+  - After `opw-prod` promotion: remove `ODOO_UPSTREAM_*` env vars from
+    `opw-prod` (no upstream once the docker prod becomes source of truth).

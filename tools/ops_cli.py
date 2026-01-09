@@ -1077,7 +1077,10 @@ def _run_ship(
         for app_ref in post_apps:
             _coolify_update_application(
                 app_ref,
-                {"post_deployment_command": "", "post_deployment_command_container": ""},
+                {
+                    "post_deployment_command": "true",
+                    "post_deployment_command_container": "script-runner",
+                },
             )
 
 

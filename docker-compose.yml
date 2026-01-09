@@ -12,9 +12,6 @@ x-odoo-base: &odoo-base
   pull_policy: never
   env_file:
     - .env
-  volumes:
-    - odoo_data:/volumes/data
-    - odoo_logs:/volumes/logs
 
 x-odoo-build: &odoo-build
   build:
@@ -42,6 +39,9 @@ services:
   web:
     <<: [ *odoo-base, *odoo-build ]
     command: /odoo/odoo-bin
+    volumes:
+      - odoo_data:/volumes/data
+      - odoo_logs:/volumes/logs
     environment:
       <<: *odoo-env
     healthcheck:

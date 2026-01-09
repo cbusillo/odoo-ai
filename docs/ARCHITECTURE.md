@@ -13,18 +13,24 @@ When
 
 ## Runtime Topology
 
-| Environment     | Location         | Deployment                           |
-|-----------------|------------------|--------------------------------------|
-| OPW local       | developer laptop | `uv run ops local up opw --build`    |
-| CM local        | developer laptop | `uv run ops local up cm --build`     |
-| OPW dev/testing | Coolify + Docker | Coolify UI                           |
-| CM dev/testing  | Coolify + Docker | Coolify UI                           |
-| OPW prod        | legacy host      | legacy (non-Docker)                  |
+| Environment          | Location   | Deployment                         |
+|----------------------|------------|------------------------------------|
+| OPW local            | dev laptop | `uv run ops local up opw --build`  |
+| CM local             | dev laptop | `uv run ops local up cm --build`   |
+| OPW dev/testing      | Coolify    | Coolify UI                         |
+| CM dev/testing       | Coolify    | Coolify UI                         |
+| OPW prod (candidate) | Coolify    | app `opw-prod`                     |
+| CM prod (candidate)  | Coolify    | app `cm-prod`                      |
+| OPW prod (live)      | legacy LXC | `opw-prod.shiny` (non-Docker)      |
 
 ## Key points
 
 - Local stacks use `docker/config/*.env` and `docker/config/*.yaml` overlays.
   Coolify uses `docker-compose.yml` plus environment variables defined in the UI.
+- `opw-prod.shiny` remains the live production system until cutover; it is
+  read-only and the data source for `opw-*` restores.
+- Coolify prod apps track `opw-prod`/`cm-prod` branches and are treated as
+  candidate prod during validation.
 - Bind mounts are used for state; set `ODOO_STATE_ROOT` per local stack so
   `filestore/`, `postgres/`, and `logs/` stay isolated.
 - `docker/scripts/install_prod_requirements.sh` and

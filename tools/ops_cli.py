@@ -45,7 +45,18 @@ console = Console()
 
 ALL_TARGET = "all"
 ENVS = ("local", "dev", "testing", "prod")
-LOCAL_ACTIONS = ("up", "down", "init", "restore", "restart", "upgrade", "openupgrade", "doctor", "info")
+LOCAL_ACTIONS = (
+    "up",
+    "down",
+    "init",
+    "restore",
+    "restart",
+    "upgrade",
+    "upgrade-restart",
+    "openupgrade",
+    "doctor",
+    "info",
+)
 POST_SHIP_ACTIONS = ("none", "restore", "init")
 SHIP_ACTIONS = ("ship",)
 GATE_ACTIONS = ("gate",)
@@ -918,6 +929,12 @@ def _run_local_action(
             settings = load_stack_settings(stack, env_file_path)
             _run_local_upgrade(settings, dry_run=dry_run)
             console.print(f"{entry} local upgrade complete")
+            continue
+        if action == "upgrade-restart":
+            settings = load_stack_settings(stack, env_file_path)
+            _run_local_upgrade(settings, dry_run=dry_run)
+            _run_local_restart(settings, dry_run=dry_run)
+            console.print(f"{entry} local upgrade + restart complete")
             continue
         if action == "openupgrade":
             settings = load_stack_settings(stack, env_file_path)

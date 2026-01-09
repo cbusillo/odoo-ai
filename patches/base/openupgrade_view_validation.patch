@@ -1,0 +1,51 @@
+--- openupgrade_framework/odoo_patch/odoo/addons/base/models/ir_ui_view.py
++++ openupgrade_framework/odoo_patch/odoo/addons/base/models/ir_ui_view.py
+@@ -13,6 +13,14 @@
+ _logger = logging.getLogger(__name__)
+ 
+ 
++def _safe_view_log_context(recordset):
++    """Avoid singleton errors when logging invalid views."""
++    record = recordset[:1]
++    if record:
++        return record.xml_id, record.model
++    return "<unknown>", "<unknown>"
++
++
+ @api.constrains("arch_db")
+ def _check_xml(self):
+     """Don't raise or log exceptions in view validation unless explicitely
+@@ -21,13 +29,14 @@
+         try:
+             return IrUiView._check_xml._original_method(self)
+         except ValidationError as e:
++            xml_id, model = _safe_view_log_context(self)
+             _logger.warning(
+                 "Can't render custom view %s for model %s. "
+                 "Assuming you are migrating between major versions of Odoo. "
+                 "Please review the view contents manually after the migration.\n"
+                 "Error: %s",
+-                self.xml_id,
+-                self.model,
++                xml_id,
++                model,
+                 e,
+             )
+ 
+@@ -50,13 +59,14 @@
+                 from_traceback=from_traceback,
+             )
+         except ValueError as e:
++            xml_id, model = _safe_view_log_context(self)
+             _logger.warning(
+                 "Can't render custom view %s for model %s. "
+                 "Assuming you are migrating between major versions of Odoo. "
+                 "Please review the view contents manually after the migration.\n"
+                 "Error: %s",
+-                self.xml_id,
+-                self.model,
++                xml_id,
++                model,
+                 e,
+             )
+ 

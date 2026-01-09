@@ -49,6 +49,8 @@ COPY /docker/config /volumes/config
 COPY /docker/scripts /volumes/scripts
 COPY /addons /volumes/addons
 COPY --from=addon_sources /extra_addons /opt/extra_addons
+COPY patches/base /tmp/patches/base
+RUN /volumes/scripts/apply_patches.sh /tmp/patches/base /opt/extra_addons --cleanup
 COPY /pyproject.toml /volumes/pyproject.toml
 COPY /uv.lock /volumes/uv.lock
 
@@ -93,11 +95,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     /volumes/scripts/install_dev_requirements.sh
 
 # Apply development patches for --dev mode issues
-COPY patches/fix_dev_mode_validation.patch /tmp/
+COPY patches/dev /tmp/patches/dev
 WORKDIR /
-RUN patch -p0 < /tmp/fix_dev_mode_validation.patch \
-    && rm /tmp/fix_dev_mode_validation.patch \
-    && echo "✓ Applied --dev mode validation fix"
+RUN /volumes/scripts/apply_patches.sh /tmp/patches/dev / --cleanup
 
 # Common final steps
 ENV HOOK_SETUP_FILE=/volumes/scripts/hook_setup

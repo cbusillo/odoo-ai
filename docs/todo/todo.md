@@ -34,3 +34,8 @@ title: TODO / Optimization Ideas
     longer needed.
   - After `opw-prod` promotion: remove `ODOO_UPSTREAM_*` env vars from
     `opw-prod` (no upstream once the docker prod becomes source of truth).
+
+## Health Checks
+
+- Build a dedicated `odoo_healthcheck` addon with a DB/registry-aware endpoint
+  (avoid `/web/health` false positives) and use it across all environments.

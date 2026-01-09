@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -62,6 +63,7 @@ SHIP_ACTIONS = ("ship",)
 GATE_ACTIONS = ("gate",)
 STATUS_ENVS = ("dev", "testing")
 HISTORY_LIMIT = 50
+FAVORITES_LIMIT = 6
 STATUS_INTERVAL_DEFAULT = 10.0
 STATUS_TIMEOUT_DEFAULT = 600.0
 LOCAL_INFO_SCHEMA_VERSION = 1
@@ -247,7 +249,7 @@ def _record_history(state: OpsState) -> None:
     _write_state_payload(updated)
 
 
-def _favorite_states(limit: int = 3) -> list[OpsState]:
+def _favorite_states(limit: int = FAVORITES_LIMIT) -> list[OpsState]:
     payload = _load_state_payload()
     history = _normalize_history(payload.get("history"))
     if not history:
@@ -281,6 +283,53 @@ def _favorite_label(state: OpsState) -> str:
             if state.no_cache:
                 label = f"{label} +no-cache"
     return label
+
+
+def _render_cli_command(
+        *,
+        target: str,
+        env: str,
+        action: str,
+        deploy: bool,
+        wait_deploy: bool,
+        serial: bool,
+        build: bool,
+        no_cache: bool,
+        post_action: str | None,
+        dry_run: bool,
+) -> str:
+    command_parts: list[str] = ["uv", "run", "ops"]
+    if action in LOCAL_ACTIONS:
+        command_parts.extend(["local", action, target])
+        if build:
+            command_parts.append("--build")
+            if no_cache:
+                command_parts.append("--no-cache")
+        if dry_run:
+            command_parts.append("--dry-run")
+        return shlex.join(command_parts)
+
+    if action == "ship":
+        command_parts.extend(["ship", env, target])
+        if not deploy:
+            command_parts.append("--no-deploy")
+        if not wait_deploy:
+            command_parts.append("--no-wait")
+        if serial:
+            command_parts.append("--serial")
+        if post_action and post_action != "none":
+            command_parts.extend(["--after", post_action])
+        if dry_run:
+            command_parts.append("--dry-run")
+        return shlex.join(command_parts)
+
+    if action == "gate":
+        command_parts.extend(["gate", target])
+        if dry_run:
+            command_parts.append("--dry-run")
+        return shlex.join(command_parts)
+
+    return shlex.join(command_parts)
 
 
 def _run(cmd: Sequence[str], *, dry_run: bool = False, display: bool = True) -> None:
@@ -1430,6 +1479,19 @@ def _interactive(*, dry_run: bool, remember: bool, wait_deploy: bool) -> None:
             require_confirm=True,
             record_history=True,
         )
+        command_line = _render_cli_command(
+            target=target,
+            env=env,
+            action=action,
+            deploy=deploy,
+            wait_deploy=wait_deploy,
+            serial=serial,
+            build=build,
+            no_cache=no_cache,
+            post_action=post_action,
+            dry_run=dry_run,
+        )
+        console.print(f"CLI command: {command_line}")
     except (KeyboardInterrupt, EOFError) as error:
         raise click.Abort() from error
 

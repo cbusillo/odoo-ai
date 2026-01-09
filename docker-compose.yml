@@ -21,7 +21,7 @@ x-odoo-build: &odoo-build
     dockerfile: docker/Dockerfile
     args:
       PYTHON_VERSION: ${PYTHON_VERSION:-3.13}
-      ODOO_VERSION: ${ODOO_VERSION:-18.0}
+      ODOO_VERSION: ${ODOO_VERSION:-19.0}
       ODOO_ADDON_REPOSITORIES: ${ODOO_ADDON_REPOSITORIES:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
     target: ${COMPOSE_BUILD_TARGET:-development}

@@ -55,7 +55,9 @@ Remembered choices
 
 - The menu remembers your last selections in:
   `~/odoo-ai/ops.json`.
-- Favorites are derived from recent usage and shown as quick picks.
+- Favorites are derived from recent usage and shown as quick picks (up to 6).
+- After an interactive run, the CLI prints the equivalent `uv run ops ...`
+  command for copy/paste.
 - Interactive prompts use arrow keys when `questionary` is available; otherwise
   they fall back to typed prompts.
 - Install `rich` + `questionary` with `uv sync`.

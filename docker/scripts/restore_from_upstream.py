@@ -1537,6 +1537,8 @@ with registry.cursor() as cr:
             self.local.db_name,
             "--no-http",
         ]
+        if self.local.openupgrade_enabled:
+            cmd_parts += ["--load", "base,web,openupgrade_framework"]
         if to_install:
             cmd_parts += ["-i", ",".join(to_install)]
         if to_update:

@@ -698,7 +698,7 @@ class ProductTemplate(models.Model):
     @api.depends("name", "motor_product_computed_name", "default_code")
     def _compute_display_name(self) -> None:
         for product in self:
-            if isinstance(product.id, models.NewId):
+            if isinstance(product.id, api.NewId):
                 super()._compute_display_name()
                 continue
             name = product.motor_product_computed_name if product.source == "motor" else product.name

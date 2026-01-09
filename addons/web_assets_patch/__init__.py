@@ -1,1 +1,0 @@
-"""Asset order patch module."""

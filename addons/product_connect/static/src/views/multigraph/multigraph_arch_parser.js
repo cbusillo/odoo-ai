@@ -1,4 +1,5 @@
 import { visitXML } from "@web/core/utils/xml"
+import { evaluateExpr } from "@web/core/py_js/py"
 
 export class MultigraphArchParser {
     parse(arch, fields) {
@@ -17,7 +18,22 @@ export class MultigraphArchParser {
                 const fieldName = node.getAttribute("name")
 
                 if (node.getAttribute("type") === "measure") {
-                    const axis = node.getAttribute("axis") || "y"
+                    let axis = node.getAttribute("axis")
+                    if (!axis) {
+                        const contextExpr = node.getAttribute("context")
+                        if (contextExpr) {
+                            try {
+                                const context = evaluateExpr(contextExpr)
+                                const axisOverride = context?.["multigraph_axis"]
+                                if (typeof axisOverride === "string") {
+                                    axis = axisOverride
+                                }
+                            } catch (error) {
+                                // Ignore context parsing errors and fall back to default axis.
+                            }
+                        }
+                    }
+                    axis = axis || "y"
                     const widget = node.getAttribute("widget")
                     const label = node.getAttribute("string") || fields[fieldName]?.string || fieldName
 

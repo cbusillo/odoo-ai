@@ -39,8 +39,10 @@
                 <field name="is_ready_for_sale_last_enabled_date" interval="day"/>
                 <field name="initial_price_total" type="measure" widget="monetary" string="Revenue Value"/>
                 <field name="initial_cost_total" type="measure" widget="monetary" string="Cost Value"/>
-                <field name="initial_quantity" type="measure" string="Units Processed"/>
-                <field name="image_count" type="measure" string="Image Count"/>
+                <field name="initial_quantity" type="measure" string="Units Processed"
+                       context="{'multigraph_axis': 'y2'}"/>
+                <field name="image_count" type="measure" string="Image Count"
+                       context="{'multigraph_axis': 'y2'}"/>
             </graph>
         </field>
     </record>

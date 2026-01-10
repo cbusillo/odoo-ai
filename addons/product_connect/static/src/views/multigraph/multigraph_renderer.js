@@ -70,7 +70,7 @@ export class MultigraphRenderer extends GraphRenderer {
     getChartConfig() {
         const { data } = this.model
 
-        // Data validation is already handled in renderChart(), 
+        // Data validation is already handled in renderChart(),
         // so this should not be called with invalid data
         if (!data) {
             console.error("getChartConfig called without valid data - this should not happen")
@@ -185,13 +185,6 @@ export class MultigraphRenderer extends GraphRenderer {
                 console.log("Chart clicked - would open details view with domain:", domain)
             }
         }
-    }
-
-    onModeClick(mode) {
-        /** @type {import("./multigraph_model").MultigraphModel} */
-        const model = this.model
-        model.metaData.mode = mode
-        this.render(true)
     }
 
     // noinspection JSUnusedGlobalSymbols - Owl lifecycle method

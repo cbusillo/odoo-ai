@@ -1,14 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-name="web.MultigraphView.Buttons">
-        <div class="btn-group o_graph_buttons" role="group" aria-label="Graph Options">
-            <button t-foreach="['bar', 'line', 'pie']" t-as="mode"
-                    t-key="mode"
-                    t-attf-class="btn btn-secondary o_graph_button o_graph_mode_#{mode} #{model.metaData.mode === mode ? 'active' : ''}"
-                    t-att-data-mode="mode"
-                    t-on-click="() => this.onModeClick(mode)">
-                <i t-attf-class="fa #{mode === 'bar' ? 'fa-bar-chart' : mode === 'line' ? 'fa-line-chart' : 'fa-pie-chart'}"/>
-            </button>
-        </div>
     </t>
 </templates>

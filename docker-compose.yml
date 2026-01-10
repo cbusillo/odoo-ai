@@ -40,8 +40,8 @@ services:
     <<: [ *odoo-base, *odoo-build ]
     command: /odoo/odoo-bin
     volumes:
-      - odoo_data:/volumes/data
-      - odoo_logs:/volumes/logs
+      - ${ODOO_DATA_HOST_DIR:?missing}:/volumes/data
+      - ${ODOO_LOG_HOST_DIR:?missing}:/volumes/logs
     environment:
       <<: *odoo-env
     healthcheck:
@@ -57,7 +57,7 @@ services:
     image: postgres:17
     restart: unless-stopped
     volumes:
-      - odoo_db:/var/lib/postgresql/data
+      - ${ODOO_DB_HOST_DIR:?missing}:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=postgres
       - POSTGRES_PASSWORD=${ODOO_DB_PASSWORD}
@@ -71,8 +71,8 @@ services:
   script-runner:
     <<: *odoo-base
     volumes:
-      - odoo_data:/volumes/data
-      - odoo_logs:/volumes/logs
+      - ${ODOO_DATA_HOST_DIR:?missing}:/volumes/data
+      - ${ODOO_LOG_HOST_DIR:?missing}:/volumes/logs
       - ${RESTORE_SSH_DIR:-/home/ubuntu/.ssh}:/home/ubuntu/.ssh:ro
       - ${RESTORE_SSH_DIR:-/home/ubuntu/.ssh}:/root/.ssh:ro
     command: tail -f /dev/null
@@ -93,19 +93,3 @@ services:
         --disable-software-rasterizer --window-size=1920,1080 --no-first-run
         --no-default-browser-check
         --disable-features=TranslateUI,site-per-process,IsolateOrigins,BlockInsecurePrivateNetworkRequests
-volumes:
-  odoo_data:
-    driver: local
-    driver_opts:
-      <<: *bind-opts
-      device: ${ODOO_DATA_HOST_DIR}
-  odoo_logs:
-    driver: local
-    driver_opts:
-      <<: *bind-opts
-      device: ${ODOO_LOG_HOST_DIR}
-  odoo_db:
-    driver: local
-    driver_opts:
-      <<: *bind-opts
-      device: ${ODOO_DB_HOST_DIR}

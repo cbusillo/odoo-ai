@@ -1,8 +1,9 @@
 """Migration to backfill is_ready_for_sale_last_enabled_date field"""
 
 import logging
+from datetime import date
 
-from odoo import SUPERUSER_ID, api
+from odoo import SUPERUSER_ID, api, fields
 from odoo.sql_db import Cursor
 
 _logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ def migrate(cr: Cursor, version: str) -> None:
 
     updated_count = 0
     failed_count = 0
+    skipped_noisy_count = 0
 
     for product in products_needing_backfill:
         try:
@@ -57,6 +59,12 @@ def migrate(cr: Cursor, version: str) -> None:
             if not backfill_date:
                 continue
 
+            if backfill_source == "create_date":
+                backfill_datetime = fields.Datetime.to_datetime(backfill_date)
+                if backfill_datetime and backfill_datetime.date() in {date(2024, 2, 1), date(2024, 2, 2)}:
+                    skipped_noisy_count += 1
+                    continue
+
             _logger.debug(f"Product {product.default_code}: Using {backfill_source} {backfill_date}")
 
             # Update the field directly (bypass write method to avoid logic)
@@ -81,7 +89,8 @@ def migrate(cr: Cursor, version: str) -> None:
 
     _logger.info(
         "Migration completed: "
-        f"{updated_count} updated, {remaining_missing_count} remaining without a date, {failed_count} failed"
+        f"{updated_count} updated, {remaining_missing_count} remaining without a date, "
+        f"{failed_count} failed, {skipped_noisy_count} skipped (noisy create_date)"
     )
 
     # Commit the changes

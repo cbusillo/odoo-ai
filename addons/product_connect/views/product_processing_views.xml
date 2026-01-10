@@ -116,8 +116,6 @@
         <field name="domain">[('is_ready_for_sale', '=', True),
                               ('is_ready_for_sale_last_enabled_date', '!=', False)]</field>
         <field name="context">{
-            'search_default_motor_products': 1,
-            'search_default_import_products': 1,
             'search_default_date_range_group': 1,
             'graph_groupbys': ['is_ready_for_sale_last_enabled_date:day'],
             'graph_measures': ['initial_price_total', 'initial_cost_total', 'initial_quantity', 'image_count'],

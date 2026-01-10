@@ -64,6 +64,11 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="Skip sanitization steps (mail/cron/base URL adjustments)",
     )
+    parser.add_argument(
+        "--update-only",
+        action="store_true",
+        help="Run addon update only (no restore/bootstrap)",
+    )
     return parser.parse_args(argv)
 
 
@@ -91,6 +96,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     bootstrap_only = args.bootstrap_only or local_settings.bootstrap_only
     no_sanitize = args.no_sanitize or local_settings.no_sanitize
+    update_only = bool(args.update_only)
 
     try:
         upstream_settings = UpstreamServerSettings(**settings_kwargs)
@@ -101,6 +107,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     restorer = OdooUpstreamRestorer(local_settings, upstream_settings, env_file)
 
     try:
+        if update_only:
+            restorer.update_addons(reason="post-deploy upgrade")
+            _logger.info("Addon update completed successfully.")
+            return ExitCode.SUCCESS
+
         if bootstrap_only:
             restorer.bootstrap_database(do_sanitize=not no_sanitize)
             return ExitCode.SUCCESS

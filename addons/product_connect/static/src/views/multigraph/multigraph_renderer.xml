@@ -1,24 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-name="web.MultigraphRenderer">
-        <div class="o_graph_view">
-            <div class="o_graph_renderer o_multigraph_renderer h-100 d-flex flex-column border-top">
-                <t t-if="!chartjsLoaded">
-                    <div class="o_graph_no_data">
-                        <span>Loading chart library...</span>
-                    </div>
-                </t>
-                <t t-elif="!model.data or !model.data.datasets or model.data.datasets.length === 0">
-                    <div class="o_graph_no_data">
-                        <span>No data to display</span>
-                    </div>
-                </t>
-                <t t-else="">
-                    <div class="o_graph_canvas_container flex-grow-1 position-relative px-3 pb-3">
-                        <canvas t-ref="canvas"/>
-                    </div>
-                </t>
-            </div>
+        <div class="o_graph_renderer o_multigraph_renderer h-100 d-flex flex-column border-top">
+            <t t-if="!chartjsLoaded">
+                <div class="o_graph_no_data">
+                    <span>Loading chart library...</span>
+                </div>
+            </t>
+            <t t-elif="!model.data or !model.data.datasets or model.data.datasets.length === 0">
+                <div class="o_graph_no_data">
+                    <span>No data to display</span>
+                </div>
+            </t>
+            <t t-else="">
+                <div class="o_graph_canvas_container flex-grow-1 position-relative px-3 pb-3" t-ref="container">
+                    <canvas t-ref="canvas"/>
+                </div>
+            </t>
         </div>
     </t>
 </templates>

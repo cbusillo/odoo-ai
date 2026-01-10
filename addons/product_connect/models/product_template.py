@@ -165,6 +165,11 @@ class ProductTemplate(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list: list["odoo.values.product_template"]) -> Self:
+        defaults = self.default_get(["is_ready_for_sale"])
+        default_is_ready_for_sale = defaults.get("is_ready_for_sale")
+        if default_is_ready_for_sale is None:
+            default_is_ready_for_sale = False
+
         for vals in vals_list:
             source = self.env.context.get("default_source") or vals.get("source")
             if source:
@@ -184,6 +189,10 @@ class ProductTemplate(models.Model):
 
             if not vals.get("default_code") and vals.get("type") == "consu":
                 vals["default_code"] = self.get_next_sku()
+
+            is_ready_for_sale = vals.get("is_ready_for_sale", default_is_ready_for_sale)
+            if is_ready_for_sale and not vals.get("is_ready_for_sale_last_enabled_date"):
+                vals["is_ready_for_sale_last_enabled_date"] = fields.Datetime.now()
 
         products = super().create(vals_list)
         for product in products:

@@ -7,7 +7,8 @@ log() {
 
 mkdir -p /addons /extra_addons
 
-addons_repos="${ODOO_ADDON_REPOSITORIES:-}"
+addons_repos_raw="${ODOO_ADDON_REPOSITORIES:-}"
+addons_repos="$(printf '%s' "$addons_repos_raw" | tr -d '[:space:]')"
 openupgrade_repo="OCA/OpenUpgrade@${ODOO_VERSION:-19.0}"
 case ",${addons_repos}," in
 *,OCA/OpenUpgrade@*,* | *,OCA/OpenUpgrade,*) ;;

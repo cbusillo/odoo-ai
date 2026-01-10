@@ -84,9 +84,9 @@ assembles the correct file order automatically.
   not fail.
 - For Coolify deployments, use explicit bind mounts (`/host/path:/container`)
   instead of named volumes. Coolify rewrites named volumes per app, which
-  bypasses `driver_opts` bindings. Coolify apps point at
-  `docker/config/coolify.yml` and require `ODOO_*_HOST_DIR` env vars to be set
-  so bind mounts are enforced.
+  bypasses `driver_opts` bindings. The Coolify apps point at
+  `docker/coolify/<app>.yml` with hard-coded host paths so the bind mounts are
+  enforced.
 - Keep `ODOO_LOGFILE` pointed inside `/volumes/logs/` (e.g.
   `/volumes/logs/odoo.log`) so log rotation targets the bind-mounted directory.
 - Remote hosts are managed in Coolify; local stacks should keep state under

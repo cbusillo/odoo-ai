@@ -6,6 +6,8 @@ x-odoo-base: &odoo-base
   # If registry push ever needed: refactor Dockerfile to use BuildKit secrets
   image: ${DOCKER_IMAGE:-odoo-ai}:latest
   pull_policy: never
+  env_file:
+    - .env
 
 x-odoo-build: &odoo-build
   build:
@@ -28,14 +30,14 @@ x-healthcheck-defaults: &healthcheck-defaults
   interval: 30s
   timeout: 5s
 
-name: ${ODOO_PROJECT_NAME:-odoo}
+name: cm-dev
 services:
   web:
-    <<: [*odoo-base, *odoo-build]
+    <<: [ *odoo-base, *odoo-build ]
     command: /odoo/odoo-bin
     volumes:
-      - ${ODOO_DATA_HOST_DIR:?missing}:/volumes/data
-      - ${ODOO_LOG_HOST_DIR:?missing}:/volumes/logs
+      - /opt/odoo-ai/data/cm-dev/data:/volumes/data
+      - /opt/odoo-ai/data/cm-dev/logs:/volumes/logs
     environment:
       <<: *odoo-env
     healthcheck:
@@ -51,7 +53,7 @@ services:
     image: postgres:17
     restart: unless-stopped
     volumes:
-      - ${ODOO_DB_HOST_DIR:?missing}:/var/lib/postgresql/data
+      - /opt/odoo-ai/data/cm-dev/postgres:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=postgres
       - POSTGRES_PASSWORD=${ODOO_DB_PASSWORD}
@@ -66,10 +68,10 @@ services:
   script-runner:
     <<: *odoo-base
     volumes:
-      - ${ODOO_DATA_HOST_DIR:?missing}:/volumes/data
-      - ${ODOO_LOG_HOST_DIR:?missing}:/volumes/logs
-      - ${RESTORE_SSH_DIR:-/home/ubuntu/.ssh}:/home/ubuntu/.ssh:ro
-      - ${RESTORE_SSH_DIR:-/home/ubuntu/.ssh}:/root/.ssh:ro
+      - /opt/odoo-ai/data/cm-dev/data:/volumes/data
+      - /opt/odoo-ai/data/cm-dev/logs:/volumes/logs
+      - /home/ubuntu/.ssh:/home/ubuntu/.ssh:ro
+      - /home/ubuntu/.ssh:/root/.ssh:ro
     command: tail -f /dev/null
     working_dir: /opt/project
     restart: unless-stopped
@@ -77,18 +79,14 @@ services:
     healthcheck:
       <<: *healthcheck-defaults
       test: >-
-        test -x /odoo/odoo-bin &&
-        test -f /volumes/scripts/restore_from_upstream.py
+        test -x /odoo/odoo-bin && test -f /volumes/scripts/restore_from_upstream.py
       retries: 3
       start_period: 10s
     environment:
       <<: *odoo-env
       CHROMIUM_BIN: /usr/bin/chromium
       CHROMIUM_FLAGS: >-
-        --headless=new --no-sandbox --disable-gpu
-        --disable-dev-shm-usage
-        --disable-software-rasterizer
-        --window-size=1920,1080
-        --no-first-run --no-default-browser-check
-        --disable-features=TranslateUI,site-per-process,IsolateOrigins,
-        BlockInsecurePrivateNetworkRequests
+        --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage
+        --disable-software-rasterizer --window-size=1920,1080 --no-first-run
+        --no-default-browser-check
+        --disable-features=TranslateUI,site-per-process,IsolateOrigins,BlockInsecurePrivateNetworkRequests

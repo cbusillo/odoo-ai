@@ -1,8 +1,8 @@
 # Docker Config Layering (Local Dev)
 
 This directory holds local stack overlays used by `uv run ops local ...` and
-ad-hoc `docker compose` commands. Coolify deployments use
-`docker/config/coolify.yml` and the Coolify-managed environment variables.
+ad-hoc `docker compose` commands. Coolify deployments ignore these files and
+use the repo's `docker-compose.yml` only.
 
 ## Layer order
 

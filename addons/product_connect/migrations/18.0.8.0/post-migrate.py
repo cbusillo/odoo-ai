@@ -1,6 +1,7 @@
 """Migration to backfill is_ready_for_sale_last_enabled_date field"""
 
 import logging
+
 from odoo import SUPERUSER_ID, api
 from odoo.sql_db import Cursor
 
@@ -44,11 +45,19 @@ def migrate(cr: Cursor, version: str) -> None:
             if tracking_messages:
                 # Use the most recent tracking date
                 backfill_date = tracking_messages[0].create_date
-                _logger.debug(f"Product {product.default_code}: Using tracking date {backfill_date}")
+                backfill_source = "tracking"
             else:
-                # Fallback to product write_date
-                backfill_date = product.write_date
-                _logger.debug(f"Product {product.default_code}: Using write_date fallback {backfill_date}")
+                if product.create_date:
+                    backfill_date = product.create_date
+                    backfill_source = "create_date"
+                else:
+                    backfill_date = None
+                    backfill_source = "missing"
+
+            if not backfill_date:
+                continue
+
+            _logger.debug(f"Product {product.default_code}: Using {backfill_source} {backfill_date}")
 
             # Update the field directly (bypass write method to avoid logic)
             cr.execute(
@@ -60,7 +69,20 @@ def migrate(cr: Cursor, version: str) -> None:
             _logger.error(f"Failed to backfill product {product.id} ({product.default_code}): {e}")
             failed_count += 1
 
-    _logger.info(f"Migration completed: {updated_count} updated, {failed_count} failed")
+    cr.execute(
+        """
+        SELECT COUNT(*)
+        FROM product_template
+        WHERE is_ready_for_sale = TRUE
+          AND is_ready_for_sale_last_enabled_date IS NULL
+        """
+    )
+    remaining_missing_count = cr.fetchone()[0]
+
+    _logger.info(
+        "Migration completed: "
+        f"{updated_count} updated, {remaining_missing_count} remaining without a date, {failed_count} failed"
+    )
 
     # Commit the changes
     cr.commit()

@@ -17,10 +17,4 @@ export class MultigraphController extends GraphController {
         super.setup()
     }
 
-    onModeClick(mode) {
-        // Delegate to the renderer's onModeClick method
-        if (this.renderer && this.renderer.onModeClick) {
-            this.renderer.onModeClick(mode)
-        }
-    }
 }

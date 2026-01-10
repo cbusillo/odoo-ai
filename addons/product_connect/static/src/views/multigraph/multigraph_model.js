@@ -1,3 +1,4 @@
+import { orderByToString } from "@web/search/utils/order_by"
 import { GraphModel } from "@web/views/graph/graph_model"
 
 export class MultigraphModel extends GraphModel {
@@ -6,23 +7,31 @@ export class MultigraphModel extends GraphModel {
             // Minimal stub to satisfy constructor paths that require an orm
             webReadGroup: async () => ({ groups: [] }),
         }
+        /** @type {import("services").ServiceFactories} */
+        const normalizedServices = {}
+        if (env?.services) {
+            Object.assign(normalizedServices, env.services)
+        }
+        if (services) {
+            Object.assign(normalizedServices, services)
+        }
+
+        if (!normalizedServices.orm) {
+            normalizedServices.orm = fallbackOrm
+        }
+
         const mergedEnv = {
             ...env,
-            services: {
-                // Ensure an ORM service always exists to avoid constructor crashes
-                orm: (services && services.orm) || (env && env.services && env.services.orm) || fallbackOrm,
-                ...(env?.services || {}),
-                ...(services || {}),
-            },
+            services: normalizedServices,
         }
 
         // Call parent with normalized signature (env, params, services)
         // Some Odoo models expect exactly 3 constructor args
-        super(mergedEnv, params, mergedEnv.services)
+        super(mergedEnv, params, normalizedServices)
 
         // Ensure orm is present for direct calls in our methods/tests
-        if (!this.orm && mergedEnv.services && mergedEnv.services.orm) {
-            this.orm = mergedEnv.services.orm
+        if (!this.orm && normalizedServices.orm) {
+            this.orm = normalizedServices.orm
         }
     }
 
@@ -83,7 +92,7 @@ export class MultigraphModel extends GraphModel {
             }
         }
 
-        return await this._loadData(searchParams)
+        await this._loadData(searchParams)
     }
 
     async _loadData(searchParams) {
@@ -100,7 +109,7 @@ export class MultigraphModel extends GraphModel {
             ? context.graph_groupbys
             : (Array.isArray(metaContextGroupBys) ? metaContextGroupBys : [])
 
-        const normalizedGroupBy = groupBy.map((groupByEntry) => {
+        groupBy = groupBy.map((groupByEntry) => {
             if (typeof groupByEntry === "string") {
                 return groupByEntry
             }
@@ -120,8 +129,6 @@ export class MultigraphModel extends GraphModel {
 
             return groupByEntry
         })
-
-        groupBy = normalizedGroupBy
 
         // If no groupBy is specified but we have graph_groupbys in context, use that
         if (groupBy.length === 0 && contextGroupBys.length > 0) {
@@ -167,6 +174,7 @@ export class MultigraphModel extends GraphModel {
 
         const fieldDefinitions = this.metaData?.fields || {}
         const aggregates = ["__count"]
+        const measureAggregateConfigByField = {}
         measureFieldNames.forEach((measureFieldName) => {
             const fieldDefinition = fieldDefinitions[measureFieldName] || {}
             let aggregator = fieldDefinition.aggregator
@@ -174,17 +182,29 @@ export class MultigraphModel extends GraphModel {
                 aggregator = fieldDefinition.type === "many2one" ? "count_distinct" : "sum"
             }
 
+            const aggregateKey = `${measureFieldName}:${aggregator}`
+            const aggregateConfig = { valueKey: aggregateKey }
+
             if (fieldDefinition.type === "monetary" && fieldDefinition.currency_field) {
-                aggregates.push(`${fieldDefinition.currency_field}:array_agg_distinct`)
-                aggregates.push(`${measureFieldName}:sum_currency`)
-                return
+                const currencyKey = `${fieldDefinition.currency_field}:array_agg_distinct`
+                const sumCurrencyKey = `${measureFieldName}:sum_currency`
+                aggregates.push(currencyKey)
+                aggregates.push(sumCurrencyKey)
+                aggregateConfig.currencyKey = currencyKey
+                aggregateConfig.sumCurrencyKey = sumCurrencyKey
             }
 
-            aggregates.push(`${measureFieldName}:${aggregator}`)
+            aggregates.push(aggregateKey)
+            measureAggregateConfigByField[measureFieldName] = aggregateConfig
         })
 
+        const order = orderBy.length ? orderByToString(orderBy) : ""
         const options = {
-            context,
+            context: {
+                fill_temporal: true,
+                ...context,
+            },
+            ...(order ? { order } : {}),
         }
 
         // Keep the effective groupBy in searchParams for downstream processing
@@ -198,6 +218,7 @@ export class MultigraphModel extends GraphModel {
             options
         )
 
+        this.measureAggregateConfigByField = measureAggregateConfigByField
         this.data = this._processData(data, fieldNamesOnly)
         // Keep a stable alias expected by some renderer/test helpers
         this.dataPoints = this.data
@@ -236,8 +257,30 @@ export class MultigraphModel extends GraphModel {
         })
         processedData.domains = data.groups.map(group => group.__domain || [])
 
+        const measureAggregateConfigByField = this.measureAggregateConfigByField || {}
+
         this.measures.forEach((measure, index) => {
-            const values = data.groups.map(group => group[measure.fieldName] || 0)
+            const aggregateConfig = measureAggregateConfigByField[measure.fieldName]
+            const values = data.groups.map((group) => {
+                if (!aggregateConfig) {
+                    return group[measure.fieldName] || 0
+                }
+
+                const rawValue = group[aggregateConfig.valueKey]
+                let value = rawValue === undefined || rawValue === null ? 0 : rawValue
+
+                if (aggregateConfig.currencyKey && aggregateConfig.sumCurrencyKey) {
+                    const currencyIds = group[aggregateConfig.currencyKey] || []
+                    if (currencyIds.length > 1) {
+                        const convertedValue = group[aggregateConfig.sumCurrencyKey]
+                        if (convertedValue !== undefined && convertedValue !== null) {
+                            value = convertedValue
+                        }
+                    }
+                }
+
+                return value
+            })
 
             processedData.datasets.push({
                 label: measure.label,
@@ -319,6 +362,7 @@ export class MultigraphModel extends GraphModel {
 
         return {
             ...this.metaData,
+            ...params,
             fields,
             axisConfig: this.axisConfig
         }

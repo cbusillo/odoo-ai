@@ -26,7 +26,8 @@ When
 ## Key points
 
 - Local stacks use `docker/config/*.env` and `docker/config/*.yaml` overlays.
-  Coolify uses `docker-compose.yml` plus environment variables defined in the UI.
+  Coolify uses `docker/config/coolify.yml` plus environment variables defined
+  in the UI.
 - `opw-prod.shiny` remains the live production system until cutover; it is
   read-only and the data source for `opw-*` restores.
 - Coolify prod apps track `opw-prod`/`cm-prod` branches and are treated as

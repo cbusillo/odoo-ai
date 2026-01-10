@@ -58,7 +58,7 @@ LOCAL_ACTIONS = (
     "doctor",
     "info",
 )
-POST_SHIP_ACTIONS = ("none", "restore", "init")
+POST_SHIP_ACTIONS = ("none", "restore", "init", "upgrade")
 SHIP_ACTIONS = ("ship",)
 GATE_ACTIONS = ("gate",)
 STATUS_ENVS = ("dev", "testing")
@@ -66,6 +66,10 @@ HISTORY_LIMIT = 50
 FAVORITES_LIMIT = 6
 STATUS_INTERVAL_DEFAULT = 10.0
 STATUS_TIMEOUT_DEFAULT = 600.0
+POST_DEPLOY_INTERVAL_DEFAULT = 15.0
+POST_DEPLOY_TIMEOUT_DEFAULT = 7200.0
+WEB_READY_INTERVAL_DEFAULT = 15.0
+WEB_READY_TIMEOUT_DEFAULT = 900.0
 LOCAL_INFO_SCHEMA_VERSION = 1
 
 OPS_CONFIG_PATH = Path("docker/config/ops.toml")
@@ -409,7 +413,7 @@ def _resolve_coolify_app(target: str, env: str) -> str | None:
         value = coolify.get(env)
         if isinstance(value, str) and value:
             return value
-    if env in ("dev", "testing"):
+    if env in ("dev", "testing", "prod"):
         return f"{target}-{env}"
     return None
 
@@ -548,6 +552,122 @@ def _coolify_latest_deployment(app_ref: str) -> dict[str, object] | None:
         return numeric_id, created_ts
 
     return max(deployments, key=_sort_key)
+
+
+def _normalize_deployment_logs(raw_logs: object) -> list[str]:
+    if isinstance(raw_logs, str):
+        try:
+            parsed = json.loads(raw_logs)
+        except json.JSONDecodeError:
+            return [raw_logs]
+        raw_logs = parsed
+    if not isinstance(raw_logs, list):
+        return []
+    outputs: list[str] = []
+    for entry in raw_logs:
+        if not isinstance(entry, dict):
+            continue
+        output = entry.get("output")
+        if isinstance(output, str) and output:
+            outputs.append(output)
+    return outputs
+
+
+def _coolify_deployment_logs(app_ref: str) -> list[str]:
+    deployment = _coolify_latest_deployment(app_ref)
+    if not deployment:
+        return []
+    candidates = []
+    for key in ("deployment_uuid", "uuid", "id"):
+        value = deployment.get(key)
+        if value:
+            candidates.append(str(value))
+    for candidate in candidates:
+        try:
+            payload = _coolify_request(f"/api/v1/deployments/{candidate}")
+        except urllib.error.HTTPError:
+            continue
+        except urllib.error.URLError:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        outputs = _normalize_deployment_logs(payload.get("logs"))
+        if outputs:
+            return outputs
+    return []
+
+
+def _coolify_env_value(app_ref: str, key: str) -> str | None:
+    app_uuid = _coolify_find_app_uuid(app_ref)
+    try:
+        payload = _coolify_request(f"/api/v1/applications/{app_uuid}/envs")
+    except urllib.error.HTTPError:
+        return None
+    except urllib.error.URLError:
+        return None
+    if not isinstance(payload, list):
+        return None
+    for entry in payload:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("key") != key:
+            continue
+        if entry.get("is_preview"):
+            continue
+        value = entry.get("real_value") or entry.get("value")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _wait_for_web_ready(entry: str, env: str, app_ref: str) -> None:
+    base_url = _coolify_env_value(app_ref, "ODOO_BASE_URL")
+    if not base_url:
+        console.print(f"{entry} {env}: ODOO_BASE_URL missing; skipping web readiness wait.")
+        return
+    url = f"{base_url.rstrip('/')}/web/login"
+    console.print(f"{entry} {env}: waiting for web login ({url})...")
+    start = time.monotonic()
+    while True:
+        try:
+            with urllib.request.urlopen(url, timeout=5) as response:
+                status = response.status
+        except urllib.error.HTTPError as error:
+            status = error.code
+        except (OSError, TimeoutError, urllib.error.URLError):
+            status = None
+        if status == 200:
+            console.print(f"{entry} {env}: [green]web login ready[/green]")
+            return
+        if time.monotonic() - start > WEB_READY_TIMEOUT_DEFAULT:
+            raise click.ClickException(f"Timed out waiting for {entry} {env} web login to be ready.")
+        time.sleep(WEB_READY_INTERVAL_DEFAULT)
+
+
+def _post_deploy_success_marker(post_action: str) -> str:
+    if post_action == "restore":
+        return "Upstream overwrite completed successfully."
+    if post_action == "init":
+        return "Bootstrap completed successfully."
+    if post_action == "upgrade":
+        return "Addon update completed successfully."
+    return ""
+
+
+def _wait_for_post_deploy(entry: str, env: str, app_ref: str, post_action: str) -> None:
+    marker = _post_deploy_success_marker(post_action)
+    if not marker:
+        return
+    console.print(f"{entry} {env}: waiting for post-deploy {post_action} to finish...")
+    start = time.monotonic()
+    while True:
+        outputs = _coolify_deployment_logs(app_ref)
+        if any(marker in output for output in outputs):
+            console.print(f"{entry} {env}: [green]{post_action} completed[/green]")
+            return
+        if time.monotonic() - start > POST_DEPLOY_TIMEOUT_DEFAULT:
+            raise click.ClickException(f"Timed out waiting for {entry} {env} post-deploy {post_action} to finish.")
+        time.sleep(POST_DEPLOY_INTERVAL_DEFAULT)
 
 
 def _deployment_key(deployment: dict[str, object] | None) -> str:
@@ -1053,14 +1173,16 @@ def _run_ship(
         return
 
     auto_deploy = _load_ops_config().coolify_auto_deploy
-    wait_enabled = wait_deploy and env in ("dev", "testing") and (deploy or auto_deploy)
+    wait_enabled = wait_deploy and (deploy or auto_deploy) and env in ("dev", "testing", "prod")
     if post_action:
-        if env not in ("dev", "testing"):
+        if post_action in {"restore", "init"} and env not in ("dev", "testing"):
             raise click.ClickException("Post-deploy restore/init is only supported for dev/testing.")
+        if post_action == "upgrade" and env not in ("dev", "testing", "prod"):
+            raise click.ClickException("Post-deploy upgrade is only supported for dev/testing/prod.")
         if not wait_enabled:
-            raise click.ClickException("Post-deploy restore/init requires --wait.")
+            raise click.ClickException("Post-deploy actions require --wait.")
         if not (deploy or auto_deploy):
-            raise click.ClickException("Post-deploy restore/init requires a deploy (auto-deploy or --deploy).")
+            raise click.ClickException("Post-deploy actions require a deploy (auto-deploy or --deploy).")
     token = _env_value("COOLIFY_TOKEN") if wait_enabled else None
     if wait_enabled and not token:
         console.print("COOLIFY_TOKEN not set; skipping deploy wait.")
@@ -1079,6 +1201,8 @@ def _run_ship(
         command = "python3 /volumes/scripts/restore_from_upstream.py"
         if post_action == "init":
             command = f"{command} --bootstrap-only"
+        elif post_action == "upgrade":
+            command = f"{command} --update-only"
         for entry in _targets_for(target):
             app_ref = _resolve_coolify_app(entry, env)
             if not app_ref:
@@ -1094,43 +1218,59 @@ def _run_ship(
             post_apps.append(app_ref)
 
     entries = _targets_for(target)
-    if serial and env in ("dev", "testing"):
-        for entry in entries:
-            branch = _resolve_branch(entry, env)
-            _run(["git", "push", "origin", f"HEAD:{branch}"], dry_run=dry_run)
-            if deploy:
-                app_ref = _resolve_coolify_app(entry, env)
-                if not app_ref:
-                    console.print(f"No Coolify app ref for {entry} {env}; skipping deploy.")
-                else:
+    try:
+        if serial and env in ("dev", "testing", "prod"):
+            for entry in entries:
+                branch = _resolve_branch(entry, env)
+                _run(["git", "push", "origin", f"HEAD:{branch}"], dry_run=dry_run)
+                app_ref = None
+                if deploy or wait_enabled or post_action:
+                    app_ref = _resolve_coolify_app(entry, env)
+                if deploy:
+                    if not app_ref:
+                        console.print(f"No Coolify app ref for {entry} {env}; skipping deploy.")
+                    else:
+                        _coolify_deploy(app_ref, dry_run=dry_run)
+                if wait_enabled:
+                    if not app_ref:
+                        console.print(f"No Coolify app ref for {entry} {env}; skipping wait.")
+                    else:
+                        _wait_for_deploy(entry, env, before_keys)
+                        if post_action:
+                            _wait_for_post_deploy(entry, env, app_ref, post_action)
+                            _wait_for_web_ready(entry, env, app_ref)
+        else:
+            for entry in entries:
+                branch = _resolve_branch(entry, env)
+                _run(["git", "push", "origin", f"HEAD:{branch}"], dry_run=dry_run)
+            if deploy and env in ("dev", "testing", "prod"):
+                for entry in entries:
+                    app_ref = _resolve_coolify_app(entry, env)
+                    if not app_ref:
+                        console.print(f"No Coolify app ref for {entry} {env}; skipping deploy.")
+                        continue
                     _coolify_deploy(app_ref, dry_run=dry_run)
+
             if wait_enabled:
-                _wait_for_deploy(entry, env, before_keys)
-    else:
-        for entry in entries:
-            branch = _resolve_branch(entry, env)
-            _run(["git", "push", "origin", f"HEAD:{branch}"], dry_run=dry_run)
-        if deploy and env in ("dev", "testing"):
-            for entry in entries:
-                app_ref = _resolve_coolify_app(entry, env)
-                if not app_ref:
-                    console.print(f"No Coolify app ref for {entry} {env}; skipping deploy.")
-                    continue
-                _coolify_deploy(app_ref, dry_run=dry_run)
-
-        if wait_enabled:
-            for entry in entries:
-                _wait_for_deploy(entry, env, before_keys)
-
-    if post_apps:
-        for app_ref in post_apps:
-            _coolify_update_application(
-                app_ref,
-                {
-                    "post_deployment_command": "true",
-                    "post_deployment_command_container": "script-runner",
-                },
-            )
+                for entry in entries:
+                    _wait_for_deploy(entry, env, before_keys)
+                    if post_action:
+                        app_ref = _resolve_coolify_app(entry, env)
+                        if not app_ref:
+                            console.print(f"No Coolify app ref for {entry} {env}; skipping post-deploy wait.")
+                            continue
+                        _wait_for_post_deploy(entry, env, app_ref, post_action)
+                        _wait_for_web_ready(entry, env, app_ref)
+    finally:
+        if post_apps:
+            for app_ref in post_apps:
+                _coolify_update_application(
+                    app_ref,
+                    {
+                        "post_deployment_command": "true",
+                        "post_deployment_command_container": "script-runner",
+                    },
+                )
 
 
 def _run_gate(target: str, *, dry_run: bool, skip_tests: bool, require_confirm: bool) -> None:
@@ -1661,7 +1801,7 @@ def local_command(
 @click.option("--deploy/--no-deploy", default=True)
 @click.option("--wait/--no-wait", default=True, help="Wait for Coolify deploy to finish")
 @click.option("--serial/--parallel", default=False, help="Deploy one target at a time")
-@click.option("--after", type=click.Choice(("none", "restore", "init"), case_sensitive=False), default="none")
+@click.option("--after", type=click.Choice(POST_SHIP_ACTIONS, case_sensitive=False), default="none")
 @click.option("--skip-tests", is_flag=True)
 @click.option("--dry-run", is_flag=True)
 @click.option("--confirm/--no-confirm", default=False)
@@ -1679,6 +1819,9 @@ def ship_command(
     if env == "prod" and not confirm and not sys.stdin.isatty():
         raise click.ClickException("Prod ship requires --confirm when non-interactive.")
     require_confirm = env == "prod" and not confirm
+    post_action = after if after != "none" else None
+    if env == "prod" and post_action is None:
+        post_action = "upgrade"
     _execute(
         target,
         env,
@@ -1688,7 +1831,7 @@ def ship_command(
         serial=serial,
         build=False,
         no_cache=False,
-        post_action=after if after != "none" else None,
+        post_action=post_action,
         dry_run=dry_run,
         skip_tests=skip_tests,
         require_confirm=require_confirm,

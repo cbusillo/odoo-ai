@@ -77,6 +77,14 @@ assembles the correct file order automatically.
   not writable (remote stacks), the CLI falls back to
   `~/.odoo-ai/stack-env/<stack>.env`. If `ODOO_STATE_ROOT` is omitted (e.g.,
   local dev), the CLI defaults to `~/odoo-ai/${ODOO_PROJECT_NAME}/...`.
+- `ODOO_DATA_HOST_DIR`, `ODOO_LOG_HOST_DIR`, and `ODOO_DB_HOST_DIR` are
+  required for Compose. On remote hosts, create the target directories before
+  the first deploy (for example,
+  `mkdir -p /opt/odoo-ai/data/<stack>/{data,logs,postgres}`) so bind mounts do
+  not fail.
+- For Coolify deployments, use explicit bind mounts (`/host/path:/container`)
+  instead of named volumes. Coolify rewrites named volumes per app, which
+  bypasses `driver_opts` bindings.
 - Keep `ODOO_LOGFILE` pointed inside `/volumes/logs/` (e.g.
   `/volumes/logs/odoo.log`) so log rotation targets the bind-mounted directory.
 - Remote hosts are managed in Coolify; local stacks should keep state under

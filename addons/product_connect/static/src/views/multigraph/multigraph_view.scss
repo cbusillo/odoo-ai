@@ -1,15 +1,6 @@
-// Multigraph view styles - match standard graph view behavior
-.o_multigraph_view {
-    // Ensure proper minimum height for the chart container
-    .o_graph_canvas_container {
-        min-height: 50vh;
-    }
-}
-
-// Ensure multigraph renderer inherits standard graph styling
+// Multigraph view styles - defer sizing to the base graph view
 .o_multigraph_renderer {
-    // Match standard graph view height behavior
-    .o_graph_canvas_container {
-        min-height: 50vh;
-    }
+  .o_graph_canvas_container {
+    min-height: 0;
+  }
 }

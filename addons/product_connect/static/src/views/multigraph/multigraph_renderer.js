@@ -7,15 +7,17 @@ export class MultigraphRenderer extends GraphRenderer {
 
     setup() {
         super.setup()
-        this.canvasRef = useRef("canvas")
+        this.canvasReference = useRef("canvas")
+        this.containerReference = useRef("container")
         this.chart = null
         this.chartjsLoaded = false
+        this.resizeObserver = null
 
         onWillStart(async () => {
             try {
                 await loadBundle("web.chartjs_lib")
                 // Validate Chart.js is available
-                if (typeof Chart !== 'undefined') {
+                if (typeof Chart !== "undefined") {
                     this.chartjsLoaded = true
                 } else {
                     console.error("Chart.js failed to load properly")
@@ -25,33 +27,71 @@ export class MultigraphRenderer extends GraphRenderer {
             }
         })
 
-        onMounted(() => this.renderChart())
+        onMounted(() => {
+            this.renderChart()
+            this.initializeResizeObserver()
+        })
 
         onWillUnmount(() => {
+            this.teardownResizeObserver()
             if (this.chart) {
                 this.chart.destroy()
             }
         })
     }
 
+    initializeResizeObserver() {
+        const containerElement = this.containerReference.el
+        if (!containerElement || typeof ResizeObserver === "undefined") {
+            return
+        }
+
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect()
+        }
+
+        this.resizeObserver = new ResizeObserver(() => {
+            if (this.chart) {
+                this.chart.resize()
+            } else {
+                this.renderChart()
+            }
+        })
+
+        this.resizeObserver.observe(containerElement)
+    }
+
+    teardownResizeObserver() {
+        if (!this.resizeObserver) {
+            return
+        }
+
+        this.resizeObserver.disconnect()
+        this.resizeObserver = null
+    }
+
     renderChart() {
+        if (!this.model.data || !this.model.data.datasets || this.model.data.datasets.length === 0) {
+            this.teardownResizeObserver()
+            if (this.chart) {
+                this.chart.destroy()
+                this.chart = null
+            }
+            return
+        }
+
         if (this.chart) {
             this.chart.destroy()
         }
 
         // Check if Chart.js is loaded and canvas is available
-        if (!this.chartjsLoaded || typeof Chart === 'undefined') {
+        if (!this.chartjsLoaded || typeof Chart === "undefined") {
             console.error("Chart.js is not available - cannot render chart")
             return
         }
 
-        if (!this.canvasRef.el) {
+        if (!this.canvasReference.el) {
             console.warn("Canvas element not available")
-            return
-        }
-
-        if (!this.model.data) {
-            console.warn("No chart data available")
             return
         }
 
@@ -61,7 +101,8 @@ export class MultigraphRenderer extends GraphRenderer {
                 console.error("Failed to get chart configuration")
                 return
             }
-            this.chart = new Chart(this.canvasRef.el, config)
+            this.chart = new Chart(this.canvasReference.el, config)
+            this.initializeResizeObserver()
         } catch (error) {
             console.error("Failed to create chart:", error)
         }
@@ -190,7 +231,7 @@ export class MultigraphRenderer extends GraphRenderer {
     // noinspection JSUnusedGlobalSymbols - Owl lifecycle method
     onWillUpdateProps(nextProps) {
         // Handle prop updates
-        if (this.chart && this.props.model?.data !== nextProps.model?.data) {
+        if (this.props.model?.data !== nextProps.model?.data) {
             this.renderChart()
         }
     }

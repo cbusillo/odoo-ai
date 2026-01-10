@@ -27,6 +27,9 @@ title: TODO / Optimization Ideas
   - After `opw-prod` promotion: clean up legacy LXC references in docs and
     tooling (only after the Coolify `opw-prod` container replaces
     `opw-prod.shiny`).
+  - After `opw-prod` promotion: enable hourly backup for `docker-opw-prod`.
+  - After `opw-prod` promotion: update zrepl fixture targeting the new
+    container (from 109 to 104).
   - After Odoo 19 cutover + `opw-prod` promotion: remove `OPENUPGRADE_ENABLED`
     from opw apps (dev/testing/prod) once upgrades are complete.
   - After `opw-prod` promotion: remove `OPENUPGRADE_TARGET_VERSION` and the

@@ -100,14 +100,19 @@ Behavior notes
   uses `--no-cache` and the rest use normal cache.
 - Ship actions push to the correct branch:
   - `opw-testing`, `cm-testing`, `opw-dev`, `cm-dev`, `opw-prod`, `cm-prod`.
-- Ship actions for dev/testing can optionally run a post-deploy `restore` or
-  `init` via Coolify post-deployment commands (requires `--wait`).
+- Ship actions for dev/testing can optionally run a post-deploy `restore`,
+  `init`, or `upgrade` via Coolify post-deployment commands (requires
+  `--wait`).
+- When `--after restore`/`--after init`/`--after upgrade` is set, ops waits for
+  the post-deploy command and web login to finish (default `--wait`).
+  `--no-wait` cannot be used with `--after`.
+- Prod ships default to `--after upgrade` to update addons on deploy.
 - Prod ship runs the prod gate first using `uv run prod-gate backup`.
 - Prod actions require an explicit confirmation (interactive prompt or
   `--confirm` for non-interactive usage).
 - For dev/testing, `ops ship` triggers a Coolify deploy by default (use
   `--no-deploy` to skip). Deploy waits are on by default; use `--no-wait` to
-  skip.
+  skip (not compatible with `--after`).
 - Use `--serial` to deploy one target at a time when shipping `all`.
 - `ops status` uses the Coolify API and requires `COOLIFY_TOKEN` (waits by
   default; use `--no-wait`).

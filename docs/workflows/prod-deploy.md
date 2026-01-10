@@ -20,6 +20,7 @@ Set these in your `.env` or shell before running the gate (prefix per client):
 - `<PREFIX>_PROD_CT_ID` (LXC container ID)
 - `<PREFIX>_PROD_BACKUP_STORAGE` (PBS storage name for `vzdump`)
 - `<PREFIX>_PROD_BACKUP_MODE` (default `both`; options: `snapshot`, `vzdump`, `both`)
+- `<PREFIX>_PROD_SNAPSHOT_KEEP` (optional; keep N snapshots with the prefix)
 - `<PREFIX>_PROD_SNAPSHOT_PREFIX` (optional; default `<prefix>-predeploy`)
 
 Example for OPW (commented):
@@ -29,6 +30,7 @@ Example for OPW (commented):
 # OPW_PROD_CT_ID=111
 # OPW_PROD_BACKUP_STORAGE=pbs
 # OPW_PROD_BACKUP_MODE=both
+# OPW_PROD_SNAPSHOT_KEEP=10
 # OPW_PROD_SNAPSHOT_PREFIX=opw-predeploy
 ```
 
@@ -37,7 +39,8 @@ Deploy flow (OPW example)
 1) Run tests + backup gate:
    - `uv run prod-gate backup --target opw --run-tests`
 
-2) Deploy in Coolify (prod app).
+2) Deploy in Coolify (prod app) or run `uv run ops ship prod <target>` to
+   trigger the deploy + post-deploy upgrade.
 
 3) If rollback needed:
    - `uv run prod-gate list --target opw`
@@ -46,4 +49,5 @@ Deploy flow (OPW example)
 Notes
 
 - `vzdump` provides the full CT backup (PBS). `pct snapshot` gives fast rollback.
+- `PROD_BACKUP_MODE=none` skips the snapshot/vzdump steps (tests still run).
 - The gate intentionally does not auto-deploy; prod deploy stays manual.

@@ -68,8 +68,9 @@ describe("@discuss_record_links Message link label transformer", () => {
         await sleep(0)
 
         const img = container.querySelector("img.o-drl-avatar")
-        expect(img).toBeTruthy()
-        expect(img.getAttribute("src")).toContain("/web/image/product.product/77/image_128")
+        expect(Boolean(img)).toBe(true)
+        const imgSrc = img?.getAttribute("src") || ""
+        expect(imgSrc.includes("/web/image/product.product/77/image_128")).toBe(true)
         expect(container.querySelector('a').textContent.trim()).toBe("[SKU77] Iconic")
     })
 
@@ -192,7 +193,7 @@ describe("@discuss_record_links Message link label transformer", () => {
 
         // Assert: there is an anchor now and it is labeled
         const a = container.querySelector("a[href*='/web#']")
-        expect(a).toBeTruthy()
-        expect((a.textContent || '').trim()).toBe("[SKU99] Widget")
+        expect(Boolean(a)).toBe(true)
+        expect((a?.textContent || "").trim()).toBe("[SKU99] Widget")
     })
 })

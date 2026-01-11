@@ -7,6 +7,20 @@
 
 import { registry } from "@web/core/registry";
 
+function queryElement(selector) {
+    return /** @type {HTMLElement | null} */ (document.querySelector(selector))
+}
+
+function clickFirst(...selectors) {
+    for (const selector of selectors) {
+        const element = queryElement(selector)
+        if (element) {
+            element.dispatchEvent(new MouseEvent("click", { bubbles: true }))
+            return
+        }
+    }
+}
+
 // Product Processing Analytics: open, switch views, and assert basic UI health
 registry.category("web_tour.tours").add("test_multigraph_view", {
     test: true,
@@ -44,8 +58,10 @@ registry.category("web_tour.tours").add("test_multigraph_view", {
                 "button.o_switch_view.o_multigraph:visible, .o_control_panel .o_switch_view .o_multigraph:visible",
             timeout: 30000,
             run() {
-                (document.querySelector("button.o_switch_view.o_multigraph")
-                    || document.querySelector(".o_control_panel .o_switch_view .o_multigraph"))?.click();
+                clickFirst(
+                    "button.o_switch_view.o_multigraph",
+                    ".o_control_panel .o_switch_view .o_multigraph",
+                )
             },
         },
         {
@@ -69,8 +85,10 @@ registry.category("web_tour.tours").add("test_multigraph_view", {
             content: "Switch back to Pivot",
             trigger: "button.o_switch_view.o_pivot:visible, .o_control_panel .o_switch_view .o_pivot:visible",
             run() {
-                (document.querySelector("button.o_switch_view.o_pivot")
-                    || document.querySelector(".o_control_panel .o_switch_view .o_pivot"))?.click();
+                clickFirst(
+                    "button.o_switch_view.o_pivot",
+                    ".o_control_panel .o_switch_view .o_pivot",
+                )
             },
         },
         {

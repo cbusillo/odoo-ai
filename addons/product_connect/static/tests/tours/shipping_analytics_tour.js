@@ -2,6 +2,10 @@
 
 import { registry } from "@web/core/registry";
 
+function queryElement(selector) {
+    return /** @type {HTMLElement | null} */ (document.querySelector(selector))
+}
+
 registry.category("web_tour.tours").add("shipping_analytics_tour", {
     test: true,
     url: "/web#action=product_connect.action_sale_order_shipping_analytics",
@@ -11,8 +15,8 @@ registry.category("web_tour.tours").add("shipping_analytics_tour", {
             trigger: ".o_web_client",
             run() {
                 try {
-                    const svc = odoo?.__DEBUG__?.services?.action
-                    svc?.doAction?.("product_connect.action_sale_order_shipping_analytics")
+                    const actionService = window.odoo?.["__DEBUG__"]?.services?.action
+                    actionService?.doAction?.("product_connect.action_sale_order_shipping_analytics")
                 } catch (e) { /* non-fatal */
                 }
             },
@@ -33,9 +37,9 @@ registry.category("web_tour.tours").add("shipping_analytics_tour", {
             content: "Check if we can switch to graph view",
             trigger: "button.o_switch_view.o_graph:visible, .o_pivot",
             run: function () {
-                const graphButton = document.querySelector("button.o_switch_view.o_graph");
-                if (graphButton && graphButton.offsetParent !== null) {
-                    graphButton.click();
+                const graphButton = queryElement("button.o_switch_view.o_graph")
+                if (graphButton && graphButton.getClientRects().length) {
+                    graphButton.dispatchEvent(new MouseEvent("click", { bubbles: true }))
                 }
             },
         },
@@ -47,9 +51,9 @@ registry.category("web_tour.tours").add("shipping_analytics_tour", {
             content: "Check if we can switch back to pivot view",
             trigger: "button.o_switch_view.o_pivot:visible, .o_pivot",
             run: function () {
-                const pivotButton = document.querySelector("button.o_switch_view.o_pivot");
-                if (pivotButton && pivotButton.offsetParent !== null) {
-                    pivotButton.click();
+                const pivotButton = queryElement("button.o_switch_view.o_pivot")
+                if (pivotButton && pivotButton.getClientRects().length) {
+                    pivotButton.dispatchEvent(new MouseEvent("click", { bubbles: true }))
                 }
             },
         },

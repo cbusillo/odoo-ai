@@ -2,6 +2,36 @@
 
 import { registry } from "@web/core/registry";
 
+function queryElement(selector) {
+    return /** @type {HTMLElement | null} */ (document.querySelector(selector))
+}
+
+function queryInput(selector) {
+    return /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (document.querySelector(selector))
+}
+
+function clickElement(element) {
+    if (!element) {
+        return
+    }
+    element.dispatchEvent(new MouseEvent("click", { bubbles: true }))
+}
+
+function clickSelector(selector) {
+    clickElement(queryElement(selector))
+}
+
+function setInputValue(selector, value) {
+    const element = queryInput(selector)
+    if (!element) {
+        return
+    }
+    element.dispatchEvent(new Event("focus", { bubbles: true }))
+    element.value = value
+    element.dispatchEvent(new Event("input", { bubbles: true }))
+    element.dispatchEvent(new Event("change", { bubbles: true }))
+}
+
 // Keep the original tour name; use robust selectors and waits.
 registry.category("web_tour.tours").add("motor_workflow_to_enabled_product_tour", {
     test: true,
@@ -14,8 +44,7 @@ registry.category("web_tour.tours").add("motor_workflow_to_enabled_product_tour"
             content: "Click Create",
             trigger: ".o_list_button_add, .o-kanban-button-new",
             run() {
-                const btn = document.querySelector('.o_list_button_add, .o-kanban-button-new');
-                if (btn) btn.click();
+                clickSelector(".o_list_button_add, .o-kanban-button-new")
             },
         },
 
@@ -25,9 +54,9 @@ registry.category("web_tour.tours").add("motor_workflow_to_enabled_product_tour"
             content: "Basic Info tab",
             trigger: ".o_notebook .o_notebook_headers .nav-link",
             run() {
-                const links = Array.from(document.querySelectorAll('.o_notebook .o_notebook_headers .nav-link'))
-                const basic = links.find((a) => /Basic\s*Info/i.test(a.textContent || ''))
-                if (basic) basic.click()
+                const links = Array.from(document.querySelectorAll(".o_notebook .o_notebook_headers .nav-link"))
+                const basic = links.find((link) => /Basic\s*Info/i.test(link.textContent || ""))
+                clickElement(basic)
             },
         },
         // Keep label "Form loaded" for familiarity but use robust trigger
@@ -35,48 +64,32 @@ registry.category("web_tour.tours").add("motor_workflow_to_enabled_product_tour"
 
         // Fill core fields
         {
-            content: "Set model", trigger: ".o_form_renderer", run() {
-                const el = document.querySelector('input[name="model"], textarea[name="model"]');
-                if (el) {
-                    el.focus();
-                    el.value = 'TEST-MODEL';
-                    el.dispatchEvent(new Event('input', { bubbles: true }));
-                    el.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-            }
+            content: "Set model",
+            trigger: ".o_form_renderer",
+            run() {
+                setInputValue("input[name='model'], textarea[name='model']", "TEST-MODEL")
+            },
         },
         {
-            content: "Set serial", trigger: ".o_form_renderer", run() {
-                const el = document.querySelector('input[name="serial_number"], textarea[name="serial_number"]');
-                if (el) {
-                    el.focus();
-                    el.value = 'SN-001';
-                    el.dispatchEvent(new Event('input', { bubbles: true }));
-                    el.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-            }
+            content: "Set serial",
+            trigger: ".o_form_renderer",
+            run() {
+                setInputValue("input[name='serial_number'], textarea[name='serial_number']", "SN-001")
+            },
         },
         {
-            content: "Set location", trigger: ".o_form_renderer", run() {
-                const el = document.querySelector('input[name="location"], textarea[name="location"]');
-                if (el) {
-                    el.focus();
-                    el.value = 'A1';
-                    el.dispatchEvent(new Event('input', { bubbles: true }));
-                    el.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-            }
+            content: "Set location",
+            trigger: ".o_form_renderer",
+            run() {
+                setInputValue("input[name='location'], textarea[name='location']", "A1")
+            },
         },
         {
-            content: "Set horsepower", trigger: ".o_form_renderer", run() {
-                const el = document.querySelector('input[name="horsepower"]');
-                if (el) {
-                    el.focus();
-                    el.value = '100';
-                    el.dispatchEvent(new Event('input', { bubbles: true }));
-                    el.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-            }
+            content: "Set horsepower",
+            trigger: ".o_form_renderer",
+            run() {
+                setInputValue("input[name='horsepower']", "100")
+            },
         },
 
         // Required badge fields
@@ -84,47 +97,43 @@ registry.category("web_tour.tours").add("motor_workflow_to_enabled_product_tour"
             content: "Pick manufacturer",
             trigger: ".o_form_renderer .o_field_widget[name=manufacturer] .o_selection_badge:not(.btn-reset)",
             run() {
-                document.querySelector('.o_form_renderer .o_field_widget[name=manufacturer] .o_selection_badge:not(.btn-reset)')?.click();
+                clickSelector(".o_form_renderer .o_field_widget[name=manufacturer] .o_selection_badge:not(.btn-reset)")
             }
         },
         {
             content: "Pick stroke",
             trigger: ".o_form_renderer .o_field_widget[name=stroke] .o_selection_badge:not(.btn-reset)",
             run() {
-                document.querySelector('.o_form_renderer .o_field_widget[name=stroke] .o_selection_badge:not(.btn-reset)')?.click();
+                clickSelector(".o_form_renderer .o_field_widget[name=stroke] .o_selection_badge:not(.btn-reset)")
             }
         },
         {
             content: "Pick configuration",
             trigger: ".o_form_renderer .o_field_widget[name=configuration] .o_selection_badge:not(.btn-reset)",
             run() {
-                document.querySelector('.o_form_renderer .o_field_widget[name=configuration] .o_selection_badge:not(.btn-reset)')?.click();
+                clickSelector(".o_form_renderer .o_field_widget[name=configuration] .o_selection_badge:not(.btn-reset)")
             }
         },
         {
             content: "Pick color",
             trigger: ".o_form_renderer .o_field_widget[name=color] .o_selection_badge:not(.btn-reset)",
             run() {
-                document.querySelector('.o_form_renderer .o_field_widget[name=color] .o_selection_badge:not(.btn-reset)')?.click();
+                clickSelector(".o_form_renderer .o_field_widget[name=color] .o_selection_badge:not(.btn-reset)")
             }
         },
         {
             content: "Pick year",
             trigger: ".o_form_renderer .o_field_widget[name=year] .o_selection_badge:not(.btn-reset)",
             run() {
-                document.querySelector('.o_form_renderer .o_field_widget[name=year] .o_selection_badge:not(.btn-reset)')?.click();
+                clickSelector(".o_form_renderer .o_field_widget[name=year] .o_selection_badge:not(.btn-reset)")
             }
         },
         {
-            content: "Set cost", trigger: ".o_form_renderer", run() {
-                const el = document.querySelector('input[name="cost"]');
-                if (el) {
-                    el.focus();
-                    el.value = '1000';
-                    el.dispatchEvent(new Event('input', { bubbles: true }));
-                    el.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-            }
+            content: "Set cost",
+            trigger: ".o_form_renderer",
+            run() {
+                setInputValue("input[name='cost']", "1000")
+            },
         },
 
         // Save
@@ -140,9 +149,9 @@ registry.category("web_tour.tours").add("motor_workflow_to_enabled_product_tour"
             content: "Open Listing tab",
             trigger: ".o_notebook .o_notebook_headers .nav-link",
             run() {
-                const links = Array.from(document.querySelectorAll('.o_notebook .o_notebook_headers .nav-link'))
-                const listing = links.find((a) => /Listing/i.test(a.textContent || ''))
-                if (listing) listing.click()
+                const links = Array.from(document.querySelectorAll(".o_notebook .o_notebook_headers .nav-link"))
+                const listing = links.find((link) => /Listing/i.test(link.textContent || ""))
+                clickElement(listing)
             },
         },
         { content: "Admin present", trigger: ".o_form_renderer .btn[name=create_motor_products]" },
@@ -198,14 +207,13 @@ registry.category("web_tour.tours").add("motor_workflow_to_enabled_product_tour"
         // Proceed to the enable action if present; otherwise continue.
         {
             content: "Enable all products (if present)", trigger: "body", run() {
-                document.querySelector('.o_form_renderer .btn[name=enable_ready_for_sale]')?.click()
+                clickSelector(".o_form_renderer .btn[name=enable_ready_for_sale]")
             }
         },
         // If an error dialog appears (products not ready), close it to continue the flow
         {
             content: "Close error if present", trigger: "body", run() {
-                const btn = document.querySelector('.o_error_dialog .modal-footer .btn, .modal.o_error_dialog .btn-primary, .modal .btn-primary');
-                if (btn) btn.click();
+                clickSelector(".o_error_dialog .modal-footer .btn, .modal.o_error_dialog .btn-primary, .modal .btn-primary")
             }
         },
 

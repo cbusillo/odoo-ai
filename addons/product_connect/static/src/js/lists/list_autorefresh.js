@@ -11,7 +11,8 @@ class AutoRefreshListController extends ListController {
         super.setup()
         this.action = useService("action")
         this._reloading = false
-        const seconds = Number(this.props?.context?.refreshInterval || 10)
+        const context = /** @type {{ refreshInterval?: number }} */ (this.props?.context || {})
+        const seconds = Number(context.refreshInterval || 10)
         if (seconds > 0) {
             this._interval = setInterval(() => this._softReload(), seconds * 1_000)
             onWillUnmount(() => clearInterval(this._interval))

@@ -12,7 +12,7 @@ function insertSuggestion(option) {
     // Inline RecordLink handler (triggered by "[")
     if (itemsType === "RecordLink" && option?.record) {
         const { id, model } = option.record
-        const base = window.location?.origin || ""
+        const base = new URL(window.location.href).origin
         const url = `${base}/web#id=${id}&model=${model}&view_type=form`
         const pos = this.composer.selection.start
         const text = this.composer.text || ""

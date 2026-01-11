@@ -143,7 +143,7 @@ def backup_command(target: str, tag: str | None, run_tests: bool, dry_run: bool)
         storage_value = storage or ""
 
     if run_tests:
-        _run(["uv", "run", "test", "run", "--json"], dry_run=dry_run)
+        _run(["uv", "run", "test", "run", "--json", "--stack", target], dry_run=dry_run)
 
     if not modes:
         return

@@ -84,16 +84,16 @@ Behavior notes
 
 - Local actions run deployer helpers directly and use the stack env files
   (`docker/config/opw-local.env`, `docker/config/cm-local.env`).
-- `ops local info` prints machine-readable stack metadata (paths + identifiers
+- `uv run ops local info` prints machine-readable stack metadata (paths + identifiers
   only; no secrets) derived from `load_stack_settings()`.
-- `ops local restart` performs a fast `docker compose restart web` for the
+- `uv run ops local restart` performs a fast `docker compose restart web` for the
   target stack.
-- `ops local down` removes orphaned containers and anonymous volumes for the
-  target stack while preserving named volumes.
-- `ops local upgrade` runs module upgrades using the stack's configured module
+- `uv run ops local down` removes orphaned containers and anonymous volumes for
+  the target stack while preserving named volumes.
+- `uv run ops local upgrade` runs module upgrades using the stack's configured module
   list (AUTO by default) without rebuilding the image.
-- `ops local upgrade-restart` runs the upgrade then restarts the web service.
-- `ops local openupgrade` runs the OpenUpgrade pipeline against the current
+- `uv run ops local upgrade-restart` runs the upgrade then restarts the web service.
+- `uv run ops local openupgrade` runs the OpenUpgrade pipeline against the current
   database without restoring from upstream and resets module versions for
   modules that have OpenUpgrade scripts so their scripts re-run.
 - `--no-cache` forces a clean local build; for `all`, only the first target
@@ -110,11 +110,11 @@ Behavior notes
 - Prod ship runs the prod gate first using `uv run prod-gate backup`.
 - Prod actions require an explicit confirmation (interactive prompt or
   `--confirm` for non-interactive usage).
-- For dev/testing, `ops ship` triggers a Coolify deploy by default (use
+- For dev/testing, `uv run ops ship` triggers a Coolify deploy by default (use
   `--no-deploy` to skip). Deploy waits are on by default; use `--no-wait` to
   skip (not compatible with `--after`).
 - Use `--serial` to deploy one target at a time when shipping `all`.
-- `ops status` uses the Coolify API and requires `COOLIFY_TOKEN` (waits by
+- `uv run ops status` uses the Coolify API and requires `COOLIFY_TOKEN` (waits by
   default; use `--no-wait`).
 - For interactive runs, `uv run ops --no-wait` skips deploy waiting.
 - Local actions default to `--no-build` for speed; pass `--build` to force a rebuild.

@@ -64,3 +64,17 @@ Notes
 - Use unique `ODOO_STATE_ROOT` per stack to avoid sharing filestore/postgres.
 - Switch stacks by stopping one (`uv run ops local down cm`) before
   starting the other.
+- Local stack env files run the web service under the PyCharm debugger.
+  Create a **Python Debug Server** run configuration per stack:
+  - Host: `0.0.0.0` (or `host.docker.internal`)
+  - Port: `5678` (OPW) or `5679` (CM)
+  - Path mappings: `/volumes/addons` → `$PROJECT_DIR$/addons`
+  - Optional: enable “Suspend after connect” if you want to pause on startup
+- The Debug Server starts listening before “Before launch” tasks run, so it is
+  safe to keep `uv run ops local upgrade-restart <target>` as a pre-step; Odoo
+  will reconnect to the debugger after the restart.
+- For “always up to date” local debugging, keep the upgrade‑restart pre-step
+  enabled so modules are upgraded on every Debug run.
+- If you disable the upgrade‑restart pre-step for faster runs, use
+  `uv run ops local upgrade <target>` when you change module schema/data
+  (new fields, views, migrations).

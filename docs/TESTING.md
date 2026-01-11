@@ -39,3 +39,5 @@ Notes
   for `success: true` before declaring a run green.
 - Use detached mode (`uv run test run --detached`, then `uv run test wait
   --json`) when long tours or integrations risk timeouts.
+- The prod gate runs `uv run test run --json --stack <target>` so the correct
+  local stack env file is applied.

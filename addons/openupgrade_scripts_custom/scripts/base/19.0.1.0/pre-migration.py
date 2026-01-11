@@ -33,9 +33,7 @@ def _mark_missing_manifest_modules_uninstalled(env: "Environment") -> None:
         if module_path:
             continue
         env.cr.execute(
-            "UPDATE ir_module_module "
-            "SET state = 'uninstalled', latest_version = NULL, auto_install = FALSE "
-            "WHERE name = %s",
+            "UPDATE ir_module_module SET state = 'uninstalled', latest_version = NULL, auto_install = FALSE WHERE name = %s",
             (module_name,),
         )
 
@@ -47,9 +45,7 @@ def _clean_user_group_views(env: "Environment") -> None:
 
     def _fetch_view_id(xmlid_name: str) -> int | None:
         env.cr.execute(
-            "SELECT res_id FROM ir_model_data "
-            "WHERE module = 'base' AND name = %s AND model = 'ir.ui.view' "
-            "LIMIT 1",
+            "SELECT res_id FROM ir_model_data WHERE module = 'base' AND name = %s AND model = 'ir.ui.view' LIMIT 1",
             (xmlid_name,),
         )
         view_row = env.cr.fetchone()
@@ -164,7 +160,7 @@ def _clean_user_group_views(env: "Environment") -> None:
 
 
 @openupgrade.migrate()
-def migrate(env: "Environment", version: str | None) -> None:
+def migrate(env: "Environment", _version: str | None) -> None:
     """Pre-migration hook for base (19.0.1.0)."""
 
     _mark_missing_manifest_modules_uninstalled(env)

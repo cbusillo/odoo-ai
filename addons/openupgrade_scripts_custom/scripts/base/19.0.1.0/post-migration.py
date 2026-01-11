@@ -2,10 +2,11 @@
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
 from odoo.modules.module import get_module_path
+from odoo.orm.environments import Environment
 from openupgradelib import openupgrade
 
 
-def _cleanup_web_editor_metadata(env) -> None:
+def _cleanup_web_editor_metadata(env: Environment) -> None:
     """Drop dangling `web_editor.*` model metadata.
 
     The restored 18.0 database can contain `ir_model*` rows for `web_editor.*`
@@ -61,8 +62,7 @@ def _cleanup_web_editor_metadata(env) -> None:
     )
 
     env.cr.execute(
-        "DELETE FROM ir_model_fields_selection WHERE field_id IN "
-        "(SELECT id FROM ir_model_fields WHERE model = ANY(%s))",
+        "DELETE FROM ir_model_fields_selection WHERE field_id IN (SELECT id FROM ir_model_fields WHERE model = ANY(%s))",
         (model_names,),
     )
     env.cr.execute(
@@ -84,7 +84,7 @@ def _cleanup_web_editor_metadata(env) -> None:
     env.cr.execute("DELETE FROM ir_model WHERE id = ANY(%s)", (model_ids,))
 
 
-def _fix_ir_rule_user_groups_field(env) -> None:
+def _fix_ir_rule_user_groups_field(env: Environment) -> None:
     """Fix legacy ir.rule domains referencing `user.groups_id`.
 
     In Odoo 19, the `res.users` field is `group_ids`. Some restored databases
@@ -111,23 +111,23 @@ def _fix_ir_rule_user_groups_field(env) -> None:
         return
 
 
-def _fix_user_groups_view_field(env) -> None:
+def _fix_user_groups_view_field(env: Environment) -> None:
     """Align base.user_groups_view with the Odoo 19 `group_ids` field."""
 
     view_record = env.ref("base.user_groups_view", raise_if_not_found=False)
     if not view_record:
         return
     view_arch = view_record.arch_db or ""
-    if "name=\"groups_id\"" not in view_arch:
+    if 'name="groups_id"' not in view_arch:
         return
-    updated_arch = view_arch.replace("name=\"groups_id\"", "name=\"group_ids\"")
+    updated_arch = view_arch.replace('name="groups_id"', 'name="group_ids"')
     if updated_arch == view_arch:
         return
     view_record.write({"arch_db": updated_arch})
 
 
 @openupgrade.migrate()
-def migrate(env, version):
+def migrate(env: Environment, _version: str) -> None:
     """Post-migration hook for base (19.0.1.0)."""
 
     _fix_ir_rule_user_groups_field(env)

@@ -49,6 +49,6 @@ def _ensure_scheduler_server_action(env: "Environment") -> None:
 
 
 @openupgrade.migrate()
-def migrate(env: "Environment", version: str | None) -> None:
+def migrate(env: "Environment", _version: str | None) -> None:
     """Pre-migration hook for stock (19.0.1.1)."""
     _ensure_scheduler_server_action(env)

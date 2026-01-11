@@ -11,7 +11,7 @@
       <excludeFolder url="file://$MODULE_DIR$/.claude" />
       <excludeFolder url="file://$MODULE_DIR$/.codex" />
     </content>
-    <orderEntry type="jdk" jdkName="opw-local web" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Remote 3.13 Docker (odoo-ai:latest)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PackageRequirementsSettings">

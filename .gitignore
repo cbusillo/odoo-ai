@@ -207,3 +207,4 @@ odoo.*.conf
 *.env*
 !*.env.example
 !docker/config/base.env
+.worktrees

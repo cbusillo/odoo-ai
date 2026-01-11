@@ -2,6 +2,17 @@ import { GraphRenderer } from "@web/views/graph/graph_renderer"
 import { loadBundle } from "@web/core/assets"
 import { onWillStart, onMounted, onWillUnmount, useRef } from "@odoo/owl"
 
+/**
+ * Chart.js config stubs for JSDoc-aware tooling.
+ * @typedef {{ callback?: (value: number) => string }} ChartAxisTicks
+ * @typedef {{ ticks?: ChartAxisTicks }} ChartAxisConfig
+ * @typedef {{
+ *  plugins?: { tooltip?: { callbacks?: { label?: (context: { dataset: { label: string }, parsed: { y: number } }) => string } } },
+ *  scales?: Record<string, ChartAxisConfig>,
+ *  onClick?: (event: Event, elements: Array<{ index: number }>) => void
+ * }} ChartConfigOptions
+ */
+
 export class MultigraphRenderer extends GraphRenderer {
     static template = "web.MultigraphRenderer"
 
@@ -125,6 +136,7 @@ export class MultigraphRenderer extends GraphRenderer {
                 labels: data.labels || [],
                 datasets: data.datasets || [],
             },
+            /** @type {ChartConfigOptions} */
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
@@ -173,6 +185,23 @@ export class MultigraphRenderer extends GraphRenderer {
         }
 
         Object.entries(this.model.axisConfig || {}).forEach(([axisId, config]) => {
+            const ticks = /** @type {ChartAxisTicks} */ ({
+                callback: (value) => {
+                    const datasetsForAxis = this.model.data.datasets.filter(
+                        ds => ds.yAxisID === axisId
+                    )
+
+                    if (datasetsForAxis.some(ds => ds.widget === "monetary")) {
+                        return new Intl.NumberFormat("en-US", {
+                            style: "currency",
+                            currency: "USD",
+                            maximumFractionDigits: 1
+                        }).format(value)
+                    }
+
+                    return value.toLocaleString()
+                },
+            })
             scales[axisId] = {
                 type: "linear",
                 display: config.display,
@@ -181,21 +210,7 @@ export class MultigraphRenderer extends GraphRenderer {
                     drawOnChartArea: axisId === "y",
                 },
                 ticks: {
-                    callback: (value) => {
-                        const datasetsForAxis = this.model.data.datasets.filter(
-                            ds => ds.yAxisID === axisId
-                        )
-
-                        if (datasetsForAxis.some(ds => ds.widget === "monetary")) {
-                            return new Intl.NumberFormat("en-US", {
-                                style: "currency",
-                                currency: "USD",
-                                maximumFractionDigits: 1
-                            }).format(value)
-                        }
-
-                        return value.toLocaleString()
-                    },
+                    ...ticks,
                 },
             }
         })

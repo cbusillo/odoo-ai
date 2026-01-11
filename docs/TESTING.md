@@ -25,6 +25,7 @@ Commands
 - Stack selection: `--stack opw|cm` (or
   `--env-file docker/config/<stack>-local.env`) to load the correct local
   stack env before running tests.
+  Stack/env-file selection is required for test runs.
 
 - The canonical command list (phase entry points, detached mode, JSON output)
   lives in [docs/tooling/testing-cli.md](tooling/testing-cli.md). Prefer those

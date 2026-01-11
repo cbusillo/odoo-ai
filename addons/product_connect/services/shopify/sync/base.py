@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from datetime import timedelta
 from typing import Generic, TypeVar, Sequence, Callable, Protocol
 
-import psycopg2
+from psycopg2.errors import SerializationFailure
 from odoo.api import Environment
 
 from ..gql import Client
@@ -51,7 +51,7 @@ class ShopifyBase(ABC, Generic[T]):
             try:
                 self.sync_record._safe_commit()
                 _logger.info(f"Processed {processed_count} records so far.")
-            except psycopg2.errors.SerializationFailure:
+            except SerializationFailure:
                 _logger.warning(f"Commit at {processed_count} records skipped due to concurrent access")
                 self.sync_record._safe_rollback()
                 raise
@@ -59,7 +59,7 @@ class ShopifyBase(ABC, Generic[T]):
             try:
                 self.sync_record.write({})
                 self.sync_record._safe_commit()
-            except psycopg2.errors.SerializationFailure:
+            except SerializationFailure:
                 _logger.warning("Heartbeat update skipped due to concurrent access")
                 self.sync_record._safe_rollback()
             self._last_heartbeat = time.monotonic()

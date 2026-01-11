@@ -105,6 +105,8 @@ def _get_or_create_geo_data(env: Environment) -> tuple[Any, Any, Any]:
 
 
 class _BaseDataMixin:
+    env: Environment
+
     def _setup_base_data(self) -> None:
         self.usa_country, self.ny_state, self.shopify_category = _get_or_create_geo_data(self.env)
 

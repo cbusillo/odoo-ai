@@ -19,7 +19,6 @@ class TestRecordedDbTours(HttpCase):
         super().setUpClass()
         cls._tours = cls.env["web_tour.tour"].search(
             [
-                ("active", "=", True),
                 ("name", "ilike", f"{TOUR_PREFIX}%"),
             ]
         )
@@ -41,10 +40,7 @@ class TestRecordedDbTours(HttpCase):
             self.skipTest("No recorded web tours starting with test_")
 
         for tour in self._tours:
-            try:
-                steps = json.loads(tour.steps or "[]")
-            except json.JSONDecodeError as exc:
-                self.fail(f"Tour {tour.name} has invalid JSON steps: {exc}")
+            steps = tour.step_ids.get_steps_json()
 
             start_url = tour.url or DEFAULT_START_URL
             self._inject_tour(tour.name, steps)

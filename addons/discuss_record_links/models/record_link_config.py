@@ -1,4 +1,5 @@
 from odoo import api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class DiscussRecordLinkConfig(models.Model):
@@ -39,10 +40,10 @@ class DiscussRecordLinkConfig(models.Model):
     def _check_search_fields_model(self) -> None:
         for rec in self:
             if any(f.model_id != rec.model_id for f in rec.search_field_ids):
-                raise models.ValidationError("Search fields must belong to the selected model.")
+                raise ValidationError("Search fields must belong to the selected model.")
 
     @api.constrains("image_field_id", "model_id")
     def _check_image_field_model(self) -> None:
         for rec in self:
             if rec.image_field_id and rec.image_field_id.model_id != rec.model_id:
-                raise models.ValidationError("Image field must belong to the selected model.")
+                raise ValidationError("Image field must belong to the selected model.")

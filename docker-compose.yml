@@ -1,7 +1,3 @@
-x-bind-opts: &bind-opts
-  type: none
-  o: bind
-
 x-odoo-base: &odoo-base
   # TODO: SECURITY WARNING - Never push this image to a registry!
   # 1. GitHub token is embedded in Docker layer history

@@ -21,20 +21,6 @@ dependencies = [
     "phonenumbers",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pydevd-odoo",
-    "debugpy",
-    "watchdog",
-    "types-Pillow",
-    "types-requests",
-    "types-geoip2",
-    "pydantic[email,timezone]",
-    "rich",
-    "websocket-client",
-    "setuptools",
-]
-
 [tool.setuptools]
 packages = []
 

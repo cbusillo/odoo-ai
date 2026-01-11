@@ -19,6 +19,22 @@ dependencies = [
     "mypy",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "debugpy",
+    "pip",
+    "pydevd-odoo",
+    "pydevd-pycharm",
+    "pydantic[email,timezone]",
+    "setuptools",
+    "types-geoip2",
+    "types-Pillow",
+    "types-psycopg2",
+    "types-requests",
+    "watchdog",
+    "websocket-client",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["tools"]
 

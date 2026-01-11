@@ -157,12 +157,8 @@
                     <group string="Error Item"
                            invisible="not error_odoo_record and not error_shopify_record and not error_shopify_input">
                         <field name="error_odoo_record" readonly="1" invisible="not error_odoo_record"/>
-                        <field name="error_shopify_record" widget="jsonb" readonly="1"
-                               invisible="not error_shopify_record"
-                               options="{'mode': 'tree', 'modes': ['tree', 'code']}"
-                        />
-                        <field name="error_shopify_input" widget="jsonb" readonly="1"
-                               invisible="not error_shopify_input"/>
+                        <field name="error_shopify_record" readonly="1" invisible="not error_shopify_record"/>
+                        <field name="error_shopify_input" readonly="1" invisible="not error_shopify_input"/>
                     </group>
                     <group string="Error Info" invisible="state != 'failed'">
                         <field name="error_message" readonly="1"/>

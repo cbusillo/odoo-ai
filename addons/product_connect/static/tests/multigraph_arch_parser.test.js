@@ -97,8 +97,8 @@ describe("MultigraphArchParser", () => {
 
         expect(result.title).toBe("Test Chart")
         expect(result.stacked).toBe(true)
-        expect(result.measures).toBeInstanceOf(Array)
-        expect(result.groupBy).toBeInstanceOf(Array)
+        expect(Array.isArray(result.measures)).toBe(true)
+        expect(Array.isArray(result.groupBy)).toBe(true)
     })
 
     test("uses field string as label fallback", () => {

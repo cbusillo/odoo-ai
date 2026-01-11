@@ -3,34 +3,6 @@
   <component name="CsvFileAttributes">
     <option name="attributeMap">
       <map>
-        <entry key="$USER_HOME$/Library/Caches/JetBrains/PyCharm2025.3/remote_sources/455589175/1157504333/odoo-enterprise-mirror/account_intrastat/data/account.intrastat.code.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="$USER_HOME$/Library/Caches/JetBrains/PyCharm2025.3/remote_sources/455589175/46811940/addons/account/security/ir.model.access.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="$USER_HOME$/Library/Caches/JetBrains/PyCharm2025.3/remote_sources/455589175/46811940/addons/l10n_ec/data/res.bank.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="$USER_HOME$/Library/Caches/JetBrains/PyCharm2025.3/remote_sources/455589175/46811940/addons/l10n_mr/data/template/account.group-mr.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
         <entry key="/addons/cm_custom/security/ir.model.access.csv">
           <value>
             <Attribute>

@@ -1,6 +1,5 @@
 import { patch } from "@web/core/utils/patch"
 import { Message } from "@mail/core/common/message"
-
 function parseInternalUrl(href) {
     try {
         const url = new URL(href, window.location.origin)
@@ -68,20 +67,23 @@ function linkifyInternalUrls(root) {
     }
 }
 
-patch(Message.prototype, {
-    prepareMessageBody(bodyEl) {
+/** @type {any} */
+const originalPrepareMessageBody = Message.prototype.prepareMessageBody
+
+const prepareMessageBody = function (bodyEl) {
         try {
             // Test-only guard: allow disabling labeler via URL param for red/green runs
             try {
                 const q = new URLSearchParams(window.location.search || "")
                 if (q.get("drl_disable") === "1") {
-                    return super.prepareMessageBody
-                        ? super.prepareMessageBody(...arguments)
-                        : undefined
+                    if (originalPrepareMessageBody) {
+                        originalPrepareMessageBody.apply(this, arguments)
+                    }
+                    return
                 }
             } catch {}
-            if (super.prepareMessageBody) {
-                super.prepareMessageBody(...arguments)
+            if (originalPrepareMessageBody) {
+                originalPrepareMessageBody.apply(this, arguments)
             }
             // Fallback: if core didn't linkify, attempt to convert bare URLs to anchors
             if (
@@ -151,5 +153,9 @@ patch(Message.prototype, {
         } catch (e) {
             // swallow to avoid Owl lifecycle crashes
         }
-    },
-})
+}
+
+const messagePatch = {}
+messagePatch.prepareMessageBody = prepareMessageBody
+
+patch(Message.prototype, messagePatch)

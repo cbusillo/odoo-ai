@@ -3,25 +3,41 @@
 import { describe, test, expect } from "@odoo/hoot"
 import { SuggestionService } from "@mail/core/common/suggestion_service"
 
+const createSuggestionService = () => {
+    const env = { inFrontendPortalChatter: false }
+    const services = /** @type {any} */ ({
+        orm: { silent: { call: () => Promise.resolve([]) } },
+        "mail.store": { records: {} },
+        "mail.composer": {},
+    })
+    const suggestionService = new SuggestionService(env, services)
+    return { env, suggestionService }
+}
+
 describe("@discuss_record_links Suggestion service patch", () => {
     test("adds '[' to supported delimiters", async () => {
-        const svc = new SuggestionService({ services: {} })
-        const delims = svc.getSupportedDelimiters()
+        const { env, suggestionService } = createSuggestionService()
+        const supportedDelimiters = suggestionService.getSupportedDelimiters(undefined, env)
         // The returned structure is an array of arrays of chars
-        expect(delims.find((d) => Array.isArray(d) && d[0] === "[")).toBeTruthy()
+        expect(
+            Boolean(
+                supportedDelimiters.find(
+                    (delimiter) => Array.isArray(delimiter) && delimiter[0] === "["
+                )
+            )
+        ).toBe(true)
     })
 
     test("searchSuggestions returns RecordLink items from cache", async () => {
-        const svc = new SuggestionService({ services: {} })
+        const { suggestionService } = createSuggestionService()
         // Prime internal cache the way fetchSuggestions would
-        svc.__recordLinkCache = [
+        suggestionService.__recordLinkCache = [
             { id: 1, model: "product.product", label: "[SKU] Widget", group: "Products" },
             { id: 2, model: "motor", label: "F150 (2019)", group: "Motors" },
         ]
-        const out = svc.searchSuggestions({ delimiter: "[", term: "wi" })
-        expect(out.type).toBe("RecordLink")
-        expect(out.suggestions).toHaveLength(2)
-        expect(out.suggestions[0].label).toBe("[SKU] Widget")
+        const result = suggestionService.searchSuggestions({ delimiter: "[", term: "wi" })
+        expect(result.type).toBe("RecordLink")
+        expect(result.suggestions).toHaveLength(2)
+        expect(result.suggestions[0].label).toBe("[SKU] Widget")
     })
 })
-

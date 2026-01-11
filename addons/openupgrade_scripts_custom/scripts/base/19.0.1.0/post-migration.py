@@ -112,18 +112,21 @@ def _fix_ir_rule_user_groups_field(env: Environment) -> None:
 
 
 def _fix_user_groups_view_field(env: Environment) -> None:
-    """Align base.user_groups_view with the Odoo 19 `group_ids` field."""
+    """Align res.users views with the Odoo 19 `group_ids` field."""
 
-    view_record = env.ref("base.user_groups_view", raise_if_not_found=False)
-    if not view_record:
-        return
-    view_arch = view_record.arch_db or ""
-    if 'name="groups_id"' not in view_arch:
-        return
-    updated_arch = view_arch.replace('name="groups_id"', 'name="group_ids"')
-    if updated_arch == view_arch:
-        return
-    view_record.write({"arch_db": updated_arch})
+    views = env["ir.ui.view"].search(
+        [
+            ("model", "=", "res.users"),
+            ("arch_db", "ilike", "name=\"groups_id\""),
+        ]
+    )
+    for view_record in views:
+        view_arch = view_record.arch_db or ""
+        if 'name="groups_id"' not in view_arch:
+            continue
+        updated_arch = view_arch.replace('name="groups_id"', 'name="group_ids"')
+        if updated_arch != view_arch:
+            view_record.write({"arch_db": updated_arch})
 
 
 @openupgrade.migrate()

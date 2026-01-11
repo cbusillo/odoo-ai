@@ -7,14 +7,15 @@ from typing import cast
 
 import click
 
+from tools.deployer.settings import load_stack_settings
+
 from .db import db_capacity
+from .docker_api import compose_env
 from .phases import PhaseOutcome
 from .reporter import load_json
 from .session import PhaseName, TestSession
 from .settings import TestSettings
 from .sharding import plan_shards_for_phase
-from .docker_api import compose_env
-from tools.deployer.settings import load_stack_settings
 
 
 def _emit_bottomline(latest: Path, as_json: bool) -> int:
@@ -578,8 +579,8 @@ def plan_cmd(
     tour_modules: tuple[str, ...],
     tour_exclude: tuple[str, ...],
 ) -> None:
-    _apply_stack_env(stack, env_file)
     """Print the weight-aware sharding plan for a phase or all phases."""
+    _apply_stack_env(stack, env_file)
     # apply overrides to env so TestSession sees them if needed
     _apply_shard_overrides(unit_shards, js_shards, integration_shards, tour_shards)
 
@@ -792,8 +793,8 @@ def wait_cmd(session: str | None, timeout: int, interval: int, json_out: bool) -
 @click.option("--env-file", "env_file", default=None, help="Explicit env file for stack resolution")
 @click.option("--json", "json_out", is_flag=True, help="Emit JSON output")
 def doctor_cmd(stack: str | None, env_file: str | None, json_out: bool) -> None:
-    _apply_stack_env(stack, env_file)
     """Quick environment diagnostics for the runner (Docker, DB, disk, shards)."""
+    _apply_stack_env(stack, env_file)
     # Docker services
     import subprocess
 

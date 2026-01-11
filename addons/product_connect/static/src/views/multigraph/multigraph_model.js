@@ -7,8 +7,7 @@ export class MultigraphModel extends GraphModel {
             // Minimal stub to satisfy constructor paths that require an orm
             webReadGroup: async () => ({ groups: [] }),
         }
-        /** @type {import("services").ServiceFactories} */
-        const normalizedServices = {}
+        const normalizedServices = /** @type {import("services").ServiceFactories} */ ({})
         if (env?.services) {
             Object.assign(normalizedServices, env.services)
         }
@@ -27,7 +26,7 @@ export class MultigraphModel extends GraphModel {
 
         // Call parent with normalized signature (env, params, services)
         // Some Odoo models expect exactly 3 constructor args
-        super(mergedEnv, params, normalizedServices)
+        super(mergedEnv, params, /** @type {import("services").ServiceFactories} */ (normalizedServices))
 
         // Ensure orm is present for direct calls in our methods/tests
         if (!this.orm && normalizedServices.orm) {

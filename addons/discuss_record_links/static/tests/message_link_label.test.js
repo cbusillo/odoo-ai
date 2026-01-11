@@ -52,7 +52,7 @@ describe("@discuss_record_links Message link label transformer", () => {
 
         const fakeEnv = {
             services: {
-                rpc: async (route, payload) => {
+                rpc: async (route) => {
                     expect(route).toBe("/discuss_record_links/labels")
                     return [{ model: "product.product", id: 77, label: "[SKU77] Iconic", image_field: "image_128" }]
                 },
@@ -174,7 +174,7 @@ describe("@discuss_record_links Message link label transformer", () => {
 
         const fakeEnv = {
             services: {
-                rpc: async (route, payload) => {
+                rpc: async (route) => {
                     expect(route).toBe("/discuss_record_links/labels")
                     return [{ model: "product.product", id: 99, label: "[SKU99] Widget" }]
                 },

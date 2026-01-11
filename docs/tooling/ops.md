@@ -110,6 +110,8 @@ Behavior notes
 - Prod ship runs the prod gate first using `uv run prod-gate backup`.
 - Prod actions require an explicit confirmation (interactive prompt or
   `--confirm` for non-interactive usage).
+- For testing, `uv run ops ship` runs the test gate before deploy (skip with
+  `--skip-tests`).
 - For dev/testing, `uv run ops ship` triggers a Coolify deploy by default (use
   `--no-deploy` to skip). Deploy waits are on by default; use `--no-wait` to
   skip (not compatible with `--after`).

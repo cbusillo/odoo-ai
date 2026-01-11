@@ -290,17 +290,17 @@ def _favorite_label(state: OpsState) -> str:
 
 
 def _render_cli_command(
-        *,
-        target: str,
-        env: str,
-        action: str,
-        deploy: bool,
-        wait_deploy: bool,
-        serial: bool,
-        build: bool,
-        no_cache: bool,
-        post_action: str | None,
-        dry_run: bool,
+    *,
+    target: str,
+    env: str,
+    action: str,
+    deploy: bool,
+    wait_deploy: bool,
+    serial: bool,
+    build: bool,
+    no_cache: bool,
+    post_action: str | None,
+    dry_run: bool,
 ) -> str:
     command_parts: list[str] = ["uv", "run", "ops"]
     if action in LOCAL_ACTIONS:
@@ -1150,6 +1150,13 @@ def _run_prod_gate(target: str, *, dry_run: bool, skip_tests: bool) -> None:
     _run(cmd, dry_run=dry_run)
 
 
+def _run_test_gate(target: str, *, dry_run: bool, skip_tests: bool) -> None:
+    if skip_tests:
+        return
+    cmd = ["uv", "run", "test", "run", "--json", "--stack", target]
+    _run(cmd, dry_run=dry_run)
+
+
 def _run_ship(
     target: str,
     env: str,
@@ -1169,6 +1176,9 @@ def _run_ship(
             return
         for entry in _targets_for(target):
             _run_prod_gate(entry, dry_run=dry_run, skip_tests=skip_tests)
+    elif env == "testing":
+        for entry in _targets_for(target):
+            _run_test_gate(entry, dry_run=dry_run, skip_tests=skip_tests)
     if not _confirm_dirty():
         return
 
@@ -1426,9 +1436,7 @@ def _resolve_command_path(command: str) -> str | None:
         candidates = [f"{command_name}{extension}" for extension in path_extensions]
 
         normalized_command = command_name.upper()
-        if not (mode & os.X_OK) or any(
-            normalized_command.endswith(extension.upper()) for extension in path_extensions
-        ):
+        if not (mode & os.X_OK) or any(normalized_command.endswith(extension.upper()) for extension in path_extensions):
             candidates.insert(0, command_name)
     else:
         candidates = [command_name]
@@ -1718,7 +1726,7 @@ def _execute(
 @click.option("--serial/--parallel", default=False, help="Deploy one target at a time when shipping")
 @click.option("--build/--no-build", default=False, help="Build image before local actions")
 @click.option("--no-cache", is_flag=True, help="Build without cache for local actions")
-@click.option("--skip-tests", is_flag=True, help="Skip prod gate tests")
+@click.option("--skip-tests", is_flag=True, help="Skip ship gate tests")
 @click.option("--dry-run", is_flag=True)
 @click.option("--remember/--no-remember", default=True)
 @click.pass_context

@@ -7,19 +7,19 @@ from typing import Generator, Union
 
 from babel.dates import format_timedelta
 from httpx import RequestError
-from odoo import api, models, fields
+from odoo import api, fields, models
 from odoo.tools import config
-from psycopg2 import OperationalError, InterfaceError
-from psycopg2.errors import TransactionRollbackError, SerializationFailure, InFailedSqlTransaction
+from psycopg2 import InterfaceError, OperationalError
+from psycopg2.errors import InFailedSqlTransaction, SerializationFailure, TransactionRollbackError
 from pydantic import BaseModel
 
 from ..services.shopify.helpers import (
     DEFAULT_DATETIME,
-    SyncMode,
+    OdooDataError,
     ShopifyApiError,
     ShopifyStaleRunTimeout,
-    OdooDataError,
     ShopifySyncRunFailed,
+    SyncMode,
     format_datetime_for_shopify,
     last_import_config_key,
 )

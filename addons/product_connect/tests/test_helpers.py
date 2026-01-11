@@ -7,6 +7,9 @@ from datetime import datetime
 from typing import Any, Generator, Optional
 from unittest.mock import MagicMock, patch
 
+from odoo.api import Environment
+from odoo.models import BaseModel
+
 from .base_types import TEST_SHOPIFY_ID_MAX, TEST_SHOPIFY_ID_MIN
 
 
@@ -38,7 +41,7 @@ def assert_shopify_fields(record: object, expected: dict[str, object]) -> None:
         assert actual == value, f"Field {field}: expected {value!r}, got {actual!r}"
 
 
-def with_test_context(env: "odoo.api.Environment") -> "odoo.api.Environment":
+def with_test_context(env: Environment) -> Environment:
     from .base_types import DEFAULT_TEST_CONTEXT
 
     return env.with_context(**DEFAULT_TEST_CONTEXT)
@@ -101,7 +104,7 @@ def assert_fields_equal(
 
 
 def assert_record_count(
-    model: object,
+    model: BaseModel,
     domain: list,
     expected_count: int,
     message: Optional[str] = None,

@@ -1,10 +1,10 @@
 # Copyright 2026 Shiny Computers
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
-
+from odoo.orm.environments import Environment
 from openupgradelib import openupgrade
 
 
-def _ensure_mail_link_preview_unique_source_url(env) -> None:
+def _ensure_mail_link_preview_unique_source_url(env: Environment) -> None:
     """De-duplicate mail_link_preview.source_url and create the unique index.
 
     Odoo 18 can store multiple `mail_link_preview` rows per URL (one per
@@ -54,17 +54,12 @@ def _ensure_mail_link_preview_unique_source_url(env) -> None:
 
     # Find duplicate source_url groups and keep the lowest id.
     env.cr.execute(
-        "SELECT source_url, MIN(id) "
-        "FROM mail_link_preview "
-        "WHERE source_url IS NOT NULL "
-        "GROUP BY source_url "
-        "HAVING COUNT(*) > 1",
+        "SELECT source_url, MIN(id) FROM mail_link_preview WHERE source_url IS NOT NULL GROUP BY source_url HAVING COUNT(*) > 1",
     )
     duplicate_groups = env.cr.fetchall()
     if not duplicate_groups:
         env.cr.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS mail_link_preview_unique_source_url "
-            "ON mail_link_preview (source_url)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS mail_link_preview_unique_source_url ON mail_link_preview (source_url)",
         )
         return
 
@@ -118,8 +113,7 @@ def _ensure_mail_link_preview_unique_source_url(env) -> None:
         env.cr.execute("DELETE FROM mail_link_preview WHERE id = ANY(%s)", (duplicate_ids,))
 
     env.cr.execute(
-        "CREATE UNIQUE INDEX IF NOT EXISTS mail_link_preview_unique_source_url "
-        "ON mail_link_preview (source_url)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS mail_link_preview_unique_source_url ON mail_link_preview (source_url)",
     )
 
     if message_link_preview_exists:
@@ -130,7 +124,7 @@ def _ensure_mail_link_preview_unique_source_url(env) -> None:
 
 
 @openupgrade.migrate()
-def migrate(env, version):
+def migrate(env: Environment, _version: str) -> None:
     """Pre-migration hook for mail (19.0.1.0)."""
 
     _ensure_mail_link_preview_unique_source_url(env)

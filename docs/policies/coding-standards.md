@@ -35,6 +35,8 @@ Descriptive Code (Naming & DRY)
 - DRY: extract shared logic into helpers; avoid duplicating code/queries/selectors.
 - Prefer code that needs no comments. If a comment explains “what” the code does, rename or refactor so the code reads
   clearly. Reserve comments for “why/constraints/links to decisions”.
+- Keep code and configs non-redundant and low-noise: avoid explicit defaults or
+  repeated attributes when behavior is already clear.
 
 Project Deviation: Relational Field Naming
 

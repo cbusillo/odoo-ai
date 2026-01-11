@@ -1,7 +1,9 @@
-import { onWillStart, useState } from "@odoo/owl"
-import { useService } from "@web/core/utils/hooks"
 import { HtmlField, htmlField } from "@html_editor/fields/html_field"
+import { onWillStart, useState } from "@odoo/owl"
+import { _t } from "@web/core/l10n/translation"
 import { registry } from "@web/core/registry"
+import { useService } from "@web/core/utils/hooks"
+import { withSequence } from "@html_editor/utils/resource"
 
 export class HtmlTemplateWidget extends HtmlField {
     static template = "html_editor.HtmlField"
@@ -14,7 +16,6 @@ export class HtmlTemplateWidget extends HtmlField {
 
     setup() {
         super.setup()
-        this.startWysiwyg = this.startWysiwyg.bind(this)
         this.orm = useService("orm")
         this.serverTagModel = this.props.serverTagModel || this.props.record.resModel
         this.serverTagMethod = this.props.serverTagMethod || "get_template_tags_list"
@@ -41,58 +42,67 @@ export class HtmlTemplateWidget extends HtmlField {
         }
     }
 
-    async startWysiwyg(wysiwyg) {
-        await super.startWysiwyg(wysiwyg)
-        this.addInsertTagButton()
-        this.addTemplateTagsCommands()
+    getConfig() {
+        const config = super.getConfig()
+        const tags = this.state.tags || []
+        if (!tags.length) {
+            return config
+        }
 
-    }
+        const resources = { ...config.resources }
+        const commandId = "insert_template_tag"
+        const categoryId = "template_tags"
+        const userCommands = Array.isArray(resources.user_commands)
+            ? [...resources.user_commands]
+            : (resources.user_commands ? [resources.user_commands] : [])
+        const categories = Array.isArray(resources.powerbox_categories)
+            ? [...resources.powerbox_categories]
+            : (resources.powerbox_categories ? [resources.powerbox_categories] : [])
+        const items = Array.isArray(resources.powerbox_items)
+            ? [...resources.powerbox_items]
+            : (resources.powerbox_items ? [resources.powerbox_items] : [])
 
-    addInsertTagButton() {
-        const insertTagButton = `
-            <button class="o_codeview_btn btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                <i class="fa fa-tags"></i>
-            </button>
-            <ul class="dropdown-menu">
-                ${this.state.tags.map(tag => `
-                    <li>
-                         <a class="dropdown-item insert-tag-item" href="#">${tag}</a>
-                    </li>
-                `).join('')}
-            </ul>
-        `;
+        if (!userCommands.some((command) => command.id === commandId)) {
+            userCommands.push({
+                id: commandId,
+                title: _t("Insert template tag"),
+                description: _t("Insert template tag"),
+                icon: "fa-tag",
+                run: ({ tag }) => this.insertTag(tag),
+            })
+        }
 
-        const toolbar = this.wysiwyg.odooEditor.toolbar;  // Get the toolbar element
-        const buttonGroup = document.createElement('div');
-        buttonGroup.id = 'insert-tags-btn-group';
-        buttonGroup.className = 'btn-group';
-        buttonGroup.innerHTML = insertTagButton;
-        toolbar.appendChild(buttonGroup);
+        if (!categories.some((category) => category.id === categoryId)) {
+            categories.push(withSequence(200, { id: categoryId, name: _t("Template Tags") }))
+        }
 
-        const items = buttonGroup.querySelectorAll('.insert-tag-item');
-        items.forEach((item, index) => {
-            item.addEventListener('click', () => {
-                this.insertTag(this.state.tags[index]);
-            });
-        });
-    }
+        tags.forEach((tag, index) => {
+            items.push(withSequence(200 + index, {
+                categoryId,
+                commandId,
+                title: tag,
+                description: tag,
+                icon: "fa-tag",
+                commandParams: { tag },
+            }))
+        })
 
-    addTemplateTagsCommands() {
-        this.state.tags.slice().reverse().forEach((tag, index) => {
-            // noinspection JSUnusedGlobalSymbols
-            this.wysiwyg.odooEditor.powerbox.commands.push({
-                category: 'Template Tags',
-                name: tag,
-                priority: 10 + index,
-                description: 'Insert template tag: ' + tag,
-                fontawesome: 'fa-tag',
-                callback: () => this.insertTag(tag),
-            });
-        });
+        return {
+            ...config,
+            resources: {
+                ...resources,
+                user_commands: userCommands,
+                powerbox_categories: categories,
+                powerbox_items: items,
+            },
+        }
     }
 
     insertTag(value) {
-        this.wysiwyg.odooEditor.execCommand('insert', `{${value}}`);
+        const insert = this.editor?.shared?.dom?.insert
+        if (insert) {
+            insert(`{${value}}`)
+        }
     }
 }
 

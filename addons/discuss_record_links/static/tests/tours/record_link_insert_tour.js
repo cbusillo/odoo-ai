@@ -38,7 +38,7 @@ registry.category("web_tour.tours").add("drl_record_link_insert", {
             trigger: ".o-mail-Composer [contenteditable='true']",
             run() {
                 const el = document.querySelector(".o-mail-Composer [contenteditable='true']")
-                const text = (el && (el.textContent || el.innerText || "")).trim()
+                const text = (el?.textContent || "").trim()
                 if (!/\/web#id=\d+&model=/.test(text)) {
                     throw new Error("Expected inserted record URL in composer text")
                 }

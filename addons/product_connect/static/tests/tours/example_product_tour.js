@@ -24,8 +24,8 @@ registry.category("web_tour.tours").add("example_product_tour", {
                 if (!bc || !/Product/i.test(bc.textContent || "")) {
                     // As a fallback, force-load the action again
                     try {
-                        const svc = odoo?.__DEBUG__?.services?.action
-                        svc?.doAction?.("product_connect.action_product_template_list_edit")
+                        const actionService = window.odoo?.["__DEBUG__"]?.services?.action
+                        actionService?.doAction?.("product_connect.action_product_template_list_edit")
                     } catch (e) {
                     }
                 }

@@ -22,6 +22,9 @@ Commands
 - Loop: `uv run test unit --modules <touched>`; JS with `--js-modules`;
   selective integration/tour as needed.
 - Gate: `uv run test run --json` all phases; require `success: true`.
+- Stack selection: `--stack opw|cm` (or
+  `--env-file docker/config/<stack>-local.env`) to load the correct local
+  stack env before running tests.
 
 - The canonical command list (phase entry points, detached mode, JSON output)
   lives in [docs/tooling/testing-cli.md](tooling/testing-cli.md). Prefer those

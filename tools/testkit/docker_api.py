@@ -12,6 +12,16 @@ def _blank_to_none(value: str | None) -> str | None:
     return stripped or None
 
 
+def _resolve_env_file(env: dict[str, str]) -> Path | None:
+    raw_value = _blank_to_none(env.get("TESTKIT_ENV_FILE"))
+    if not raw_value:
+        return None
+    env_path = Path(os.path.expandvars(os.path.expanduser(raw_value))).resolve()
+    if not env_path.exists():
+        raise FileNotFoundError(f"TESTKIT_ENV_FILE not found: {env_path}")
+    return env_path
+
+
 def compose_env() -> dict[str, str]:
     """Return an env dict suitable for `docker compose`.
 
@@ -25,9 +35,13 @@ def compose_env() -> dict[str, str]:
     """
 
     env = os.environ.copy()
-    dotenv_path = Path.cwd() / ".env"
-    if dotenv_path.exists():
-        env.update(parse_env_file(dotenv_path))
+    env_file_path = _resolve_env_file(env)
+    if env_file_path:
+        env.update(parse_env_file(env_file_path))
+    else:
+        dotenv_path = Path.cwd() / ".env"
+        if dotenv_path.exists():
+            env.update(parse_env_file(dotenv_path))
 
     project_name = (_blank_to_none(env.get("ODOO_PROJECT_NAME")) or "odoo").strip()
     state_root_raw = _blank_to_none(env.get("ODOO_STATE_ROOT"))

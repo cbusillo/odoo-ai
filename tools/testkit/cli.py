@@ -14,6 +14,7 @@ from .session import PhaseName, TestSession
 from .settings import TestSettings
 from .sharding import plan_shards_for_phase
 from .docker_api import compose_env
+from tools.deployer.settings import load_stack_settings
 
 
 def _emit_bottomline(latest: Path, as_json: bool) -> int:
@@ -67,6 +68,30 @@ def _parse_multi(values: tuple[str, ...]) -> list[str]:
         parts = [part.strip() for part in value.split(",") if part.strip()]
         items.extend(parts)
     return items
+
+
+def _normalize_stack_name(stack: str | None, env_file: Path | None) -> str | None:
+    if stack:
+        normalized = stack.strip()
+        if not normalized:
+            return None
+        if normalized.endswith(("-local", "-dev", "-testing", "-prod")):
+            return normalized
+        return f"{normalized}-local"
+    if env_file:
+        return env_file.stem
+    return None
+
+
+def _apply_stack_env(stack: str | None, env_file: str | None) -> None:
+    env_path = Path(env_file).expanduser().resolve() if env_file else None
+    stack_name = _normalize_stack_name(stack, env_path)
+    if stack_name is None:
+        return
+    settings = load_stack_settings(stack_name, env_path)
+    os.environ.update(settings.environment)
+    os.environ["TESTKIT_ENV_FILE"] = str(settings.env_file)
+    os.environ["ODOO_STACK_NAME"] = stack_name
 
 
 def _apply_shard_overrides(
@@ -135,6 +160,8 @@ def _run_phase_and_exit(test_session: TestSession, phase: PhaseName, timeout: in
 
 
 @test.command("run")
+@click.option("--stack", default=None, help="Use local stack env (e.g. opw, cm, opw-local)")
+@click.option("--env-file", "env_file", default=None, help="Explicit env file for stack resolution")
 @click.option("--json", "json_out", is_flag=True, help="Print bottom-line JSON at end")
 @click.option("--unit-shards", type=int, default=None, help="Override UNIT_SHARDS")
 @click.option("--js-shards", type=int, default=None, help="Override JS_SHARDS")
@@ -159,6 +186,8 @@ def _run_phase_and_exit(test_session: TestSession, phase: PhaseName, timeout: in
 @click.option("--tour-within-shards", type=int, default=None, help="Split tour by class across N shards")
 @click.option("--overlap", is_flag=True, help="Run phases in parallel (unit+js, integration+tour)")
 def run_all(
+    stack: str | None,
+    env_file: str | None,
     json_out: bool,
     unit_shards: int | None,
     js_shards: int | None,
@@ -182,6 +211,7 @@ def run_all(
     tour_within_shards: int | None,
     overlap: bool,
 ) -> None:
+    _apply_stack_env(stack, env_file)
     # Set env overrides for settings
     _apply_shard_overrides(unit_shards, js_shards, integration_shards, tour_shards)
     if skip_filestore_integration:
@@ -238,6 +268,10 @@ def run_all(
             detached_command += ["--tour-modules", module_name]
         for excluded_module in _parse_multi(tour_exclude):
             detached_command += ["--tour-exclude", excluded_module]
+        if stack:
+            detached_command += ["--stack", stack]
+        if env_file:
+            detached_command += ["--env-file", env_file]
         if skip_filestore_integration:
             detached_command += ["--skip-filestore-integration"]
         if skip_filestore_tour:
@@ -291,6 +325,8 @@ def run_all(
 
 
 @test.command("unit")
+@click.option("--stack", default=None, help="Use local stack env (e.g. opw, cm, opw-local)")
+@click.option("--env-file", "env_file", default=None, help="Explicit env file for stack resolution")
 @click.option("--json", "json_out", is_flag=True, help="Print bottom-line JSON at end")
 @click.option("--shards", type=int, default=None, help="Override UNIT_SHARDS")
 @click.option("--modules", "modules", multiple=True, help="Only include these modules")
@@ -298,6 +334,8 @@ def run_all(
 @click.option("--unit-modules", multiple=True, help="Unit phase: only include these modules")
 @click.option("--unit-exclude", multiple=True, help="Unit phase: exclude these modules")
 def run_unit(
+    stack: str | None,
+    env_file: str | None,
     json_out: bool,
     shards: int | None,
     modules: tuple[str, ...],
@@ -305,6 +343,7 @@ def run_unit(
     unit_modules: tuple[str, ...],
     unit_exclude: tuple[str, ...],
 ) -> None:
+    _apply_stack_env(stack, env_file)
     if shards is not None:
         os.environ["UNIT_SHARDS"] = str(shards)
     include = _parse_multi(modules)
@@ -320,6 +359,8 @@ def run_unit(
 
 
 @test.command("js")
+@click.option("--stack", default=None, help="Use local stack env (e.g. opw, cm, opw-local)")
+@click.option("--env-file", "env_file", default=None, help="Explicit env file for stack resolution")
 @click.option("--json", "json_out", is_flag=True, help="Print bottom-line JSON at end")
 @click.option("--shards", type=int, default=None, help="Override JS_SHARDS")
 @click.option("--modules", "modules", multiple=True, help="Only include these modules")
@@ -328,6 +369,8 @@ def run_unit(
 @click.option("--js-exclude", multiple=True, help="JS phase: exclude these modules")
 @click.option("--detached", is_flag=True, help="Run in background and return immediately")
 def run_js(
+    stack: str | None,
+    env_file: str | None,
     json_out: bool,
     shards: int | None,
     modules: tuple[str, ...],
@@ -336,6 +379,7 @@ def run_js(
     js_exclude: tuple[str, ...],
     detached: bool,
 ) -> None:
+    _apply_stack_env(stack, env_file)
     if shards is not None:
         os.environ["JS_SHARDS"] = str(shards)
     include = _parse_multi(modules)
@@ -361,6 +405,10 @@ def run_js(
             detached_command += ["--js-modules", module_name]
         for excluded_module in _parse_multi(js_exclude):
             detached_command += ["--js-exclude", excluded_module]
+        if stack:
+            detached_command += ["--stack", stack]
+        if env_file:
+            detached_command += ["--env-file", env_file]
         from subprocess import Popen
 
         launcher_log = Path("tmp/test-logs/launcher.out")
@@ -381,6 +429,8 @@ def run_js(
 
 
 @test.command("integration")
+@click.option("--stack", default=None, help="Use local stack env (e.g. opw, cm, opw-local)")
+@click.option("--env-file", "env_file", default=None, help="Explicit env file for stack resolution")
 @click.option("--json", "json_out", is_flag=True, help="Print bottom-line JSON at end")
 @click.option("--shards", type=int, default=None, help="Override INTEGRATION_SHARDS")
 @click.option("--modules", "modules", multiple=True, help="Only include these modules")
@@ -389,6 +439,8 @@ def run_js(
 @click.option("--integration-exclude", multiple=True, help="Integration phase: exclude these modules")
 @click.option("--skip-filestore", is_flag=True, help="Skip filestore snapshot for integration")
 def run_integration(
+    stack: str | None,
+    env_file: str | None,
     json_out: bool,
     shards: int | None,
     modules: tuple[str, ...],
@@ -397,6 +449,7 @@ def run_integration(
     integration_exclude: tuple[str, ...],
     skip_filestore: bool,
 ) -> None:
+    _apply_stack_env(stack, env_file)
     if shards is not None:
         os.environ["INTEGRATION_SHARDS"] = str(shards)
     include = _parse_multi(modules)
@@ -414,6 +467,8 @@ def run_integration(
 
 
 @test.command("tour")
+@click.option("--stack", default=None, help="Use local stack env (e.g. opw, cm, opw-local)")
+@click.option("--env-file", "env_file", default=None, help="Explicit env file for stack resolution")
 @click.option("--json", "json_out", is_flag=True, help="Print bottom-line JSON at end")
 @click.option("--shards", type=int, default=None, help="Override TOUR_SHARDS")
 @click.option("--modules", "modules", multiple=True, help="Only include these modules")
@@ -423,6 +478,8 @@ def run_integration(
 @click.option("--skip-filestore", is_flag=True, help="Skip filestore snapshot for tour")
 @click.option("--detached", is_flag=True, help="Run in background and return immediately")
 def run_tour(
+    stack: str | None,
+    env_file: str | None,
     json_out: bool,
     shards: int | None,
     modules: tuple[str, ...],
@@ -432,6 +489,7 @@ def run_tour(
     skip_filestore: bool,
     detached: bool,
 ) -> None:
+    _apply_stack_env(stack, env_file)
     if shards is not None:
         os.environ["TOUR_SHARDS"] = str(shards)
     include = _parse_multi(modules)
@@ -459,6 +517,10 @@ def run_tour(
             detached_command += ["--tour-exclude", excluded_module]
         if skip_filestore:
             detached_command += ["--skip-filestore"]
+        if stack:
+            detached_command += ["--stack", stack]
+        if env_file:
+            detached_command += ["--env-file", env_file]
         from subprocess import DEVNULL, Popen
 
         Popen(detached_command, stdout=DEVNULL, stderr=DEVNULL)
@@ -478,6 +540,8 @@ def run_tour(
 
 
 @test.command("plan")
+@click.option("--stack", default=None, help="Use local stack env (e.g. opw, cm, opw-local)")
+@click.option("--env-file", "env_file", default=None, help="Explicit env file for stack resolution")
 @click.option("--phase", type=click.Choice(["unit", "js", "integration", "tour", "all"]), default="all")
 @click.option("--json", "json_out", is_flag=True, help="Emit JSON plan (default)")
 @click.option("--unit-shards", type=int, default=None, help="Override UNIT_SHARDS")
@@ -495,6 +559,8 @@ def run_tour(
 @click.option("--tour-modules", multiple=True, help="Tour phase: only include these modules")
 @click.option("--tour-exclude", multiple=True, help="Tour phase: exclude these modules")
 def plan_cmd(
+    stack: str | None,
+    env_file: str | None,
     phase: str,
     json_out: bool,
     unit_shards: int | None,
@@ -512,6 +578,7 @@ def plan_cmd(
     tour_modules: tuple[str, ...],
     tour_exclude: tuple[str, ...],
 ) -> None:
+    _apply_stack_env(stack, env_file)
     """Print the weight-aware sharding plan for a phase or all phases."""
     # apply overrides to env so TestSession sees them if needed
     _apply_shard_overrides(unit_shards, js_shards, integration_shards, tour_shards)
@@ -585,12 +652,15 @@ def plan_cmd(
 
 
 @test.command("rerun-failures")
+@click.option("--stack", default=None, help="Use local stack env (e.g. opw, cm, opw-local)")
+@click.option("--env-file", "env_file", default=None, help="Explicit env file for stack resolution")
 @click.option("--json", "json_out", is_flag=True, help="Emit JSON output")
-def rerun_failures(json_out: bool) -> None:
+def rerun_failures(stack: str | None, env_file: str | None, json_out: bool) -> None:
     """Re-run only failing modules from the latest session.
 
     Reads per-shard summaries and collects modules for phases that failed; runs a filtered session.
     """
+    _apply_stack_env(stack, env_file)
     base = Path("tmp/test-logs/latest")
     if not base.exists():
         print(json.dumps({"status": "no_latest"}) if json_out else "no_latest")
@@ -627,13 +697,20 @@ def rerun_failures(json_out: bool) -> None:
         args += ["--integration-modules", module_name]
     for module_name in payload.get("tour", []):
         args += ["--tour-modules", module_name]
+    if stack:
+        args += ["--stack", stack]
+    if env_file:
+        args += ["--env-file", env_file]
     from subprocess import call
 
     sys.exit(call(args))
 
 
 @test.command("clean")
-def run_clean() -> None:
+@click.option("--stack", default=None, help="Use local stack env (e.g. opw, cm, opw-local)")
+@click.option("--env-file", "env_file", default=None, help="Explicit env file for stack resolution")
+def run_clean(stack: str | None, env_file: str | None) -> None:
+    _apply_stack_env(stack, env_file)
     from .db import cleanup_test_databases
     from .filestore import cleanup_filestores
 
@@ -711,8 +788,11 @@ def wait_cmd(session: str | None, timeout: int, interval: int, json_out: bool) -
 
 
 @test.command("doctor")
+@click.option("--stack", default=None, help="Use local stack env (e.g. opw, cm, opw-local)")
+@click.option("--env-file", "env_file", default=None, help="Explicit env file for stack resolution")
 @click.option("--json", "json_out", is_flag=True, help="Emit JSON output")
-def doctor_cmd(json_out: bool) -> None:
+def doctor_cmd(stack: str | None, env_file: str | None, json_out: bool) -> None:
+    _apply_stack_env(stack, env_file)
     """Quick environment diagnostics for the runner (Docker, DB, disk, shards)."""
     # Docker services
     import subprocess

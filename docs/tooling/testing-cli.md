@@ -28,6 +28,8 @@ Commands
   large run.
 - `uv run test validate --json` — verify all tests executed + summarize
   failures.
+- `--stack opw|cm` (or `--env-file docker/config/<stack>-local.env`) —
+  load the matching local stack env before running.
 
 Scoping Flags
 

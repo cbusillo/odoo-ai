@@ -14,6 +14,7 @@ export class HtmlTemplateWidget extends HtmlField {
 
     setup() {
         super.setup()
+        this.startWysiwyg = this.startWysiwyg.bind(this)
         this.orm = useService("orm")
         this.serverTagModel = this.props.serverTagModel || this.props.record.resModel
         this.serverTagMethod = this.props.serverTagMethod || "get_template_tags_list"

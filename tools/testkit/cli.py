@@ -85,10 +85,14 @@ def _normalize_stack_name(stack: str | None, env_file: Path | None) -> str | Non
 
 
 def _apply_stack_env(stack: str | None, env_file: str | None) -> None:
+    if not stack and not env_file:
+        raise click.ClickException(
+            "Missing required --stack or --env-file (e.g. --stack opw or --env-file docker/config/opw-local.env)."
+        )
     env_path = Path(env_file).expanduser().resolve() if env_file else None
     stack_name = _normalize_stack_name(stack, env_path)
     if stack_name is None:
-        return
+        raise click.ClickException("Unable to resolve stack name; provide --stack or --env-file.")
     settings = load_stack_settings(stack_name, env_path)
     os.environ.update(settings.environment)
     os.environ["TESTKIT_ENV_FILE"] = str(settings.env_file)

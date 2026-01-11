@@ -1,10 +1,10 @@
 from collections.abc import Callable
 
-from ..common_imports import datetime, patch, MagicMock, UserError, tagged, UNIT_TAGS
-from ..fixtures.base import UnitTestCase
-from ..fixtures.factories import ProductFactory, PartnerFactory
 from ...services.shopify import helpers
 from ...services.shopify.gql.base_model import BaseModel
+from ..common_imports import UNIT_TAGS, MagicMock, UserError, datetime, patch, tagged
+from ..fixtures.base import UnitTestCase
+from ..fixtures.factories import PartnerFactory, ProductFactory
 
 
 @tagged(*UNIT_TAGS)
@@ -244,7 +244,6 @@ class TestShopifyHelpers(UnitTestCase):
         # Since we can't set write_date to NULL in tests (it's always set on creation),
         # we'll test with a mock object instead
         from unittest.mock import MagicMock
-        from datetime import datetime
 
         mock_product = MagicMock()
         mock_product.write_date = None

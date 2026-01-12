@@ -61,6 +61,7 @@ target-version = "py313"
 select = ["ANN", "UP", "B", "I"]
 ignore = [
     "D", # pydocstyle
+    "B018", # Ruff flags Odoo manifests (module dict literal) as useless expression
     "COM812", # trailing-comma-missing (conflicts with formatter)
     "ISC001", # single-line-implicit-string-concatenation (conflicts with formatter)
     "FBT001", # Boolean default positional argument - PyCharm shows inlay hints

@@ -74,6 +74,7 @@ USER ubuntu
 
 # Development build stage - prod + dev dependencies
 FROM base AS development
+ARG PYTHON_VERSION
 WORKDIR /volumes/addons
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
@@ -93,6 +94,13 @@ ENV CHROME_BIN=/usr/bin/chromium
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     /volumes/scripts/install_dev_requirements.sh
+
+# Ensure Odoo roots are discoverable by IDEs without shadowing stdlib.
+RUN site_packages="/venv/lib/python${PYTHON_VERSION}/site-packages" \
+    && printf '/odoo\n' > "${site_packages}/odoo_local.pth" \
+    && printf '/odoo/addons\n' > "${site_packages}/odoo_addons.pth" \
+    && printf '/opt/extra_addons\n' > "${site_packages}/odoo_enterprise.pth" \
+    && printf '/opt/extra_addons/OpenUpgrade\n' > "${site_packages}/upgrade_utils.pth"
 
 # Apply development patches for --dev mode issues
 COPY patches/dev /tmp/patches/dev

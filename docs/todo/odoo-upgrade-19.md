@@ -2,7 +2,6 @@
 title: Odoo 19 Upgrade (OPW)
 ---
 
-
 ## Constraints
 
 - Cannot use Odoo Upgrade platform (no database upload).
@@ -44,31 +43,31 @@ From `addons/product_connect/__manifest__.py` (version 19.0.8.2):
 
 ## Dependency classification (product_connect)
 
-| Dependency | Repo location | Opw DB state (2026-01-05) | License (DB) |
-| --- | --- | --- | --- |
-| account | core (Odoo) | installed | LGPL-3 |
-| base | core (Odoo) | installed | LGPL-3 |
-| base_automation | core (Odoo) | installed | LGPL-3 |
-| base_geolocalize | core (Odoo) | installed | LGPL-3 |
-| contacts | core (Odoo) | installed | LGPL-3 |
-| delivery | core (Odoo) | installed | LGPL-3 |
-| delivery_ups_rest | enterprise | installed | OEEL-1 |
-| delivery_usps_rest | enterprise | installed | OEEL-1 |
-| disable_odoo_online | core (Odoo) | installed | LGPL-3 |
-| discuss_record_links | custom (addons) | missing from DB | |
-| external_ids | custom (addons) | missing from DB | |
-| hr_employee_name_extended | custom (addons) | missing from DB | |
-| mail | core (Odoo) | installed | LGPL-3 |
-| phone_validation | core (Odoo) | installed | LGPL-3 |
-| product | core (Odoo) | installed | LGPL-3 |
-| project | core (Odoo) | installed | LGPL-3 |
-| purchase | core (Odoo) | installed | LGPL-3 |
-| repair | core (Odoo) | installed | LGPL-3 |
-| sale_management | core (Odoo) | installed | LGPL-3 |
-| stock | core (Odoo) | installed | LGPL-3 |
-| web | core (Odoo) | installed | LGPL-3 |
-| web_tour | core (Odoo) | installed | LGPL-3 |
-| website_sale | core (Odoo) | installed | LGPL-3 |
+| Dependency                | Repo location   | Opw DB state (2026-01-05) | License (DB) |
+|---------------------------|-----------------|---------------------------|--------------|
+| account                   | core (Odoo)     | installed                 | LGPL-3       |
+| base                      | core (Odoo)     | installed                 | LGPL-3       |
+| base_automation           | core (Odoo)     | installed                 | LGPL-3       |
+| base_geolocalize          | core (Odoo)     | installed                 | LGPL-3       |
+| contacts                  | core (Odoo)     | installed                 | LGPL-3       |
+| delivery                  | core (Odoo)     | installed                 | LGPL-3       |
+| delivery_ups_rest         | enterprise      | installed                 | OEEL-1       |
+| delivery_usps_rest        | enterprise      | installed                 | OEEL-1       |
+| disable_odoo_online       | core (Odoo)     | installed                 | LGPL-3       |
+| discuss_record_links      | custom (addons) | missing from DB           |              |
+| external_ids              | custom (addons) | missing from DB           |              |
+| hr_employee_name_extended | custom (addons) | missing from DB           |              |
+| mail                      | core (Odoo)     | installed                 | LGPL-3       |
+| phone_validation          | core (Odoo)     | installed                 | LGPL-3       |
+| product                   | core (Odoo)     | installed                 | LGPL-3       |
+| project                   | core (Odoo)     | installed                 | LGPL-3       |
+| purchase                  | core (Odoo)     | installed                 | LGPL-3       |
+| repair                    | core (Odoo)     | installed                 | LGPL-3       |
+| sale_management           | core (Odoo)     | installed                 | LGPL-3       |
+| stock                     | core (Odoo)     | installed                 | LGPL-3       |
+| web                       | core (Odoo)     | installed                 | LGPL-3       |
+| web_tour                  | core (Odoo)     | installed                 | LGPL-3       |
+| website_sale              | core (Odoo)     | installed                 | LGPL-3       |
 
 Notes:
 
@@ -198,68 +197,68 @@ Snapshot: 2026-01-05.
   `odoo.upgrade.util` is unavailable (Odoo 19).
 - OpenUpgrade completed successfully via `uv run ops local openupgrade opw`.
   Warnings captured:
-  - modules not installable: account_auto_transfer, account_disallowed_expenses,
-    sale_async_emails, web_editor.
-  - unique index `mail_link_preview_unique_source_url` could not be created due
-    to duplicate `mail_link_preview.source_url` rows (Odoo 18 stored one row per
-    message, Odoo 19 expects one row per URL).
-  - web_editor models declared but not loadable (likely because web_editor is
-    missing).
+    - modules not installable: account_auto_transfer, account_disallowed_expenses,
+      sale_async_emails, web_editor.
+    - unique index `mail_link_preview_unique_source_url` could not be created due
+      to duplicate `mail_link_preview.source_url` rows (Odoo 18 stored one row per
+      message, Odoo 19 expects one row per URL).
+    - web_editor models declared but not loadable (likely because web_editor is
+      missing).
 
 ## Test run notes (2026-01-06)
 
 - Ran `uv run test run --json` (session test-20260106_024002). Failures in
   unit/js/integration/tour phases.
 - Root causes identified:
-  - `res.users` field renamed from `groups_id` to `group_ids` in Odoo 19;
-    update product_connect fixtures/tests accordingly.
-  - `Registry.in_test_mode()` removed in Odoo 19; update product_connect
-    transaction mixin/tests to use `odoo.modules.module.current_test` and
-    `config["test_enable"]`.
-  - `res.partner.mobile` and `mobile_blacklisted` are no longer available in
-    Odoo 19; update customer importer/tests to rely on `phone_mobile_search`
-    and the phone blacklist API.
+    - `res.users` field renamed from `groups_id` to `group_ids` in Odoo 19;
+      update product_connect fixtures/tests accordingly.
+    - `Registry.in_test_mode()` removed in Odoo 19; update product_connect
+      transaction mixin/tests to use `odoo.modules.module.current_test` and
+      `config["test_enable"]`.
+    - `res.partner.mobile` and `mobile_blacklisted` are no longer available in
+      Odoo 19; update customer importer/tests to rely on `phone_mobile_search`
+      and the phone blacklist API.
 - Integration fixes in progress:
-  - `sale.order.line` field renamed from `tax_id` to `tax_ids` in Odoo 19;
-    update Shopify order importer global discount logic.
-  - Phone blacklist updates in Odoo 19 should use
-    `res.partner._phone_set_blacklisted()` when available to sync
-    `phone_blacklisted`.
-  - Odoo 19 `mail.thread.phone` blacklist helpers do not accept arguments;
-    call `_phone_set_blacklisted()` or `_phone_reset_blacklisted()` based on
-    desired state.
-  - Phone blacklist behavior depends on `phone_sanitized`; adjusted test data
-    to use valid phone numbers so blacklist assertions remain meaningful.
-  - Tour tests now target `/web` URLs; `/odoo` endpoints returned 400 and
-    prevented `odoo.isTourReady` from seeing registered tours (Odoo 18/19
-    harness expects `/web` entry points).
-  - Removed `window.location` navigation from the example product tour's first
-    step to avoid Odoo 19's `expectUnloadPage` warning on implicit reloads.
-  - Multigraph tour failures were caused by `web_read_group` rejecting legacy
-    options (`orderby`, `lazy`) and missing date granularity; the multigraph
-    model now avoids those options and restores `:day` (or other) intervals
-    from `graph_groupbys`, falling back to `:day` for date/datetime fields
-    when the interval is missing, and normalizes groupBy entries from the
-    search model (including `metaData.context`) before calling `web_read_group`.
-  - Multigraph model now follows the Odoo 19 `webReadGroup(model, domain,
+    - `sale.order.line` field renamed from `tax_id` to `tax_ids` in Odoo 19;
+      update Shopify order importer global discount logic.
+    - Phone blacklist updates in Odoo 19 should use
+      `res.partner._phone_set_blacklisted()` when available to sync
+      `phone_blacklisted`.
+    - Odoo 19 `mail.thread.phone` blacklist helpers do not accept arguments;
+      call `_phone_set_blacklisted()` or `_phone_reset_blacklisted()` based on
+      desired state.
+    - Phone blacklist behavior depends on `phone_sanitized`; adjusted test data
+      to use valid phone numbers so blacklist assertions remain meaningful.
+    - Tour tests now target `/web` URLs; `/odoo` endpoints returned 400 and
+      prevented `odoo.isTourReady` from seeing registered tours (Odoo 18/19
+      harness expects `/web` entry points).
+    - Removed `window.location` navigation from the example product tour's first
+      step to avoid Odoo 19's `expectUnloadPage` warning on implicit reloads.
+    - Multigraph tour failures were caused by `web_read_group` rejecting legacy
+      options (`orderby`, `lazy`) and missing date granularity; the multigraph
+      model now avoids those options and restores `:day` (or other) intervals
+      from `graph_groupbys`, falling back to `:day` for date/datetime fields
+      when the interval is missing, and normalizes groupBy entries from the
+      search model (including `metaData.context`) before calling `web_read_group`.
+    - Multigraph model now follows the Odoo 19 `webReadGroup(model, domain,
     groupby, aggregates)` signature so groupby intervals reach the server.
-  - Multigraph `web_read_group` calls now send aggregate specs (including
-    monetary `sum_currency`) instead of raw field names to satisfy Odoo 19
-    aggregate validation.
-  - Product processing analytics search filter now groups by
-    `is_ready_for_sale_last_enabled_date:day` to keep date granularity intact.
-  - `TestSimpleFix` now uses `url_open("/web/login")` so the test client sends
-    the required test cursor cookie (raw `requests.get` returned 400).
-  - Phone blacklist checks now prefer `phone_sanitized_blacklisted` in Odoo 19
-    to reflect the underlying blacklist state reliably.
-  - `_sync_phone_blacklist` now uses `phone.blacklist` with sanitized numbers
-    and skips invalid phone values to avoid UserErrors on overly long inputs.
-  - Tour setup now stores attachments in DB (`ir_attachment.location=db`) to
-    avoid missing filestore asset files during headless tours.
-  - Filestore snapshot now skips removal when the production filestore is
-    absent to prevent deleting tour DB assets.
-  - Tour setup clears cached `/web/assets/` attachments after switching to DB
-    storage so fresh bundles regenerate for the test DB.
+    - Multigraph `web_read_group` calls now send aggregate specs (including
+      monetary `sum_currency`) instead of raw field names to satisfy Odoo 19
+      aggregate validation.
+    - Product processing analytics search filter now groups by
+      `is_ready_for_sale_last_enabled_date:day` to keep date granularity intact.
+    - `TestSimpleFix` now uses `url_open("/web/login")` so the test client sends
+      the required test cursor cookie (raw `requests.get` returned 400).
+    - Phone blacklist checks now prefer `phone_sanitized_blacklisted` in Odoo 19
+      to reflect the underlying blacklist state reliably.
+    - `_sync_phone_blacklist` now uses `phone.blacklist` with sanitized numbers
+      and skips invalid phone values to avoid UserErrors on overly long inputs.
+    - Tour setup now stores attachments in DB (`ir_attachment.location=db`) to
+      avoid missing filestore asset files during headless tours.
+    - Filestore snapshot now skips removal when the production filestore is
+      absent to prevent deleting tour DB assets.
+    - Tour setup clears cached `/web/assets/` attachments after switching to DB
+      storage so fresh bundles regenerate for the test DB.
 - `uv run test integration --modules product_connect` (session
   test-20260106_031050) passed after applying the order importer tax field
   update and phone blacklist sync changes.

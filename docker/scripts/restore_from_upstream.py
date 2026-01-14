@@ -459,8 +459,13 @@ class OdooUpstreamRestorer:
         )
         self.run_command(dump_cmd)
         _logger.info("Upstream database dump and transfer completed.")
-        self.terminate_all_db_connections()
-        self.run_command(f"dropdb --if-exists -h {local_host} -U {local_user} {local_db}")
+        self._set_database_allow_connections(False)
+        try:
+            self.terminate_all_db_connections()
+            self.run_command(f"dropdb --if-exists -h {local_host} -U {local_user} {local_db}")
+        except OdooRestorerError:
+            self._set_database_allow_connections(True)
+            raise
         self.run_command(f"createdb -h {local_host} -U {local_user} {local_db}")
         _logger.info("Restoring database into %s", self.local.db_name)
         restore_cmd = (
@@ -504,6 +509,20 @@ class OdooUpstreamRestorer:
                 )
                 conn.commit()
         _logger.info("All database connections terminated.")
+
+    def _set_database_allow_connections(self, allow_connections: bool) -> None:
+        if not self.database_exists():
+            return
+        with self._connect_with_retry("postgres") as conn:
+            conn.autocommit = True
+            with conn.cursor() as cursor:
+                allow_value = sql.SQL("true") if allow_connections else sql.SQL("false")
+                query = sql.SQL("ALTER DATABASE {} WITH ALLOW_CONNECTIONS {}")
+                cursor.execute(query.format(sql.Identifier(self.local.db_name), allow_value))
+        if allow_connections:
+            _logger.info("Re-enabled connections for database %s", self.local.db_name)
+        else:
+            _logger.info("Disabled new connections for database %s", self.local.db_name)
 
     def _reset_db_connection(self) -> None:
         if self.local.db_conn:
@@ -657,12 +676,17 @@ class OdooUpstreamRestorer:
 
     def drop_database(self) -> None:
         _logger.info("Rolling back database update: dropping database")
-        self.terminate_all_db_connections()
-        local_host = shlex.quote(self.local.host)
-        local_user = shlex.quote(self.local.db_user)
-        local_db = shlex.quote(self.local.db_name)
-        drop_cmd = f"dropdb --if-exists -h {local_host} -U {local_user} {local_db}"
-        self.run_command(drop_cmd)
+        self._set_database_allow_connections(False)
+        try:
+            self.terminate_all_db_connections()
+            local_host = shlex.quote(self.local.host)
+            local_user = shlex.quote(self.local.db_user)
+            local_db = shlex.quote(self.local.db_name)
+            drop_cmd = f"dropdb --if-exists -h {local_host} -U {local_user} {local_db}"
+            self.run_command(drop_cmd)
+        except OdooRestorerError:
+            self._set_database_allow_connections(True)
+            raise
 
     # --- Sanity checks ---
     def assert_core_schema_healthy(self) -> None:

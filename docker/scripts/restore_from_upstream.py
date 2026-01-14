@@ -762,6 +762,11 @@ with registry.cursor() as cr:
         cr.commit()
     else:
         print('Environment overrides addon not installed; skipping overrides.')
+    if 'authentik.sso.config' in env.registry:
+        env['authentik.sso.config'].sudo().apply_from_env()
+        cr.commit()
+    else:
+        print('Authentik SSO addon not installed; skipping Authentik overrides.')
 """).replace("__PAYLOAD__", json.dumps(payload))
 
         try:

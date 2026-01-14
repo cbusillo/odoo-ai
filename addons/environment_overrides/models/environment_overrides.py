@@ -7,7 +7,6 @@ from odoo.exceptions import AccessError, UserError, ValidationError
 _logger = logging.getLogger(__name__)
 
 CONFIG_PARAM_PREFIX = "ENV_OVERRIDE_CONFIG_PARAM__"
-AUTHENTIK_PREFIX = "ENV_OVERRIDE_AUTHENTIK__"
 SHOPIFY_PREFIX = "ENV_OVERRIDE_SHOPIFY__"
 
 FALSE_VALUES = {"", "0", "false", "no", "off"}
@@ -42,7 +41,6 @@ class EnvironmentOverrides(models.AbstractModel):
 
     def apply_from_env(self) -> None:
         self._apply_config_param_overrides()
-        self._apply_authentik_overrides()
         self._apply_shopify_overrides()
 
     def _apply_config_param_overrides(self) -> None:
@@ -69,64 +67,6 @@ class EnvironmentOverrides(models.AbstractModel):
         )
         for key, value in overrides.items():
             parameter_model.set_param(key, value)
-
-    def _apply_authentik_overrides(self) -> None:
-        provider_name = os.environ.get(f"{AUTHENTIK_PREFIX}PROVIDER_NAME", "Authentik").strip()
-        client_id = os.environ.get(f"{AUTHENTIK_PREFIX}CLIENT_ID", "").strip()
-        authorization_endpoint = os.environ.get(f"{AUTHENTIK_PREFIX}AUTHORIZATION_ENDPOINT", "").strip()
-        userinfo_endpoint = os.environ.get(f"{AUTHENTIK_PREFIX}USERINFO_ENDPOINT", "").strip()
-        scope = os.environ.get(f"{AUTHENTIK_PREFIX}SCOPE", "openid profile email").strip()
-        login_label = os.environ.get(f"{AUTHENTIK_PREFIX}LOGIN_LABEL", "Sign in with Authentik").strip()
-        css_class = os.environ.get(f"{AUTHENTIK_PREFIX}CSS_CLASS", "fa fa-fw fa-sign-in text-primary").strip()
-        data_endpoint = os.environ.get(f"{AUTHENTIK_PREFIX}DATA_ENDPOINT", "").strip()
-
-        provider_model = self.env["auth.oauth.provider"].sudo()
-        provider = provider_model.search([("name", "=", provider_name)], limit=1)
-
-        required_missing = not client_id or not authorization_endpoint or not userinfo_endpoint
-        if required_missing:
-            if provider:
-                clear_values = {
-                    "enabled": False,
-                    "client_id": False,
-                    "auth_endpoint": False,
-                    "validation_endpoint": False,
-                    "data_endpoint": False,
-                    "scope": False,
-                    "css_class": False,
-                    "body": False,
-                }
-                provider.write(clear_values)
-                _logger.info("Authentik overrides missing; disabled provider '%s'.", provider_name)
-            else:
-                _logger.info("Authentik overrides missing; provider '%s' not found.", provider_name)
-            return
-
-        values = {
-            "name": provider_name,
-            "client_id": client_id,
-            "auth_endpoint": authorization_endpoint,
-            "validation_endpoint": userinfo_endpoint,
-            "data_endpoint": data_endpoint or False,
-            "scope": scope,
-            "enabled": True,
-            "css_class": css_class,
-            "body": login_label,
-        }
-        try:
-            if provider:
-                provider.write(values)
-                _logger.info("Updated Authentik provider '%s'.", provider_name)
-            else:
-                provider_model.create({**values, "sequence": 10})
-                _logger.info("Created Authentik provider '%s'.", provider_name)
-        except (AccessError, UserError, ValidationError, ValueError):  # pragma: no cover - defensive logging
-            _logger.exception("Failed to apply Authentik overrides; disabling provider if present.")
-            if provider:
-                try:
-                    provider.write({"enabled": False})
-                except (AccessError, UserError, ValidationError, ValueError):  # pragma: no cover - best-effort disable
-                    _logger.exception("Failed to disable Authentik provider after error.")
 
     def _apply_shopify_overrides(self) -> None:
         shop_url_key = os.environ.get(f"{SHOPIFY_PREFIX}SHOP_URL_KEY", "").strip()

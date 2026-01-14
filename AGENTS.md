@@ -102,6 +102,8 @@ the linked docs, then keep prompts lean.
 - Use Codex built-ins for routine file reads/searches and `apply_patch`; reserve
   JetBrains automation for IDE-only tasks.
 - Sandbox/approval profiles are documented in `docs/tooling/codex-cli.md`.
+- Coolify env edits should go through `uv run ops coolify env-set` / `env-get`
+  / `env-unset` instead of ad-hoc scripts.
 
 ## Domain Notes
 

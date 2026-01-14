@@ -37,6 +37,9 @@ title: TODO / Optimization Ideas
     `OCA/OpenUpgrade@19.0` references if no longer needed.
   - After `opw-prod` promotion: remove `ODOO_UPSTREAM_*` env vars from
     `opw-prod` (no upstream once the docker prod becomes source of truth).
+  - After `cm-prod` promotion: set `allow_prod_init = false` for `cm` in
+    `docker/config/ops.toml` (or remove the flag entirely) to prevent prod
+    bootstraps.
 
 ## Health Checks
 

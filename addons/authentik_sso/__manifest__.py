@@ -12,7 +12,10 @@
         "auth_signup",
     ],
     "data": [
+        "security/ir.model.access.csv",
         "data/authentik_template_user.xml",
+        "data/authentik_group_mapping_data.xml",
+        "views/authentik_group_mapping_views.xml",
     ],
     "pre_init_hook": "pre_init_hook",
     "post_init_hook": "post_init_hook",

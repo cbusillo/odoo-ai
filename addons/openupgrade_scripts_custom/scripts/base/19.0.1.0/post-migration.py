@@ -1,8 +1,7 @@
-# Copyright 2026 Shiny Computers
-# License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
-
+from odoo import SUPERUSER_ID, api
+from odoo.api import Environment
 from odoo.modules.module import get_module_path
-from odoo.orm.environments import Environment
+from odoo.sql_db import Cursor
 from openupgradelib import openupgrade
 
 
@@ -117,7 +116,7 @@ def _fix_user_groups_view_field(env: Environment) -> None:
     views = env["ir.ui.view"].search(
         [
             ("model", "=", "res.users"),
-            ("arch_db", "ilike", "name=\"groups_id\""),
+            ("arch_db", "ilike", 'name="groups_id"'),
         ]
     )
     for view_record in views:
@@ -129,10 +128,17 @@ def _fix_user_groups_view_field(env: Environment) -> None:
             view_record.write({"arch_db": updated_arch})
 
 
-@openupgrade.migrate()
-def migrate(env: Environment, _version: str) -> None:
-    """Post-migration hook for base (19.0.1.0)."""
+def _ensure_env(cursor_or_env: Cursor | Environment) -> Environment:
+    if isinstance(cursor_or_env, api.Environment):
+        return cursor_or_env
+    return api.Environment(cursor_or_env, SUPERUSER_ID, {})
 
+
+@openupgrade.migrate()
+def migrate(cr: Cursor, version: str) -> None:
+    """Post-migration hook for base (19.0.1.0)."""
+    _ = version
+    env = _ensure_env(cr)
     _fix_ir_rule_user_groups_field(env)
     _fix_user_groups_view_field(env)
     _cleanup_web_editor_metadata(env)

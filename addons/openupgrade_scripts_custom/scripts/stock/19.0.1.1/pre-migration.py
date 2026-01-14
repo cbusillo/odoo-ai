@@ -1,14 +1,12 @@
 # Copyright 2026 Shiny Computers
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
-from typing import TYPE_CHECKING
-
+from odoo import SUPERUSER_ID, api
+from odoo.api import Environment
+from odoo.sql_db import Cursor
 from openupgradelib import openupgrade
 
-if TYPE_CHECKING:
-    from odoo.api import Environment
 
-
-def _ensure_scheduler_server_action(env: "Environment") -> None:
+def _ensure_scheduler_server_action(env: Environment) -> None:
     model_data = env["ir.model.data"].search(
         [
             ("module", "=", "stock"),
@@ -48,7 +46,15 @@ def _ensure_scheduler_server_action(env: "Environment") -> None:
         )
 
 
+def _ensure_env(cursor_or_env: Cursor | Environment) -> Environment:
+    if isinstance(cursor_or_env, api.Environment):
+        return cursor_or_env
+    return api.Environment(cursor_or_env, SUPERUSER_ID, {})
+
+
 @openupgrade.migrate()
-def migrate(env: "Environment", _version: str | None) -> None:
+def migrate(cr: Cursor, version: str | None) -> None:
     """Pre-migration hook for stock (19.0.1.1)."""
+    _ = version
+    env = _ensure_env(cr)
     _ensure_scheduler_server_action(env)

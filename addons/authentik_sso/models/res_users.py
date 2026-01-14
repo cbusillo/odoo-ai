@@ -241,9 +241,46 @@ class ResUsers(models.Model):
                     self._sync_authentik_groups(created_user, normalized_validation, provider)
                 return login
             except (SignupError, UserError):
-                _logger.warning(
-                    "OAuth signup failed for provider %s. Validation keys=%s",
-                    provider,
-                    ", ".join(sorted(normalized_validation.keys())),
+                login_value = self._claim_to_string(normalized_validation.get("login"))
+                email_value = self._claim_to_string(normalized_validation.get("email"))
+                if not login_value:
+                    login_value = email_value or oauth_uid
+                name_value = self._claim_to_string(normalized_validation.get("name")) or login_value
+                if not email_value and login_value and "@" in login_value:
+                    email_value = login_value
+
+                if not login_value:
+                    _logger.warning(
+                        "OAuth signup failed and no login value could be derived. Validation keys=%s",
+                        ", ".join(sorted(normalized_validation.keys())),
+                    )
+                    raise access_denied_exception
+
+                existing_user = self.search([("login", "=", login_value)], limit=1)
+                if existing_user:
+                    existing_user.write(
+                        {
+                            "oauth_uid": oauth_uid,
+                            "oauth_provider_id": provider,
+                            "oauth_access_token": params.get("access_token"),
+                        }
+                    )
+                    self._sync_authentik_groups(existing_user, normalized_validation, provider)
+                    return existing_user.login
+
+                create_vals: dict[str, object] = {
+                    "login": login_value,
+                    "name": name_value,
+                }
+                if email_value:
+                    create_vals["email"] = email_value
+                new_user = self.with_context(oauth_use_internal_template=True)._create_user_from_template(create_vals)
+                new_user.write(
+                    {
+                        "oauth_uid": oauth_uid,
+                        "oauth_provider_id": provider,
+                        "oauth_access_token": params.get("access_token"),
+                    }
                 )
-                raise access_denied_exception
+                self._sync_authentik_groups(new_user, normalized_validation, provider)
+                return new_user.login

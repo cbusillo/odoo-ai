@@ -55,6 +55,8 @@ class AuthentikSsoConfig(models.AbstractModel):
 
     def _apply_authentik_provider(self) -> None:
         provider_name = os.environ.get(f"{AUTHENTIK_PREFIX}PROVIDER_NAME", DEFAULT_PROVIDER_NAME).strip()
+        if not provider_name:
+            provider_name = DEFAULT_PROVIDER_NAME
         client_id = os.environ.get(f"{AUTHENTIK_PREFIX}CLIENT_ID", "").strip()
         authorization_endpoint = os.environ.get(f"{AUTHENTIK_PREFIX}AUTHORIZATION_ENDPOINT", "").strip()
         userinfo_endpoint = os.environ.get(f"{AUTHENTIK_PREFIX}USERINFO_ENDPOINT", "").strip()

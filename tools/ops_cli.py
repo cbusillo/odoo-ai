@@ -371,6 +371,13 @@ def _env_value(key: str, *, default: str | None = None) -> str | None:
     return repo_env.get(key, default)
 
 
+def _is_truthy(raw: str | None) -> bool:
+    if raw is None:
+        return False
+    normalized = raw.strip().lower()
+    return normalized in {"1", "true", "yes", "on"}
+
+
 def _target_names() -> list[str]:
     config = _load_ops_config()
     return sorted(config.targets.keys())
@@ -386,6 +393,28 @@ def _target_config(target: str) -> dict[str, object]:
         return dict(config.targets[target])
     except KeyError as error:
         raise click.ClickException(f"Unknown target: {target}") from error
+
+
+def _allow_prod_init(target: str) -> bool:
+    env_value = _env_value("OPS_ALLOW_PROD_INIT")
+    if _is_truthy(env_value):
+        return True
+    if target == ALL_TARGET:
+        return all(_allow_prod_init(entry) for entry in _target_names())
+    target_config = _target_config(target)
+    allow_value = target_config.get("allow_prod_init")
+    return bool(allow_value)
+
+
+def _allow_prod_restore(target: str) -> bool:
+    env_value = _env_value("OPS_ALLOW_PROD_RESTORE")
+    if _is_truthy(env_value):
+        return True
+    if target == ALL_TARGET:
+        return all(_allow_prod_restore(entry) for entry in _target_names())
+    target_config = _target_config(target)
+    allow_value = target_config.get("allow_prod_restore")
+    return bool(allow_value)
 
 
 def _resolve_local_stack(target: str) -> str:
@@ -1279,6 +1308,28 @@ def _run_ship(
     if env == "prod":
         if require_confirm and not Confirm.ask("Ship to prod?", default=False):
             return
+        if post_action == "init":
+            if not _allow_prod_init(target):
+                raise click.ClickException(
+                    "Post-deploy init is disabled for prod. Set allow_prod_init=true in docker/config/ops.toml or "
+                    "OPS_ALLOW_PROD_INIT=1 to proceed."
+                )
+            if require_confirm and not Confirm.ask(
+                "Run prod bootstrap after deploy? This will wipe existing data.",
+                default=False,
+            ):
+                return
+        if post_action == "restore":
+            if not _allow_prod_restore(target):
+                raise click.ClickException(
+                    "Post-deploy restore is disabled for prod. Set allow_prod_restore=true in docker/config/ops.toml "
+                    "or OPS_ALLOW_PROD_RESTORE=1 to proceed."
+                )
+            if require_confirm and not Confirm.ask(
+                "Run prod restore after deploy? This will overwrite existing data.",
+                default=False,
+            ):
+                return
         for entry in _targets_for(target):
             _run_prod_gate(entry, dry_run=dry_run, skip_tests=skip_tests)
     elif env == "testing":
@@ -1290,8 +1341,18 @@ def _run_ship(
     auto_deploy = _load_ops_config().coolify_auto_deploy
     wait_enabled = wait_deploy and (deploy or auto_deploy) and env in ("dev", "testing", "prod")
     if post_action:
-        if post_action in {"restore", "init"} and env not in ("dev", "testing"):
-            raise click.ClickException("Post-deploy restore/init is only supported for dev/testing.")
+        if post_action in {"restore", "init"} and env not in ("dev", "testing", "prod"):
+            raise click.ClickException("Post-deploy restore/init is only supported for dev/testing/prod.")
+        if post_action == "init" and env == "prod" and not _allow_prod_init(target):
+            raise click.ClickException(
+                "Post-deploy init is disabled for prod. Set allow_prod_init=true in docker/config/ops.toml or "
+                "OPS_ALLOW_PROD_INIT=1 to proceed."
+            )
+        if post_action == "restore" and env == "prod" and not _allow_prod_restore(target):
+            raise click.ClickException(
+                "Post-deploy restore is disabled for prod. Set allow_prod_restore=true in docker/config/ops.toml "
+                "or OPS_ALLOW_PROD_RESTORE=1 to proceed."
+            )
         if post_action == "upgrade" and env not in ("dev", "testing", "prod"):
             raise click.ClickException("Post-deploy upgrade is only supported for dev/testing/prod.")
         if not wait_enabled:
@@ -1684,10 +1745,17 @@ def _interactive(*, dry_run: bool, remember: bool, wait_deploy: bool) -> None:
             action_default = state.action if state.action in action_choices else action_choices[0]
             action = _prompt_choice("Action", action_choices, action_default)
             deploy = state.deploy
-            if action == "ship" and env in ("dev", "testing"):
+            if action == "ship" and env in ("dev", "testing", "prod"):
                 deploy = Confirm.ask("Trigger Coolify deploy after push?", default=True)
                 serial = Confirm.ask("Deploy serially?", default=False)
-                post_action = _prompt_choice("After deploy", POST_SHIP_ACTIONS, "none")
+                post_action_choices = list(POST_SHIP_ACTIONS)
+                if env == "prod":
+                    post_action_choices = ["none", "upgrade"]
+                    if _allow_prod_restore(target):
+                        post_action_choices.append("restore")
+                    if _allow_prod_init(target):
+                        post_action_choices.append("init")
+                post_action = _prompt_choice("After deploy", post_action_choices, "none")
             if env == "local" and action in ("up", "init", "restore"):
                 if questionary and sys.stdin.isatty():
                     build_choice = questionary.select("Build image?", choices=["No", "Yes"], default="No").ask()

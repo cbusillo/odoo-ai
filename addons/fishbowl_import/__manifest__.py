@@ -1,6 +1,6 @@
 {
     "name": "Fishbowl Import",
-    "version": "19.0.0.1",
+    "version": "19.0.0.2",
     "category": "Tools",
     "summary": "Import Fishbowl data into Odoo",
     "description": "Import Fishbowl customers, vendors, products, orders, and inventory history.",
@@ -25,5 +25,6 @@
     ],
     "installable": True,
     "application": False,
+    "post_init_hook": "post_init_hook",
     "uninstall_hook": "uninstall_hook",
 }

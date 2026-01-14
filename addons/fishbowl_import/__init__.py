@@ -1,6 +1,7 @@
 from odoo import api, SUPERUSER_ID
 
 from . import models
+from .hooks import post_init_hook
 
 
 def uninstall_hook(cr, registry) -> None:

@@ -74,60 +74,76 @@ class FishbowlImporter(models.Model):
             self._set_last_sync_at(run_started_at)
 
     def _import_units_of_measure(self, client: FishbowlClient) -> None:
-        unit_type_rows = client.fetch_all("SELECT id, name FROM uomtype ORDER BY id")
         unit_rows = client.fetch_all("SELECT id, name, code, uomType, defaultRecord, integral, activeFlag FROM uom ORDER BY id")
         conversion_rows = client.fetch_all("SELECT fromUomId, toUomId, factor, multiply FROM uomconversion ORDER BY id")
-
-        category_by_fishbowl_id: dict[int, int] = {}
-        category_model = self.env["uom.category"].sudo()
-        for row in unit_type_rows:
-            name = str(row.get("name") or "").strip()
-            if not name:
-                continue
-            existing = category_model.search([("name", "=", name)], limit=1)
-            if not existing:
-                existing = category_model.create({"name": name})
-            row_id = row.get("id")
-            if row_id is None:
-                continue
-            category_by_fishbowl_id[int(row_id)] = existing.id
+        reference_by_type: dict[int, int] = {}
+        unit_ids_by_type: dict[int, list[int]] = {}
+        for row in unit_rows:
+            unit_type_id = int(row.get("uomType") or 0)
+            unit_id = int(row.get("id") or 0)
+            if unit_type_id:
+                unit_ids_by_type.setdefault(unit_type_id, []).append(unit_id)
+            if self._to_bool(row.get("defaultRecord")) and unit_type_id:
+                reference_by_type[unit_type_id] = unit_id
+        for unit_type_id, unit_ids in unit_ids_by_type.items():
+            if unit_type_id not in reference_by_type and unit_ids:
+                reference_by_type[unit_type_id] = unit_ids[0]
 
         ratios_by_id = self._compute_unit_ratios(unit_rows, conversion_rows)
-        unit_model = self.env["uom.uom"].sudo()
+        unit_model = self.env["uom.uom"].sudo().with_context(IMPORT_CONTEXT)
+        reference_unit_map: dict[int, int] = {}
         for row in unit_rows:
             fishbowl_unit_id = int(row["id"])
-            category_id = category_by_fishbowl_id.get(int(row["uomType"]))
-            if not category_id:
-                _logger.warning("Missing UoM category for Fishbowl unit %s", fishbowl_unit_id)
+            unit_type_id = int(row.get("uomType") or 0)
+            reference_unit_id = reference_by_type.get(unit_type_id)
+            if not reference_unit_id or reference_unit_id != fishbowl_unit_id:
                 continue
-            name = str(row["name"]).strip()
-            code = str(row["code"]).strip()
+            name = str(row.get("name") or "").strip() or f"Unit {fishbowl_unit_id}"
+            values = {
+                "name": name,
+                "relative_factor": 1.0,
+                "relative_uom_id": False,
+                "active": self._to_bool(row.get("activeFlag")),
+            }
+            unit = unit_model.get_or_create_by_external_id(
+                EXTERNAL_SYSTEM_CODE,
+                str(fishbowl_unit_id),
+                values,
+                RESOURCE_UNIT,
+            )
+            reference_unit_map[fishbowl_unit_id] = unit.id
+
+        for row in unit_rows:
+            fishbowl_unit_id = int(row["id"])
+            unit_type_id = int(row.get("uomType") or 0)
+            reference_unit_id = reference_by_type.get(unit_type_id)
+            if not reference_unit_id:
+                _logger.warning("Missing reference UoM for Fishbowl unit %s", fishbowl_unit_id)
+                continue
+            reference_odoo_id = reference_unit_map.get(reference_unit_id)
+            if not reference_odoo_id:
+                _logger.warning("Missing reference mapping for Fishbowl unit %s", fishbowl_unit_id)
+                continue
+            name = str(row.get("name") or "").strip() or f"Unit {fishbowl_unit_id}"
             ratio = ratios_by_id.get(fishbowl_unit_id)
             if ratio is None:
                 ratio = 1.0
                 _logger.warning("Missing conversion ratio for Fishbowl unit %s; defaulting to 1.0", fishbowl_unit_id)
-            unit_type = "reference" if ratio == 1 else "bigger" if ratio > 1 else "smaller"
-            rounding = 1.0 if self._to_bool(row.get("integral")) else 0.01
             values = {
                 "name": name,
-                "category_id": category_id,
-                "uom_type": unit_type,
-                "factor": float(ratio),
-                "rounding": rounding,
+                "relative_factor": float(ratio),
+                "relative_uom_id": reference_odoo_id,
                 "active": self._to_bool(row.get("activeFlag")),
             }
-            domain = [
-                ("category_id", "=", category_id),
-                "|",
-                ("name", "=", name),
-                ("name", "=", code),
-            ]
-            existing = unit_model.search(domain, limit=1)
-            if existing:
-                self._write_if_changed(existing, values)
-            else:
-                existing = unit_model.create(values)
-            existing.set_external_id(EXTERNAL_SYSTEM_CODE, str(fishbowl_unit_id), RESOURCE_UNIT)
+            if fishbowl_unit_id == reference_unit_id:
+                values["relative_factor"] = 1.0
+                values["relative_uom_id"] = False
+            unit_model.get_or_create_by_external_id(
+                EXTERNAL_SYSTEM_CODE,
+                str(fishbowl_unit_id),
+                values,
+                RESOURCE_UNIT,
+            )
 
     def _import_partners(self, client: FishbowlClient) -> dict[str, dict[int, int]]:
         customer_rows = client.fetch_all("SELECT id, accountId, number, name, note, activeFlag FROM customer ORDER BY id")
@@ -262,7 +278,6 @@ class FishbowlImporter(models.Model):
             }
             if unit_id:
                 values["uom_id"] = unit_id
-                values["uom_po_id"] = unit_id
             values[self._product_type_field(template_model)] = product_type
             standard_price = row.get("stdCost")
             if standard_price is not None:
@@ -834,34 +849,34 @@ class FishbowlImporter(models.Model):
             "estimate": "draft",
             "issued": "sale",
             "in progress": "sale",
-            "fulfilled": "done",
-            "closed short": "done",
+            "fulfilled": "sale",
+            "closed short": "sale",
             "voided": "cancel",
             "cancelled": "cancel",
             "expired": "cancel",
-            "historical": "done",
+            "historical": "sale",
         }
         return mapping.get(status_name.lower(), "draft")
 
     def _map_purchase_state(self, status_name: str) -> str:
         mapping = {
             "bid request": "draft",
-            "pending approval": "draft",
-            "issued": "draft",
+            "pending approval": "to approve",
+            "issued": "purchase",
             "picking": "purchase",
             "partial": "purchase",
             "picked": "purchase",
             "shipped": "purchase",
-            "fulfilled": "done",
-            "closed short": "done",
+            "fulfilled": "purchase",
+            "closed short": "purchase",
             "void": "cancel",
-            "historical": "done",
+            "historical": "purchase",
         }
         return mapping.get(status_name.lower(), "draft")
 
     def _map_part_type(self, part_type_name: str) -> str:
         mapping = {
-            "inventory": "product",
+            "inventory": "consu",
             "service": "service",
             "labor": "service",
             "overhead": "service",
@@ -872,7 +887,7 @@ class FishbowlImporter(models.Model):
             "tax": "consu",
             "misc": "consu",
         }
-        return mapping.get(part_type_name.lower(), "product")
+        return mapping.get(part_type_name.lower(), "consu")
 
     def _map_tracking(self, tracking_flag: Any, serialized_flag: Any) -> str:
         if self._to_bool(serialized_flag):

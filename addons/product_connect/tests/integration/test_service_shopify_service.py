@@ -1,5 +1,5 @@
 from collections.abc import Callable, Iterator
-from typing import cast, Any
+from typing import Any
 from contextlib import contextmanager
 
 from httpx import Request, Response
@@ -39,7 +39,9 @@ class TestShopifyService(IntegrationTestCase):
     @contextmanager
     def _client(self, service: ShopifyService, client_cls: type[_BaseDummyClient]) -> Iterator[tuple[_BaseDummyClient, MagicMock]]:
         with patch.object(_service_module, "Client", client_cls), patch.object(_service_module, "sleep") as fake_sleep:
-            client = cast(_BaseDummyClient, service._create_http_client("t"))
+            client = service._create_http_client("t")
+            if not isinstance(client, _BaseDummyClient):
+                raise AssertionError("HTTP client was not constructed as _BaseDummyClient")
             yield client, fake_sleep
 
     def _test_client_retry_behavior(self, service: ShopifyService, client_cls: type[_BaseDummyClient], expected_calls: int):
@@ -140,7 +142,9 @@ class TestShopifyService(IntegrationTestCase):
             patch.object(service, "_throttle_info", side_effect=[(True, None), (False, None)]),
         ):
             client = service._create_client()
-            dummy_client = cast(DummyClient, client)
+            if not isinstance(client, DummyClient):
+                raise AssertionError("Client was not constructed as DummyClient")
+            dummy_client = client
             self.assertIs(service._client, client)
             dummy_client.send_func = send_one
             result = dummy_client.send(req)
@@ -649,7 +653,9 @@ class TestShopifyService(IntegrationTestCase):
             patch.object(service, "_throttle_info", side_effect=[(False, 2), (False, None)]),
         ):
             client = service._create_http_client("t")
-            cast(DummyClient, client).send_func = send_one  # type: ignore
+            if not isinstance(client, DummyClient):
+                raise AssertionError("HTTP client was not constructed as DummyClient")
+            client.send_func = send_one
             req = Request("GET", "http://t")
             result = client.send(req)
             self.assertEqual(result.status_code, 200)

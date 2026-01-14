@@ -523,28 +523,38 @@ class FishbowlImporter(models.Model):
             shipment_map[fishbowl_id] = picking.id
             done_pickings.append(picking)
 
-        if not shipment_map and start_datetime is not None:
-            # No new shipments in this window; ensure existing ones are refreshed.
-            existing_ship_ids = self._load_existing_external_ids(RESOURCE_SHIPMENT)
-            if not existing_ship_ids:
-                return
-            shipment_item_rows = self._fetch_rows_by_ids(
-                client,
-                "shipitem",
-                "shipId",
-                existing_ship_ids,
-                select_columns="id, shipId, soItemId, qtyShipped, uomId",
+        if not shipment_map:
+            return
+        shipment_item_rows = self._fetch_rows_by_ids(
+            client,
+            "shipitem",
+            "shipId",
+            list(shipment_map.keys()),
+            select_columns="id, shipId, soItemId, qtyShipped, uomId",
+        )
+        missing_sales_line_ids = {
+            int(row["soItemId"])
+            for row in shipment_item_rows
+            if row.get("soItemId") is not None
+            and int(row["soItemId"]) not in order_maps["sales_line"]
+        }
+        sales_line_external_map: dict[int, int] = {}
+        if missing_sales_line_ids:
+            fishbowl_system = self._get_fishbowl_system()
+            external_id_records = self.env["external.id"].sudo().search(
+                [
+                    ("system_id", "=", fishbowl_system.id),
+                    ("resource", "=", RESOURCE_SALES_ORDER_LINE),
+                    ("res_model", "=", "sale.order.line"),
+                    ("active", "=", True),
+                    ("external_id", "in", [str(value) for value in missing_sales_line_ids]),
+                ]
             )
-        else:
-            if not shipment_map:
-                return
-            shipment_item_rows = self._fetch_rows_by_ids(
-                client,
-                "shipitem",
-                "shipId",
-                list(shipment_map.keys()),
-                select_columns="id, shipId, soItemId, qtyShipped, uomId",
-            )
+            for record in external_id_records:
+                try:
+                    sales_line_external_map[int(record.external_id)] = record.res_id
+                except (TypeError, ValueError):
+                    _logger.warning("Invalid Fishbowl sales line external id '%s'", record.external_id)
         unit_map = self._load_unit_map()
         for row in shipment_item_rows:
             ship_id = row.get("shipId")
@@ -555,8 +565,13 @@ class FishbowlImporter(models.Model):
                 continue
             fishbowl_id = int(row["id"])
             picking = picking_model.browse(picking_id)
-            sale_line_id = order_maps["sales_line"].get(int(row.get("soItemId") or 0))
-            product_id = self._resolve_product_from_shipment_row(row, order_maps, product_maps)
+            sales_line = self._resolve_sales_line_for_shipment_row(
+                row,
+                order_maps,
+                sales_line_external_map,
+            )
+            sale_line_id = sales_line.id if sales_line else False
+            product_id = sales_line.product_id.id if sales_line else None
             if not product_id:
                 continue
             unit_id = unit_map.get(int(row.get("uomId") or 0))
@@ -1059,16 +1074,22 @@ class FishbowlImporter(models.Model):
                 return product.id
         return None
 
-    def _resolve_product_from_shipment_row(
+    def _resolve_sales_line_for_shipment_row(
         self,
         row: dict[str, Any],
         order_maps: dict[str, dict[int, int]],
-        product_maps: dict[str, dict[int, int]],
-    ) -> int | None:
-        sale_line_id = order_maps["sales_line"].get(int(row.get("soItemId") or 0))
-        if sale_line_id:
-            return self.env["sale.order.line"].sudo().browse(sale_line_id).product_id.id
-        return None
+        sales_line_external_map: dict[int, int] | None = None,
+    ) -> models.Model:
+        sales_order_item_value = row.get("soItemId")
+        if sales_order_item_value is None:
+            return self.env["sale.order.line"].browse()
+        sales_order_item_id = int(sales_order_item_value)
+        sales_order_line_id = order_maps["sales_line"].get(sales_order_item_id)
+        if not sales_order_line_id and sales_line_external_map:
+            sales_order_line_id = sales_line_external_map.get(sales_order_item_id)
+        if not sales_order_line_id:
+            return self.env["sale.order.line"].browse()
+        return self.env["sale.order.line"].sudo().browse(sales_order_line_id).exists()
 
     def _resolve_product_from_receipt_row(
         self,

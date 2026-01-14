@@ -34,11 +34,24 @@ class AuthentikSsoConfig(models.AbstractModel):
         if not disabled_names:
             return
         provider_model = self.env["auth.oauth.provider"].sudo()
-        providers = provider_model.search([("name", "in", disabled_names)])
+        providers = provider_model.search([])
         if not providers:
             return
-        providers.write({"enabled": False})
-        _logger.info("Disabled OAuth providers: %s", ", ".join(sorted(providers.mapped("name"))))
+        lowered_terms = {term.casefold() for term in disabled_names}
+        to_disable = provider_model.browse()
+        for provider in providers:
+            provider_name = (provider.name or "").casefold()
+            if provider_name in lowered_terms:
+                to_disable |= provider
+                continue
+            auth_endpoint = (provider.auth_endpoint or "").casefold()
+            if any(term in auth_endpoint for term in lowered_terms):
+                to_disable |= provider
+
+        if not to_disable:
+            return
+        to_disable.write({"enabled": False})
+        _logger.info("Disabled OAuth providers: %s", ", ".join(sorted(to_disable.mapped("name"))))
 
     def _apply_authentik_provider(self) -> None:
         provider_name = os.environ.get(f"{AUTHENTIK_PREFIX}PROVIDER_NAME", DEFAULT_PROVIDER_NAME).strip()

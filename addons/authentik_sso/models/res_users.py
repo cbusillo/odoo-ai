@@ -214,6 +214,7 @@ class ResUsers(models.Model):
                 ", ".join(sorted(normalized_validation.keys())),
             )
             raise AccessDenied()
+        oauth_uid = str(oauth_uid)
         try:
             oauth_user = self.search(
                 [
@@ -240,4 +241,9 @@ class ResUsers(models.Model):
                     self._sync_authentik_groups(created_user, normalized_validation, provider)
                 return login
             except (SignupError, UserError):
+                _logger.warning(
+                    "OAuth signup failed for provider %s. Validation keys=%s",
+                    provider,
+                    ", ".join(sorted(normalized_validation.keys())),
+                )
                 raise access_denied_exception

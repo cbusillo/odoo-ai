@@ -433,7 +433,7 @@ class FishbowlImporter(models.Model):
                 "name": str(row.get("num") or f"PO-{fishbowl_id}"),
                 "partner_id": partner_id,
                 "date_order": row.get("dateIssued") or row.get("dateCreated"),
-                "notes": row.get("note") or False,
+                "note": row.get("note") or False,
                 "state": order_state,
             }
             order = purchase_order_model.get_or_create_by_external_id(

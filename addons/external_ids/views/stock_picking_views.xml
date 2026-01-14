@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_stock_picking_form_external_ids" model="ir.ui.view">
+        <field name="name">stock.picking.form.external.ids</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_external_ids" type="object" class="oe_stat_button" icon="fa-link">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">External IDs</span>
+                    </div>
+                </button>
+            </xpath>
+            <xpath expr="//sheet/notebook" position="inside">
+                <page string="External IDs" name="external_ids">
+                    <field name="external_ids"
+                           domain="[('res_model', '=', 'stock.picking')]"
+                           context="{'default_res_model': 'stock.picking', 'default_res_id': id}">
+                        <list editable="bottom">
+                            <field name="system_id"/>
+                            <field name="resource"/>
+                            <field name="external_id"/>
+                            <field name="last_sync"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </list>
+                        <form string="External ID">
+                            <group>
+                                <field name="system_id" options="{'no_create_edit': True}"/>
+                                <field name="resource"/>
+                                <field name="external_id"/>
+                                <field name="reference" readonly="1"/>
+                                <field name="last_sync" readonly="1"/>
+                                <field name="notes"/>
+                            </group>
+                        </form>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

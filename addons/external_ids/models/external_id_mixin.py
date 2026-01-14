@@ -1,4 +1,4 @@
-from typing import Self
+from typing import Any, Self
 
 from odoo import api, fields, models
 
@@ -114,6 +114,22 @@ class ExternalIdMixin(models.AbstractModel):
                 "default_reference": f"{self._name},{self.id}",
             },
         }
+
+    @api.model
+    def get_or_create_by_external_id(
+        self,
+        system_code: str,
+        external_id_value: str,
+        values: dict[str, Any],
+        resource: str | None = None,
+    ) -> Self:
+        record = self.search_by_external_id(system_code, external_id_value, resource)
+        if record:
+            record.write(values)
+            return record
+        record = self.create(values)
+        record.set_external_id(system_code, external_id_value, resource)
+        return record
 
     @staticmethod
     def _extract_numeric_id(external_id_value: str) -> str:

@@ -22,4 +22,5 @@
     ],
     "installable": True,
     "application": False,
+    "uninstall_hook": "uninstall_hook",
 }

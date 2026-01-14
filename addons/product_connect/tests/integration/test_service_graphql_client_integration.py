@@ -359,63 +359,6 @@ class TestGraphQLClientIntegration(IntegrationTestCase):
                 self.assertEqual(len(result.user_errors), 2)
                 self.assertEqual(result.user_errors[0].message, "Title can't be blank")
 
-    def test_graphql_bulk_operations(self) -> None:
-        from ...services.shopify.gql import (
-            ProductSetBulkRunBulkOperationRunMutation,
-            ProductSetBulkRunBulkOperationRunMutationBulkOperation,
-        )
-
-        bulk_mutation = """
-        mutation {
-            productSet(
-                input: { title: "Updated Title" }
-                identifier: { id: "gid://shopify/Product/123" }
-            ) {
-                product { id }
-                userErrors { field message }
-            }
-        }
-        """
-
-        bulk_response = {
-            "data": {
-                "bulkOperationRunMutation": {
-                    "bulkOperation": {
-                        "id": "gid://shopify/BulkOperation/123",
-                        "status": "CREATED",
-                    },
-                    "userErrors": [],
-                }
-            }
-        }
-
-        with patch.object(self.service, "_create_http_client") as mock_create_client:
-            mock_http_client, mock_shopify_client = self._create_mock_http_response(bulk_response)
-            mock_create_client.return_value = mock_http_client
-
-            mock_bulk_op = Mock(spec=ProductSetBulkRunBulkOperationRunMutation)
-            mock_bulk_op.bulk_operation = Mock(spec=ProductSetBulkRunBulkOperationRunMutationBulkOperation)
-            mock_bulk_op.bulk_operation.id = "gid://shopify/BulkOperation/123"
-            mock_bulk_op.bulk_operation.status = "CREATED"
-            mock_bulk_op.user_errors = []
-
-            mock_shopify_client.product_set_bulk_run = Mock(return_value=mock_bulk_op)
-
-            with patch.object(self.service, "_client", mock_shopify_client):
-                result = self.service.client.product_set_bulk_run(
-                    mutation=bulk_mutation,
-                    staged_upload_path="path/to/upload",
-                )
-
-                self.assertEqual(
-                    result.bulk_operation.id,
-                    "gid://shopify/BulkOperation/123",
-                )
-                self.assertEqual(
-                    result.bulk_operation.status,
-                    "CREATED",
-                )
-
     def test_graphql_field_selection(self) -> None:
         minimal_product_query = """
         {

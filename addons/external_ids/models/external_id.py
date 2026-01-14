@@ -108,7 +108,7 @@ class ExternalId(models.Model):
         if default_model:
             try:
                 label = self.env[default_model]._description or default_model
-            except Exception:  # pragma: no cover
+            except KeyError:  # pragma: no cover
                 label = default_model
             return [(default_model, label)]
 
@@ -117,7 +117,7 @@ class ExternalId(models.Model):
         for model_name in self.env:
             try:
                 model = self.env[model_name]
-            except Exception:  # pragma: no cover - defensive registry guard
+            except KeyError:  # pragma: no cover - defensive registry guard
                 continue
             if getattr(model, "_abstract", False) or getattr(model, "_transient", False):
                 continue

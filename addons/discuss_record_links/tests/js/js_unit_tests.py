@@ -4,7 +4,7 @@ from odoo.addons.product_connect.tests.common_imports import JS_TAGS, tagged  # 
 
 try:
     import requests  # type: ignore
-except Exception:  # pragma: no cover - optional dependency in some CI images
+except ImportError:  # pragma: no cover - optional dependency in some CI images
     requests = None  # type: ignore
 from odoo.addons.product_connect.tests.fixtures.base import TourTestCase  # stable base with test user
 
@@ -32,7 +32,7 @@ class DiscussRecordLinksJSTests(TourTestCase):
                     r = requests.get(full, timeout=3)
                     if r.status_code < 500:
                         break
-                except Exception:  # requests.RequestException, but requests may be vendored
+                except requests.RequestException:
                     pass
                 time.sleep(0.5)
 

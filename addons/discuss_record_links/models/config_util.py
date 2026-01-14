@@ -41,7 +41,7 @@ def load_config(env) -> dict[str, ModelCfg]:
                 limit=r.limit or 8,
                 enabled=True,
             )
-    except Exception:
+    except (KeyError, AttributeError):
         # During module install/update the model might be unavailable briefly.
         pass
     return cfg

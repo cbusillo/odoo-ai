@@ -51,10 +51,14 @@ def post_init_hook(cr_or_env, registry=None) -> None:
             return
         if "authentik.sso.config" in env.registry:
             env["authentik.sso.config"].sudo().apply_from_env()
-            env.cr.commit()
+        if "authentik.sso.group.mapping" in env.registry:
+            env["authentik.sso.group.mapping"].sudo().ensure_default_mappings()
+        env.cr.commit()
         return
 
     env = api.Environment(cr_or_env, SUPERUSER_ID, {})
     if "authentik.sso.config" in env.registry:
         env["authentik.sso.config"].sudo().apply_from_env()
-        cr_or_env.commit()
+    if "authentik.sso.group.mapping" in env.registry:
+        env["authentik.sso.group.mapping"].sudo().ensure_default_mappings()
+    cr_or_env.commit()

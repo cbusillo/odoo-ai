@@ -1,3 +1,4 @@
+import html
 import json
 import logging
 import os
@@ -11,7 +12,6 @@ _logger = logging.getLogger(__name__)
 AUTHENTIK_PREFIX = "ENV_OVERRIDE_AUTHENTIK__"
 DEFAULT_AUTHENTIK_PROVIDER_NAME = "Authentik"
 DEFAULT_AUTHENTIK_GROUP_CLAIM = "groups"
-DEFAULT_AUTHENTIK_ADMIN_GROUP = "authentik Admins"
 DEFAULT_AUTHENTIK_USER_ID_CLAIMS = ("user_id", "sub", "id", "uid")
 DEFAULT_AUTHENTIK_LOGIN_CLAIMS = ("email", "preferred_username", "username", "login")
 DEFAULT_AUTHENTIK_NAME_CLAIMS = (
@@ -21,14 +21,6 @@ DEFAULT_AUTHENTIK_NAME_CLAIMS = (
     "preferred_username",
     "username",
     "email",
-)
-DEFAULT_AUTHENTIK_ADMIN_GROUP_XML_IDS = (
-    "sales_team.group_sale_manager",
-    "sales_team.group_sale_salesman",
-    "purchase.group_purchase_manager",
-    "purchase.group_purchase_user",
-    "stock.group_stock_manager",
-    "stock.group_stock_user",
 )
 
 
@@ -55,7 +47,8 @@ class ResUsers(models.Model):
                 if "signature" not in values:
                     signature_name = values.get("name")
                     if signature_name:
-                        values["signature"] = f"<div>{signature_name}</div>"
+                        safe_name = html.escape(str(signature_name))
+                        values["signature"] = f"<div>{safe_name}</div>"
                     else:
                         values["signature"] = False
                 values["active"] = True
@@ -81,15 +74,6 @@ class ResUsers(models.Model):
         if raw_value is None:
             return DEFAULT_AUTHENTIK_GROUP_CLAIM
         return raw_value.strip()
-
-    def _authentik_admin_group_name(self) -> str:
-        raw_value = os.environ.get(f"{AUTHENTIK_PREFIX}ADMIN_GROUP")
-        if raw_value is None:
-            return DEFAULT_AUTHENTIK_ADMIN_GROUP
-        return raw_value.strip()
-
-    def _authentik_admin_group_xml_ids(self) -> tuple[str, ...]:
-        return DEFAULT_AUTHENTIK_ADMIN_GROUP_XML_IDS
 
     def _authentik_user_id_claims(self) -> tuple[str, ...]:
         raw_value = os.environ.get(f"{AUTHENTIK_PREFIX}USER_ID_CLAIMS")
@@ -186,40 +170,38 @@ class ResUsers(models.Model):
         if provider.name != self._authentik_provider_name():
             return
         group_names = self._extract_authentik_groups(validation)
-        if not group_names:
-            return
-        admin_group_name = self._authentik_admin_group_name()
-        if not admin_group_name:
+        mapping_model = self.env["authentik.sso.group.mapping"].sudo()
+        mappings = mapping_model.search([("active", "=", True)], order="sequence, id")
+        if not mappings:
+            _logger.warning("Authentik group mapping skipped; no mappings configured.")
             return
 
+        normalized_groups = {name.casefold() for name in group_names}
+        matching_mappings = mapping_model.browse()
+        if normalized_groups:
+            for mapping in mappings:
+                if mapping.is_fallback:
+                    continue
+                authentik_group = (mapping.authentik_group or "").casefold()
+                if authentik_group and authentik_group in normalized_groups:
+                    matching_mappings |= mapping
+        else:
+            fallback = mappings.filtered("is_fallback")
+            if fallback:
+                matching_mappings = fallback
+
+        target_group_ids = set(matching_mappings.mapped("odoo_groups").ids)
         base_user_group = self.env.ref("base.group_user", raise_if_not_found=False)
-        if not base_user_group:
+        if base_user_group:
+            target_group_ids.add(base_user_group.id)
+        else:
             _logger.warning("Authentik group mapping skipped; base user group not found.")
             return
 
-        extra_admin_groups: list[models.Model] = []
-        for xml_id in self._authentik_admin_group_xml_ids():
-            group = self.env.ref(xml_id, raise_if_not_found=False)
-            if not group:
-                _logger.warning("Authentik admin group mapping skipped; %s not found.", xml_id)
-                continue
-            extra_admin_groups.append(group)
-
-        commands = [Command.link(base_user_group.id)]
-        admin_group = self.env.ref("base.group_system", raise_if_not_found=False)
-        if admin_group:
-            normalized_groups = {name.casefold() for name in group_names}
-            is_admin = admin_group_name.casefold() in normalized_groups
-            if is_admin:
-                commands.append(Command.link(admin_group.id))
-                for group in extra_admin_groups:
-                    commands.append(Command.link(group.id))
-            else:
-                commands.append(Command.unlink(admin_group.id))
-                for group in extra_admin_groups:
-                    commands.append(Command.unlink(group.id))
-        else:
-            _logger.warning("Authentik group mapping skipped; admin group not found.")
+        managed_group_ids = set(mappings.mapped("odoo_groups").ids)
+        commands: list[Command] = [Command.link(group_id) for group_id in target_group_ids]
+        for group_id in managed_group_ids - target_group_ids:
+            commands.append(Command.unlink(group_id))
 
         oauth_user.sudo().write({"group_ids": commands})
 

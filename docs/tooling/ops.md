@@ -101,7 +101,8 @@ Behavior notes
 - `uv run ops local down` removes orphaned containers and anonymous volumes for
   the target stack while preserving named volumes.
 - `uv run ops local upgrade` runs module upgrades using the stack's configured module
-  list (AUTO by default) without rebuilding the image.
+  list (AUTO by default) without rebuilding the image. If `ODOO_INSTALL_MODULES` is set,
+  it installs any missing modules from that list before upgrading.
 - `uv run ops local upgrade-restart` runs the upgrade then restarts the web service.
 - `uv run ops local openupgrade` runs the OpenUpgrade pipeline against the current
   database without restoring from upstream and resets module versions for

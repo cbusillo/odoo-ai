@@ -1,16 +1,11 @@
-# Copyright 2026 Shiny Computers
-# License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
-
 import json
 import re
-from typing import TYPE_CHECKING
 
+from odoo import SUPERUSER_ID, api
+from odoo.api import Environment
 from odoo.modules.module import get_module_path
+from odoo.sql_db import Cursor
 from openupgradelib import openupgrade
-
-if TYPE_CHECKING:
-    from odoo.api import Environment
-
 
 _MISSING_MANIFEST_MODULES = (
     "account_auto_transfer",
@@ -20,7 +15,7 @@ _MISSING_MANIFEST_MODULES = (
 )
 
 
-def _mark_missing_manifest_modules_uninstalled(env: "Environment") -> None:
+def _mark_missing_manifest_modules_uninstalled(env: Environment) -> None:
     """Avoid inconsistent module states for addons removed in 19.0.
 
     These modules can exist as installed records in the restored 18.0 database,
@@ -38,15 +33,15 @@ def _mark_missing_manifest_modules_uninstalled(env: "Environment") -> None:
         )
 
 
-def _clean_user_group_views(env: "Environment") -> None:
+def _clean_user_group_views(env: Environment) -> None:
     """Normalize legacy user group fields before the 19.0 view update."""
 
-    candidate_xmlids = ("user_groups_view", "view_users_form")
+    candidate_xml_ids = ("user_groups_view", "view_users_form")
 
-    def _fetch_view_id(xmlid_name: str) -> int | None:
+    def _fetch_view_id(xml_id_key: str) -> int | None:
         env.cr.execute(
             "SELECT res_id FROM ir_model_data WHERE module = 'base' AND name = %s AND model = 'ir.ui.view' LIMIT 1",
-            (xmlid_name,),
+            (xml_id_key,),
         )
         view_row = env.cr.fetchone()
         if not view_row:
@@ -121,8 +116,8 @@ def _clean_user_group_views(env: "Environment") -> None:
         updated_text = re.sub(r"\bin_group_[0-9_]+\b", "False", updated_text)
         return updated_text
 
-    for xmlid_name in candidate_xmlids:
-        view_id = _fetch_view_id(xmlid_name)
+    for xml_id_name in candidate_xml_ids:
+        view_id = _fetch_view_id(xml_id_name)
         if view_id is None:
             continue
         env.cr.execute("SELECT arch_db FROM ir_ui_view WHERE id = %s", (view_id,))
@@ -159,9 +154,16 @@ def _clean_user_group_views(env: "Environment") -> None:
         env.cr.execute("UPDATE ir_ui_view SET arch_db = %s WHERE id = %s", (updated_arch, view_id))
 
 
-@openupgrade.migrate()
-def migrate(env: "Environment", _version: str | None) -> None:
-    """Pre-migration hook for base (19.0.1.0)."""
+def _ensure_env(cursor_or_env: Cursor | Environment) -> Environment:
+    if isinstance(cursor_or_env, api.Environment):
+        return cursor_or_env
+    return api.Environment(cursor_or_env, SUPERUSER_ID, {})
 
+
+@openupgrade.migrate()
+def migrate(cr: Cursor, version: str) -> None:
+    """Pre-migration hook for base (19.0.1.0)."""
+    _ = version
+    env = _ensure_env(cr)
     _mark_missing_manifest_modules_uninstalled(env)
     _clean_user_group_views(env)

@@ -16,7 +16,7 @@ class TestSimpleFix(TourTestCase):
     def test_wait_and_navigate(self) -> None:
         """Test navigation with proper server wait"""
         import socket
-        import odoo.tools.config as config
+        from odoo.tools import config
 
         # Get the port from config
         port = int(config.get("http_port", 8069))

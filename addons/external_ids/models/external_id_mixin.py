@@ -1,4 +1,4 @@
-from typing import Any, Self
+from typing import Any, Self, cast
 
 from odoo import api, fields, models
 
@@ -233,7 +233,7 @@ class ExternalIdMixin(models.AbstractModel):
         resource = (self.env.context or {}).get("external_resource")
         url = self.get_external_url(system_code, kind, resource)
         if not url:
-            return {
+            notification_action = {
                 "type": "ir.actions.client",
                 "tag": "display_notification",
                 "params": {
@@ -242,4 +242,5 @@ class ExternalIdMixin(models.AbstractModel):
                     "type": "warning",
                 },
             }
+            return cast("odoo.values.ir_actions_client", notification_action)
         return {"type": "ir.actions.act_url", "url": url, "target": "new"}

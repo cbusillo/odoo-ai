@@ -146,8 +146,9 @@ class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
                 if "phone_mobile_search" in partner_model._fields:
                     partner = partner_model.search([("phone_mobile_search", "=", formatted_phone)], limit=1)
                 elif "mobile" in partner_model._fields:
+                    mobile_field = "mobile"
                     partner = partner_model.search(
-                        ["|", ("phone", "=", formatted_phone), ("mobile", "=", formatted_phone)],
+                        ["|", ("phone", "=", formatted_phone), (mobile_field, "=", formatted_phone)],
                         limit=1,
                     )
                 else:

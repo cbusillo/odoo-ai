@@ -8,7 +8,7 @@ import logging
 _logger = logging.getLogger(__name__)
 
 
-def _expose_subdir_tests():
+def _expose_subdir_tests() -> set[str]:
     """
     Recursively discovers all test modules in subdirectories and exposes them
     as attributes on the tests package so Odoo's test loader can find them.

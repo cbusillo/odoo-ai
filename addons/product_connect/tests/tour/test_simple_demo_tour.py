@@ -18,7 +18,7 @@ class TestSimpleDemoTour(TourTestCase):
     """Test using standard Odoo pattern with demo data - converted to non-browser tests"""
 
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         super().setUpClass()
         _logger.info("TestSimpleDemoTour.setUpClass called - TEST IS RUNNING!")
 
@@ -29,7 +29,7 @@ class TestSimpleDemoTour(TourTestCase):
             # Update the admin user's password for this test session
             cls.env["res.users"].browse(2).password = test_password
 
-    def test_basic_access_verification(self):
+    def test_basic_access_verification(self) -> None:
         """Test basic system access without browser automation"""
         # Test that we can access basic models and views
 
@@ -59,7 +59,7 @@ class TestSimpleDemoTour(TourTestCase):
 
         _logger.info("✓ Basic access verification completed successfully")
 
-    def test_demo_data_availability(self):
+    def test_demo_data_availability(self) -> None:
         """Test that demo data is available for testing purposes"""
         # Check for some basic demo data that should be present
 

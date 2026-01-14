@@ -13,7 +13,7 @@ _logger = logging.getLogger(__name__)
 class TestSimpleFix(TourTestCase):
     """Test with proper server readiness check"""
 
-    def test_wait_and_navigate(self):
+    def test_wait_and_navigate(self) -> None:
         """Test navigation with proper server wait"""
         import socket
         import odoo.tools.config as config

@@ -258,15 +258,11 @@ class ResUsers(models.Model):
 
                 existing_user = self.search([("login", "=", login_value)], limit=1)
                 if existing_user:
-                    existing_user.write(
-                        {
-                            "oauth_uid": oauth_uid,
-                            "oauth_provider_id": provider,
-                            "oauth_access_token": params.get("access_token"),
-                        }
+                    _logger.warning(
+                        "OAuth signup blocked: login '%s' already exists; refusing to auto-link OAuth identity.",
+                        login_value,
                     )
-                    self._sync_authentik_groups(existing_user, normalized_validation, provider)
-                    return existing_user.login
+                    raise access_denied_exception
 
                 create_vals: dict[str, object] = {
                     "login": login_value,

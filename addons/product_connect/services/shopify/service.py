@@ -16,7 +16,7 @@ class ShopifyService:
     MAX_RETRY_ATTEMPTS = 10
     MIN_SLEEP_TIME = 1.0
     MAX_SLEEP_TIME = 60.0
-    API_VERSION = "2025-04"
+    API_VERSION = "2026-01"
 
     def __init__(self, env: Environment, sync_record: "odoo.model.shopify_sync") -> None:
         self.env = env

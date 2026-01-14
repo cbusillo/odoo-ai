@@ -345,32 +345,6 @@ def create_shopify_order_response(
     return base_response
 
 
-def create_bulk_operation_response(
-    gid: str = "gid://shopify/BulkOperation/123456789",
-    status: str = "COMPLETED",
-    error_code: str | None = None,
-    created_at: str | None = None,
-    completed_at: str | None = None,
-    url: str | None = "https://storage.googleapis.com/shopify-bulk-data/test.jsonl",
-    **overrides: Any,
-) -> dict[str, Any]:
-    now = datetime.now(timezone.utc).isoformat()
-    created_at = created_at or now
-    completed_at = completed_at or now if status == "COMPLETED" else None
-
-    base_response = {
-        "id": gid,
-        "status": status,
-        "errorCode": error_code,
-        "createdAt": created_at,
-        "completedAt": completed_at,
-        "url": url,
-    }
-
-    deep_update(base_response, overrides)
-    return base_response
-
-
 def create_shopify_page_info(has_next_page: bool = False, has_previous_page: bool = False) -> dict[str, Any]:
     return {"hasNextPage": has_next_page, "hasPreviousPage": has_previous_page}
 

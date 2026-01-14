@@ -8,7 +8,8 @@ from graphql import get_introspection_query, build_client_schema, print_schema, 
 
 from ariadne_codegen.main import client as codegen_client
 
-ADDONS_PATH = Path("/opt/project/addons/product_connect")
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+ADDONS_PATH = REPOSITORY_ROOT / "addons" / "product_connect"
 
 
 def fetch_shopify_introspection(endpoint: str, token: str) -> dict[str, dict[str, str]]:

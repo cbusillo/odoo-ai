@@ -9,11 +9,14 @@ description = "AI-powered Odoo 18 Enterprise development framework"
 requires-python = ">=3.13"
 
 dependencies = [
+    "ariadne-codegen",
     "psutil==5.9.8",
     "click",
+    "graphql-core",
     "pydantic",
     "pydantic_settings",
     "questionary",
+    "requests",
     "ruff",
     "rich",
     "mypy",

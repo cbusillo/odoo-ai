@@ -34,7 +34,7 @@ Key sections for development:
 
 **Website**:
 [Shopify Admin GraphQL API](https://shopify.dev/docs/api/admin-graphql)
-**Local schema**: `addons/product_connect/graphql/schema/shopify_schema_2025-07.sdl`
+**Local schema**: `addons/product_connect/graphql/schema/shopify_schema_2026-01.sdl`
 
 Use the local schema file for complete type definitions and the online docs for
 guides and best practices.
@@ -79,5 +79,5 @@ grep -r "type \|match \|case " addons/product_connect/
 docker exec ${ODOO_PROJECT_NAME}-database-1 psql -U odoo -c "SELECT version();"
 
 # Search Shopify schema for specific types
-grep -A10 "^type Product" addons/product_connect/graphql/schema/shopify_schema_2025-07.sdl
+grep -A10 "^type Product" addons/product_connect/graphql/schema/shopify_schema_2026-01.sdl
 ```

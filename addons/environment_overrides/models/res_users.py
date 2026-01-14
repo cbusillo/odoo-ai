@@ -12,6 +12,16 @@ AUTHENTIK_PREFIX = "ENV_OVERRIDE_AUTHENTIK__"
 DEFAULT_AUTHENTIK_PROVIDER_NAME = "Authentik"
 DEFAULT_AUTHENTIK_GROUP_CLAIM = "groups"
 DEFAULT_AUTHENTIK_ADMIN_GROUP = "authentik Admins"
+DEFAULT_AUTHENTIK_USER_ID_CLAIMS = ("user_id", "sub", "id", "uid")
+DEFAULT_AUTHENTIK_LOGIN_CLAIMS = ("email", "preferred_username", "username", "login")
+DEFAULT_AUTHENTIK_NAME_CLAIMS = (
+    "name",
+    "full_name",
+    "display_name",
+    "preferred_username",
+    "username",
+    "email",
+)
 
 
 class ResUsers(models.Model):
@@ -63,6 +73,69 @@ class ResUsers(models.Model):
         if raw_value is None:
             return DEFAULT_AUTHENTIK_ADMIN_GROUP
         return raw_value.strip()
+
+    def _authentik_user_id_claims(self) -> tuple[str, ...]:
+        raw_value = os.environ.get(f"{AUTHENTIK_PREFIX}USER_ID_CLAIMS")
+        if raw_value is None:
+            return DEFAULT_AUTHENTIK_USER_ID_CLAIMS
+        return tuple(item.strip() for item in raw_value.split(",") if item.strip())
+
+    def _authentik_login_claims(self) -> tuple[str, ...]:
+        raw_value = os.environ.get(f"{AUTHENTIK_PREFIX}LOGIN_CLAIMS")
+        if raw_value is None:
+            return DEFAULT_AUTHENTIK_LOGIN_CLAIMS
+        return tuple(item.strip() for item in raw_value.split(",") if item.strip())
+
+    def _authentik_name_claims(self) -> tuple[str, ...]:
+        raw_value = os.environ.get(f"{AUTHENTIK_PREFIX}NAME_CLAIMS")
+        if raw_value is None:
+            return DEFAULT_AUTHENTIK_NAME_CLAIMS
+        return tuple(item.strip() for item in raw_value.split(",") if item.strip())
+
+    def _claim_to_string(self, value: object) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            cleaned = value.strip()
+            return cleaned or None
+        if isinstance(value, (list, tuple)) and value:
+            first = value[0]
+            if isinstance(first, str):
+                cleaned = first.strip()
+                return cleaned or None
+        return None
+
+    def _first_claim_value(self, payload: dict[str, object], claims: tuple[str, ...]) -> str | None:
+        for claim in claims:
+            value = self._claim_to_string(payload.get(claim))
+            if value:
+                return value
+        return None
+
+    def _normalize_authentik_validation(self, validation: dict[str, object]) -> dict[str, object]:
+        normalized = dict(validation)
+        user_id_value = self._first_claim_value(normalized, self._authentik_user_id_claims())
+        if user_id_value:
+            normalized.setdefault("user_id", user_id_value)
+
+        login_value = self._first_claim_value(normalized, self._authentik_login_claims())
+        if login_value:
+            normalized.setdefault("login", login_value)
+            if "@" in login_value and not normalized.get("email"):
+                normalized["email"] = login_value
+
+        if not normalized.get("name"):
+            given_name = self._claim_to_string(normalized.get("given_name"))
+            family_name = self._claim_to_string(normalized.get("family_name"))
+            combined_name = " ".join(part for part in (given_name, family_name) if part)
+            if combined_name:
+                normalized["name"] = combined_name
+        if not normalized.get("name"):
+            name_value = self._first_claim_value(normalized, self._authentik_name_claims())
+            if name_value:
+                normalized["name"] = name_value
+
+        return normalized
 
     def _extract_authentik_groups(self, validation: dict[str, object]) -> set[str]:
         claim_key = self._authentik_group_claim()
@@ -124,7 +197,19 @@ class ResUsers(models.Model):
         validation: dict[str, object],
         params: dict[str, str],
     ) -> str | None:
-        oauth_uid = validation["user_id"]
+        provider_record = self.env["auth.oauth.provider"].sudo().browse(provider)
+        if provider_record and provider_record.exists() and provider_record.name == self._authentik_provider_name():
+            normalized_validation = self._normalize_authentik_validation(validation)
+        else:
+            normalized_validation = validation
+
+        oauth_uid = normalized_validation.get("user_id")
+        if not oauth_uid:
+            _logger.warning(
+                "OAuth validation missing user_id claim. Keys=%s",
+                ", ".join(sorted(normalized_validation.keys())),
+            )
+            raise AccessDenied()
         try:
             oauth_user = self.search(
                 [
@@ -136,19 +221,19 @@ class ResUsers(models.Model):
                 raise AccessDenied()
             assert len(oauth_user) == 1
             oauth_user.write({"oauth_access_token": params["access_token"]})
-            self._sync_authentik_groups(oauth_user, validation, provider)
+            self._sync_authentik_groups(oauth_user, normalized_validation, provider)
             return oauth_user.login
         except AccessDenied as access_denied_exception:
             if self.env.context.get("no_user_creation"):
                 return None
             state = json.loads(params["state"])
             token = state.get("t")
-            values = self._generate_signup_values(provider, validation, params)
+            values = self._generate_signup_values(provider, normalized_validation, params)
             try:
                 login, _ = self.with_context(oauth_use_internal_template=True).signup(values, token)
                 created_user = self.search([("login", "=", login)], limit=1)
                 if created_user:
-                    self._sync_authentik_groups(created_user, validation, provider)
+                    self._sync_authentik_groups(created_user, normalized_validation, provider)
                 return login
             except (SignupError, UserError):
                 raise access_denied_exception

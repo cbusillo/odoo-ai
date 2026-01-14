@@ -242,7 +242,7 @@ class TourTestCase(MultiWorkerHttpCase):
             # Make the stock manager group optional to avoid hard dependency in JS/tour tests.
             try:
                 stock_manager = cls.env.ref("stock.group_stock_manager")
-            except Exception:  # ValueError when external id not found
+            except ValueError:  # External ID not found when stock isn't installed
                 stock_manager = None
 
             group_ids = [system_group.id] + ([stock_manager.id] if stock_manager else [])
@@ -270,7 +270,7 @@ class TourTestCase(MultiWorkerHttpCase):
             system_group = cls.env.ref("base.group_system")
             try:
                 stock_manager = cls.env.ref("stock.group_stock_manager")
-            except Exception:
+            except ValueError:
                 stock_manager = None
             to_add = []
             if system_group not in test_user.group_ids:

@@ -33,18 +33,19 @@ class ProductConnectJSTests(TourTestCase):
         full = base + url
         try:
             import requests
+        except ImportError:
+            requests = None
 
+        if requests is not None:
             deadline = time.time() + 60
             while time.time() < deadline:
                 try:
                     r = requests.get(full, timeout=3)
                     if r.status_code < 500:
                         break
-                except Exception:
+                except requests.RequestException:
                     pass
                 time.sleep(0.5)
-        except Exception:
-            pass
 
         try:
             self.browser_js(
@@ -68,18 +69,19 @@ class ProductConnectJSTests(TourTestCase):
         full = base + url
         try:
             import requests
+        except ImportError:
+            requests = None
 
+        if requests is not None:
             deadline = time.time() + 60
             while time.time() < deadline:
                 try:
                     r = requests.get(full, timeout=3)
                     if r.status_code < 500:
                         break
-                except Exception:
+                except requests.RequestException:
                     pass
                 time.sleep(0.5)
-        except Exception:
-            pass
         try:
             self.browser_js(
                 url,

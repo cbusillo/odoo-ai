@@ -223,7 +223,7 @@ class ExternalIdMixin(models.AbstractModel):
         }
         try:
             return template.format(**tokens)
-        except Exception:
+        except (KeyError, ValueError):
             return None
 
     def action_open_external_url(self) -> "odoo.values.ir_actions_act_url | odoo.values.ir_actions_client":

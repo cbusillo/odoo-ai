@@ -2,6 +2,7 @@
 
 import logging
 import time
+import requests
 from odoo.tests import tagged
 from ..base_types import TOUR_TAGS
 from ..fixtures.base import TourTestCase
@@ -36,7 +37,7 @@ class TestSimpleFix(TourTestCase):
                     _logger.info(f"✓ Server ready on port {port} after {i + 1} seconds")
                     server_ready = True
                     break
-            except:
+            except (OSError, ValueError):
                 pass
 
             time.sleep(1)
@@ -51,6 +52,6 @@ class TestSimpleFix(TourTestCase):
             response = self.url_open("/web/login")
             _logger.info(f"Server response status: {response.status_code}")
             self.assertEqual(response.status_code, 200, "Should get 200 response from /web/login")
-        except Exception as e:
+        except (OSError, ValueError, requests.RequestException) as e:
             _logger.error(f"Failed to reach server: {e}")
             self.fail(f"Could not reach server: {e}")

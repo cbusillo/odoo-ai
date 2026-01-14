@@ -8,5 +8,7 @@ host = "https://coolify.shinycomputers.com"
 auto_deploy = true
 
 [targets.opw]
+allow_prod_restore = true
 
 [targets.cm]
+allow_prod_init = true

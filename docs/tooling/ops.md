@@ -67,6 +67,12 @@ Configuration
 - Source of truth: `docker/config/ops.toml` (targets + Coolify host). Branches,
   app names, and local stack/env paths follow conventions by default. No secrets
   live in this file.
+- Prod bootstrap guard: defaults to disabled. Set `allow_prod_init = true` under
+  a target in `docker/config/ops.toml` (or export `OPS_ALLOW_PROD_INIT=1`) to
+  allow `uv run ops ship prod <target> --after init`.
+- Prod restore guard: defaults to disabled. Set `allow_prod_restore = true`
+  under a target in `docker/config/ops.toml` (or export
+  `OPS_ALLOW_PROD_RESTORE=1`) to allow `uv run ops ship prod <target> --after restore`.
 
 Conventions
 
@@ -96,13 +102,18 @@ Behavior notes
 - `uv run ops local openupgrade` runs the OpenUpgrade pipeline against the current
   database without restoring from upstream and resets module versions for
   modules that have OpenUpgrade scripts so their scripts re-run.
+- `uv run ops ship prod <target> --after init` runs a prod bootstrap-only init
+  via Coolify (sets the post-deploy command, deploys, waits for completion,
+  then restores the previous post-deploy command). Requires the prod init guard.
 - `--no-cache` forces a clean local build; for `all`, only the first target
   uses `--no-cache` and the rest use normal cache.
 - Ship actions push to the correct branch:
   - `opw-testing`, `cm-testing`, `opw-dev`, `cm-dev`, `opw-prod`, `cm-prod`.
 - Ship actions for dev/testing can optionally run a post-deploy `restore`,
   `init`, or `upgrade` via Coolify post-deployment commands (requires
-  `--wait`).
+  `--wait`). Prod allows `--after init` only when the prod init guard is
+  enabled, and `--after restore` only when the prod restore guard is enabled
+  (both require confirmation).
 - When `--after restore`/`--after init`/`--after upgrade` is set, ops waits for
   the post-deploy command and web login to finish (default `--wait`).
   `--no-wait` cannot be used with `--after`.

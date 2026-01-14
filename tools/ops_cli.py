@@ -34,7 +34,7 @@ from tools.deployer.deploy import (
     deploy_stack,
     execute_install,
     execute_upgrade,
-    resolve_missing_install_modules,
+    resolve_install_modules,
 )
 from tools.deployer.health import HealthcheckError
 from tools.deployer.helpers import get_git_commit
@@ -1163,10 +1163,10 @@ def _run_local_upgrade(settings: StackSettings, *, dry_run: bool) -> None:
     if dry_run:
         return
     _ensure_local_service(settings, settings.script_runner_service, dry_run=dry_run)
-    missing_modules = resolve_missing_install_modules(settings)
-    if missing_modules:
-        console.print(f"Installing missing local modules: {', '.join(missing_modules)}")
-        execute_install(settings, missing_modules, remote=False)
+    install_modules = resolve_install_modules(settings, remote=False)
+    if install_modules:
+        console.print(f"Installing missing local modules: {', '.join(install_modules)}")
+        execute_install(settings, install_modules, remote=False)
     execute_upgrade(settings, settings.update_modules, remote=False)
 
 

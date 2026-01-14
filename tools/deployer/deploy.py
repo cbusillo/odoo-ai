@@ -291,10 +291,12 @@ def _installed_local_modules(settings: StackSettings) -> tuple[str, ...]:
     return tuple(sorted(installed & local_modules))
 
 
-def resolve_missing_install_modules(settings: StackSettings) -> tuple[str, ...]:
+def resolve_install_modules(settings: StackSettings, remote: bool) -> tuple[str, ...]:
     install_modules = split_modules(settings.environment.get("ODOO_INSTALL_MODULES"))
     if not install_modules:
         return ()
+    if remote:
+        return tuple(dict.fromkeys(install_modules))
     installed = _installed_module_names(settings)
     missing = [module for module in install_modules if module not in installed]
     return tuple(missing)
@@ -334,6 +336,13 @@ def deploy_stack(
     execute_compose_pull(settings, remote)
     execute_compose_up(settings, remote)
     if not skip_upgrade:
+        install_modules = resolve_install_modules(settings, remote)
+        if install_modules:
+            logging.getLogger("deploy.workflow").info(
+                "installing missing modules: %s",
+                ", ".join(install_modules),
+            )
+            execute_install(settings, install_modules, remote)
         update_modules = settings.update_modules
         if update_modules == (AUTO_INSTALLED_SENTINEL,):
             try:

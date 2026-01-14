@@ -255,6 +255,7 @@ class LocalServerSettings(BaseSettings):
     odoo_version: str | None = Field(None, alias="ODOO_VERSION")
     addons_path: str | None = Field(None, alias="ODOO_ADDONS_PATH")
     addon_repositories: str | None = Field(None, alias="ODOO_ADDON_REPOSITORIES")
+    install_modules: str | None = Field(None, alias="ODOO_INSTALL_MODULES")
     update_modules: str | None = Field(None, alias="ODOO_UPDATE_MODULES")
     update_modules_legacy: str | None = Field(None, alias="ODOO_UPDATE")
     local_addons_dirs: str | None = Field(None, alias="LOCAL_ADDONS_DIRS")
@@ -273,6 +274,7 @@ class LocalServerSettings(BaseSettings):
         "odoo_version",
         "addons_path",
         "addon_repositories",
+        "install_modules",
         "update_modules",
         "update_modules_legacy",
         "local_addons_dirs",
@@ -731,8 +733,11 @@ payload = json.loads('__PAYLOAD__')
 registry = Registry(payload['db'])
 with registry.cursor() as cr:
     env = api.Environment(cr, SUPERUSER_ID, {})
-    env['environment.overrides'].sudo().apply_from_env()
-    cr.commit()
+    if 'environment.overrides' in env.registry:
+        env['environment.overrides'].sudo().apply_from_env()
+        cr.commit()
+    else:
+        print('Environment overrides addon not installed; skipping overrides.')
 """).replace("__PAYLOAD__", json.dumps(payload))
 
         try:
@@ -1008,7 +1013,8 @@ with registry.cursor() as cr:
         else:
             _logger.info("Base schema already present; skipping base install step.")
 
-        self.update_addons()
+        self.install_addons(reason="bootstrap install")
+        self.update_addons(reason="bootstrap upgrade")
         self._reset_db_connection()
         self.connect_to_db()
 
@@ -1221,13 +1227,35 @@ with registry.cursor() as cr:
                     addons_paths.append(auto_dir)
         return addons_paths
 
-    def _default_modules_for_project(self) -> list[str]:
-        raw = (self.local.auto_modules_raw or "").strip()
-        if not raw or raw.upper() == "AUTO":
+    @staticmethod
+    def _split_module_list(raw: str | None) -> list[str]:
+        raw_value = (raw or "").strip()
+        if not raw_value or raw_value.upper() == "AUTO":
             return []
-        separator = "," if "," in raw else ":"
-        modules = [item.strip() for item in raw.split(separator) if item.strip()]
-        return modules
+        separator = "," if "," in raw_value else ":"
+        return [item.strip() for item in raw_value.split(separator) if item.strip()]
+
+    def _resolve_install_modules(self) -> tuple[list[str], str]:
+        install_modules = self._split_module_list(self.local.install_modules)
+        if install_modules:
+            return install_modules, "ODOO_INSTALL_MODULES"
+        auto_modules = self._split_module_list(self.local.auto_modules_raw)
+        if auto_modules:
+            return auto_modules, "ODOO_AUTO_MODULES"
+        return [], "none"
+
+    def install_addons(self, reason: str | None = None) -> None:
+        install_modules, modules_source_label = self._resolve_install_modules()
+        if not install_modules:
+            _logger.info("No install modules configured; skipping addon install.")
+            return
+        if reason:
+            modules_source_label = f"{modules_source_label} ({reason})"
+        self._apply_module_updates(
+            install_modules,
+            modules_source_label=modules_source_label,
+            update_existing=False,
+        )
 
     def update_addons(self, explicit_modules: Sequence[str] | None = None, reason: str | None = None) -> None:
         mods_env = (self.local.update_modules or "").strip()
@@ -1238,67 +1266,82 @@ with registry.cursor() as cr:
             if not desired:
                 _logger.info("No explicit modules provided; skipping addon update.")
                 return
+            modules_source_label = "explicit module list"
             if reason:
-                _logger.info("Updating addons for %s: %s", reason, ", ".join(desired))
-            else:
-                _logger.info("Updating addons: %s", ", ".join(desired))
+                modules_source_label = f"{modules_source_label} ({reason})"
         elif not mods_env or mods_env.upper() == "AUTO":
-            project_defaults = self._default_modules_for_project()
-            if project_defaults:
-                desired = project_defaults
+            local_module_paths = self._resolve_local_module_paths()
+            local_modules = set(local_module_paths)
+            if not local_modules:
+                _logger.info("ODOO_UPDATE_MODULES unset/AUTO and no local modules detected; skipping addon update.")
+                return
+            installed_modules = self._installed_modules()
+            installed_local_modules = sorted(local_modules & installed_modules)
+            if not installed_local_modules:
+                _logger.info("ODOO_UPDATE_MODULES unset/AUTO and no installed local modules detected; skipping.")
+                return
+            mode_label = mods_env.upper() if mods_env else "AUTO"
+            desired_set = set(installed_local_modules)
+            pending = list(installed_local_modules)
+            while pending:
+                module_name = pending.pop()
+                addon_path = local_module_paths.get(module_name)
+                if not addon_path:
+                    continue
+                for dependency_name in self._load_manifest_dependencies(addon_path):
+                    if dependency_name not in local_modules:
+                        continue
+                    if dependency_name not in desired_set:
+                        desired_set.add(dependency_name)
+                        pending.append(dependency_name)
+            missing_dependencies = sorted(name for name in desired_set if name not in installed_modules)
+            if missing_dependencies:
                 _logger.info(
-                    "ODOO_UPDATE_MODULES=%s; using project defaults: %s",
-                    mods_env.upper() if mods_env else "AUTO",
-                    ", ".join(desired),
+                    "ODOO_UPDATE_MODULES=%s; auto-detected %d installed local modules; "
+                    "will install missing local deps: %s",
+                    mode_label,
+                    len(installed_local_modules),
+                    ", ".join(missing_dependencies),
                 )
             else:
-                local_module_paths = self._resolve_local_module_paths()
-                local_modules = set(local_module_paths)
-                if not local_modules:
-                    _logger.info("ODOO_UPDATE_MODULES unset/AUTO and no local modules detected; skipping addon update.")
-                    return
-                installed_modules = self._installed_modules()
-                installed_local_modules = sorted(local_modules & installed_modules)
-                if not installed_local_modules:
-                    _logger.info(
-                        "ODOO_UPDATE_MODULES unset/AUTO and no installed local modules detected; skipping addon update."
-                    )
-                    return
-                mode_label = mods_env.upper() if mods_env else "AUTO"
-                desired_set = set(installed_local_modules)
-                pending = list(installed_local_modules)
-                while pending:
-                    module_name = pending.pop()
-                    addon_path = local_module_paths.get(module_name)
-                    if not addon_path:
-                        continue
-                    for dependency_name in self._load_manifest_dependencies(addon_path):
-                        if dependency_name not in local_modules:
-                            continue
-                        if dependency_name not in desired_set:
-                            desired_set.add(dependency_name)
-                            pending.append(dependency_name)
-                missing_dependencies = sorted(name for name in desired_set if name not in installed_modules)
-                if missing_dependencies:
-                    _logger.info(
-                        "ODOO_UPDATE_MODULES=%s; auto-detected %d installed local modules; "
-                        "will install missing local deps: %s",
-                        mode_label,
-                        len(installed_local_modules),
-                        ", ".join(missing_dependencies),
-                    )
-                else:
-                    _logger.info(
-                        "ODOO_UPDATE_MODULES=%s; auto-detected %d installed local modules for upgrade.",
-                        mode_label,
-                        len(installed_local_modules),
-                    )
-                desired = sorted(desired_set)
+                _logger.info(
+                    "ODOO_UPDATE_MODULES=%s; auto-detected %d installed local modules for upgrade.",
+                    mode_label,
+                    len(installed_local_modules),
+                )
+            desired = sorted(desired_set)
+            modules_source_label = f"ODOO_UPDATE_MODULES={mode_label}"
         else:
             desired = [module_name.strip() for module_name in mods_env.split(",") if module_name.strip()]
             if not desired:
                 _logger.info("ODOO_UPDATE_MODULES is empty after parsing; skipping.")
                 return
+            modules_source_label = "ODOO_UPDATE_MODULES"
+
+        if explicit_modules is not None:
+            _logger.info("Updating addons: %s", ", ".join(desired))
+        elif reason:
+            _logger.info("Updating addons for %s: %s", reason, ", ".join(desired))
+        else:
+            _logger.info("Updating addons: %s", ", ".join(desired))
+
+        self._apply_module_updates(
+            desired,
+            modules_source_label=modules_source_label,
+            local_module_paths=local_module_paths,
+        )
+
+    def _apply_module_updates(
+        self,
+        desired: Sequence[str],
+        *,
+        modules_source_label: str,
+        update_existing: bool = True,
+        local_module_paths: dict[str, Path] | None = None,
+    ) -> None:
+        if not desired:
+            _logger.info("No addons requested for %s; skipping.", modules_source_label)
+            return
 
         addons_paths = self._resolve_addons_paths()
         _logger.info(
@@ -1324,31 +1367,14 @@ with registry.cursor() as cr:
                 if not present:
                     missing_fs.append(name)
 
-        if explicit_modules is not None:
-            modules_source_label = "explicit module list"
-            if reason:
-                modules_source_label = f"{modules_source_label} ({reason})"
-            if missing_fs:
-                _logger.warning(
-                    "Modules from %s not found on disk and will be skipped: %s",
-                    modules_source_label,
-                    ", ".join(missing_fs),
-                )
-            if not found:
-                _logger.info(
-                    "No valid modules from %s found on disk; skipping.",
-                    modules_source_label,
-                )
-        else:
-            if missing_fs:
-                _logger.warning(
-                    "Modules listed in ODOO_UPDATE_MODULES not found on disk and will be skipped: %s",
-                    ", ".join(missing_fs),
-                )
-            if not found:
-                _logger.info("No valid modules from ODOO_UPDATE_MODULES found on disk; skipping.")
-
+        if missing_fs:
+            _logger.warning(
+                "Modules from %s not found on disk and will be skipped: %s",
+                modules_source_label,
+                ", ".join(missing_fs),
+            )
         if not found:
+            _logger.info("No valid modules from %s found on disk; skipping.", modules_source_label)
             return
 
         self.connect_to_db()
@@ -1362,7 +1388,7 @@ with registry.cursor() as cr:
                 rows[name] = state
 
         to_install = [name for name in found if name not in rows or rows.get(name) in ("uninstalled", "to remove")]
-        to_update = list(found)
+        to_update = list(found) if update_existing else []
 
         odoo_bin = "/odoo/odoo-bin"
         if not Path(odoo_bin).exists():
@@ -1387,7 +1413,7 @@ with registry.cursor() as cr:
             cmd_parts += ["--config", generated_config_path]
 
         command = " ".join(cmd_parts)
-        _logger.info(f"Installing: {to_install if to_install else 'none'}; Updating: {to_update if to_update else 'none'}")
+        _logger.info("Installing: %s; Updating: %s", to_install or "none", to_update or "none")
         try:
             self.run_command(command)
         except subprocess.CalledProcessError as update_error:
@@ -1601,6 +1627,8 @@ with registry.cursor() as cr:
                 self.drop_database()
                 raise
 
+        self.install_addons(reason="restore install")
+
         if self.local.openupgrade_enabled and self.local.openupgrade_skip_update_addons:
             _logger.info("OpenUpgrade enabled; skipping update_addons per OPENUPGRADE_SKIP_UPDATE_ADDONS.")
             if self._should_refresh_website_after_openupgrade():
@@ -1610,7 +1638,7 @@ with registry.cursor() as cr:
                     reason="OpenUpgrade 19 website refresh",
                 )
         else:
-            self.update_addons()
+            self.update_addons(reason="restore upgrade")
         self.connect_to_db()
 
         try:

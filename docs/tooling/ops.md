@@ -93,9 +93,9 @@ Behavior notes
 - `uv run ops local info` prints machine-readable stack metadata (paths + identifiers
   only; no secrets) derived from `load_stack_settings()`.
 - Restore/init runs `docker/scripts/restore_from_upstream.py` (restore/boot,
-  sanitize, addon updates, and environment cleanups). It calls the
-  `environment_overrides` addon hook, which applies `ENV_OVERRIDE_*` settings
-  for SSO and integrations after each restore.
+  sanitize, addon updates, and environment cleanups). If installed, the
+  `environment_overrides` addon applies `ENV_OVERRIDE_*` settings for SSO and
+  integrations after each restore.
 - `uv run ops local restart` performs a fast `docker compose restart web` for the
   target stack.
 - `uv run ops local down` removes orphaned containers and anonymous volumes for
@@ -145,3 +145,9 @@ Behavior notes
   default; use `--no-wait`).
 - For interactive runs, `uv run ops --no-wait` skips deploy waiting.
 - Local actions default to `--no-build` for speed; pass `--build` to force a rebuild.
+- `ODOO_INSTALL_MODULES` controls the install list on init/restore (fallback:
+  `ODOO_AUTO_MODULES` if set). Use this to guarantee key addons are installed.
+  For non-prod, include `environment_overrides` here; omit it for prod once
+  the instance is promoted.
+- `ODOO_UPDATE_MODULES=AUTO` upgrades all installed local addons; explicit lists
+  only update the modules named.

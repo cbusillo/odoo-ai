@@ -10,7 +10,7 @@ _logger = logging.getLogger(__name__)
 class TestSingleWorker(HttpCase):
     """Test with standard HttpCase to avoid multi-worker issues"""
 
-    def test_basic_http_case(self):
+    def test_basic_http_case(self) -> None:
         """Test basic HttpCase functionality without multi-worker complexity"""
         _logger.info("Testing basic HttpCase functionality")
 

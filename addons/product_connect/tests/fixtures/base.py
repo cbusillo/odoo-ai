@@ -179,7 +179,7 @@ class MultiWorkerHttpCase(HttpCase):
     """HttpCase that works with multi-worker mode (--workers > 0)."""
 
     @classmethod
-    def http_port(cls):
+    def http_port(cls) -> int | None:
         """Override to work with PreforkServer in multi-worker mode."""
         import odoo.service.server
 

@@ -12,14 +12,14 @@ _logger = logging.getLogger(__name__)
 class TestMinimalTour(TourTestCase):
     """Minimal test to debug tour infrastructure"""
 
-    def test_http_port_available(self):
+    def test_http_port_available(self) -> None:
         """Test that we can get the HTTP port in multi-worker mode"""
         port = self.http_port()
         _logger.info(f"HTTP Port: {port}")
         self.assertIsNotNone(port, "HTTP port should be available")
         self.assertGreater(port, 0, "HTTP port should be positive")
 
-    def test_browser_can_start(self):
+    def test_browser_can_start(self) -> None:
         """Test that browser environment is configured properly"""
         # Instead of trying to start Chrome directly (which has SIGTRAP issues in test framework),
         # verify that the browser environment is configured and executable exists

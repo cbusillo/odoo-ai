@@ -15,7 +15,7 @@ _logger = logging.getLogger(__name__)
 class TestWorkerConnectivity(TourTestCase):
     """Test if server is accessible in multi-worker mode"""
 
-    def test_server_accessible_in_workers_mode(self):
+    def test_server_accessible_in_workers_mode(self) -> None:
         """Verify server is accessible when using --workers=2"""
         import odoo.service.server
         import odoo.tools.config as config

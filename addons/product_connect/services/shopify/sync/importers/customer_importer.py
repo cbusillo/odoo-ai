@@ -97,7 +97,7 @@ class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
 
         phone_sanitized = partner.phone_sanitized or ""
         if not phone_sanitized and hasattr(partner, "_phone_format"):
-            phone_sanitized = partner._phone_format(number=phone_numbers[0], raise_exception=False) or ""
+            phone_sanitized = partner._phone_format(number=phone_numbers[0]) or ""
         if not phone_sanitized:
             return False
 

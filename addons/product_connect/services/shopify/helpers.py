@@ -92,13 +92,11 @@ class SyncMode(StrEnum):
 
     @classmethod
     def choices(cls) -> list[tuple[str, str]]:
-        from typing import cast
-
-        return cast(list[tuple[str, str]], [(m.value, m.display_name) for m in cls])
+        return [(m.value, m.display_name) for m in cls]
 
 
 class OdooDataError(UserError):
-    def __init__(self, message: str, odoo_record: OdooRecordInfo | None = None) -> None:
+    def __init__(self, message: str, odoo_record: models.Model | OdooRecordInfo | None = None) -> None:
         super().__init__(message)
         self.odoo_record = odoo_record
 

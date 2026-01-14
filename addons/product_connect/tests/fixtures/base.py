@@ -77,7 +77,7 @@ class UnitTestCase(_ShopifyMockMixin, TransactionCase):
             mock_client.return_value = instance
             yield instance
 
-    def assertRecordValues(self, record: BaseModel, expected_values: dict) -> None:
+    def assertRecordValues(self, record: BaseModel, expected_values: dict, msg: str | None = None) -> None:
         for field, expected in expected_values.items():
             actual = record[field]
             if hasattr(actual, "id"):
@@ -85,7 +85,8 @@ class UnitTestCase(_ShopifyMockMixin, TransactionCase):
             elif hasattr(actual, "ids"):
                 actual = actual.ids
 
-            self.assertEqual(actual, expected, f"Field '{field}' mismatch: expected {expected}, got {actual}")
+            message = msg or f"Field '{field}' mismatch: expected {expected}, got {actual}"
+            self.assertEqual(actual, expected, message)
 
 
 def _get_or_create_geo_data(env: Environment) -> tuple[Any, Any, Any]:
@@ -340,7 +341,8 @@ class TourTestCase(MultiWorkerHttpCase):
             except Exception as outer:
                 _logger.warning(f"Warm-up setup skipped due to error: {outer}")
 
-    def _setup_browser_environment(self) -> None:
+    @staticmethod
+    def _setup_browser_environment() -> None:
         """Configure browser environment for headless operation."""
         import os
 

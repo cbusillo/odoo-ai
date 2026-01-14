@@ -98,7 +98,7 @@ class ProductImporter(ShopifyBaseImporter[ProductFields]):
 
         except ValueError as error:
             raise ShopifyDataError(
-                f"Failed to update Odoo product",
+                "Failed to update Odoo product",
                 shopify_record=shopify_product,
                 odoo_record=odoo_product,
             ) from error
@@ -180,7 +180,9 @@ class ProductImporter(ShopifyBaseImporter[ProductFields]):
                 preview_url = shopify_image.preview.image.url
                 if not preview_url:
                     exception = ShopifyDataError(
-                        "No image URL for product", shopify_record=shopify_product, odoo_record=odoo_product
+                        "No image URL for product",
+                        shopify_record=shopify_product,
+                        odoo_record=odoo_product,
                     )
                     _logger.error(exception)
                     raise exception

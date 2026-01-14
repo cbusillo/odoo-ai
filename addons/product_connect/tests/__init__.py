@@ -51,8 +51,8 @@ def _expose_subdir_tests() -> set[str]:
                 exported.add(alias)
                 _logger.debug(f"Exposed test module: {fullname} as {alias}")
 
-            except ImportError as e:
-                _logger.warning(f"Failed to import test module {fullname}: {e}")
+            except ImportError as import_error:
+                _logger.warning(f"Failed to import test module {fullname}: {import_error}")
                 continue
 
     _logger.info(f"Auto-discovered and exposed {len(exported)} test modules from subdirectories")
@@ -69,5 +69,5 @@ try:
     # Expose it as test_js_units for Odoo's test discovery
     sys.modules[__name__].test_js_units = js_unit_tests
     _logger.info("Manually imported JS unit tests module")
-except ImportError as e:
-    _logger.warning(f"Failed to import JS unit tests: {e}")
+except ImportError as js_import_error:
+    _logger.warning(f"Failed to import JS unit tests: {js_import_error}")

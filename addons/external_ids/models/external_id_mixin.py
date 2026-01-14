@@ -1,4 +1,4 @@
-from typing import Any, Self, cast
+from typing import Any, Self
 
 from odoo import api, fields, models
 
@@ -242,5 +242,5 @@ class ExternalIdMixin(models.AbstractModel):
                     "type": "warning",
                 },
             }
-            return cast("odoo.values.ir_actions_client", notification_action)
+            return notification_action
         return {"type": "ir.actions.act_url", "url": url, "target": "new"}

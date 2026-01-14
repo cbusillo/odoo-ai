@@ -9,12 +9,8 @@
     "depends": [
         "base",
         "product",
-        "auth_oauth",
-        "auth_signup",
     ],
-    "data": [
-        "data/authentik_template_user.xml",
-    ],
+    "data": [],
     "installable": True,
     "application": False,
     "license": "LGPL-3",

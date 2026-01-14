@@ -10,7 +10,7 @@
     "maintainers": ["cbusillo"],
     "development_status": "Beta",
     "license": "LGPL-3",
-    "depends": ["hr", "base", "product"],
+    "depends": ["hr", "base", "web", "product"],
     "data": [
         "data/external_systems.xml",
         "security/ir.model.access.csv",

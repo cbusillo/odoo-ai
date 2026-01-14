@@ -4,10 +4,9 @@ import secrets
 import string
 import time
 from datetime import datetime
-from typing import Any, Generator, Optional
+from typing import Any, Generator, Optional, Protocol
 from unittest.mock import MagicMock, patch
 
-from odoo.api import Environment
 from odoo.models import BaseModel
 
 from .base_types import TEST_SHOPIFY_ID_MAX, TEST_SHOPIFY_ID_MIN
@@ -41,7 +40,12 @@ def assert_shopify_fields(record: object, expected: dict[str, object]) -> None:
         assert actual == value, f"Field {field}: expected {value!r}, got {actual!r}"
 
 
-def with_test_context(env: Environment) -> Environment:
+class EnvironmentWithContext(Protocol):
+    def with_context(self, **kwargs: object) -> "EnvironmentWithContext":
+        ...
+
+
+def with_test_context(env: EnvironmentWithContext) -> EnvironmentWithContext:
     from .base_types import DEFAULT_TEST_CONTEXT
 
     return env.with_context(**DEFAULT_TEST_CONTEXT)

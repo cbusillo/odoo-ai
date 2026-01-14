@@ -197,7 +197,7 @@ class MultiWorkerHttpCase(HttpCase):
 
         # Handle multi-worker mode (PreforkServer)
         # Use the configured port from tools.config
-        import odoo.tools.config as config
+        from odoo.tools import config
 
         return int(config.get("http_port", 8069))
 

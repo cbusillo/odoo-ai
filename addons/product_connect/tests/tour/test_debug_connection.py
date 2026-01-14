@@ -73,7 +73,7 @@ class TestDebugConnection(TourTestCase):
         _logger.info(f"Environment HOST: {os.environ.get('HOST', 'not set')}")
 
         # Try to get the URL from Odoo's test framework
-        import odoo.tools.config as config
+        from odoo.tools import config
 
         _logger.info(f"Odoo config http_interface: {config.get('http_interface', 'not set')}")
         _logger.info(f"Odoo config http_port: {config.get('http_port', 'not set')}")

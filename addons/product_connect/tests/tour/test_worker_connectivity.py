@@ -18,7 +18,7 @@ class TestWorkerConnectivity(TourTestCase):
     def test_server_accessible_in_workers_mode(self) -> None:
         """Verify server is accessible when using --workers=2"""
         import odoo.service.server
-        import odoo.tools.config as config
+        from odoo.tools import config
 
         # Log server configuration
         server = odoo.service.server.server

@@ -53,7 +53,8 @@ class FishbowlImporter(models.Model):
     @api.model
     def _run_import(self, *, update_last_sync: bool, start_datetime: datetime | None = None) -> None:
         fishbowl_settings = self._get_fishbowl_settings()
-        if start_datetime is None:
+        run_started_at = fields.Datetime.now()
+        if start_datetime is None and update_last_sync:
             start_datetime = self._get_last_sync_at()
         try:
             with FishbowlClient(fishbowl_settings) as client:
@@ -69,7 +70,7 @@ class FishbowlImporter(models.Model):
             raise
         self._record_last_run("success", "")
         if update_last_sync:
-            self._set_last_sync_at(fields.Datetime.now())
+            self._set_last_sync_at(run_started_at)
 
     def _import_units_of_measure(self, client: FishbowlClient) -> None:
         unit_type_rows = client.fetch_all("SELECT id, name FROM uomtype ORDER BY id")
@@ -880,7 +881,7 @@ class FishbowlImporter(models.Model):
         )
         if not record:
             return None
-        return self.env[record.res_model].browse(record.res_id)
+        return model.browse(record.res_id)
 
     def _ensure_external_id(
         self,

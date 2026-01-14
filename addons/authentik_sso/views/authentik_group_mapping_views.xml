@@ -28,7 +28,7 @@
                         <field name="odoo_groups" widget="many2many_tags"/>
                     </group>
                     <group>
-                        <label string="Fallback mappings apply when the Authentik token has no group claim."/>
+                        <div class="o_form_label">Fallback mappings apply when the Authentik token has no group claim.</div>
                     </group>
                 </sheet>
             </form>

@@ -1,19 +1,13 @@
-# Copyright 2026 Shiny Computers
-# License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
-from odoo.orm.environments import Environment
+from odoo import SUPERUSER_ID, api
+from odoo.api import Environment
+from odoo.sql_db import Cursor
 from openupgradelib import openupgrade
 
 
 def _ensure_mail_link_preview_unique_source_url(env: Environment) -> None:
-    """De-duplicate mail_link_preview.source_url and create the unique index.
-
-    Odoo 18 can store multiple `mail_link_preview` rows per URL (one per
-    message). Odoo 19 introduces a unique index on `(source_url)`.
-
-    This hook runs before the mail module update to avoid upgrade warnings and
-    ensure schema creation succeeds.
-    """
-
+    message_id_column = "message_id"
+    mail_link_preview_table = "mail_link_preview"
+    message_link_preview_table = "mail_message_link_preview"
     env.cr.execute("SELECT to_regclass('public.mail_link_preview')")
     if env.cr.fetchone()[0] is None:
         return
@@ -44,15 +38,17 @@ def _ensure_mail_link_preview_unique_source_url(env: Environment) -> None:
             "  sequence INTEGER NOT NULL DEFAULT 0"
             ")",
         )
-        env.cr.execute(
-            "INSERT INTO mail_message_link_preview (message_id, link_preview_id, sequence) "
-            "SELECT DISTINCT message_id, id, 0 "
-            "FROM mail_link_preview "
-            "WHERE message_id IS NOT NULL",
+        insert_message_link_preview_sql = (
+            f"INSERT INTO {message_link_preview_table} (message_id, link_preview_id, sequence) "
+            f"SELECT DISTINCT {message_id_column}, id, 0 "
+            f"FROM {mail_link_preview_table} "
+            f"WHERE {message_id_column} IS NOT NULL"
         )
+        env.cr.execute(insert_message_link_preview_sql)
         message_link_preview_exists = True
 
     # Find duplicate source_url groups and keep the lowest id.
+    # noinspection SqlShouldBeInGroupBy
     env.cr.execute(
         "SELECT source_url, MIN(id) FROM mail_link_preview WHERE source_url IS NOT NULL GROUP BY source_url HAVING COUNT(*) > 1",
     )
@@ -65,10 +61,10 @@ def _ensure_mail_link_preview_unique_source_url(env: Environment) -> None:
 
     for source_url, keep_id in duplicate_groups:
         if mail_link_preview_has_message_id:
-            env.cr.execute(
-                "SELECT id, message_id FROM mail_link_preview WHERE source_url = %s ORDER BY id",
-                (source_url,),
+            select_mail_link_preview_sql = (
+                f"SELECT id, {message_id_column} FROM {mail_link_preview_table} WHERE source_url = %s ORDER BY id"
             )
+            env.cr.execute(select_mail_link_preview_sql, (source_url,))
         else:
             env.cr.execute(
                 "SELECT id, NULL::integer AS message_id FROM mail_link_preview WHERE source_url = %s ORDER BY id",
@@ -82,33 +78,34 @@ def _ensure_mail_link_preview_unique_source_url(env: Environment) -> None:
 
         if message_link_preview_exists:
             # Preserve existing per-message association if present.
-            env.cr.execute(
-                "UPDATE mail_message_link_preview SET link_preview_id = %s WHERE link_preview_id = ANY(%s)",
-                (keep_id, duplicate_ids),
+            update_message_link_preview_sql = (
+                f"UPDATE {message_link_preview_table} SET link_preview_id = %s WHERE link_preview_id = ANY(%s)"
             )
+            env.cr.execute(update_message_link_preview_sql, (keep_id, duplicate_ids))
             if mail_link_preview_has_message_id and message_ids:
                 # Backfill association from legacy mail_link_preview.message_id.
-                env.cr.execute(
-                    "INSERT INTO mail_message_link_preview (message_id, link_preview_id, sequence) "
-                    "SELECT DISTINCT mail_link_preview.message_id, %s, 0 "
-                    "FROM mail_link_preview "
-                    "WHERE mail_link_preview.source_url = %s "
-                    "  AND mail_link_preview.message_id IS NOT NULL "
+                backfill_message_link_preview_sql = (
+                    f"INSERT INTO {message_link_preview_table} (message_id, link_preview_id, sequence) "
+                    f"SELECT DISTINCT {mail_link_preview_table}.{message_id_column}, %s, 0 "
+                    f"FROM {mail_link_preview_table} "
+                    f"WHERE {mail_link_preview_table}.source_url = %s "
+                    f"  AND {mail_link_preview_table}.{message_id_column} IS NOT NULL "
                     "  AND NOT EXISTS ("
-                    "    SELECT 1 FROM mail_message_link_preview "
-                    "    WHERE mail_message_link_preview.message_id = mail_link_preview.message_id "
-                    "      AND mail_message_link_preview.link_preview_id = %s"
-                    "  )",
-                    (keep_id, source_url, keep_id),
+                    f"    SELECT 1 FROM {message_link_preview_table} "
+                    f"    WHERE {message_link_preview_table}.{message_id_column} = {mail_link_preview_table}.{message_id_column} "
+                    f"      AND {message_link_preview_table}.link_preview_id = %s"
+                    "  )"
                 )
+                env.cr.execute(backfill_message_link_preview_sql, (keep_id, source_url, keep_id))
             # Defensive: remove any duplicates created by the update/backfill.
-            env.cr.execute(
-                "DELETE FROM mail_message_link_preview kept "
-                "USING mail_message_link_preview dropped "
+            remove_duplicate_message_link_preview_sql = (
+                f"DELETE FROM {message_link_preview_table} kept "
+                f"USING {message_link_preview_table} dropped "
                 "WHERE kept.id < dropped.id "
-                "  AND kept.message_id = dropped.message_id "
-                "  AND kept.link_preview_id = dropped.link_preview_id",
+                f"  AND kept.{message_id_column} = dropped.{message_id_column} "
+                "  AND kept.link_preview_id = dropped.link_preview_id"
             )
+            env.cr.execute(remove_duplicate_message_link_preview_sql)
 
         env.cr.execute("DELETE FROM mail_link_preview WHERE id = ANY(%s)", (duplicate_ids,))
 
@@ -117,14 +114,22 @@ def _ensure_mail_link_preview_unique_source_url(env: Environment) -> None:
     )
 
     if message_link_preview_exists:
-        env.cr.execute(
+        create_message_link_preview_index_sql = (
             "CREATE UNIQUE INDEX IF NOT EXISTS mail_message_link_preview_unique_message_link_preview "
-            "ON mail_message_link_preview (message_id, link_preview_id)",
+            f"ON {message_link_preview_table} ({message_id_column}, link_preview_id)"
         )
+        env.cr.execute(create_message_link_preview_index_sql)
+
+
+def _ensure_env(cursor_or_env: Cursor | Environment) -> Environment:
+    if isinstance(cursor_or_env, api.Environment):
+        return cursor_or_env
+    return api.Environment(cursor_or_env, SUPERUSER_ID, {})
 
 
 @openupgrade.migrate()
-def migrate(env: Environment, _version: str) -> None:
+def migrate(cr: Cursor, version: str) -> None:
     """Pre-migration hook for mail (19.0.1.0)."""
-
+    _ = version
+    env = _ensure_env(cr)
     _ensure_mail_link_preview_unique_source_url(env)

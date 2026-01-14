@@ -57,6 +57,7 @@ class FishbowlImporter(models.Model):
         if start_datetime is None and update_last_sync:
             start_datetime = self._get_last_sync_at()
         try:
+            self._get_fishbowl_system()
             with FishbowlClient(fishbowl_settings) as client:
                 self._import_units_of_measure(client)
                 partner_maps = self._import_partners(client)
@@ -74,12 +75,8 @@ class FishbowlImporter(models.Model):
 
     def _import_units_of_measure(self, client: FishbowlClient) -> None:
         unit_type_rows = client.fetch_all("SELECT id, name FROM uomtype ORDER BY id")
-        unit_rows = client.fetch_all(
-            "SELECT id, name, code, uomType, defaultRecord, integral, activeFlag FROM uom ORDER BY id"
-        )
-        conversion_rows = client.fetch_all(
-            "SELECT fromUomId, toUomId, factor, multiply FROM uomconversion ORDER BY id"
-        )
+        unit_rows = client.fetch_all("SELECT id, name, code, uomType, defaultRecord, integral, activeFlag FROM uom ORDER BY id")
+        conversion_rows = client.fetch_all("SELECT fromUomId, toUomId, factor, multiply FROM uomconversion ORDER BY id")
 
         category_by_fishbowl_id: dict[int, int] = {}
         category_model = self.env["uom.category"].sudo()
@@ -97,8 +94,6 @@ class FishbowlImporter(models.Model):
 
         ratios_by_id = self._compute_unit_ratios(unit_rows, conversion_rows)
         unit_model = self.env["uom.uom"].sudo()
-        external_id_model = self.env["external.id"].sudo()
-        fishbowl_system = self._get_fishbowl_system()
         for row in unit_rows:
             fishbowl_unit_id = int(row["id"])
             category_id = category_by_fishbowl_id.get(int(row["uomType"]))
@@ -132,24 +127,13 @@ class FishbowlImporter(models.Model):
                 self._write_if_changed(existing, values)
             else:
                 existing = unit_model.create(values)
-            self._ensure_external_id(
-                external_id_model,
-                fishbowl_system,
-                RESOURCE_UNIT,
-                fishbowl_unit_id,
-                existing,
-            )
+            existing.set_external_id(EXTERNAL_SYSTEM_CODE, str(fishbowl_unit_id), RESOURCE_UNIT)
 
     def _import_partners(self, client: FishbowlClient) -> dict[str, dict[int, int]]:
-        customer_rows = client.fetch_all(
-            "SELECT id, accountId, number, name, note, activeFlag FROM customer ORDER BY id"
-        )
-        vendor_rows = client.fetch_all(
-            "SELECT id, accountId, name, accountNum, note, activeFlag FROM vendor ORDER BY id"
-        )
+        customer_rows = client.fetch_all("SELECT id, accountId, number, name, note, activeFlag FROM customer ORDER BY id")
+        vendor_rows = client.fetch_all("SELECT id, accountId, name, accountNum, note, activeFlag FROM vendor ORDER BY id")
         address_rows = client.fetch_all(
-            "SELECT id, accountId, name, addressName, address, city, stateId, countryId, zip, typeId "
-            "FROM address ORDER BY id"
+            "SELECT id, accountId, name, addressName, address, city, stateId, countryId, zip, typeId FROM address ORDER BY id"
         )
         address_type_rows = client.fetch_all("SELECT id, name FROM addresstype ORDER BY id")
         country_rows = client.fetch_all("SELECT id, name, abbreviation FROM countryconst ORDER BY id")
@@ -160,9 +144,6 @@ class FishbowlImporter(models.Model):
         state_map = {int(row["id"]): row for row in state_rows}
 
         partner_model = self.env["res.partner"].sudo().with_context(IMPORT_CONTEXT)
-        external_id_model = self.env["external.id"].sudo()
-        fishbowl_system = self._get_fishbowl_system()
-
         account_partner_map: dict[int, int] = {}
         customer_partner_map: dict[int, int] = {}
         vendor_partner_map: dict[int, int] = {}
@@ -176,13 +157,11 @@ class FishbowlImporter(models.Model):
                 "active": self._to_bool(row.get("activeFlag")),
                 "customer_rank": 1,
             }
-            partner = self._get_or_create_by_external_id(
-                partner_model,
-                external_id_model,
-                fishbowl_system,
-                RESOURCE_CUSTOMER,
-                fishbowl_id,
+            partner = partner_model.get_or_create_by_external_id(
+                EXTERNAL_SYSTEM_CODE,
+                str(fishbowl_id),
                 values,
+                RESOURCE_CUSTOMER,
             )
             account_id = row.get("accountId")
             if account_id is not None:
@@ -198,13 +177,11 @@ class FishbowlImporter(models.Model):
                 "active": self._to_bool(row.get("activeFlag")),
                 "supplier_rank": 1,
             }
-            partner = self._get_or_create_by_external_id(
-                partner_model,
-                external_id_model,
-                fishbowl_system,
-                RESOURCE_VENDOR,
-                fishbowl_id,
+            partner = partner_model.get_or_create_by_external_id(
+                EXTERNAL_SYSTEM_CODE,
+                str(fishbowl_id),
                 values,
+                RESOURCE_VENDOR,
             )
             account_id = row.get("accountId")
             if account_id is not None:
@@ -241,13 +218,11 @@ class FishbowlImporter(models.Model):
                 "country_id": country_id or False,
                 "state_id": state_id or False,
             }
-            self._get_or_create_by_external_id(
-                partner_model,
-                external_id_model,
-                fishbowl_system,
-                RESOURCE_ADDRESS,
-                fishbowl_id,
+            partner_model.get_or_create_by_external_id(
+                EXTERNAL_SYSTEM_CODE,
+                str(fishbowl_id),
                 values,
+                RESOURCE_ADDRESS,
             )
 
         return {
@@ -263,13 +238,9 @@ class FishbowlImporter(models.Model):
             "SELECT id, num, description, details, uomId, typeId, trackingFlag, serializedFlag, stdCost, activeFlag "
             "FROM part ORDER BY id"
         )
-        product_rows = client.fetch_all(
-            "SELECT id, partId, num, description, price, uomId, activeFlag FROM product ORDER BY id"
-        )
+        product_rows = client.fetch_all("SELECT id, partId, num, description, price, uomId, activeFlag FROM product ORDER BY id")
 
         unit_map = self._load_unit_map()
-        external_id_model = self.env["external.id"].sudo()
-        fishbowl_system = self._get_fishbowl_system()
         template_model = self.env["product.template"].sudo().with_context(IMPORT_CONTEXT)
 
         part_product_map: dict[int, int] = {}
@@ -296,13 +267,11 @@ class FishbowlImporter(models.Model):
             standard_price = row.get("stdCost")
             if standard_price is not None:
                 values["standard_price"] = float(standard_price)
-            template = self._get_or_create_by_external_id(
-                template_model,
-                external_id_model,
-                fishbowl_system,
-                RESOURCE_PART,
-                fishbowl_id,
+            template = template_model.get_or_create_by_external_id(
+                EXTERNAL_SYSTEM_CODE,
+                str(fishbowl_id),
                 values,
+                RESOURCE_PART,
             )
             part_product_map[fishbowl_id] = template.product_variant_id.id
 
@@ -328,13 +297,7 @@ class FishbowlImporter(models.Model):
             if unit_id:
                 values["uom_id"] = unit_id
             self._write_if_changed(template, values)
-            self._ensure_external_id(
-                external_id_model,
-                fishbowl_system,
-                RESOURCE_PRODUCT,
-                fishbowl_id,
-                template,
-            )
+            template.set_external_id(EXTERNAL_SYSTEM_CODE, str(fishbowl_id), RESOURCE_PRODUCT)
             product_product_map[fishbowl_id] = variant_id
 
         return {
@@ -382,8 +345,6 @@ class FishbowlImporter(models.Model):
         )
 
         unit_map = self._load_unit_map()
-        external_id_model = self.env["external.id"].sudo()
-        fishbowl_system = self._get_fishbowl_system()
         sale_order_model = self.env["sale.order"].sudo().with_context(IMPORT_CONTEXT)
         sale_line_model = self.env["sale.order.line"].sudo().with_context(IMPORT_CONTEXT)
         purchase_order_model = self.env["purchase.order"].sudo().with_context(IMPORT_CONTEXT)
@@ -410,13 +371,11 @@ class FishbowlImporter(models.Model):
                 "note": row.get("note") or False,
                 "state": order_state,
             }
-            order = self._get_or_create_by_external_id(
-                sale_order_model,
-                external_id_model,
-                fishbowl_system,
-                RESOURCE_SALES_ORDER,
-                fishbowl_id,
+            order = sale_order_model.get_or_create_by_external_id(
+                EXTERNAL_SYSTEM_CODE,
+                str(fishbowl_id),
                 values,
+                RESOURCE_SALES_ORDER,
             )
             sales_order_map[fishbowl_id] = order.id
 
@@ -441,13 +400,11 @@ class FishbowlImporter(models.Model):
             }
             if unit_id:
                 values["product_uom"] = unit_id
-            line = self._get_or_create_by_external_id(
-                sale_line_model,
-                external_id_model,
-                fishbowl_system,
-                RESOURCE_SALES_ORDER_LINE,
-                fishbowl_id,
+            line = sale_line_model.get_or_create_by_external_id(
+                EXTERNAL_SYSTEM_CODE,
+                str(fishbowl_id),
                 values,
+                RESOURCE_SALES_ORDER_LINE,
             )
             sales_line_map[fishbowl_id] = line.id
 
@@ -464,13 +421,11 @@ class FishbowlImporter(models.Model):
                 "notes": row.get("note") or False,
                 "state": order_state,
             }
-            order = self._get_or_create_by_external_id(
-                purchase_order_model,
-                external_id_model,
-                fishbowl_system,
-                RESOURCE_PURCHASE_ORDER,
-                fishbowl_id,
+            order = purchase_order_model.get_or_create_by_external_id(
+                EXTERNAL_SYSTEM_CODE,
+                str(fishbowl_id),
                 values,
+                RESOURCE_PURCHASE_ORDER,
             )
             purchase_order_map[fishbowl_id] = order.id
 
@@ -496,13 +451,11 @@ class FishbowlImporter(models.Model):
             }
             if unit_id:
                 values["product_uom"] = unit_id
-            line = self._get_or_create_by_external_id(
-                purchase_line_model,
-                external_id_model,
-                fishbowl_system,
-                RESOURCE_PURCHASE_ORDER_LINE,
-                fishbowl_id,
+            line = purchase_line_model.get_or_create_by_external_id(
+                EXTERNAL_SYSTEM_CODE,
+                str(fishbowl_id),
                 values,
+                RESOURCE_PURCHASE_ORDER_LINE,
             )
             purchase_line_map[fishbowl_id] = line.id
 
@@ -528,8 +481,6 @@ class FishbowlImporter(models.Model):
             extra_where="dateShipped IS NOT NULL",
         )
         shipment_status_map = self._load_status_map(client, "shipstatus")
-        external_id_model = self.env["external.id"].sudo()
-        fishbowl_system = self._get_fishbowl_system()
         picking_model = self.env["stock.picking"].sudo().with_context(IMPORT_CONTEXT)
         move_model = self.env["stock.move"].sudo().with_context(IMPORT_CONTEXT)
         move_line_model = self.env["stock.move.line"].sudo().with_context(IMPORT_CONTEXT)
@@ -563,13 +514,11 @@ class FishbowlImporter(models.Model):
                 "scheduled_date": row.get("dateShipped") or row.get("dateCreated"),
                 "date_done": row.get("dateShipped"),
             }
-            picking = self._get_or_create_by_external_id(
-                picking_model,
-                external_id_model,
-                fishbowl_system,
-                RESOURCE_SHIPMENT,
-                fishbowl_id,
+            picking = picking_model.get_or_create_by_external_id(
+                EXTERNAL_SYSTEM_CODE,
+                str(fishbowl_id),
                 values,
+                RESOURCE_SHIPMENT,
             )
             shipment_map[fishbowl_id] = picking.id
             done_pickings.append(picking)
@@ -610,13 +559,11 @@ class FishbowlImporter(models.Model):
                 "picking_id": picking.id,
                 "sale_line_id": sale_line_id or False,
             }
-            move = self._get_or_create_by_external_id(
-                move_model,
-                external_id_model,
-                fishbowl_system,
-                RESOURCE_SHIPMENT_LINE,
-                fishbowl_id,
+            move = move_model.get_or_create_by_external_id(
+                EXTERNAL_SYSTEM_CODE,
+                str(fishbowl_id),
                 move_values,
+                RESOURCE_SHIPMENT_LINE,
             )
             if move.move_line_ids:
                 continue
@@ -641,18 +588,17 @@ class FishbowlImporter(models.Model):
         product_maps: dict[str, dict[int, int]],
         start_datetime: datetime | None,
     ) -> None:
-        receipt_rows = client.fetch_all("SELECT id, poId, statusId FROM receipt ORDER BY id")
         receipt_status_map = self._load_status_map(client, "receiptstatus")
-        receipt_map = {int(row["id"]): row for row in receipt_rows}
         done_statuses = {"received", "fulfilled"}
-        done_receipt_ids = {
-            receipt_id
-            for receipt_id, receipt_record in receipt_map.items()
-            if receipt_status_map.get(int(receipt_record.get("statusId") or 0), "").lower() in done_statuses
-        }
+        done_status_ids = [
+            status_id
+            for status_id, status_name in receipt_status_map.items()
+            if status_name.lower() in done_statuses
+        ]
+        if not done_status_ids:
+            _logger.warning("No receipt statuses mapped for completion; skipping receipts.")
+            return
 
-        external_id_model = self.env["external.id"].sudo()
-        fishbowl_system = self._get_fishbowl_system()
         picking_model = self.env["stock.picking"].sudo().with_context(IMPORT_CONTEXT)
         move_model = self.env["stock.move"].sudo().with_context(IMPORT_CONTEXT)
         move_line_model = self.env["stock.move.line"].sudo().with_context(IMPORT_CONTEXT)
@@ -664,20 +610,19 @@ class FishbowlImporter(models.Model):
         source_location = picking_type.default_location_src_id or self._get_location("supplier")
         destination_location = picking_type.default_location_dest_id or self._get_location("internal")
 
-        receipt_filter = "dateReceived IS NOT NULL"
-        receipt_params: list[Any] | None = None
+        status_placeholders = ", ".join(["%s"] * len(done_status_ids))
+        receipt_conditions = [f"ri.dateReceived IS NOT NULL", f"r.statusId IN ({status_placeholders})"]
+        receipt_params: list[Any] = list(done_status_ids)
         if start_datetime:
-            receipt_filter = f"{receipt_filter} AND dateReceived >= %s"
-            receipt_params = [start_datetime]
-        receipt_item_rows = self._fetch_rows_by_ids(
-            client,
-            "receiptitem",
-            "receiptId",
-            list(done_receipt_ids),
-            select_columns="id, receiptId, poItemId, qty, uomId, dateReceived, partId",
-            extra_where=receipt_filter,
-            extra_params=receipt_params,
+            receipt_conditions.append("ri.dateReceived >= %s")
+            receipt_params.append(start_datetime)
+        receipt_where = " AND ".join(receipt_conditions)
+        receipt_query = (
+            "SELECT ri.id, ri.receiptId, ri.poItemId, ri.qty, ri.uomId, ri.dateReceived, ri.partId, r.poId "
+            "FROM receiptitem ri JOIN receipt r ON r.id = ri.receiptId "
+            f"WHERE {receipt_where} ORDER BY ri.id"
         )
+        receipt_item_rows = client.fetch_all(receipt_query, receipt_params)
 
         unit_map = self._load_unit_map()
         done_pickings: dict[int, models.Model] = {}
@@ -686,13 +631,10 @@ class FishbowlImporter(models.Model):
             receipt_id = row.get("receiptId")
             if receipt_id is None:
                 continue
-            receipt_record = receipt_map.get(int(receipt_id))
-            if not receipt_record or int(receipt_id) not in done_receipt_ids:
-                continue
             fishbowl_receipt_id = int(receipt_id)
             picking = done_pickings.get(fishbowl_receipt_id)
             if not picking:
-                purchase_order_id = order_maps["purchase_order"].get(int(receipt_record.get("poId") or 0))
+                purchase_order_id = order_maps["purchase_order"].get(int(row.get("poId") or 0))
                 partner_id = False
                 if purchase_order_id:
                     partner_id = self.env["purchase.order"].sudo().browse(purchase_order_id).partner_id.id
@@ -701,18 +643,16 @@ class FishbowlImporter(models.Model):
                     "location_id": source_location.id,
                     "location_dest_id": destination_location.id,
                     "partner_id": partner_id or False,
-                    "origin": receipt_record.get("id"),
+                    "origin": row.get("receiptId"),
                     "purchase_id": purchase_order_id or False,
                     "scheduled_date": row.get("dateReceived"),
                     "date_done": row.get("dateReceived"),
                 }
-                picking = self._get_or_create_by_external_id(
-                    picking_model,
-                    external_id_model,
-                    fishbowl_system,
-                    RESOURCE_RECEIPT,
-                    fishbowl_receipt_id,
+                picking = picking_model.get_or_create_by_external_id(
+                    EXTERNAL_SYSTEM_CODE,
+                    str(fishbowl_receipt_id),
                     values,
+                    RESOURCE_RECEIPT,
                 )
                 done_pickings[fishbowl_receipt_id] = picking
 
@@ -732,13 +672,11 @@ class FishbowlImporter(models.Model):
                 "picking_id": picking.id,
                 "purchase_line_id": order_maps["purchase_line"].get(int(row.get("poItemId") or 0)) or False,
             }
-            move = self._get_or_create_by_external_id(
-                move_model,
-                external_id_model,
-                fishbowl_system,
-                RESOURCE_RECEIPT_LINE,
-                fishbowl_line_id,
+            move = move_model.get_or_create_by_external_id(
+                EXTERNAL_SYSTEM_CODE,
+                str(fishbowl_line_id),
                 move_values,
+                RESOURCE_RECEIPT_LINE,
             )
             if move.move_line_ids:
                 continue
@@ -770,6 +708,8 @@ class FishbowlImporter(models.Model):
         )
         if not host or not user or not database or not password:
             raise UserError("Fishbowl connection settings are missing.")
+        if not ssl_verify:
+            _logger.warning("Fishbowl SSL verification disabled; enable for production.")
         return FishbowlConnectionSettings(
             host=host,
             user=user,
@@ -844,81 +784,6 @@ class FishbowlImporter(models.Model):
         if not system:
             raise UserError("External system 'fishbowl' is not configured.")
         return system
-
-    def _get_or_create_by_external_id(
-        self,
-        model: models.Model,
-        external_id_model: models.Model,
-        system: models.Model,
-        resource: str,
-        external_id_value: int,
-        values: dict[str, Any],
-    ) -> models.Model:
-        record = self._find_external_record(external_id_model, system, resource, external_id_value, model._name)
-        if record:
-            self._write_if_changed(record, values)
-            return record
-        record = model.create(values)
-        self._ensure_external_id(external_id_model, system, resource, external_id_value, record)
-        return record
-
-    def _find_external_record(
-        self,
-        external_id_model: models.Model,
-        system: models.Model,
-        resource: str,
-        external_id_value: int,
-        model_name: str,
-    ) -> models.Model | None:
-        record = external_id_model.search(
-            [
-                ("system_id", "=", system.id),
-                ("resource", "=", resource),
-                ("external_id", "=", str(external_id_value)),
-                ("res_model", "=", model_name),
-            ],
-            limit=1,
-        )
-        if not record:
-            return None
-        return model.browse(record.res_id)
-
-    def _ensure_external_id(
-        self,
-        external_id_model: models.Model,
-        system: models.Model,
-        resource: str,
-        external_id_value: int,
-        record: models.Model,
-    ) -> None:
-        existing = external_id_model.search(
-            [
-                ("system_id", "=", system.id),
-                ("resource", "=", resource),
-                ("external_id", "=", str(external_id_value)),
-            ],
-            limit=1,
-        )
-        if existing:
-            if existing.res_model != record._name or existing.res_id != record.id:
-                _logger.warning(
-                    "External ID collision for %s/%s on %s:%s",
-                    resource,
-                    external_id_value,
-                    record._name,
-                    record.id,
-                )
-            return
-        external_id_model.create(
-            {
-                "res_model": record._name,
-                "res_id": record.id,
-                "system_id": system.id,
-                "resource": resource,
-                "external_id": str(external_id_value),
-                "active": True,
-            }
-        )
 
     def _write_if_changed(self, record: models.Model, values: dict[str, Any]) -> None:
         changes: dict[str, Any] = {}
@@ -1041,9 +906,13 @@ class FishbowlImporter(models.Model):
         country = self.env["res.country"].sudo().search([("code", "=", country_code)], limit=1)
         if not country:
             return None
-        state = self.env["res.country.state"].sudo().search(
-            [("code", "=", code), ("country_id", "=", country.id)],
-            limit=1,
+        state = (
+            self.env["res.country.state"]
+            .sudo()
+            .search(
+                [("code", "=", code), ("country_id", "=", country.id)],
+                limit=1,
+            )
         )
         return state.id if state else None
 
@@ -1054,11 +923,13 @@ class FishbowlImporter(models.Model):
         unit_map: dict[int, int] = {}
         external_id_model = self.env["external.id"].sudo()
         fishbowl_system = self._get_fishbowl_system()
-        unit_records = external_id_model.search([
-            ("system_id", "=", fishbowl_system.id),
-            ("resource", "=", "uom"),
-            ("res_model", "=", "uom.uom"),
-        ])
+        unit_records = external_id_model.search(
+            [
+                ("system_id", "=", fishbowl_system.id),
+                ("resource", "=", "uom"),
+                ("res_model", "=", "uom.uom"),
+            ]
+        )
         for record in unit_records:
             unit_map[int(record.external_id)] = record.res_id
         if unit_map:
@@ -1153,7 +1024,7 @@ class FishbowlImporter(models.Model):
         results: list[dict[str, Any]] = []
         deduped_ids = sorted(set(record_ids))
         for start_index in range(0, len(deduped_ids), batch_size):
-            batch_ids = deduped_ids[start_index:start_index + batch_size]
+            batch_ids = deduped_ids[start_index : start_index + batch_size]
             placeholders = ", ".join(["%s"] * len(batch_ids))
             query = f"SELECT {columns} FROM {table} WHERE {id_column} IN ({placeholders})"
             params: list[Any] = list(batch_ids)

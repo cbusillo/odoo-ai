@@ -24,6 +24,13 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="/addons/fishbowl_import/security/ir.model.access.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="/addons/hr_employee_name_extended/security/ir.model.access.csv">
           <value>
             <Attribute>

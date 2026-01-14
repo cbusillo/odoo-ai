@@ -42,7 +42,7 @@ class ImageMixin(models.AbstractModel):
             records._mark_for_shopify_product_export()
         return records
 
-    def write(self, vals: dict) -> "odoo.model.image_mixin":
+    def write(self, vals: dict) -> bool:
         res = super().write(vals)
         if {"image_1920", "sequence"} & vals.keys() and not self.env.context.get("skip_shopify_sync"):
             self._mark_for_shopify_product_export()

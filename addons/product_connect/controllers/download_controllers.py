@@ -22,11 +22,11 @@ class SingleDownloadController(http.Controller):
 
         attachment.unlink()
 
-        return request.make_response(
+        return Response(
             file_content,
-            [
+            headers=[
                 ("Content-Type", content_type),
                 ("Content-Disposition", f'attachment; filename="{filename}"'),
-                ("Content-Length", len(file_content)),
+                ("Content-Length", str(len(file_content))),
             ],
         )

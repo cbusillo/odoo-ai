@@ -328,7 +328,7 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
                 moves.append(
                     MoveInput(
                         id=format_shopify_gid_from_id("MediaImage", odoo_image.shopify_media_id),
-                        newPosition=str(new_position),
+                        newPosition=new_position,
                     )
                 )
 

@@ -147,7 +147,15 @@ class ProductTemplate(models.Model):
             orderby: str | None = "",
             lazy: bool = True,
     ) -> list[dict[str, Any]]:
-        groups = super().read_group(domain, fields, groupby, offset=offset, limit=limit, orderby=orderby, lazy=lazy)
+        groups: list[dict[str, Any]] = super().read_group(
+            domain,
+            fields,
+            groupby,
+            offset=offset,
+            limit=limit,
+            orderby=orderby,
+            lazy=lazy,
+        )
         fields_to_sum_with_qty = {"list_price", "standard_price"}
         if not fields_to_sum_with_qty.intersection(fields):
             return groups

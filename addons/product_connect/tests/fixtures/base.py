@@ -164,9 +164,12 @@ class IntegrationTestCase(_ShopifyMockMixin, _BaseDataMixin, TransactionCase):
         config_param.set_param("shopify.test_store", "1")
 
     @staticmethod
-    def mock_shopify_response(data: dict | None = None, errors: list | None = None) -> dict:
-        response = {"data": data or {}}
-        if errors:
+    def mock_shopify_response(
+        data: dict[str, object] | None = None,
+        errors: list[dict[str, str]] | None = None,
+    ) -> dict[str, dict[str, object] | list[dict[str, str]]]:
+        response: dict[str, dict[str, object] | list[dict[str, str]]] = {"data": data or {}}
+        if errors is not None:
             response["errors"] = errors
         return response
 

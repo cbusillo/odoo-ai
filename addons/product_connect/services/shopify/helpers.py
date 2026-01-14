@@ -2,7 +2,7 @@ import logging
 import re
 from datetime import datetime, UTC
 from enum import StrEnum
-from typing import TypeVar, Self, Any
+from typing import TypeVar, Self, Any, Protocol
 
 from odoo import models
 from odoo.exceptions import UserError
@@ -12,6 +12,12 @@ from .gql.base_model import BaseModel
 
 
 T = TypeVar("T")
+
+
+class OdooRecordInfo(Protocol):
+    id: int | None
+    name: str | None
+    default_code: str | None
 
 _logger = logging.getLogger(__name__)
 
@@ -92,7 +98,7 @@ class SyncMode(StrEnum):
 
 
 class OdooDataError(UserError):
-    def __init__(self, message: str, odoo_record: models.Model | None = None) -> None:
+    def __init__(self, message: str, odoo_record: OdooRecordInfo | None = None) -> None:
         super().__init__(message)
         self.odoo_record = odoo_record
 
@@ -105,7 +111,8 @@ class OdooDataError(UserError):
     @property
     def odoo_product_id(self) -> str:
         if self.odoo_record:
-            return getattr(self.odoo_record, "id", "")
+            record_id = getattr(self.odoo_record, "id", None)
+            return str(record_id) if record_id is not None else ""
         return ""
 
     @property
@@ -140,7 +147,7 @@ class ShopifyApiError(OdooDataError):
         *,
         shopify_record: BaseModel | None = None,
         shopify_input: BaseModel | None = None,
-        odoo_record: models.Model | None = None,
+        odoo_record: OdooRecordInfo | None = None,
     ) -> None:
         super().__init__(message, odoo_record=odoo_record)
         self.shopify_record = shopify_record

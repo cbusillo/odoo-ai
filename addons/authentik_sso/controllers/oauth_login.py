@@ -4,9 +4,12 @@ import logging
 import os
 
 import werkzeug.urls
+import werkzeug.utils
+from werkzeug.exceptions import BadRequest
 
 from odoo import http
 from odoo.addons.auth_oauth.controllers.main import OAuthLogin as BaseOAuthLogin
+from odoo.addons.web.controllers.utils import ensure_db
 from odoo.http import request
 
 _logger = logging.getLogger(__name__)
@@ -41,6 +44,21 @@ def _build_authentik_auth_link(
     return f"{provider['auth_endpoint']}?{werkzeug.urls.url_encode(params)}"
 
 
+def _build_oauth_state(provider_id: int) -> dict[str, object]:
+    redirect = request.params.get("redirect") or "web"
+    if not redirect.startswith(("//", "http://", "https://")):
+        redirect = f"{request.httprequest.url_root}{redirect[1:] if redirect[0] == '/' else redirect}"
+    state = {
+        "d": request.session.db,
+        "p": provider_id,
+        "r": werkzeug.urls.url_quote_plus(redirect),
+    }
+    token = request.params.get("token")
+    if token:
+        state["t"] = token
+    return state
+
+
 class AuthentikOAuthLogin(BaseOAuthLogin):
     def list_providers(self) -> list[dict[str, object]]:
         providers = super().list_providers()
@@ -66,3 +84,31 @@ class AuthentikOAuthLogin(BaseOAuthLogin):
     @http.route()
     def web_login(self, *args: object, **kwargs: object) -> object:
         return super().web_login(*args, **kwargs)
+
+    @http.route("/authentik/login", type="http", auth="none", sitemap=False)
+    def authentik_login(self, **kwargs: object) -> object:
+        ensure_db()
+        provider_name = _authentik_provider_name()
+        provider = (
+            request.env["auth.oauth.provider"]
+            .sudo()
+            .search(
+                [
+                    ("enabled", "=", True),
+                    ("name", "=", provider_name),
+                ],
+                limit=1,
+            )
+        )
+        if not provider:
+            raise BadRequest()
+        state = _build_oauth_state(provider.id)
+        redirect_url = request.httprequest.url_root + "auth_oauth/signin"
+        provider_data = {
+            "auth_endpoint": provider.auth_endpoint,
+            "client_id": provider.client_id,
+            "scope": provider.scope,
+            "name": provider.name,
+        }
+        auth_link = _build_authentik_auth_link(provider_data, state, redirect_url)
+        return werkzeug.utils.redirect(auth_link, 303)

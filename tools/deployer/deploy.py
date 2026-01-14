@@ -10,7 +10,7 @@ from .command import CommandError, run_process
 from .compose_ops import local_compose, local_compose_command, local_compose_env, remote_compose_command
 from .health import HealthcheckError, wait_for_health
 from .remote import ensure_remote_directory, run_remote, upload_file
-from .settings import AUTO_INSTALLED_SENTINEL, StackSettings, discover_local_modules
+from .settings import AUTO_INSTALLED_SENTINEL, StackSettings, discover_local_modules, split_modules
 
 
 def _run_compose(settings: StackSettings, args: list[str], remote: bool) -> None:
@@ -208,7 +208,34 @@ def execute_upgrade(settings: StackSettings, modules: tuple[str, ...], remote: b
     _run_upgrade_with_retry(settings, upgrade_subcommand, remote=remote)
 
 
-def _installed_local_modules(settings: StackSettings) -> tuple[str, ...]:
+def execute_install(settings: StackSettings, modules: tuple[str, ...], remote: bool) -> None:
+    if not modules:
+        return
+    module_argument = ",".join(dict.fromkeys(modules))
+    install_subcommand = [
+        "exec",
+        "-T",
+        settings.script_runner_service,
+        "bash",
+        "-lc",
+        f"{settings.odoo_bin_path} -i {module_argument} -d $ODOO_DB_NAME --stop-after-init",
+    ]
+    if not remote and "web" in settings.services:
+        _run_compose(settings, ["stop", "web"], remote)
+        try:
+            _run_compose(settings, ["up", "-d", settings.script_runner_service], remote)
+            _wait_for_local_service(settings, settings.script_runner_service)
+            _run_upgrade_with_retry(settings, install_subcommand, remote=remote)
+        finally:
+            _run_compose(settings, ["up", "-d", "web"], remote)
+        return
+    if not remote:
+        _run_compose(settings, ["up", "-d", settings.script_runner_service], remote)
+        _wait_for_local_service(settings, settings.script_runner_service)
+    _run_upgrade_with_retry(settings, install_subcommand, remote=remote)
+
+
+def _installed_module_names(settings: StackSettings) -> set[str]:
     container_name = f"{settings.compose_project}-database-1"
     db_name = settings.environment.get("ODOO_DB_NAME")
     db_user = settings.environment.get("ODOO_DB_USER")
@@ -253,10 +280,24 @@ def _installed_local_modules(settings: StackSettings) -> tuple[str, ...]:
     else:
         raise ValueError(f"Failed to query installed modules after retries; database may be restarting. {last_error}")
     installed = {line.strip() for line in (result.stdout or "").splitlines() if line.strip()}
+    return installed
+
+
+def _installed_local_modules(settings: StackSettings) -> tuple[str, ...]:
+    installed = _installed_module_names(settings)
     if not installed:
         return ()
     local_modules = set(discover_local_modules(settings.environment, settings.repo_root))
     return tuple(sorted(installed & local_modules))
+
+
+def resolve_missing_install_modules(settings: StackSettings) -> tuple[str, ...]:
+    install_modules = split_modules(settings.environment.get("ODOO_INSTALL_MODULES"))
+    if not install_modules:
+        return ()
+    installed = _installed_module_names(settings)
+    missing = [module for module in install_modules if module not in installed]
+    return tuple(missing)
 
 
 def run_health_check(settings: StackSettings, remote: bool, timeout_seconds: int) -> None:

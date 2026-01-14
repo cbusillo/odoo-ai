@@ -92,6 +92,10 @@ Behavior notes
   (`docker/config/opw-local.env`, `docker/config/cm-local.env`).
 - `uv run ops local info` prints machine-readable stack metadata (paths + identifiers
   only; no secrets) derived from `load_stack_settings()`.
+- Restore/init runs `docker/scripts/restore_from_upstream.py` (restore/boot,
+  sanitize, addon updates, and environment cleanups). It calls the
+  `environment_overrides` addon hook, which applies `ENV_OVERRIDE_*` settings
+  for SSO and integrations after each restore.
 - `uv run ops local restart` performs a fast `docker compose restart web` for the
   target stack.
 - `uv run ops local down` removes orphaned containers and anonymous volumes for

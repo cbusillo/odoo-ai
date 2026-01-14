@@ -40,12 +40,16 @@ def save_schema_sdl(json_data: IntrospectionQuery, output_file_path: Path) -> No
 
 
 def main() -> None:
-    shopify_store_key = os.getenv("SHOPIFY_STORE_URL_KEY")
-    shopify_api_token = os.getenv("SHOPIFY_API_TOKEN")
-    shopify_api_version = os.getenv("SHOPIFY_API_VERSION")
-    required_env_vars = ["SHOPIFY_STORE_URL_KEY", "SHOPIFY_API_TOKEN", "SHOPIFY_API_VERSION"]
-
-    missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+    shopify_store_key = os.getenv("ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY") or os.getenv("SHOPIFY_STORE_URL_KEY")
+    shopify_api_token = os.getenv("ENV_OVERRIDE_SHOPIFY__API_TOKEN") or os.getenv("SHOPIFY_API_TOKEN")
+    shopify_api_version = os.getenv("ENV_OVERRIDE_SHOPIFY__API_VERSION") or os.getenv("SHOPIFY_API_VERSION")
+    missing_vars: list[str] = []
+    if not shopify_store_key:
+        missing_vars.append("ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY or SHOPIFY_STORE_URL_KEY")
+    if not shopify_api_token:
+        missing_vars.append("ENV_OVERRIDE_SHOPIFY__API_TOKEN or SHOPIFY_API_TOKEN")
+    if not shopify_api_version:
+        missing_vars.append("ENV_OVERRIDE_SHOPIFY__API_VERSION or SHOPIFY_API_VERSION")
     if missing_vars:
         raise RuntimeError(f"Missing required environment variables: {', '.join(missing_vars)}")
 

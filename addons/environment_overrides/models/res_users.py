@@ -1,11 +1,17 @@
 import json
 import logging
+import os
 
-from odoo import api, models
+from odoo import Command, api, models
 from odoo.addons.auth_signup.models.res_users import SignupError
 from odoo.exceptions import AccessDenied, UserError
 
 _logger = logging.getLogger(__name__)
+
+AUTHENTIK_PREFIX = "ENV_OVERRIDE_AUTHENTIK__"
+DEFAULT_AUTHENTIK_PROVIDER_NAME = "Authentik"
+DEFAULT_AUTHENTIK_GROUP_CLAIM = "groups"
+DEFAULT_AUTHENTIK_ADMIN_GROUP = "authentik Admins"
 
 
 class ResUsers(models.Model):
@@ -39,6 +45,78 @@ class ResUsers(models.Model):
             return self._create_user_from_template(values)
         return super()._signup_create_user(values)
 
+    def _authentik_provider_name(self) -> str:
+        raw_value = os.environ.get(f"{AUTHENTIK_PREFIX}PROVIDER_NAME")
+        if raw_value is None:
+            return DEFAULT_AUTHENTIK_PROVIDER_NAME
+        cleaned = raw_value.strip()
+        return cleaned or DEFAULT_AUTHENTIK_PROVIDER_NAME
+
+    def _authentik_group_claim(self) -> str:
+        raw_value = os.environ.get(f"{AUTHENTIK_PREFIX}GROUP_CLAIM")
+        if raw_value is None:
+            return DEFAULT_AUTHENTIK_GROUP_CLAIM
+        return raw_value.strip()
+
+    def _authentik_admin_group_name(self) -> str:
+        raw_value = os.environ.get(f"{AUTHENTIK_PREFIX}ADMIN_GROUP")
+        if raw_value is None:
+            return DEFAULT_AUTHENTIK_ADMIN_GROUP
+        return raw_value.strip()
+
+    def _extract_authentik_groups(self, validation: dict[str, object]) -> set[str]:
+        claim_key = self._authentik_group_claim()
+        if not claim_key:
+            return set()
+        raw_groups = validation.get(claim_key)
+        if not raw_groups:
+            return set()
+        if isinstance(raw_groups, str):
+            candidates = [raw_groups]
+        elif isinstance(raw_groups, (list, tuple, set)):
+            candidates = [str(item) for item in raw_groups]
+        else:
+            return set()
+        cleaned = {item.strip() for item in candidates if item and item.strip()}
+        return cleaned
+
+    def _sync_authentik_groups(
+        self,
+        oauth_user: models.Model,
+        validation: dict[str, object],
+        provider_id: int,
+    ) -> None:
+        provider = self.env["auth.oauth.provider"].sudo().browse(provider_id)
+        if not provider or not provider.exists():
+            return
+        if provider.name != self._authentik_provider_name():
+            return
+        group_names = self._extract_authentik_groups(validation)
+        if not group_names:
+            return
+        admin_group_name = self._authentik_admin_group_name()
+        if not admin_group_name:
+            return
+
+        base_user_group = self.env.ref("base.group_user", raise_if_not_found=False)
+        if not base_user_group:
+            _logger.warning("Authentik group mapping skipped; base user group not found.")
+            return
+
+        commands = [Command.link(base_user_group.id)]
+        admin_group = self.env.ref("base.group_system", raise_if_not_found=False)
+        if admin_group:
+            normalized_groups = {name.casefold() for name in group_names}
+            is_admin = admin_group_name.casefold() in normalized_groups
+            if is_admin:
+                commands.append(Command.link(admin_group.id))
+            else:
+                commands.append(Command.unlink(admin_group.id))
+        else:
+            _logger.warning("Authentik group mapping skipped; admin group not found.")
+
+        oauth_user.sudo().write({"groups_id": commands})
+
     @api.model
     def _auth_oauth_signin(
         self,
@@ -58,6 +136,7 @@ class ResUsers(models.Model):
                 raise AccessDenied()
             assert len(oauth_user) == 1
             oauth_user.write({"oauth_access_token": params["access_token"]})
+            self._sync_authentik_groups(oauth_user, validation, provider)
             return oauth_user.login
         except AccessDenied as access_denied_exception:
             if self.env.context.get("no_user_creation"):
@@ -67,6 +146,9 @@ class ResUsers(models.Model):
             values = self._generate_signup_values(provider, validation, params)
             try:
                 login, _ = self.with_context(oauth_use_internal_template=True).signup(values, token)
+                created_user = self.search([("login", "=", login)], limit=1)
+                if created_user:
+                    self._sync_authentik_groups(created_user, validation, provider)
                 return login
             except (SignupError, UserError):
                 raise access_denied_exception

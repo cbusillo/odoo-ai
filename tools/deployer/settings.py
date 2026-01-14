@@ -182,7 +182,7 @@ class StackConfig(BaseModel):
     image_variable_raw: str | None = Field(None, alias="DEPLOY_IMAGE_VARIABLE")
     project_name: str | None = Field(None, alias="ODOO_PROJECT_NAME")
     docker_image: str | None = Field(None, alias="DOCKER_IMAGE")
-    base_url: str | None = Field(None, alias="ODOO_BASE_URL")
+    base_url: str | None = Field(None, alias="ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL")
     update_modules_raw: str | None = Field(None, alias="ODOO_UPDATE_MODULES")
     update_modules_legacy: str | None = Field(None, alias="ODOO_UPDATE")
     github_token: str | None = Field(None, alias="GITHUB_TOKEN")

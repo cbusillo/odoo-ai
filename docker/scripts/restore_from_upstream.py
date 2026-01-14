@@ -11,18 +11,18 @@ import subprocess
 import sys
 import textwrap
 import time
+from collections.abc import Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from enum import Enum, IntEnum
 from pathlib import Path
-from typing import Annotated, Optional, Sequence
 
 import psycopg2
 from passlib.context import CryptContext
 from psycopg2 import sql
 from psycopg2.extensions import connection
 from pydantic import Field, SecretStr, ValidationError, field_validator, model_validator
-from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logging.basicConfig(level=logging.INFO)
 _logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ class ExitCode(IntEnum):
     RESTORE_FAILED = 40
 
 
-def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Restore or bootstrap an Odoo database/filestore")
     parser.add_argument("--env-file", type=Path, default=None, help="Optional env file to load settings from")
     parser.add_argument(
@@ -72,10 +72,10 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
 
-    env_file: Optional[Path] = args.env_file
+    env_file: Path | None = args.env_file
     if env_file is None:
         candidate = Path(".env")
         if candidate.exists():
@@ -234,6 +234,8 @@ def _normalize_path(value: object) -> Path | None:
     return Path(expanded)
 
 
+
+
 class LocalServerSettings(BaseSettings):
     # noinspection Pydantic
     model_config = SettingsConfigDict(case_sensitive=False)
@@ -247,9 +249,8 @@ class LocalServerSettings(BaseSettings):
     filestore_owner: str | None = Field(None, alias="ODOO_FILESTORE_OWNER")
     restore_ssh_dir: Path | None = Field(None, alias="RESTORE_SSH_DIR")
     restore_ssh_key: Path | None = Field(None, alias="RESTORE_SSH_KEY")
-    base_url: str | None = Field(None, alias="ODOO_BASE_URL")
     # Script/runtime toggles
-    disable_cron: bool = Field(True, alias="SANITIZE_DISABLE_CRON")
+    disable_cron: bool = Field(True, alias="ENV_OVERRIDE_DISABLE_CRON")
     project_name: str = Field("odoo", alias="ODOO_PROJECT_NAME")
     odoo_version: str | None = Field(None, alias="ODOO_VERSION")
     addons_path: str | None = Field(None, alias="ODOO_ADDONS_PATH")
@@ -269,7 +270,6 @@ class LocalServerSettings(BaseSettings):
 
     @field_validator(
         "filestore_owner",
-        "base_url",
         "odoo_version",
         "addons_path",
         "addon_repositories",
@@ -324,44 +324,11 @@ class UpstreamServerSettings(BaseSettings):
     filestore_path: Path = Field(..., alias="ODOO_UPSTREAM_FILESTORE_PATH")
 
 
-class ShopifySettings(BaseSettings):
-    # noinspection Pydantic
-    model_config = SettingsConfigDict(case_sensitive=False)
-    shop_url_key: str = Field(..., alias="SHOPIFY_STORE_URL_KEY")
-    api_token: SecretStr = Field(..., alias="SHOPIFY_API_TOKEN")
-    api_version: str = Field(..., alias="SHOPIFY_API_VERSION")
-    webhook_key: str = Field(..., alias="SHOPIFY_WEBHOOK_KEY")
-    production_indicators: Annotated[list[str], NoDecode, Field(alias="PRODUCTION_INDICATORS")] = ["production", "live", "prod-"]
-
-    @field_validator("production_indicators", mode="before")
-    @classmethod
-    def parse_production_indicators(cls, value: object) -> list[str]:
-        if value is None:
-            return ["production", "live", "prod-"]
-        if isinstance(value, str):
-            cleaned = [item.strip() for item in value.split(",") if item.strip()]
-            return cleaned or ["production", "live", "prod-"]
-        if isinstance(value, list):
-            return [str(item).strip() for item in value if str(item).strip()]
-        return ["production", "live", "prod-"]
-
-    def validate_safe_environment(self) -> None:
-        shop_url_lower = self.shop_url_key.lower()
-        for indicator in self.production_indicators:
-            if indicator in shop_url_lower:
-                raise OdooDatabaseUpdateError(
-                    f"SAFETY CHECK FAILED: shop_url_key '{self.shop_url_key}' appears to be production. "
-                    f"This script should only run on development/test environments. "
-                    f"Found production indicator: '{indicator}'. Database will be dropped for safety."
-                )
-        _logger.info(f"SAFETY CHECK PASSED: {self.production_indicators} not in shop_url_key.")
-
-
 class OdooUpstreamRestorer:
     def __init__(
         self,
         local: LocalServerSettings,
-        upstream: Optional[UpstreamServerSettings],
+        upstream: UpstreamServerSettings | None,
         env_file: Path | None,
     ) -> None:
         self.local = local
@@ -371,7 +338,7 @@ class OdooUpstreamRestorer:
         self.os_env["PGPASSWORD"] = self.local.db_password.get_secret_value()
         if self.local.restore_ssh_dir:
             self.os_env["RESTORE_SSH_DIR"] = str(self.local.restore_ssh_dir)
-        self._ssh_identity: Optional[Path] = None
+        self._ssh_identity: Path | None = None
         if self.upstream:
             resolved_key = self._resolve_restore_ssh_key()
             self._ssh_identity = resolved_key
@@ -671,21 +638,6 @@ class OdooUpstreamRestorer:
         ]
         if disable_cron:
             sql_calls.append(SqlCall("ir.cron", KeyValuePair("active", False)))
-        if self.local.base_url:
-            sql_calls.append(
-                SqlCall(
-                    "ir.config_parameter",
-                    KeyValuePair("value", self.local.base_url),
-                    KeyValuePair("key", "web.base.url"),
-                )
-            )
-            sql_calls.append(
-                SqlCall(
-                    "ir.config_parameter",
-                    KeyValuePair("value", "True"),
-                    KeyValuePair("key", "web.base.url.freeze"),
-                )
-            )
 
         _logger.info("Sanitizing database...")
         # noinspection PyUnresolvedReferences  # call_odoo_sql exists on this class; PyCharm false positive.
@@ -700,159 +652,6 @@ class OdooUpstreamRestorer:
             if active_crons:
                 errors = "\n".join(f"- {cron[7]} (id: {cron[0]})" for cron in active_crons)
                 raise OdooDatabaseUpdateError(f"Error: The following cron jobs are still active after sanitization:\n{errors}")
-
-    def update_shopify_config(self) -> None:
-        try:
-            if self.env_file and self.env_file.exists():
-                # noinspection PyArgumentList
-                settings = ShopifySettings(_env_file=self.env_file)
-            else:
-                # noinspection PyArgumentList
-                settings = ShopifySettings()
-        except ValidationError:
-            _logger.info("Shopify envs missing; clearing Shopify config.")
-            self.clear_shopify_config()
-            return
-
-        shop_url_key = (settings.shop_url_key or "").strip()
-        api_token = settings.api_token.get_secret_value().strip()
-        webhook_key = (settings.webhook_key or "").strip()
-        api_version = (settings.api_version or "").strip()
-
-        if not shop_url_key or not api_token or not webhook_key or not api_version:
-            _logger.info("Shopify envs incomplete; clearing Shopify config.")
-            self.clear_shopify_config()
-            return
-
-        # Safety check: prevent setting production values, allow replacing production with development
-        settings.shop_url_key = shop_url_key
-        settings.validate_safe_environment()
-        production_indicators = settings.production_indicators
-        # noinspection PyUnresolvedReferences  # call_odoo_sql exists on this class; PyCharm false positive.
-        call_odoo_sql = self.call_odoo_sql
-
-        # Log what we're doing for transparency
-        current_shop_url_key = call_odoo_sql(
-            SqlCall("ir.config_parameter", KeyValuePair("value"), KeyValuePair("key", "shopify.shop_url_key")),
-            SqlCallType.SELECT,
-        )
-
-        if current_shop_url_key and current_shop_url_key[0]:
-            current_value = current_shop_url_key[0][0]
-            _logger.info(f"Replacing shop_url_key: '{current_value}' → '{shop_url_key}'")
-        else:
-            _logger.info(f"Setting shop_url_key to: '{shop_url_key}'")
-
-        sql_calls: list[SqlCall] = [
-            SqlCall(
-                "ir.config_parameter",
-                KeyValuePair("value", shop_url_key),
-                KeyValuePair("key", "shopify.shop_url_key"),
-            ),
-            SqlCall(
-                "ir.config_parameter",
-                KeyValuePair("value", api_token),
-                KeyValuePair("key", "shopify.api_token"),
-            ),
-            SqlCall(
-                "ir.config_parameter",
-                KeyValuePair("value", webhook_key),
-                KeyValuePair("key", "shopify.webhook_key"),
-            ),
-            SqlCall(
-                "ir.config_parameter",
-                KeyValuePair("value", api_version),
-                KeyValuePair("key", "shopify.api_version"),
-            ),
-            SqlCall(
-                "ir.config_parameter",
-                KeyValuePair("value", "True"),
-                KeyValuePair("key", "shopify.test_store"),
-            ),
-        ]
-        _logger.info("Updating Shopify configuration...")
-        for sql_call in sql_calls:
-            _logger.debug(f"Executing SQL call: {sql_call}")
-            try:
-                call_odoo_sql(sql_call, SqlCallType.UPDATE)
-            except psycopg2.Error as error:
-                raise OdooDatabaseUpdateError(f"Failed to update Shopify configuration: {error}") from error
-
-        legacy_keys = ("shopify.shop_url", "shopify.store_url")
-        for key in legacy_keys:
-            result = call_odoo_sql(
-                SqlCall("ir.config_parameter", KeyValuePair("value"), KeyValuePair("key", key)),
-                SqlCallType.SELECT,
-            )
-            if result and result[0]:
-                value = (result[0][0] or "").strip().lower()
-                for indicator in production_indicators:
-                    if indicator and indicator in value:
-                        raise OdooDatabaseUpdateError(
-                            f"Safety check failed: {key} still contains production indicator '{indicator}'."
-                        )
-                with self.local.db_conn.cursor() as cursor:
-                    cursor.execute("DELETE FROM ir_config_parameter WHERE key = %s", (key,))
-                _logger.info("Removed legacy Shopify config key %s", key)
-
-        sanitized_keys = ["shopify.shop_url_key"]
-        for key in sanitized_keys:
-            result = call_odoo_sql(
-                SqlCall("ir.config_parameter", KeyValuePair("value"), KeyValuePair("key", key)),
-                SqlCallType.SELECT,
-            )
-            value = (result[0][0].strip() if result and result[0] else "").lower()
-            for indicator in production_indicators:
-                if indicator and indicator in value:
-                    raise OdooDatabaseUpdateError(
-                        f"Safety check failed: {key} still contains production indicator '{indicator}'."
-                    )
-
-    def clear_shopify_config(self) -> None:
-        self.connect_to_db()
-        keys = (
-            "shopify.shop_url_key",
-            "shopify.api_token",
-            "shopify.webhook_key",
-            "shopify.api_version",
-            "shopify.test_store",
-            "shopify.shop_url",
-            "shopify.store_url",
-        )
-        with self.local.db_conn.cursor() as cursor:
-            cursor.execute("DELETE FROM ir_config_parameter WHERE key = ANY(%s)", (list(keys),))
-            self.local.db_conn.commit()
-        _logger.info("Cleared Shopify configuration keys: %s", ", ".join(keys))
-
-    def clear_shopify_ids(self) -> None:
-        with self.local.db_conn.cursor() as cursor:
-            cursor.execute(
-                "SELECT column_name FROM information_schema.columns "
-                "WHERE table_name = 'product_product' AND column_name LIKE 'shopify%'"
-            )
-            existing_fields = [row[0] for row in cursor.fetchall()]
-
-        fields_to_clear = [
-            "shopify_created_at",
-            "shopify_last_exported",
-            "shopify_last_exported_at",
-            "shopify_condition_id",
-            "shopify_variant_id",
-            "shopify_product_id",
-            "shopify_ebay_category_id",
-        ]
-
-        for field in fields_to_clear:
-            if field in existing_fields:
-                sql_call = SqlCall("product.product", KeyValuePair(field))
-                try:
-                    # noinspection PyUnresolvedReferences  # call_odoo_sql exists on this class; PyCharm false positive.
-                    call_odoo_sql = self.call_odoo_sql
-                    call_odoo_sql(sql_call, SqlCallType.UPDATE)
-                except psycopg2.Error as error:
-                    raise OdooDatabaseUpdateError(f"Failed to clear Shopify ID {field}: {error}") from error
-            else:
-                _logger.info(f"Skipping field {field} - does not exist in database")
 
     def drop_database(self) -> None:
         _logger.info("Rolling back database update: dropping database")
@@ -906,9 +705,9 @@ class OdooUpstreamRestorer:
             command += ["--config", str(generated_config_path)]
         return command
 
-    def _run_odoo_shell(self, script: str) -> None:
+    def _run_odoo_shell(self, script: str, label: str) -> None:
         command = self._odoo_shell_command()
-        _logger.info("Executing odoo shell for GPT user provisioning: %s", " ".join(command))
+        _logger.info("Executing odoo shell for %s: %s", label, " ".join(command))
         try:
             subprocess.run(
                 command,
@@ -917,7 +716,29 @@ class OdooUpstreamRestorer:
                 check=True,
             )
         except subprocess.CalledProcessError as error:
-            raise OdooRestorerError("Failed to execute Odoo shell for GPT provisioning.") from error
+            raise OdooRestorerError(f"Failed to execute Odoo shell for {label}.") from error
+
+    def apply_environment_overrides(self) -> None:
+        payload = {
+            "db": self.local.db_name,
+        }
+        script = textwrap.dedent("""
+import json
+from odoo import api, SUPERUSER_ID
+from odoo.modules.registry import Registry
+
+payload = json.loads('__PAYLOAD__')
+registry = Registry(payload['db'])
+with registry.cursor() as cr:
+    env = api.Environment(cr, SUPERUSER_ID, {})
+    env['environment.overrides'].sudo().apply_from_env()
+    cr.commit()
+""").replace("__PAYLOAD__", json.dumps(payload))
+
+        try:
+            self._run_odoo_shell(script, "environment overrides")
+        except OdooRestorerError as error:
+            raise OdooDatabaseUpdateError("Failed to apply environment overrides.") from error
 
     def ensure_gpt_users(self) -> None:
         secret = self.local.odoo_key
@@ -1083,7 +904,7 @@ with registry.cursor() as cr:
     cr.commit()
 """)
         script = script.replace("__PAYLOAD__", json.dumps(payload))
-        self._run_odoo_shell(script)
+        self._run_odoo_shell(script, "GPT user provisioning")
         self._reset_db_connection()
 
     def ensure_admin_user(self) -> None:
@@ -1098,7 +919,7 @@ with registry.cursor() as cr:
         _, partner_id = row
 
         set_password = False
-        password_plain: Optional[str] = None
+        password_plain: str | None = None
         if self.local.admin_password:
             candidate = self.local.admin_password.get_secret_value().strip()
             if candidate:
@@ -1157,7 +978,7 @@ with registry.cursor() as cr:
 """).replace("__PAYLOAD__", json.dumps(payload))
 
         _logger.info("Hardening admin credentials (password=%s, email=%s)", set_password, set_email)
-        self._run_odoo_shell(script)
+        self._run_odoo_shell(script, "admin hardening")
         self._reset_db_connection()
 
     def bootstrap_database(self, *, do_sanitize: bool) -> None:
@@ -1196,6 +1017,12 @@ with registry.cursor() as cr:
             self.local.db_conn.commit()
         else:
             _logger.info("Skipping sanitization per --no-sanitize flag.")
+
+        try:
+            self.apply_environment_overrides()
+        except OdooDatabaseUpdateError:
+            self.drop_database()
+            raise
 
         self.ensure_admin_user()
         self.connect_to_db()
@@ -1614,7 +1441,8 @@ with registry.cursor() as cr:
             )
         return scripts_paths, framework_path
 
-    def _collect_openupgrade_modules(self, scripts_path: Path) -> list[str]:
+    @staticmethod
+    def _collect_openupgrade_modules(scripts_path: Path) -> list[str]:
         module_names: list[str] = []
         for entry in scripts_path.iterdir():
             if not entry.is_dir():
@@ -1785,14 +1613,11 @@ with registry.cursor() as cr:
             self.update_addons()
         self.connect_to_db()
 
-        if do_sanitize:
-            try:
-                self.update_shopify_config()
-                self.clear_shopify_ids()
-                self.local.db_conn.commit()
-            except OdooDatabaseUpdateError:
-                self.drop_database()
-                raise
+        try:
+            self.apply_environment_overrides()
+        except OdooDatabaseUpdateError:
+            self.drop_database()
+            raise
 
         self.assert_core_schema_healthy()
         self.ensure_gpt_users()

@@ -15,6 +15,7 @@
         "external_ids",
         "hr_employee_name_extended",
         "disable_odoo_online",
+        "environment_overrides",
     ],
     "data": [
         "security/ir.model.access.csv",

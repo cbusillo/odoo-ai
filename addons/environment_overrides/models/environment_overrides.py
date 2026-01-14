@@ -73,8 +73,6 @@ class EnvironmentOverrides(models.AbstractModel):
     def _apply_authentik_overrides(self) -> None:
         provider_name = os.environ.get(f"{AUTHENTIK_PREFIX}PROVIDER_NAME", "Authentik").strip()
         client_id = os.environ.get(f"{AUTHENTIK_PREFIX}CLIENT_ID", "").strip()
-        client_secret_raw = os.environ.get(f"{AUTHENTIK_PREFIX}CLIENT_SECRET")
-        client_secret = client_secret_raw.strip() if client_secret_raw is not None else None
         authorization_endpoint = os.environ.get(f"{AUTHENTIK_PREFIX}AUTHORIZATION_ENDPOINT", "").strip()
         userinfo_endpoint = os.environ.get(f"{AUTHENTIK_PREFIX}USERINFO_ENDPOINT", "").strip()
         scope = os.environ.get(f"{AUTHENTIK_PREFIX}SCOPE", "openid profile email").strip()
@@ -98,8 +96,6 @@ class EnvironmentOverrides(models.AbstractModel):
                     "css_class": False,
                     "body": False,
                 }
-                if "client_secret" in provider_model._fields:
-                    clear_values["client_secret"] = False
                 provider.write(clear_values)
                 _logger.info("Authentik overrides missing; disabled provider '%s'.", provider_name)
             else:
@@ -117,8 +113,6 @@ class EnvironmentOverrides(models.AbstractModel):
             "css_class": css_class,
             "body": login_label,
         }
-        if client_secret is not None and "client_secret" in provider_model._fields:
-            values["client_secret"] = client_secret or False
         try:
             if provider:
                 provider.write(values)

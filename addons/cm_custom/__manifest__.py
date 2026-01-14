@@ -19,6 +19,7 @@
         "external_ids",
         "hr_employee_name_extended",
         "disable_odoo_online",
+        "authentik_sso",
     ],
     "data": [
         "security/ir.model.access.csv",

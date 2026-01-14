@@ -71,6 +71,15 @@ POST_DEPLOY_TIMEOUT_DEFAULT = 7200.0
 WEB_READY_INTERVAL_DEFAULT = 15.0
 WEB_READY_TIMEOUT_DEFAULT = 900.0
 LOCAL_INFO_SCHEMA_VERSION = 1
+COOLIFY_LOG_DEFAULT_PATTERNS = (
+    r"environment_overrides",
+    r"Applying \d+ environment config parameter overrides",
+    r"Shopify overrides",
+    r"Authentik overrides",
+    r"Upstream overwrite completed successfully\.",
+    r"Bootstrap completed successfully\.",
+    r"Addon update completed successfully\.",
+)
 
 OPS_CONFIG_PATH = Path("docker/config/ops.toml")
 
@@ -597,6 +606,33 @@ def _coolify_deployment_logs(app_ref: str) -> list[str]:
     return []
 
 
+def _compile_log_patterns(patterns: Sequence[str]) -> list[re.Pattern[str]]:
+    compiled: list[re.Pattern[str]] = []
+    for pattern in patterns:
+        try:
+            compiled.append(re.compile(pattern))
+        except re.error as error:
+            raise click.ClickException(f"Invalid regex pattern '{pattern}': {error}") from error
+    return compiled
+
+
+def _select_coolify_log_lines(
+    log_lines: list[str],
+    patterns: Sequence[str],
+    *,
+    show_all: bool,
+    tail: int,
+) -> list[str]:
+    if show_all:
+        if tail <= 0:
+            return log_lines
+        return log_lines[-tail:]
+
+    effective_patterns = patterns or COOLIFY_LOG_DEFAULT_PATTERNS
+    compiled = _compile_log_patterns(effective_patterns)
+    return [line for line in log_lines if any(regex.search(line) for regex in compiled)]
+
+
 def _coolify_env_value(app_ref: str, key: str) -> str | None:
     app_uuid = _coolify_find_app_uuid(app_ref)
     try:
@@ -618,6 +654,75 @@ def _coolify_env_value(app_ref: str, key: str) -> str | None:
         if isinstance(value, str) and value.strip():
             return value.strip()
     return None
+
+def _coolify_env_entries(app_ref: str) -> tuple[str, list[dict[str, object]]]:
+    app_uuid = _coolify_find_app_uuid(app_ref)
+    payload = _coolify_request(f"/api/v1/applications/{app_uuid}/envs")
+    if not isinstance(payload, list):
+        raise click.ClickException(f"Unexpected env payload for {app_ref}.")
+    env_entries: list[dict[str, object]] = [entry for entry in payload if isinstance(entry, dict)]
+    return app_uuid, env_entries
+
+
+def _parse_coolify_app_refs(apps: str) -> list[str]:
+    app_refs = [item.strip() for item in apps.split(",") if item.strip()]
+    if not app_refs:
+        raise click.ClickException("Provide at least one app name via --apps.")
+    return app_refs
+
+
+def _parse_coolify_key_filter(keys: str | None) -> set[str] | None:
+    if not keys:
+        return None
+    return {item.strip() for item in keys.split(",") if item.strip()}
+
+
+def _filter_coolify_env_entries(
+    entries: Iterable[dict[str, object]],
+    *,
+    include_preview: bool,
+    key_filter: set[str] | None,
+    prefixes: tuple[str, ...],
+) -> list[tuple[dict[str, object], str]]:
+    matches: list[tuple[dict[str, object], str]] = []
+    for entry in entries:
+        if not include_preview and entry.get("is_preview"):
+            continue
+        key = entry.get("key")
+        if not isinstance(key, str):
+            continue
+        if key_filter is not None and key not in key_filter:
+            continue
+        if prefixes and not any(key.startswith(prefix) for prefix in prefixes):
+            continue
+        matches.append((entry, key))
+    return matches
+
+
+def _env_entry_value(entry: dict[str, object]) -> str:
+    value = entry.get("real_value") or entry.get("value")
+    if isinstance(value, str):
+        return value
+    return ""
+
+
+def _env_entry_flags(entry: dict[str, object]) -> dict[str, object]:
+    flags: dict[str, object] = {}
+    for flag in ("is_preview", "is_literal", "is_multiline", "is_shown_once", "is_buildtime"):
+        if flag in entry:
+            flags[flag] = bool(entry[flag])
+    return flags
+
+
+def _create_or_update_env(app_uuid: str, payload: dict[str, object], *, exists: bool) -> None:
+    path = f"/api/v1/applications/{app_uuid}/envs"
+    method = "PATCH" if exists else "POST"
+    _coolify_request(path, method=method, body=payload)
+
+
+def _delete_env(app_uuid: str, env_uuid: str) -> None:
+    path = f"/api/v1/applications/{app_uuid}/envs/{env_uuid}"
+    _coolify_request(path, method="DELETE")
 
 
 def _wait_for_web_ready(entry: str, env: str, app_ref: str) -> None:
@@ -1880,6 +1985,226 @@ def gate_command(target: str, skip_tests: bool, dry_run: bool, confirm: bool) ->
 @click.option("--timeout", type=float, default=STATUS_TIMEOUT_DEFAULT, help="Timeout in seconds")
 def status_command(env: str, target: str, wait: bool, interval: float, timeout: float) -> None:
     _run_status(target, env, wait=wait, interval=interval, timeout=timeout)
+
+
+@main.group("coolify")
+def coolify_group() -> None:
+    """Coolify helpers."""
+
+
+@coolify_group.command("env-set")
+@click.option("--apps", required=True, help="Comma-separated list of Coolify app names")
+@click.option("--env", "env_pairs", multiple=True, help="KEY=VALUE pair (repeatable)")
+@click.option("--env-file", "env_file", type=click.Path(path_type=Path), default=None)
+@click.option("--prefix", "prefixes", multiple=True, help="Only include keys with this prefix")
+@click.option("--keys", default=None, help="Comma-separated list of keys to include")
+@click.option("--include-preview", is_flag=True, help="Update preview env entries too")
+@click.option("--dry-run", is_flag=True)
+def coolify_env_set(
+    apps: str,
+    env_pairs: tuple[str, ...],
+    env_file: Path | None,
+    prefixes: tuple[str, ...],
+    keys: str | None,
+    include_preview: bool,
+    dry_run: bool,
+) -> None:
+    app_refs = _parse_coolify_app_refs(apps)
+
+    key_filter = _parse_coolify_key_filter(keys)
+
+    updates: dict[str, str] = {}
+    if env_file:
+        values = parse_env_file(env_file)
+        for key, value in values.items():
+            if key_filter is not None and key not in key_filter:
+                continue
+            if prefixes and not any(key.startswith(prefix) for prefix in prefixes):
+                continue
+            updates[key] = value
+
+    for pair in env_pairs:
+        if "=" not in pair:
+            raise click.ClickException(f"Invalid --env '{pair}'. Use KEY=VALUE.")
+        key, value = pair.split("=", 1)
+        key = key.strip()
+        if not key:
+            raise click.ClickException(f"Invalid --env '{pair}'. Key is empty.")
+        updates[key] = value
+
+    if not updates:
+        raise click.ClickException("No env vars to set. Provide --env or --env-file with filters.")
+
+    for app_ref in app_refs:
+        app_uuid, entries = _coolify_env_entries(app_ref)
+        env_by_key: dict[str, dict[str, object]] = {}
+        for entry, key in _filter_coolify_env_entries(
+            entries,
+            include_preview=include_preview,
+            key_filter=None,
+            prefixes=(),
+        ):
+            env_by_key[key] = entry
+
+        for key, value in sorted(updates.items()):
+            entry = env_by_key.get(key)
+            payload: dict[str, object] = {
+                "key": key,
+                "value": value,
+            }
+            if entry:
+                payload.update(_env_entry_flags(entry))
+            if dry_run:
+                console.print(f"[dry-run] {app_ref}: set {key}")
+                continue
+            _create_or_update_env(app_uuid, payload, exists=bool(entry))
+            console.print(f"{app_ref}: set {key}")
+
+
+@coolify_group.command("env-get")
+@click.option("--apps", required=True, help="Comma-separated list of Coolify app names")
+@click.option("--prefix", "prefixes", multiple=True, help="Only include keys with this prefix")
+@click.option("--keys", default=None, help="Comma-separated list of keys to include")
+@click.option("--include-preview", is_flag=True, help="Include preview env entries")
+@click.option("--show-values", is_flag=True, help="Show raw values (may include secrets)")
+@click.option("--json", "json_output", is_flag=True)
+def coolify_env_get(
+    apps: str,
+    prefixes: tuple[str, ...],
+    keys: str | None,
+    include_preview: bool,
+    show_values: bool,
+    json_output: bool,
+) -> None:
+    app_refs = _parse_coolify_app_refs(apps)
+
+    key_filter = _parse_coolify_key_filter(keys)
+
+    output: dict[str, list[dict[str, str]]] = {}
+    for app_ref in app_refs:
+        _app_uuid, entries = _coolify_env_entries(app_ref)
+        app_output: list[dict[str, str]] = []
+        for entry, key in _filter_coolify_env_entries(
+            entries,
+            include_preview=include_preview,
+            key_filter=key_filter,
+            prefixes=prefixes,
+        ):
+            value = _env_entry_value(entry) if show_values else "REDACTED"
+            label = key
+            if include_preview and entry.get("is_preview"):
+                label = f"{key} (preview)"
+            app_output.append({"key": label, "value": value})
+        output[app_ref] = app_output
+
+    if json_output:
+        console.print_json(json.dumps(output, indent=2))
+        return
+
+    for app_ref in app_refs:
+        console.print(f"[{app_ref}]", markup=False)
+        for entry in output.get(app_ref, []):
+            console.print(f"{entry['key']}={entry['value']}", markup=False)
+
+
+@coolify_group.command("logs")
+@click.option("--apps", required=True, help="Comma-separated list of Coolify app names")
+@click.option(
+    "--pattern",
+    "patterns",
+    multiple=True,
+    help="Regex pattern to filter log lines (repeatable). Defaults to override/post-deploy markers.",
+)
+@click.option("--all", "show_all", is_flag=True, help="Show full logs instead of filtering")
+@click.option(
+    "--tail",
+    type=int,
+    default=200,
+    show_default=True,
+    help="Number of lines to show when --all is set (0 for all).",
+)
+@click.option("--json", "json_output", is_flag=True)
+def coolify_logs(
+    apps: str,
+    patterns: tuple[str, ...],
+    show_all: bool,
+    tail: int,
+    json_output: bool,
+) -> None:
+    if tail < 0:
+        raise click.ClickException("--tail must be >= 0.")
+
+    app_references = _parse_coolify_app_refs(apps)
+    log_output: dict[str, list[str]] = {}
+    for app_reference in app_references:
+        log_lines = _coolify_deployment_logs(app_reference)
+        selected_lines = _select_coolify_log_lines(
+            log_lines,
+            patterns,
+            show_all=show_all,
+            tail=tail,
+        )
+        log_output[app_reference] = selected_lines
+
+    if json_output:
+        console.print_json(json.dumps(log_output, indent=2))
+        return
+
+    for app_reference in app_references:
+        console.print(f"[{app_reference}]", markup=False)
+        selected_lines = log_output.get(app_reference, [])
+        if not selected_lines:
+            if show_all:
+                console.print("no log lines available", markup=False)
+            else:
+                console.print("no matching log lines (use --all to show full logs)", markup=False)
+            continue
+        for line in selected_lines:
+            console.print(line, markup=False)
+
+
+@coolify_group.command("env-unset")
+@click.option("--apps", required=True, help="Comma-separated list of Coolify app names")
+@click.option("--keys", default=None, help="Comma-separated list of keys to delete")
+@click.option("--prefix", "prefixes", multiple=True, help="Delete keys with this prefix")
+@click.option("--include-preview", is_flag=True, help="Include preview env entries")
+@click.option("--dry-run", is_flag=True)
+def coolify_env_unset(
+    apps: str,
+    keys: str | None,
+    prefixes: tuple[str, ...],
+    include_preview: bool,
+    dry_run: bool,
+) -> None:
+    app_refs = _parse_coolify_app_refs(apps)
+
+    key_filter = _parse_coolify_key_filter(keys)
+
+    if key_filter is None and not prefixes:
+        raise click.ClickException("Provide --keys or --prefix for env-unset.")
+
+    for app_ref in app_refs:
+        app_uuid, entries = _coolify_env_entries(app_ref)
+        matches = _filter_coolify_env_entries(
+            entries,
+            include_preview=include_preview,
+            key_filter=key_filter,
+            prefixes=prefixes,
+        )
+
+        if not matches:
+            console.print(f"{app_ref}: no matching env vars to delete")
+            continue
+
+        for entry, key in matches:
+            env_uuid = entry.get("uuid")
+            if not isinstance(env_uuid, str):
+                continue
+            if dry_run:
+                console.print(f"[dry-run] {app_ref}: delete {key}")
+                continue
+            _delete_env(app_uuid, env_uuid)
+            console.print(f"{app_ref}: deleted {key}")
 
 
 if __name__ == "__main__":

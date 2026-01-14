@@ -115,6 +115,16 @@ Behavior notes
 - For dev/testing, `uv run ops ship` triggers a Coolify deploy by default (use
   `--no-deploy` to skip). Deploy waits are on by default; use `--no-wait` to
   skip (not compatible with `--after`).
+- `uv run ops coolify env-set` can push env vars to one or more Coolify apps
+  (reads env files via the same parser as other ops tooling).
+- `uv run ops coolify env-get` can fetch env vars from one or more Coolify apps
+  with optional prefix/key filters for quick audits (values are redacted unless
+  `--show-values` is supplied).
+- `uv run ops coolify env-unset` can remove env vars from one or more Coolify apps
+  using key/prefix filters.
+- `uv run ops coolify logs` can fetch the latest deployment logs from Coolify.
+  Defaults to override/post-deploy markers; use `--all` or `--pattern` for
+  broader output.
 - Use `--serial` to deploy one target at a time when shipping `all`.
 - `uv run ops status` uses the Coolify API and requires `COOLIFY_TOKEN` (waits by
   default; use `--no-wait`).

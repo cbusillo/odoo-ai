@@ -8,6 +8,7 @@ _logger = logging.getLogger(__name__)
 
 AUTHENTIK_PREFIX = "ENV_OVERRIDE_AUTHENTIK__"
 
+
 DEFAULT_PROVIDER_NAME = "Authentik"
 DEFAULT_SCOPE = "openid profile email"
 DEFAULT_LOGIN_LABEL = "Sign in with Authentik"
@@ -18,6 +19,13 @@ def _split_list(raw_value: str | None) -> list[str]:
     if raw_value is None:
         return []
     return [item.strip() for item in raw_value.split(",") if item.strip()]
+
+
+def _normalize_base_url(raw_value: str | None) -> str | None:
+    if raw_value is None:
+        return None
+    cleaned = raw_value.strip().rstrip("/")
+    return cleaned or None
 
 
 class AuthentikSsoConfig(models.AbstractModel):
@@ -58,6 +66,7 @@ class AuthentikSsoConfig(models.AbstractModel):
         if not provider_name:
             provider_name = DEFAULT_PROVIDER_NAME
         client_id = os.environ.get(f"{AUTHENTIK_PREFIX}CLIENT_ID", "").strip()
+        base_url = _normalize_base_url(os.environ.get(f"{AUTHENTIK_PREFIX}BASE_URL"))
         authorization_endpoint = os.environ.get(f"{AUTHENTIK_PREFIX}AUTHORIZATION_ENDPOINT", "").strip()
         userinfo_endpoint = os.environ.get(f"{AUTHENTIK_PREFIX}USERINFO_ENDPOINT", "").strip()
         scope = os.environ.get(f"{AUTHENTIK_PREFIX}SCOPE", DEFAULT_SCOPE).strip()
@@ -65,10 +74,18 @@ class AuthentikSsoConfig(models.AbstractModel):
         css_class = os.environ.get(f"{AUTHENTIK_PREFIX}CSS_CLASS", DEFAULT_CSS_CLASS).strip()
         data_endpoint = os.environ.get(f"{AUTHENTIK_PREFIX}DATA_ENDPOINT", "").strip()
 
+        if base_url:
+            if not authorization_endpoint:
+                authorization_endpoint = f"{base_url}/application/o/authorize/"
+            if not userinfo_endpoint:
+                userinfo_endpoint = f"{base_url}/application/o/userinfo/"
+            if not data_endpoint:
+                data_endpoint = f"{base_url}/application/o/token/"
+
         provider_model = self.env["auth.oauth.provider"].sudo()
         provider = provider_model.search([("name", "=", provider_name)], limit=1)
 
-        required_missing = not client_id or not authorization_endpoint or not userinfo_endpoint
+        required_missing = not client_id or not base_url or not authorization_endpoint or not userinfo_endpoint
         if required_missing:
             if provider:
                 provider.write(

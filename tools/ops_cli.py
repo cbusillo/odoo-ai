@@ -104,6 +104,12 @@ class OpsConfig:
     targets: dict[str, dict[str, object]]
 
 
+@dataclass(frozen=True)
+class PostDeploySettings:
+    command: str | None
+    container: str | None
+
+
 _OPS_CONFIG: OpsConfig | None = None
 _COOLIFY_APP_CACHE: dict[str, str] = {}
 _UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
@@ -522,6 +528,23 @@ def _coolify_update_application(app_ref: str, payload: dict[str, object]) -> Non
     _coolify_request(f"/api/v1/applications/{app_uuid}", method="PATCH", body=payload)
 
 
+def _normalize_post_deploy_value(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)
+
+
+def _coolify_post_deploy_settings(app_ref: str) -> PostDeploySettings:
+    app_uuid = _coolify_find_app_uuid(app_ref)
+    payload = _coolify_request(f"/api/v1/applications/{app_uuid}")
+    if not isinstance(payload, dict):
+        return PostDeploySettings(command=None, container=None)
+    return PostDeploySettings(
+        command=_normalize_post_deploy_value(payload.get("post_deployment_command")),
+        container=_normalize_post_deploy_value(payload.get("post_deployment_command_container")),
+    )
+
+
 def _coolify_find_app_uuid(app_ref: str) -> str:
     if _looks_like_uuid(app_ref):
         return app_ref
@@ -755,9 +778,11 @@ def _delete_env(app_uuid: str, env_uuid: str) -> None:
 
 
 def _wait_for_web_ready(entry: str, env: str, app_ref: str) -> None:
-    base_url = _coolify_env_value(app_ref, "ODOO_BASE_URL")
+    base_url = _coolify_env_value(app_ref, "ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL")
     if not base_url:
-        console.print(f"{entry} {env}: ODOO_BASE_URL missing; skipping web readiness wait.")
+        console.print(
+            f"{entry} {env}: ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL missing; skipping web readiness wait."
+        )
         return
     url = f"{base_url.rstrip('/')}/web/login"
     console.print(f"{entry} {env}: waiting for web login ({url})...")
@@ -1142,8 +1167,8 @@ def _run_local_openupgrade(settings: StackSettings, *, dry_run: bool) -> None:
             try:
                 _run_local_compose(settings, arguments, dry_run=False)
                 return
-            except CommandError as exc:
-                last_error = exc
+            except CommandError as command_error:
+                last_error = command_error
                 if attempt_number >= attempts:
                     raise
                 delay_seconds = 2 ** (attempt_number - 1)
@@ -1373,6 +1398,7 @@ def _run_ship(
             before_keys[entry] = _deployment_key(_coolify_latest_deployment(app_ref))
 
     post_apps: list[str] = []
+    post_settings: dict[str, PostDeploySettings] = {}
     if post_action:
         command = "python3 /volumes/scripts/restore_from_upstream.py"
         if post_action == "init":
@@ -1384,6 +1410,7 @@ def _run_ship(
             if not app_ref:
                 console.print(f"No Coolify app ref for {entry} {env}; skipping post-deploy {post_action}.")
                 continue
+            post_settings[app_ref] = _coolify_post_deploy_settings(app_ref)
             _coolify_update_application(
                 app_ref,
                 {
@@ -1440,11 +1467,14 @@ def _run_ship(
     finally:
         if post_apps:
             for app_ref in post_apps:
+                settings = post_settings.get(app_ref)
+                if settings is None:
+                    continue
                 _coolify_update_application(
                     app_ref,
                     {
-                        "post_deployment_command": "true",
-                        "post_deployment_command_container": "script-runner",
+                        "post_deployment_command": settings.command,
+                        "post_deployment_command_container": settings.container,
                     },
                 )
 
@@ -1842,6 +1872,11 @@ def _execute(
 
     if action in LOCAL_ACTIONS:
         if env != "local":
+            if action == "init":
+                raise click.ClickException(
+                    "Init is only supported for local. Use 'uv run ops local init <target>' for local or "
+                    "'uv run ops ship <env> <target> --after init' for dev/testing/prod."
+                )
             raise click.ClickException("Local actions are only valid for env=local.")
         _run_local_action(
             target,

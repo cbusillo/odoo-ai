@@ -123,14 +123,48 @@ class ExternalIdMixin(models.AbstractModel):
         values: dict[str, Any],
         resource: str | None = None,
     ) -> Self:
-        record = self.search_by_external_id(system_code, external_id_value, resource)
-        if record and not record.exists():
-            record = self.browse()
-        if record:
+        sanitized_external_id = (external_id_value or "").strip()
+        record = self.search_by_external_id(system_code, sanitized_external_id, resource)
+        if record and record.exists():
             record.write(values)
             return record
+
+        System = self.env["external.system"].sudo()
+        ExternalId = self.env["external.id"].sudo()
+        system = System.search([("code", "=", system_code)], limit=1)
+        if not system:
+            raise ValueError(f"External system with code '{system_code}' not found")
+
+        resource_key = resource or "default"
+        external_id_record = ExternalId.search(
+            [
+                ("system_id", "=", system.id),
+                ("resource", "=", resource_key),
+                ("external_id", "=", sanitized_external_id),
+            ],
+            limit=1,
+        )
+        if external_id_record:
+            if external_id_record.res_model and external_id_record.res_model != self._name:
+                raise ValueError(
+                    f"External ID '{sanitized_external_id}' already belongs to {external_id_record.res_model}"
+                )
+            existing_record = self.browse(external_id_record.res_id).exists()
+            if existing_record:
+                existing_record.write(values)
+                return existing_record
+            record = self.create(values)
+            external_id_record.write(
+                {
+                    "res_model": self._name,
+                    "res_id": record.id,
+                    "active": True,
+                }
+            )
+            return record
+
         record = self.create(values)
-        record.set_external_id(system_code, external_id_value, resource)
+        record.set_external_id(system_code, sanitized_external_id, resource)
         return record
 
     @staticmethod

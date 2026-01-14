@@ -16,8 +16,9 @@ def _unit_test_error_checker(message: str) -> bool:
 @tagged(*JS_TAGS, "discuss_record_links")
 class DiscussRecordLinksJSTests(TourTestCase):
     def _get_test_login(self) -> str:
-        if hasattr(self, "test_user") and self.test_user:
+        if hasattr(self, "test_user") and self.test_user and self.test_user.login:
             return self.test_user.login
+        return "tour_test_user"
 
     def test_hoot_desktop(self) -> None:
         url = "/web/tests?headless=1&loglevel=2&timeout=30000&filter=%40discuss_record_links&autorun=1"

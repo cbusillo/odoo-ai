@@ -133,7 +133,8 @@ class ProductConnectJSTests(TourTestCase):
             except FileNotFoundError:
                 pass
 
-    def _preflight_get(self, url: str, timeout: int = 10) -> Tuple[int, float, int, str]:
+    @staticmethod
+    def _preflight_get(url: str, timeout: int = 10) -> Tuple[int, float, int, str]:
         """Fetch URL and return (status, seconds, size, snippet). Never raises."""
         try:
             import requests

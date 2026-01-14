@@ -13,37 +13,37 @@ class DiscussRecordLinks(http.Controller):
         model_filter, query = parse_prefix(term or "", cfg)
         tokens = [t for t in (query or "").strip().split() if t]
 
-        def build_domain(c: ModelCfg):
+        def build_domain(model_cfg: ModelCfg) -> list:
             if not tokens:
                 return []
-            domain: list = []
-            fields = c.search or ["name"]
+            search_domain: list = []
+            search_fields = model_cfg.search or ["name"]
             for t in tokens:
                 # OR across all fields for this single token
-                leaves: list = [[f, "ilike", t] for f in fields]
+                leaves: list = [[f, "ilike", t] for f in search_fields]
                 if len(leaves) > 1:
                     sub = ["|"] * (len(leaves) - 1) + leaves
                 else:
                     sub = leaves[0]
-                domain = ["&", domain, sub] if domain else sub
-            return domain
+                search_domain = ["&", search_domain, sub] if search_domain else sub
+            return search_domain
 
         suggestions = []
-        for key, c in cfg.items():
-            if model_filter and c.model != model_filter:
+        for key, model_cfg in cfg.items():
+            if model_filter and model_cfg.model != model_filter:
                 continue
-            domain = build_domain(c)
+            domain = build_domain(model_cfg)
             # fields needed for display template + display_name fallback
-            fields = {"display_name"}
-            fields.update(extract_template_fields(c.display_template))
-            rows = env[c.model].sudo().search_read(domain, list(fields), limit=c.limit)
+            display_fields = {"display_name"}
+            display_fields.update(extract_template_fields(model_cfg.display_template))
+            rows = env[model_cfg.model].sudo().search_read(domain, list(display_fields), limit=model_cfg.limit)
             for r in rows:
                 # render label per model config
-                label = render_template(c.display_template or "{{ display_name }}", r) or r.get("display_name")
+                label = render_template(model_cfg.display_template or "{{ display_name }}", r) or r.get("display_name")
                 suggestions.append(
                     {
-                        "group": c.label,
-                        "model": c.model,
+                        "group": model_cfg.label,
+                        "model": model_cfg.model,
                         "id": r["id"],
                         "label": label,
                     }
@@ -62,8 +62,8 @@ class DiscussRecordLinks(http.Controller):
         cfg = load_config(env)
         # Build map model -> cfg
         by_model_cfg: dict[str, ModelCfg] = {}
-        for c in cfg.values():
-            by_model_cfg[c.model] = c
+        for model_cfg in cfg.values():
+            by_model_cfg[model_cfg.model] = model_cfg
 
         result: list[dict] = []
         if not targets:
@@ -78,18 +78,18 @@ class DiscussRecordLinks(http.Controller):
             by_model.setdefault(model, set()).add(int(rid))
 
         for model, idset in by_model.items():
-            c = by_model_cfg.get(model)
-            if not c:
+            model_cfg = by_model_cfg.get(model)
+            if not model_cfg:
                 # Fallback to display_name only
-                rows = env[model].sudo().read(list(idset), ["display_name"])
+                rows = env[model].sudo().browse(list(idset)).read(["display_name"])
                 for r in rows:
                     result.append({"model": model, "id": r["id"], "label": r.get("display_name")})
                 continue
-            fields = {"display_name"}
-            fields.update(extract_template_fields(c.display_template))
-            rows = env[model].sudo().read(list(idset), list(fields))
+            display_fields = {"display_name"}
+            display_fields.update(extract_template_fields(model_cfg.display_template))
+            rows = env[model].sudo().browse(list(idset)).read(list(display_fields))
             for r in rows:
-                label = render_template(c.display_template or "{{ display_name }}", r) or r.get("display_name")
+                label = render_template(model_cfg.display_template or "{{ display_name }}", r) or r.get("display_name")
                 result.append({"model": model, "id": r["id"], "label": label})
 
         return result

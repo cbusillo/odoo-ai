@@ -32,7 +32,7 @@ class TestMinimalTour(TourTestCase):
         self.assertTrue(os.access(chrome_path, os.X_OK), f"Chrome executable not executable at {chrome_path}")
 
         # Check if chrome binary is in PATH
-        chrome_in_path = shutil.which("chromium")
+        chrome_in_path = shutil.which(os.fspath("chromium"))
         self.assertIsNotNone(chrome_in_path, "chromium not found in PATH")
 
         # Verify CHROME_BIN environment variable is set correctly

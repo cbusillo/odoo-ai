@@ -3,7 +3,7 @@ import re
 from datetime import timedelta
 from odoo import api, fields, models
 from odoo.exceptions import ValidationError, UserError
-from typing import Any, Self
+from typing import Any, Self, cast
 
 from ..services.shopify.helpers import SyncMode
 
@@ -147,7 +147,7 @@ class ProductTemplate(models.Model):
             orderby: str | None = "",
             lazy: bool = True,
     ) -> list[dict[str, Any]]:
-        groups: list[dict[str, Any]] = super().read_group(
+        groups = cast(list[dict[str, Any]], super().read_group(
             domain,
             fields,
             groupby,
@@ -155,7 +155,7 @@ class ProductTemplate(models.Model):
             limit=limit,
             orderby=orderby,
             lazy=lazy,
-        )
+        ))
         fields_to_sum_with_qty = {"list_price", "standard_price"}
         if not fields_to_sum_with_qty.intersection(fields):
             return groups

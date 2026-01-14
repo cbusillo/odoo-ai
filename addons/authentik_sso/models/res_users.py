@@ -192,7 +192,7 @@ class ResUsers(models.Model):
         else:
             _logger.warning("Authentik group mapping skipped; admin group not found.")
 
-        oauth_user.sudo().write({"groups_id": commands})
+        oauth_user.sudo().write({"group_ids": commands})
 
     @api.model
     def _auth_oauth_signin(

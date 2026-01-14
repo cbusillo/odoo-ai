@@ -88,18 +88,19 @@ class EnvironmentOverrides(models.AbstractModel):
         required_missing = not client_id or not authorization_endpoint or not userinfo_endpoint
         if required_missing:
             if provider:
-                provider.write(
-                    {
-                        "enabled": False,
-                        "client_id": False,
-                        "auth_endpoint": False,
-                        "validation_endpoint": False,
-                        "data_endpoint": False,
-                        "scope": False,
-                        "css_class": False,
-                        "body": False,
-                    }
-                )
+                clear_values = {
+                    "enabled": False,
+                    "client_id": False,
+                    "auth_endpoint": False,
+                    "validation_endpoint": False,
+                    "data_endpoint": False,
+                    "scope": False,
+                    "css_class": False,
+                    "body": False,
+                }
+                if "client_secret" in provider_model._fields:
+                    clear_values["client_secret"] = False
+                provider.write(clear_values)
                 _logger.info("Authentik overrides missing; disabled provider '%s'.", provider_name)
             else:
                 _logger.info("Authentik overrides missing; provider '%s' not found.", provider_name)
@@ -116,7 +117,7 @@ class EnvironmentOverrides(models.AbstractModel):
             "css_class": css_class,
             "body": login_label,
         }
-        if client_secret is not None:
+        if client_secret is not None and "client_secret" in provider_model._fields:
             values["client_secret"] = client_secret or False
         try:
             if provider:

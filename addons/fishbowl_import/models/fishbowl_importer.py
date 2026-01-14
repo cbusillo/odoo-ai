@@ -523,16 +523,28 @@ class FishbowlImporter(models.Model):
             shipment_map[fishbowl_id] = picking.id
             done_pickings.append(picking)
 
-        if not shipment_map:
-            return
-
-        shipment_item_rows = self._fetch_rows_by_ids(
-            client,
-            "shipitem",
-            "shipId",
-            list(shipment_map.keys()),
-            select_columns="id, shipId, soItemId, qtyShipped, uomId",
-        )
+        if not shipment_map and start_datetime is not None:
+            # No new shipments in this window; ensure existing ones are refreshed.
+            existing_ship_ids = self._load_existing_external_ids(RESOURCE_SHIPMENT)
+            if not existing_ship_ids:
+                return
+            shipment_item_rows = self._fetch_rows_by_ids(
+                client,
+                "shipitem",
+                "shipId",
+                existing_ship_ids,
+                select_columns="id, shipId, soItemId, qtyShipped, uomId",
+            )
+        else:
+            if not shipment_map:
+                return
+            shipment_item_rows = self._fetch_rows_by_ids(
+                client,
+                "shipitem",
+                "shipId",
+                list(shipment_map.keys()),
+                select_columns="id, shipId, soItemId, qtyShipped, uomId",
+            )
         unit_map = self._load_unit_map()
         for row in shipment_item_rows:
             ship_id = row.get("shipId")

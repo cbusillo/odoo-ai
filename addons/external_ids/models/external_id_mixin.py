@@ -124,6 +124,8 @@ class ExternalIdMixin(models.AbstractModel):
         resource: str | None = None,
     ) -> Self:
         record = self.search_by_external_id(system_code, external_id_value, resource)
+        if record and not record.exists():
+            record = self.browse()
         if record:
             record.write(values)
             return record

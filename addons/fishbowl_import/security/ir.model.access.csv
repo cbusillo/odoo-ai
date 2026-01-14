@@ -1,0 +1,2 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_fishbowl_importer,fishbowl.importer,model_fishbowl_importer,base.group_system,1,1,1,1

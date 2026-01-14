@@ -1,0 +1,25 @@
+{
+    "name": "Fishbowl Import",
+    "version": "19.0.0.1",
+    "category": "Tools",
+    "summary": "Import Fishbowl data into Odoo",
+    "description": "Import Fishbowl customers, vendors, products, orders, and inventory history.",
+    "author": "Shiny Computers",
+    "maintainers": ["cbusillo"],
+    "license": "LGPL-3",
+    "depends": [
+        "base",
+        "product",
+        "stock",
+        "sale",
+        "purchase",
+        "external_ids",
+    ],
+    "data": [
+        "security/ir.model.access.csv",
+        "data/external_system.xml",
+        "data/ir_cron.xml",
+    ],
+    "installable": True,
+    "application": False,
+}

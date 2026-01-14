@@ -14,6 +14,7 @@
     "data": [
         "data/authentik_template_user.xml",
     ],
+    "pre_init_hook": "pre_init_hook",
     "post_init_hook": "post_init_hook",
     "installable": True,
     "application": False,

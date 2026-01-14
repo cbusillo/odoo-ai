@@ -1,5 +1,6 @@
 import time
-from odoo.addons.product_connect.tests.common_imports import tagged, JS_TAGS  # reuse shared tags
+
+from odoo.addons.product_connect.tests.common_imports import JS_TAGS, tagged  # reuse shared tags
 
 try:
     import requests  # type: ignore

@@ -73,6 +73,7 @@ class AuthentikSsoGroupMapping(models.Model):
             admin_groups |= group_model.browse(data_records.mapped("res_id"))
 
         system_group = self.env.ref("base.group_system", raise_if_not_found=False)
+        system_group = system_group.exists() if system_group else self.env["res.groups"]
         if system_group:
             admin_groups |= system_group
 
@@ -85,6 +86,7 @@ class AuthentikSsoGroupMapping(models.Model):
         fallback_mapping = mapping_model.search([("is_fallback", "=", True)], limit=1)
         if not fallback_mapping:
             base_user_group = self.env.ref("base.group_user", raise_if_not_found=False)
+            base_user_group = base_user_group.exists() if base_user_group else self.env["res.groups"]
             mapping_model.create(
                 {
                     "is_fallback": True,
@@ -110,7 +112,11 @@ class AuthentikSsoGroupMapping(models.Model):
             )
 
         default_record = self.env.ref("authentik_sso.authentik_group_mapping_admins", raise_if_not_found=False)
+        default_record = (
+            default_record.exists() if default_record else self.env["authentik.sso.group.mapping"]
+        )
         system_group = self.env.ref("base.group_system", raise_if_not_found=False)
+        system_group = system_group.exists() if system_group else self.env["res.groups"]
         current_group_ids = set(admin_mapping.odoo_groups.ids)
         allow_seed = not current_group_ids
         if default_record and admin_mapping.id == default_record.id:

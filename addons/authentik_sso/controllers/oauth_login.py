@@ -5,17 +5,16 @@ import os
 
 import werkzeug.urls
 import werkzeug.utils
-from werkzeug.exceptions import BadRequest
-
 from odoo import http
 from odoo.addons.auth_oauth.controllers.main import OAuthLogin as BaseOAuthLogin
 from odoo.addons.web.controllers.utils import ensure_db
 from odoo.http import request
-
-_logger = logging.getLogger(__name__)
+from werkzeug.exceptions import BadRequest
 
 AUTHENTIK_PREFIX = "ENV_OVERRIDE_AUTHENTIK__"
 DEFAULT_AUTHENTIK_PROVIDER_NAME = "Authentik"
+
+_logger = logging.getLogger(__name__)
 
 
 def _authentik_provider_name() -> str:
@@ -46,6 +45,7 @@ def _build_authentik_auth_link(
 
 def _build_oauth_state(provider_id: int) -> dict[str, object]:
     redirect = request.params.get("redirect") or "web"
+    # noinspection HttpUrlsUsage
     if not redirect.startswith(("//", "http://", "https://")):
         redirect = f"{request.httprequest.url_root}{redirect[1:] if redirect[0] == '/' else redirect}"
     state = {
@@ -86,7 +86,7 @@ class AuthentikOAuthLogin(BaseOAuthLogin):
         return super().web_login(*args, **kwargs)
 
     @http.route("/authentik/login", type="http", auth="none", sitemap=False)
-    def authentik_login(self, **kwargs: object) -> object:
+    def authentik_login(self, **_kwargs: object) -> object:
         ensure_db()
         provider_name = _authentik_provider_name()
         provider = (

@@ -109,7 +109,15 @@ class AuthentikSsoGroupMapping(models.Model):
                 }
             )
 
-        if not admin_mapping.odoo_groups:
+        default_record = self.env.ref("authentik_sso.authentik_group_mapping_admins", raise_if_not_found=False)
+        system_group = self.env.ref("base.group_system", raise_if_not_found=False)
+        current_group_ids = set(admin_mapping.odoo_groups.ids)
+        allow_seed = not current_group_ids
+        if default_record and admin_mapping.id == default_record.id:
+            if system_group and current_group_ids == {system_group.id}:
+                allow_seed = True
+
+        if allow_seed:
             admin_group_ids = self._default_admin_groups()
             admin_mapping.write({"odoo_groups": [(6, 0, admin_group_ids)]})
             _logger.info("Initialized Authentik admin group mapping with %d groups.", len(admin_group_ids))

@@ -41,7 +41,15 @@ class EnvironmentOverrides(models.AbstractModel):
 
     def apply_from_env(self) -> None:
         self._apply_config_param_overrides()
+        self._apply_authentik_overrides()
         self._apply_shopify_overrides()
+
+    def _apply_authentik_overrides(self) -> None:
+        if "authentik.sso.config" not in self.env.registry:
+            return
+        self.env["authentik.sso.config"].sudo().apply_from_env()
+        if "authentik.sso.group.mapping" in self.env.registry:
+            self.env["authentik.sso.group.mapping"].sudo().ensure_default_mappings()
 
     def _apply_config_param_overrides(self) -> None:
         overrides: dict[str, str] = {}

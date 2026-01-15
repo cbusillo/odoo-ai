@@ -1,0 +1,27 @@
+{
+    "name": "RepairShopr Import",
+    "version": "19.0.0.1",
+    "category": "Tools",
+    "summary": "Import RepairShopr data into Odoo",
+    "description": "Import RepairShopr customers, tickets, estimates, and invoices.",
+    "author": "Shiny Computers",
+    "maintainers": ["cbusillo"],
+    "license": "LGPL-3",
+    "depends": [
+        "base",
+        "contacts",
+        "product",
+        "sale",
+        "account",
+        "helpdesk",
+        "external_ids",
+    ],
+    "data": [
+        "security/ir.model.access.csv",
+        "data/ir_cron.xml",
+    ],
+    "installable": True,
+    "application": False,
+    "post_init_hook": "post_init_hook",
+    "uninstall_hook": "uninstall_hook",
+}

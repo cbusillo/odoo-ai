@@ -297,6 +297,15 @@ wheels = [
 ]
 
 [[package]]
+name = "lxml-stubs"
+version = "0.5.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/99/da/1a3a3e5d159b249fc2970d73437496b908de8e4716a089c69591b4ffa6fd/lxml-stubs-0.5.1.tar.gz", hash = "sha256:e0ec2aa1ce92d91278b719091ce4515c12adc1d564359dfaf81efa7d4feab79d", size = 14778, upload-time = "2024-01-10T09:37:46.521Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1f/c9/e0f8e4e6e8a69e5959b06499582dca6349db6769cc7fdfb8a02a7c75a9ae/lxml_stubs-0.5.1-py3-none-any.whl", hash = "sha256:1f689e5dbc4b9247cb09ae820c7d34daeb1fdbd1db06123814b856dae7787272", size = 13584, upload-time = "2024-01-10T09:37:44.931Z" },
+]
+
+[[package]]
 name = "markdown-it-py"
 version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -366,6 +375,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "questionary" },
+    { name = "repairshopr-api" },
     { name = "requests" },
     { name = "rich" },
     { name = "ruff" },
@@ -374,6 +384,7 @@ dependencies = [
 [package.optional-dependencies]
 dev = [
     { name = "debugpy" },
+    { name = "lxml-stubs" },
     { name = "pip" },
     { name = "pydantic", extra = ["email", "timezone"] },
     { name = "pydevd-odoo" },
@@ -382,7 +393,9 @@ dev = [
     { name = "types-geoip2" },
     { name = "types-pillow" },
     { name = "types-psycopg2" },
+    { name = "types-pymysql" },
     { name = "types-requests" },
+    { name = "types-werkzeug" },
     { name = "watchdog" },
     { name = "websocket-client" },
 ]
@@ -393,6 +406,7 @@ requires-dist = [
     { name = "click" },
     { name = "debugpy", marker = "extra == 'dev'" },
     { name = "graphql-core" },
+    { name = "lxml-stubs", marker = "extra == 'dev'" },
     { name = "mypy" },
     { name = "pip", marker = "extra == 'dev'" },
     { name = "psutil", specifier = "==5.9.8" },
@@ -402,6 +416,7 @@ requires-dist = [
     { name = "pydevd-odoo", marker = "extra == 'dev'" },
     { name = "pydevd-pycharm", marker = "extra == 'dev'" },
     { name = "questionary" },
+    { name = "repairshopr-api" },
     { name = "requests" },
     { name = "rich" },
     { name = "ruff" },
@@ -409,7 +424,9 @@ requires-dist = [
     { name = "types-geoip2", marker = "extra == 'dev'" },
     { name = "types-pillow", marker = "extra == 'dev'" },
     { name = "types-psycopg2", marker = "extra == 'dev'" },
+    { name = "types-pymysql", marker = "extra == 'dev'" },
     { name = "types-requests", marker = "extra == 'dev'" },
+    { name = "types-werkzeug", marker = "extra == 'dev'" },
     { name = "watchdog", marker = "extra == 'dev'" },
     { name = "websocket-client", marker = "extra == 'dev'" },
 ]
@@ -619,6 +636,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pytz"
+version = "2023.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ae/fd/c5bafe60236bc2a464452f916b6a1806257109c8954d6a7d19e5d4fb012f/pytz-2023.4.tar.gz", hash = "sha256:31d4583c4ed539cd037956140d695e42c033a19e984bfce9964a3f7d59bc2b40", size = 319467, upload-time = "2024-01-29T03:49:27.068Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3b/dd/9b84302ba85ac6d3d3042d3e8698374838bde1c386b4adb1223d7a0efd4e/pytz-2023.4-py2.py3-none-any.whl", hash = "sha256:f90ef520d95e7c46951105338d918664ebfd6f1d995bd7d153127ce90efafa6a", size = 506530, upload-time = "2024-01-29T03:41:21.437Z" },
+]
+
+[[package]]
 name = "questionary"
 version = "2.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -628,6 +654,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/f6/45/eafb0bba0f9988f6a2520f9ca2df2c82ddfa8d67c95d6625452e97b204a5/questionary-2.1.1.tar.gz", hash = "sha256:3d7e980292bb0107abaa79c68dd3eee3c561b83a0f89ae482860b181c8bd412d", size = 25845, upload-time = "2025-08-28T19:00:20.851Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3c/26/1062c7ec1b053db9e499b4d2d5bc231743201b74051c973dadeac80a8f43/questionary-2.1.1-py3-none-any.whl", hash = "sha256:a51af13f345f1cdea62347589fbb6df3b290306ab8930713bfae4d475a7d4a59", size = 36753, upload-time = "2025-08-28T19:00:19.56Z" },
+]
+
+[[package]]
+name = "repairshopr-api"
+version = "0.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytz" },
+    { name = "requests" },
+    { name = "tenacity" },
+    { name = "toml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/00/a7/2d3df37b104d140ddc7ffaeb86a2f6ec011a9ad72873f10c4b021f3e6bc5/repairshopr_api-0.3.0.tar.gz", hash = "sha256:8dbfa71dd2a3d7ca94e091186344ef52a343149fd64ee95c6408c5dedb00e3a1", size = 17926, upload-time = "2026-01-15T20:36:28.399Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6a/3b/5fc41aaeef7c30978ff27a97c18c4b3d42c904cfb2a138a7195c3f2202ea/repairshopr_api-0.3.0-py3-none-any.whl", hash = "sha256:82c5401736ef9ca5c7cce11819ffb1160613a5fa606f7a37ebd13fe300f645ab", size = 38077, upload-time = "2026-01-15T20:36:24.955Z" },
 ]
 
 [[package]]
@@ -694,6 +735,15 @@ wheels = [
 ]
 
 [[package]]
+name = "tenacity"
+version = "8.5.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a3/4d/6a19536c50b849338fcbe9290d562b52cbdcf30d8963d3588a68a4107df1/tenacity-8.5.0.tar.gz", hash = "sha256:8bc6c0c8a09b31e6cad13c47afbed1a567518250a9a171418582ed8d9c20ca78", size = 47309, upload-time = "2024-07-05T07:25:31.836Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d2/3f/8ba87d9e287b9d385a02a7114ddcef61b26f86411e121c9003eb509a1773/tenacity-8.5.0-py3-none-any.whl", hash = "sha256:b594c2a5945830c267ce6b79a166228323ed52718f30302c1359836112346687", size = 28165, upload-time = "2024-07-05T07:25:29.591Z" },
+]
+
+[[package]]
 name = "toml"
 version = "0.10.2"
 source = { registry = "https://pypi.org/simple" }
@@ -754,6 +804,15 @@ wheels = [
 ]
 
 [[package]]
+name = "types-pymysql"
+version = "1.1.0.20251220"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d3/59/e959dd6d2f8e3b3c3f058d79ac9ece328922a5a8770c707fe9c3a757481c/types_pymysql-1.1.0.20251220.tar.gz", hash = "sha256:ae1c3df32a777489431e2e9963880a0df48f6591e0aa2fd3a6fabd9dee6eca54", size = 22184, upload-time = "2025-12-20T03:07:38.689Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8b/fa/4f4d3bfca9ef6dd17d69ed18b96564c53b32d3ce774132308d0bee849f10/types_pymysql-1.1.0.20251220-py3-none-any.whl", hash = "sha256:fa1082af7dea6c53b6caa5784241924b1296ea3a8d3bd060417352c5e10c0618", size = 23067, upload-time = "2025-12-20T03:07:37.766Z" },
+]
+
+[[package]]
 name = "types-requests"
 version = "2.32.4.20260107"
 source = { registry = "https://pypi.org/simple" }
@@ -763,6 +822,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/0f/f3/a0663907082280664d745929205a89d41dffb29e89a50f753af7d57d0a96/types_requests-2.32.4.20260107.tar.gz", hash = "sha256:018a11ac158f801bfa84857ddec1650750e393df8a004a8a9ae2a9bec6fcb24f", size = 23165, upload-time = "2026-01-07T03:20:54.091Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1c/12/709ea261f2bf91ef0a26a9eed20f2623227a8ed85610c1e54c5805692ecb/types_requests-2.32.4.20260107-py3-none-any.whl", hash = "sha256:b703fe72f8ce5b31ef031264fe9395cac8f46a04661a79f7ed31a80fb308730d", size = 20676, upload-time = "2026-01-07T03:20:52.929Z" },
+]
+
+[[package]]
+name = "types-werkzeug"
+version = "1.0.9"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/eb/43/161261d2ac1fc20e944aa108e48a98ff0d994e19b498d6fb19d6637caf05/types-Werkzeug-1.0.9.tar.gz", hash = "sha256:5cc269604c400133d452a40cee6397655f878fc460e03fde291b9e3a5eaa518c", size = 23909, upload-time = "2021-11-26T06:21:28.33Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4a/c1/eaf8426126eafa46d649afb2fddede327043fbc2e84021b8b09a7fa15115/types_Werkzeug-1.0.9-py3-none-any.whl", hash = "sha256:194bd5715a13c598f05c63e8a739328657590943bce941e8a3619a6b5d4a54ec", size = 36186, upload-time = "2021-11-26T06:21:27.37Z" },
 ]
 
 [[package]]

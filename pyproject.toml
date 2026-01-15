@@ -17,6 +17,7 @@ dependencies = [
     "pydantic_settings",
     "questionary",
     "requests",
+    "repairshopr-api",
     "ruff",
     "rich",
     "mypy",
@@ -25,6 +26,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "debugpy",
+    "lxml-stubs",
+    "types-Werkzeug",
     "pip",
     "pydevd-odoo",
     "pydevd-pycharm",
@@ -32,6 +35,7 @@ dev = [
     "setuptools",
     "types-geoip2",
     "types-Pillow",
+    "types-PyMySQL",
     "types-psycopg2",
     "types-requests",
     "watchdog",
@@ -83,3 +87,22 @@ known-first-party = ["tools"]
 [tool.mypy]
 python_version = "3.13"
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["odoo", "odoo.*"]
+ignore_missing_imports = true
+disable_error_code = ["name-defined"]
+
+[[tool.mypy.overrides]]
+module = ["repairshopr_api", "repairshopr_api.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["repairshopr_import", "repairshopr_import.*"]
+disable_error_code = ["name-defined"]
+
+[tool.pyright]
+typeCheckingMode = "basic"
+executionEnvironments = [
+    { root = "addons", reportMissingImports = "none", reportUndefinedVariable = "none" },
+]

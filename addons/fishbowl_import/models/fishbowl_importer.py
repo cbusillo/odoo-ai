@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from datetime import datetime
-from typing import Any
+from typing import Any, Iterator
 
 from odoo import api, fields, models
 from odoo.exceptions import UserError
+from odoo.tools.float_utils import float_is_zero
+from psycopg2 import errors as psycopg2_errors
 
-from ..services.fishbowl_client import FishbowlClient, FishbowlConnectionSettings
+from ..services.fishbowl_client import FishbowlClient, FishbowlConnectionSettings, chunked
 
 _logger = logging.getLogger(__name__)
 
@@ -29,15 +32,24 @@ RESOURCE_SHIPMENT_LINE = "shipitem"
 RESOURCE_RECEIPT = "receipt"
 RESOURCE_RECEIPT_LINE = "receiptitem"
 
+LEGACY_BUCKET_SHIPPING = "shipping"
+LEGACY_BUCKET_FEE = "fee"
+LEGACY_BUCKET_DISCOUNT = "discount"
+LEGACY_BUCKET_MISC = "misc"
+LEGACY_BUCKET_ADHOC = "adhoc"
+
 IMPORT_CONTEXT: dict[str, bool] = {
     "tracking_disable": True,
     "mail_create_nolog": True,
     "mail_notrack": True,
+    "mail_create_nosubscribe": True,
+    "sale_no_log_for_new_lines": True,
     "skip_shopify_sync": True,
     "skip_procurement": True,
 }
 
 
+# noinspection SqlResolve
 class FishbowlImporter(models.Model):
     _name = "fishbowl.importer"
     _description = "Fishbowl Importer"
@@ -56,19 +68,58 @@ class FishbowlImporter(models.Model):
         run_started_at = fields.Datetime.now()
         if start_datetime is None and update_last_sync:
             start_datetime = self._get_last_sync_at()
-        try:
-            self._get_fishbowl_system()
-            with FishbowlClient(fishbowl_settings) as client:
-                self._import_units_of_measure(client)
-                partner_maps = self._import_partners(client)
-                product_maps = self._import_products(client)
-                order_maps = self._import_orders(client, partner_maps, product_maps, start_datetime)
-                self._import_shipments(client, order_maps, product_maps, start_datetime)
-                self._import_receipts(client, order_maps, product_maps, start_datetime)
-        except Exception as exc:
-            _logger.exception("Fishbowl import failed")
-            self._record_last_run("failed", str(exc))
-            raise
+        max_retries = int(os.environ.get("FISHBOWL_IMPORT_SERIALIZATION_RETRIES", "3"))
+        retry_sleep = float(os.environ.get("FISHBOWL_IMPORT_SERIALIZATION_SLEEP", "5"))
+        attempt = 0
+        while True:
+            try:
+                self._get_fishbowl_system()
+                with FishbowlClient(fishbowl_settings) as client:
+                    total_started_at = time.monotonic()
+                    phase_started_at = time.monotonic()
+                    self._import_units_of_measure(client)
+                    _logger.info("Fishbowl import: units in %.2fs", time.monotonic() - phase_started_at)
+                    phase_started_at = time.monotonic()
+                    partner_maps = self._import_partners(client)
+                    _logger.info("Fishbowl import: partners in %.2fs", time.monotonic() - phase_started_at)
+                    phase_started_at = time.monotonic()
+                    product_maps = self._import_products(client)
+                    _logger.info("Fishbowl import: products in %.2fs", time.monotonic() - phase_started_at)
+                    phase_started_at = time.monotonic()
+                    order_maps = self._import_orders(client, partner_maps, product_maps, start_datetime)
+                    _logger.info("Fishbowl import: orders in %.2fs", time.monotonic() - phase_started_at)
+                    phase_started_at = time.monotonic()
+                    self._import_shipments(client, order_maps, product_maps, start_datetime)
+                    _logger.info("Fishbowl import: shipments in %.2fs", time.monotonic() - phase_started_at)
+                    phase_started_at = time.monotonic()
+                    self._import_receipts(client, order_maps, product_maps, start_datetime)
+                    _logger.info("Fishbowl import: receipts in %.2fs", time.monotonic() - phase_started_at)
+                    phase_started_at = time.monotonic()
+                    self._import_on_hand(client, product_maps)
+                    _logger.info("Fishbowl import: on-hand in %.2fs", time.monotonic() - phase_started_at)
+                    _logger.info("Fishbowl import: total in %.2fs", time.monotonic() - total_started_at)
+                break
+            except psycopg2_errors.SerializationFailure as exc:
+                attempt += 1
+                self.env.cr.rollback()
+                self.env.clear()
+                if attempt > max_retries:
+                    _logger.exception("Fishbowl import failed after %s serialization retries", max_retries)
+                    self._record_last_run("failed", str(exc))
+                    raise
+                sleep_for = retry_sleep * attempt
+                _logger.warning(
+                    "Fishbowl import serialization failure; retrying %s/%s in %.1fs",
+                    attempt,
+                    max_retries,
+                    sleep_for,
+                )
+                time.sleep(sleep_for)
+                continue
+            except Exception as exc:
+                _logger.exception("Fishbowl import failed")
+                self._record_last_run("failed", str(exc))
+                raise
         self._record_last_run("success", "")
         if update_last_sync:
             self._set_last_sync_at(run_started_at)
@@ -248,13 +299,16 @@ class FishbowlImporter(models.Model):
         }
 
     def _import_products(self, client: FishbowlClient) -> dict[str, dict[int, int]]:
-        part_type_rows = client.fetch_all("SELECT id, name FROM parttype ORDER BY id")
-        part_type_map = {int(row["id"]): str(row["name"]).strip().lower() for row in part_type_rows}
+        part_type_map = self._load_part_type_map(client)
         part_rows = client.fetch_all(
             "SELECT id, num, description, details, uomId, typeId, trackingFlag, serializedFlag, stdCost, activeFlag "
             "FROM part ORDER BY id"
         )
         product_rows = client.fetch_all("SELECT id, partId, num, description, price, uomId, activeFlag FROM product ORDER BY id")
+
+        part_ids = [int(row["id"]) for row in part_rows]
+        part_cost_map = self._load_part_cost_map(client, part_ids)
+        sales_price_map = self._load_sales_price_map(client, product_rows)
 
         unit_map = self._load_unit_map()
         template_model = self.env["product.template"].sudo().with_context(IMPORT_CONTEXT)
@@ -262,6 +316,43 @@ class FishbowlImporter(models.Model):
         part_product_map: dict[int, int] = {}
         product_product_map: dict[int, int] = {}
 
+        self._upsert_part_rows(
+            part_rows,
+            part_type_map,
+            unit_map,
+            part_cost_map,
+            sales_price_map,
+            template_model,
+            part_product_map,
+        )
+        self._upsert_product_rows(
+            product_rows,
+            unit_map,
+            sales_price_map,
+            template_model,
+            part_product_map,
+            product_product_map,
+        )
+
+        return {
+            "part": part_product_map,
+            "product": product_product_map,
+        }
+
+    def _load_part_type_map(self, client: FishbowlClient) -> dict[int, str]:
+        part_type_rows = client.fetch_all("SELECT id, name FROM parttype ORDER BY id")
+        return {int(row["id"]): str(row["name"]).strip().lower() for row in part_type_rows}
+
+    def _upsert_part_rows(
+        self,
+        part_rows: list[dict[str, Any]],
+        part_type_map: dict[int, str],
+        unit_map: dict[int, int],
+        part_cost_map: dict[int, float],
+        part_price_map: dict[int, float],
+        template_model: models.Model,
+        part_product_map: dict[int, int],
+    ) -> None:
         for row in part_rows:
             fishbowl_id = int(row["id"])
             unit_id = unit_map.get(int(row.get("uomId") or 0))
@@ -271,25 +362,42 @@ class FishbowlImporter(models.Model):
                 "name": str(row.get("description") or row.get("num") or "").strip() or f"Part {fishbowl_id}",
                 "default_code": str(row.get("num") or "").strip() or False,
                 "description": row.get("details") or False,
-                "active": self._to_bool(row.get("activeFlag")),
-                "sale_ok": False,
+                "active": True,
+                "sale_ok": True,
                 "purchase_ok": product_type in {"product", "consu"},
                 "tracking": self._map_tracking(row.get("trackingFlag"), row.get("serializedFlag")),
             }
             if unit_id:
                 values["uom_id"] = unit_id
             values[self._product_type_field(template_model)] = product_type
-            standard_price = row.get("stdCost")
-            if standard_price is not None:
-                values["standard_price"] = float(standard_price)
+            if "is_storable" in template_model._fields:
+                values["is_storable"] = product_type != "service"
+            standard_price = part_cost_map.get(fishbowl_id)
+            if standard_price is None:
+                standard_price = row.get("stdCost")
+            list_price = part_price_map.get(fishbowl_id)
+            if list_price is not None and float(list_price) != 0:
+                values["list_price"] = float(list_price)
             template = template_model.get_or_create_by_external_id(
                 EXTERNAL_SYSTEM_CODE,
                 str(fishbowl_id),
                 values,
                 RESOURCE_PART,
             )
+            if standard_price is not None and float(standard_price) != 0 and template.product_variant_id:
+                variant = template.product_variant_id.sudo().with_context(IMPORT_CONTEXT)
+                self._write_if_changed(variant, {"standard_price": float(standard_price)})
             part_product_map[fishbowl_id] = template.product_variant_id.id
 
+    def _upsert_product_rows(
+        self,
+        product_rows: list[dict[str, Any]],
+        unit_map: dict[int, int],
+        part_price_map: dict[int, float],
+        template_model: models.Model,
+        part_product_map: dict[int, int],
+        product_product_map: dict[int, int],
+    ) -> None:
         for row in product_rows:
             fishbowl_id = int(row["id"])
             part_id = row.get("partId")
@@ -302,11 +410,17 @@ class FishbowlImporter(models.Model):
             template = template_model.browse(variant.product_tmpl_id.id)
             values: dict[str, Any] = {
                 "name": str(row.get("description") or row.get("num") or template.name).strip(),
-                "active": self._to_bool(row.get("activeFlag")),
+                "active": True,
                 "sale_ok": True,
             }
+            if "is_storable" in template._fields:
+                values["is_storable"] = template.type != "service"
             list_price = row.get("price")
-            if list_price is not None:
+            if list_price is None or float(list_price) == 0:
+                fallback_price = part_price_map.get(int(part_id))
+                if fallback_price is not None:
+                    list_price = fallback_price
+            if list_price is not None and float(list_price) != 0:
                 values["list_price"] = float(list_price)
             unit_id = unit_map.get(int(row.get("uomId") or 0))
             if unit_id:
@@ -315,10 +429,249 @@ class FishbowlImporter(models.Model):
             template.set_external_id(EXTERNAL_SYSTEM_CODE, str(fishbowl_id), RESOURCE_PRODUCT)
             product_product_map[fishbowl_id] = variant_id
 
-        return {
-            "part": part_product_map,
-            "product": product_product_map,
+    def _import_missing_products(
+        self,
+        client: FishbowlClient,
+        missing_product_ids: set[int],
+        part_type_map: dict[int, str],
+        unit_map: dict[int, int],
+        product_maps: dict[str, dict[int, int]],
+        product_code_map: dict[str, int],
+    ) -> set[int]:
+        if not missing_product_ids:
+            return set()
+        product_rows = self._fetch_rows_by_ids(
+            client,
+            "product",
+            "id",
+            list(missing_product_ids),
+            select_columns="id, partId, num, description, price, uomId, activeFlag",
+        )
+        if not product_rows:
+            return set()
+        part_ids: list[int] = []
+        for row in product_rows:
+            part_id = row.get("partId")
+            if part_id is None:
+                continue
+            part_ids.append(int(part_id))
+        missing_part_ids = [part_id for part_id in part_ids if part_id not in product_maps["part"]]
+        part_rows = self._fetch_rows_by_ids(
+            client,
+            "part",
+            "id",
+            missing_part_ids,
+            select_columns=(
+                "id, num, description, details, uomId, typeId, trackingFlag, serializedFlag, stdCost, activeFlag"
+            ),
+        )
+        part_cost_map: dict[int, float] = {}
+        if missing_part_ids:
+            part_cost_map = self._load_part_cost_map(client, missing_part_ids)
+        part_price_map: dict[int, float] = {}
+        for row in product_rows:
+            part_id = row.get("partId")
+            if part_id is None:
+                continue
+            price = row.get("price")
+            if price is None:
+                continue
+            price_value = float(price)
+            if price_value == 0:
+                continue
+            part_price_map[int(part_id)] = price_value
+        template_model = self.env["product.template"].sudo().with_context(IMPORT_CONTEXT)
+        if part_rows:
+            self._upsert_part_rows(
+                part_rows,
+                part_type_map,
+                unit_map,
+                part_cost_map,
+                part_price_map,
+                template_model,
+                product_maps["part"],
+            )
+            self._update_product_code_map_from_part_rows(part_rows, product_maps["part"], product_code_map)
+        self._upsert_product_rows(
+            product_rows,
+            unit_map,
+            part_price_map,
+            template_model,
+            product_maps["part"],
+            product_maps["product"],
+        )
+        self._update_product_code_map_from_product_rows(product_rows, product_maps["product"], product_code_map)
+        mapped_product_ids = {
+            int(row["id"])
+            for row in product_rows
+            if int(row["id"]) in product_maps["product"]
         }
+        if mapped_product_ids:
+            _logger.info("Fishbowl import: hydrated %s missing products", len(mapped_product_ids))
+        return mapped_product_ids
+
+    def _import_missing_parts(
+        self,
+        client: FishbowlClient,
+        missing_part_ids: set[int],
+        part_type_map: dict[int, str],
+        unit_map: dict[int, int],
+        product_maps: dict[str, dict[int, int]],
+        product_code_map: dict[str, int],
+    ) -> set[int]:
+        if not missing_part_ids:
+            return set()
+        part_rows = self._fetch_rows_by_ids(
+            client,
+            "part",
+            "id",
+            list(missing_part_ids),
+            select_columns="id, num, description, details, uomId, typeId, trackingFlag, serializedFlag, stdCost, activeFlag",
+        )
+        if not part_rows:
+            return set()
+        part_cost_map: dict[int, float] = {}
+        if missing_part_ids:
+            part_cost_map = self._load_part_cost_map(client, list(missing_part_ids))
+        template_model = self.env["product.template"].sudo().with_context(IMPORT_CONTEXT)
+        self._upsert_part_rows(
+            part_rows,
+            part_type_map,
+            unit_map,
+            part_cost_map,
+            {},
+            template_model,
+            product_maps["part"],
+        )
+        self._update_product_code_map_from_part_rows(part_rows, product_maps["part"], product_code_map)
+        mapped_part_ids = {
+            int(row["id"])
+            for row in part_rows
+            if int(row["id"]) in product_maps["part"]
+        }
+        if mapped_part_ids:
+            _logger.info("Fishbowl import: hydrated %s missing parts", len(mapped_part_ids))
+        return mapped_part_ids
+
+    def _update_product_code_map_from_part_rows(
+        self,
+        part_rows: list[dict[str, Any]],
+        part_product_map: dict[int, int],
+        product_code_map: dict[str, int],
+    ) -> None:
+        for row in part_rows:
+            default_code = str(row.get("num") or "").strip()
+            if not default_code:
+                continue
+            part_id = int(row["id"])
+            variant_id = part_product_map.get(part_id)
+            if not variant_id:
+                continue
+            product_code_map[default_code] = variant_id
+
+    def _update_product_code_map_from_product_rows(
+        self,
+        product_rows: list[dict[str, Any]],
+        product_product_map: dict[int, int],
+        product_code_map: dict[str, int],
+    ) -> None:
+        for row in product_rows:
+            default_code = str(row.get("num") or "").strip()
+            if not default_code:
+                continue
+            product_id = int(row["id"])
+            variant_id = product_product_map.get(product_id)
+            if not variant_id:
+                continue
+            product_code_map[default_code] = variant_id
+
+    def _load_part_cost_map(self, client: FishbowlClient, part_ids: list[int]) -> dict[int, float]:
+        cost_map: dict[int, float] = {}
+        cost_rows = client.fetch_all(
+            "SELECT partId, avgCost FROM partcost WHERE avgCost IS NOT NULL AND avgCost != 0"
+        )
+        for row in cost_rows:
+            part_id_value = row.get("partId") or row.get("PARTID")
+            avg_cost_value = row.get("avgCost") or row.get("AVGCOST")
+            if part_id_value is None or avg_cost_value in (None, 0):
+                continue
+            cost_map[int(part_id_value)] = float(avg_cost_value)
+
+        missing_ids = [part_id for part_id in part_ids if part_id not in cost_map]
+        if not missing_ids:
+            return cost_map
+
+        for batch in chunked(missing_ids, 500):
+            placeholders = ", ".join(["%s"] * len(batch))
+            query = (
+                "SELECT h.partId, h.avgCost, h.dateCaptured "
+                "FROM partcosthistory h "
+                "JOIN ("
+                "  SELECT partId, MAX(dateCaptured) AS max_date "
+                "  FROM partcosthistory "
+                "  WHERE avgCost IS NOT NULL AND avgCost != 0 AND partId IN ("
+                f"{placeholders}"
+                ") GROUP BY partId"
+                ") latest "
+                "ON latest.partId = h.partId AND latest.max_date = h.dateCaptured"
+            )
+            history_rows = client.fetch_all(query, list(batch))
+            for row in history_rows:
+                part_id_value = row.get("partId") or row.get("PARTID")
+                avg_cost_value = row.get("avgCost") or row.get("AVGCOST")
+                if part_id_value is None or avg_cost_value in (None, 0):
+                    continue
+                part_id = int(part_id_value)
+                if part_id in cost_map:
+                    continue
+                cost_map[part_id] = float(avg_cost_value)
+
+        return cost_map
+
+    def _load_sales_price_map(self, client: FishbowlClient, product_rows: list[dict[str, Any]]) -> dict[int, float]:
+        product_part_map: dict[int, int] = {}
+        for row in product_rows:
+            product_id_value = row.get("id")
+            part_id_value = row.get("partId")
+            if product_id_value is None or part_id_value is None:
+                continue
+            product_part_map[int(product_id_value)] = int(part_id_value)
+
+        latest_price_map: dict[int, tuple[datetime, int, float]] = {}
+        last_id = 0
+        while True:
+            query = (
+                "SELECT si.id, si.productId, si.unitPrice, so.dateIssued, so.dateCreated "
+                "FROM soitem si JOIN so ON so.id = si.soId "
+                "WHERE si.unitPrice IS NOT NULL AND si.unitPrice != 0 AND si.id > %s "
+                "ORDER BY si.id LIMIT %s"
+            )
+            rows = client.fetch_all(query, [last_id, 20000])
+            if not rows:
+                break
+            for row in rows:
+                product_id_value = row.get("productId")
+                if product_id_value is None:
+                    continue
+                part_id = product_part_map.get(int(product_id_value))
+                if not part_id:
+                    continue
+                unit_price_value = row.get("unitPrice")
+                if unit_price_value is None:
+                    continue
+                unit_price = float(unit_price_value)
+                if unit_price == 0:
+                    continue
+                date_value = row.get("dateIssued") or row.get("dateCreated")
+                date_key = date_value if date_value is not None else datetime.min
+                row_id = int(row.get("id") or 0)
+                existing = latest_price_map.get(part_id)
+                if not existing or date_key > existing[0] or (date_key == existing[0] and row_id > existing[1]):
+                    latest_price_map[part_id] = (date_key, row_id, unit_price)
+            last_row_id = rows[-1].get("id") or rows[-1].get("ID")
+            last_id = int(last_row_id or last_id)
+
+        return {part_id: price for part_id, (_, __, price) in latest_price_map.items()}
 
     def _import_orders(
         self,
@@ -330,34 +683,42 @@ class FishbowlImporter(models.Model):
         sales_status_map = self._load_status_map(client, "sostatus")
         purchase_status_map = self._load_status_map(client, "postatus")
 
+        fishbowl_system = self._get_fishbowl_system()
+        product_code_map = self._load_product_code_map()
+        part_type_map = self._load_part_type_map(client)
+
         sales_order_rows = self._fetch_orders(
             client,
             "so",
             "dateIssued",
             start_datetime,
         )
-        sales_order_ids = [int(row["id"]) for row in sales_order_rows]
-        sales_line_rows = self._fetch_rows_by_ids(
+        sales_line_batches = self._stream_order_lines(
             client,
             "soitem",
+            "so",
             "soId",
-            sales_order_ids,
-            select_columns="id, soId, productId, productNum, description, qtyOrdered, unitPrice, uomId",
+            "dateIssued",
+            start_datetime,
+            select_columns="l.id, l.soId, l.productId, l.productNum, l.description, l.qtyOrdered, l.unitPrice, l.uomId",
         )
+        sales_line_total = self._count_order_lines(client, "soitem", "so", "soId", "dateIssued", start_datetime)
         purchase_order_rows = self._fetch_orders(
             client,
             "po",
             "dateIssued",
             start_datetime,
         )
-        purchase_order_ids = [int(row["id"]) for row in purchase_order_rows]
-        purchase_line_rows = self._fetch_rows_by_ids(
+        purchase_line_batches = self._stream_order_lines(
             client,
             "poitem",
+            "po",
             "poId",
-            purchase_order_ids,
-            select_columns="id, poId, partId, partNum, description, qtyToFulfill, unitCost, uomId",
+            "dateIssued",
+            start_datetime,
+            select_columns="l.id, l.poId, l.partId, l.partNum, l.description, l.qtyToFulfill, l.unitCost, l.uomId",
         )
+        purchase_line_total = self._count_order_lines(client, "poitem", "po", "poId", "dateIssued", start_datetime)
 
         unit_map = self._load_unit_map()
         sale_order_model = self.env["sale.order"].sudo().with_context(IMPORT_CONTEXT)
@@ -369,6 +730,8 @@ class FishbowlImporter(models.Model):
         sales_line_map: dict[int, int] = {}
         purchase_order_map: dict[int, int] = {}
         purchase_line_map: dict[int, int] = {}
+        unresolved_sales_product_ids: set[int] = set()
+        unresolved_purchase_part_ids: set[int] = set()
 
         for row in sales_order_rows:
             fishbowl_id = int(row["id"])
@@ -394,34 +757,151 @@ class FishbowlImporter(models.Model):
             )
             sales_order_map[fishbowl_id] = order.id
 
-        for row in sales_line_rows:
-            fishbowl_id = int(row["id"])
-            order_id = sales_order_map.get(int(row["soId"]))
-            if not order_id:
-                continue
-            product_id = self._resolve_product_from_sales_row(row, product_maps)
-            if not product_id:
-                _logger.warning("Missing product for Fishbowl soitem %s; skipping line", row.get("id"))
-                continue
-            unit_id = unit_map.get(int(row.get("uomId") or 0))
-            quantity_ordered = row.get("qtyOrdered") or 0
-            unit_price = row.get("unitPrice") or 0
-            values = {
-                "order_id": order_id,
-                "product_id": product_id or False,
-                "name": row.get("description") or False,
-                "product_uom_qty": float(quantity_ordered),
-                "price_unit": float(unit_price),
-            }
-            if unit_id:
-                values["product_uom"] = unit_id
-            line = sale_line_model.get_or_create_by_external_id(
-                EXTERNAL_SYSTEM_CODE,
-                str(fishbowl_id),
-                values,
+        missing_sales_count = 0
+        missing_sales_samples: list[str] = []
+        missing_sales_buckets: dict[str, int] = {}
+        sales_line_processed = 0
+        sales_line_log_every = 25000
+        sales_line_log_threshold = sales_line_log_every
+        sales_line_started_at = time.monotonic()
+        use_full_prefetch = start_datetime is None
+        sales_existing_map: dict[str, int] = {}
+        sales_stale_map: dict[str, models.Model] = {}
+        sales_blocked: set[str] = set()
+        if use_full_prefetch:
+            sales_existing_map, sales_stale_map, sales_blocked = self._prefetch_external_id_records_full(
+                fishbowl_system.id,
                 RESOURCE_SALES_ORDER_LINE,
+                "sale.order.line",
             )
-            sales_line_map[fishbowl_id] = line.id
+
+        for sales_line_rows in sales_line_batches:
+            external_ids = [str(int(row["id"])) for row in sales_line_rows]
+            if not use_full_prefetch:
+                sales_existing_map, sales_stale_map, sales_blocked = self._prefetch_external_id_records(
+                    fishbowl_system.id,
+                    RESOURCE_SALES_ORDER_LINE,
+                    external_ids,
+                    "sale.order.line",
+                )
+            candidate_product_ids = {
+                int(row.get("productId"))
+                for row in sales_line_rows
+                if row.get("productId") is not None
+            }
+            missing_product_ids = {
+                product_id
+                for product_id in candidate_product_ids
+                if product_id not in product_maps["product"] and product_id not in unresolved_sales_product_ids
+            }
+            if missing_product_ids:
+                mapped_product_ids = self._import_missing_products(
+                    client,
+                    missing_product_ids,
+                    part_type_map,
+                    unit_map,
+                    product_maps,
+                    product_code_map,
+                )
+                unresolved_sales_product_ids.update(missing_product_ids - mapped_product_ids)
+            create_values: list[dict[str, Any]] = []
+            create_external_ids: list[str] = []
+
+            for row in sales_line_rows:
+                fishbowl_id = int(row["id"])
+                external_id_value = str(fishbowl_id)
+                if external_id_value in sales_blocked:
+                    continue
+                order_id = sales_order_map.get(int(row["soId"]))
+                if not order_id:
+                    continue
+                product_id = self._resolve_product_from_sales_row(row, product_maps, product_code_map)
+                missing_product = False
+                bucket = ""
+                if not product_id:
+                    missing_product = True
+                    bucket = self._legacy_bucket_for_line(
+                        str(row.get("description") or ""),
+                        float(row.get("unitPrice") or 0),
+                    )
+                    product_id = self._get_legacy_bucket_product_id(bucket)
+                    missing_sales_count += 1
+                    missing_sales_buckets[bucket] = missing_sales_buckets.get(bucket, 0) + 1
+                    if len(missing_sales_samples) < 20:
+                        missing_sales_samples.append(str(row.get("id")))
+                unit_id = unit_map.get(int(row.get("uomId") or 0))
+                quantity_ordered = row.get("qtyOrdered") or 0
+                unit_price = row.get("unitPrice") or 0
+                line_name = str(row.get("description") or "").strip() or False
+                if missing_product:
+                    line_name = self._build_legacy_line_name(
+                        description=str(row.get("description") or ""),
+                        reference=str(row.get("productNum") or ""),
+                        fallback_product_id=product_id,
+                    )
+                values = {
+                    "order_id": order_id,
+                    "product_id": product_id or False,
+                    "name": line_name or False,
+                    "product_uom_qty": float(quantity_ordered),
+                    "price_unit": float(unit_price),
+                }
+                if unit_id:
+                    values["product_uom_id"] = unit_id
+                existing_line_id = sales_existing_map.get(external_id_value)
+                if existing_line_id:
+                    sale_line_model.browse(existing_line_id).write(values)
+                    sales_line_map[fishbowl_id] = existing_line_id
+                    continue
+                create_values.append(values)
+                create_external_ids.append(external_id_value)
+
+            if create_values:
+                created_lines = sale_line_model.create(create_values)
+                external_id_payloads: list[dict[str, Any]] = []
+                for external_id_value, line in zip(create_external_ids, created_lines):
+                    sales_line_map[int(external_id_value)] = line.id
+                    sales_existing_map[external_id_value] = line.id
+                    stale_record = sales_stale_map.pop(external_id_value, None)
+                    if stale_record:
+                        stale_record.write({"res_model": "sale.order.line", "res_id": line.id, "active": True})
+                        continue
+                    external_id_payloads.append(
+                        {
+                            "res_model": "sale.order.line",
+                            "res_id": line.id,
+                            "system_id": fishbowl_system.id,
+                            "resource": RESOURCE_SALES_ORDER_LINE,
+                            "external_id": external_id_value,
+                            "active": True,
+                        }
+                    )
+                if external_id_payloads:
+                    self.env["external.id"].sudo().create(external_id_payloads)
+            self._commit_and_clear()
+            sales_line_processed += len(sales_line_rows)
+            if sales_line_processed >= sales_line_log_threshold:
+                elapsed = time.monotonic() - sales_line_started_at
+                rate = sales_line_processed / elapsed if elapsed else 0.0
+                if sales_line_total:
+                    percent = (sales_line_processed / sales_line_total) * 100
+                    remaining = max(sales_line_total - sales_line_processed, 0)
+                    eta_minutes = (remaining / rate / 60) if rate else 0.0
+                    _logger.info(
+                        "Fishbowl import: sales lines %s/%s (%.1f%%) at %.0f rows/s, ETA %.1f min",
+                        sales_line_processed,
+                        sales_line_total,
+                        percent,
+                        rate,
+                        eta_minutes,
+                    )
+                else:
+                    _logger.info(
+                        "Fishbowl import: sales lines processed %s in %.2fs",
+                        sales_line_processed,
+                        elapsed,
+                    )
+                sales_line_log_threshold += sales_line_log_every
 
         for row in purchase_order_rows:
             fishbowl_id = int(row["id"])
@@ -444,35 +924,166 @@ class FishbowlImporter(models.Model):
             )
             purchase_order_map[fishbowl_id] = order.id
 
-        for row in purchase_line_rows:
-            fishbowl_id = int(row["id"])
-            order_id = purchase_order_map.get(int(row["poId"]))
-            if not order_id:
-                continue
-            part_id = row.get("partId")
-            product_id = product_maps["part"].get(int(part_id)) if part_id is not None else None
-            if not product_id:
-                _logger.warning("Missing product for Fishbowl poitem %s; skipping line", row.get("id"))
-                continue
-            unit_id = unit_map.get(int(row.get("uomId") or 0))
-            quantity_ordered = row.get("qtyToFulfill") or 0
-            unit_cost = row.get("unitCost") or 0
-            values = {
-                "order_id": order_id,
-                "product_id": product_id or False,
-                "name": row.get("description") or False,
-                "product_qty": float(quantity_ordered),
-                "price_unit": float(unit_cost),
-            }
-            if unit_id:
-                values["product_uom"] = unit_id
-            line = purchase_line_model.get_or_create_by_external_id(
-                EXTERNAL_SYSTEM_CODE,
-                str(fishbowl_id),
-                values,
+        missing_purchase_count = 0
+        missing_purchase_samples: list[str] = []
+        missing_purchase_buckets: dict[str, int] = {}
+        purchase_line_processed = 0
+        purchase_line_log_every = 5000
+        purchase_line_log_threshold = purchase_line_log_every
+        purchase_line_started_at = time.monotonic()
+        purchase_existing_map: dict[str, int] = {}
+        purchase_stale_map: dict[str, models.Model] = {}
+        purchase_blocked: set[str] = set()
+        if use_full_prefetch:
+            purchase_existing_map, purchase_stale_map, purchase_blocked = self._prefetch_external_id_records_full(
+                fishbowl_system.id,
                 RESOURCE_PURCHASE_ORDER_LINE,
+                "purchase.order.line",
             )
-            purchase_line_map[fishbowl_id] = line.id
+
+        for purchase_line_rows in purchase_line_batches:
+            external_ids = [str(int(row["id"])) for row in purchase_line_rows]
+            if not use_full_prefetch:
+                purchase_existing_map, purchase_stale_map, purchase_blocked = self._prefetch_external_id_records(
+                    fishbowl_system.id,
+                    RESOURCE_PURCHASE_ORDER_LINE,
+                    external_ids,
+                    "purchase.order.line",
+                )
+            candidate_part_ids = {
+                int(row.get("partId"))
+                for row in purchase_line_rows
+                if row.get("partId") is not None
+            }
+            missing_part_ids = {
+                part_id
+                for part_id in candidate_part_ids
+                if part_id not in product_maps["part"] and part_id not in unresolved_purchase_part_ids
+            }
+            if missing_part_ids:
+                mapped_part_ids = self._import_missing_parts(
+                    client,
+                    missing_part_ids,
+                    part_type_map,
+                    unit_map,
+                    product_maps,
+                    product_code_map,
+                )
+                unresolved_purchase_part_ids.update(missing_part_ids - mapped_part_ids)
+            create_values: list[dict[str, Any]] = []
+            create_external_ids: list[str] = []
+
+            for row in purchase_line_rows:
+                fishbowl_id = int(row["id"])
+                external_id_value = str(fishbowl_id)
+                if external_id_value in purchase_blocked:
+                    continue
+                order_id = purchase_order_map.get(int(row["poId"]))
+                if not order_id:
+                    continue
+                part_id = row.get("partId")
+                product_id = product_maps["part"].get(int(part_id)) if part_id is not None else None
+                missing_product = False
+                bucket = ""
+                if not product_id:
+                    missing_product = True
+                    bucket = self._legacy_bucket_for_line(
+                        str(row.get("description") or ""),
+                        float(row.get("unitCost") or 0),
+                    )
+                    product_id = self._get_legacy_bucket_product_id(bucket)
+                    missing_purchase_count += 1
+                    missing_purchase_buckets[bucket] = missing_purchase_buckets.get(bucket, 0) + 1
+                    if len(missing_purchase_samples) < 20:
+                        missing_purchase_samples.append(str(row.get("id")))
+                unit_id = unit_map.get(int(row.get("uomId") or 0))
+                quantity_ordered = row.get("qtyToFulfill") or 0
+                unit_cost = row.get("unitCost") or 0
+                line_name = str(row.get("description") or "").strip() or False
+                if missing_product:
+                    line_name = self._build_legacy_line_name(
+                        description=str(row.get("description") or ""),
+                        reference=str(row.get("partNum") or ""),
+                        fallback_product_id=product_id,
+                    )
+                values = {
+                    "order_id": order_id,
+                    "product_id": product_id or False,
+                    "name": line_name or False,
+                    "product_qty": float(quantity_ordered),
+                    "price_unit": float(unit_cost),
+                }
+                if unit_id:
+                    values["product_uom_id"] = unit_id
+                existing_line_id = purchase_existing_map.get(external_id_value)
+                if existing_line_id:
+                    purchase_line_model.browse(existing_line_id).write(values)
+                    purchase_line_map[fishbowl_id] = existing_line_id
+                    continue
+                create_values.append(values)
+                create_external_ids.append(external_id_value)
+
+            if create_values:
+                created_lines = purchase_line_model.create(create_values)
+                external_id_payloads: list[dict[str, Any]] = []
+                for external_id_value, line in zip(create_external_ids, created_lines):
+                    purchase_line_map[int(external_id_value)] = line.id
+                    purchase_existing_map[external_id_value] = line.id
+                    stale_record = purchase_stale_map.pop(external_id_value, None)
+                    if stale_record:
+                        stale_record.write({"res_model": "purchase.order.line", "res_id": line.id, "active": True})
+                        continue
+                    external_id_payloads.append(
+                        {
+                            "res_model": "purchase.order.line",
+                            "res_id": line.id,
+                            "system_id": fishbowl_system.id,
+                            "resource": RESOURCE_PURCHASE_ORDER_LINE,
+                            "external_id": external_id_value,
+                            "active": True,
+                        }
+                    )
+                if external_id_payloads:
+                    self.env["external.id"].sudo().create(external_id_payloads)
+            self._commit_and_clear()
+            purchase_line_processed += len(purchase_line_rows)
+            if purchase_line_processed >= purchase_line_log_threshold:
+                elapsed = time.monotonic() - purchase_line_started_at
+                rate = purchase_line_processed / elapsed if elapsed else 0.0
+                if purchase_line_total:
+                    percent = (purchase_line_processed / purchase_line_total) * 100
+                    remaining = max(purchase_line_total - purchase_line_processed, 0)
+                    eta_minutes = (remaining / rate / 60) if rate else 0.0
+                    _logger.info(
+                        "Fishbowl import: purchase lines %s/%s (%.1f%%) at %.0f rows/s, ETA %.1f min",
+                        purchase_line_processed,
+                        purchase_line_total,
+                        percent,
+                        rate,
+                        eta_minutes,
+                    )
+                else:
+                    _logger.info(
+                        "Fishbowl import: purchase lines processed %s in %.2fs",
+                        purchase_line_processed,
+                        elapsed,
+                    )
+                purchase_line_log_threshold += purchase_line_log_every
+
+        if missing_sales_count:
+            _logger.warning(
+                "Missing product for %s Fishbowl sales lines; buckets=%s; sample_ids=%s",
+                missing_sales_count,
+                missing_sales_buckets,
+                ", ".join(missing_sales_samples),
+            )
+        if missing_purchase_count:
+            _logger.warning(
+                "Missing product for %s Fishbowl purchase lines; buckets=%s; sample_ids=%s",
+                missing_purchase_count,
+                missing_purchase_buckets,
+                ", ".join(missing_purchase_samples),
+            )
 
         return {
             "sales_order": sales_order_map,
@@ -496,6 +1107,7 @@ class FishbowlImporter(models.Model):
             extra_where="dateShipped IS NOT NULL",
         )
         shipment_status_map = self._load_status_map(client, "shipstatus")
+        fishbowl_system = self._get_fishbowl_system()
         picking_model = self.env["stock.picking"].sudo().with_context(IMPORT_CONTEXT)
         move_model = self.env["stock.move"].sudo().with_context(IMPORT_CONTEXT)
         move_line_model = self.env["stock.move.line"].sudo().with_context(IMPORT_CONTEXT)
@@ -508,17 +1120,32 @@ class FishbowlImporter(models.Model):
         destination_location = picking_type.default_location_dest_id or self._get_location("customer")
 
         shipment_map: dict[int, int] = {}
-        done_pickings: list[models.Model] = []
+        done_picking_ids: list[int] = []
 
+        shipped_rows: list[dict[str, Any]] = []
         for row in shipment_rows:
+            status_name = shipment_status_map.get(int(row.get("statusId") or 0), "")
+            if status_name.lower() != "shipped":
+                continue
+            shipped_rows.append(row)
+
+        shipment_external_ids = [str(int(row["id"])) for row in shipped_rows]
+        shipment_existing_map, shipment_stale_map, shipment_blocked = self._prefetch_external_id_records(
+            fishbowl_system.id,
+            RESOURCE_SHIPMENT,
+            shipment_external_ids,
+            "stock.picking",
+        )
+
+        for row in shipped_rows:
             fishbowl_id = int(row["id"])
+            external_id_value = str(fishbowl_id)
+            if external_id_value in shipment_blocked:
+                continue
             sale_order_id = order_maps["sales_order"].get(int(row.get("soId") or 0))
             partner_id = False
             if sale_order_id:
                 partner_id = self.env["sale.order"].sudo().browse(sale_order_id).partner_id.id
-            status_name = shipment_status_map.get(int(row.get("statusId") or 0), "")
-            if status_name.lower() != "shipped":
-                continue
             values = {
                 "picking_type_id": picking_type.id,
                 "location_id": source_location.id,
@@ -529,14 +1156,32 @@ class FishbowlImporter(models.Model):
                 "scheduled_date": row.get("dateShipped") or row.get("dateCreated"),
                 "date_done": row.get("dateShipped"),
             }
+            existing_picking_id = shipment_existing_map.get(external_id_value)
+            if existing_picking_id:
+                picking = picking_model.browse(existing_picking_id)
+                shipment_map[fishbowl_id] = picking.id
+                done_picking_ids.append(picking.id)
+                if picking.picking_type_id.id != picking_type.id:
+                    _logger.warning(
+                        "Shipment %s has picking type %s (expected %s); skipping operation type update.",
+                        picking.name,
+                        picking.picking_type_id.display_name,
+                        picking_type.display_name,
+                    )
+                update_values = values.copy()
+                update_values.pop("picking_type_id", None)
+                update_values.pop("location_id", None)
+                update_values.pop("location_dest_id", None)
+                self._write_if_changed(picking, update_values)
+                continue
             picking = picking_model.get_or_create_by_external_id(
                 EXTERNAL_SYSTEM_CODE,
-                str(fishbowl_id),
+                external_id_value,
                 values,
                 RESOURCE_SHIPMENT,
             )
             shipment_map[fishbowl_id] = picking.id
-            done_pickings.append(picking)
+            done_picking_ids.append(picking.id)
 
         if not shipment_map:
             return
@@ -550,20 +1195,22 @@ class FishbowlImporter(models.Model):
         missing_sales_line_ids = {
             int(row["soItemId"])
             for row in shipment_item_rows
-            if row.get("soItemId") is not None
-            and int(row["soItemId"]) not in order_maps["sales_line"]
+            if row.get("soItemId") is not None and int(row["soItemId"]) not in order_maps["sales_line"]
         }
         sales_line_external_map: dict[int, int] = {}
         if missing_sales_line_ids:
-            fishbowl_system = self._get_fishbowl_system()
-            external_id_records = self.env["external.id"].sudo().search(
-                [
-                    ("system_id", "=", fishbowl_system.id),
-                    ("resource", "=", RESOURCE_SALES_ORDER_LINE),
-                    ("res_model", "=", "sale.order.line"),
-                    ("active", "=", True),
-                    ("external_id", "in", [str(value) for value in missing_sales_line_ids]),
-                ]
+            external_id_records = (
+                self.env["external.id"]
+                .sudo()
+                .search(
+                    [
+                        ("system_id", "=", fishbowl_system.id),
+                        ("resource", "=", RESOURCE_SALES_ORDER_LINE),
+                        ("res_model", "=", "sale.order.line"),
+                        ("active", "=", True),
+                        ("external_id", "in", [str(value) for value in missing_sales_line_ids]),
+                    ]
+                )
             )
             for record in external_id_records:
                 try:
@@ -571,57 +1218,147 @@ class FishbowlImporter(models.Model):
                 except (TypeError, ValueError):
                     _logger.warning("Invalid Fishbowl sales line external id '%s'", record.external_id)
         unit_map = self._load_unit_map()
-        for row in shipment_item_rows:
-            ship_id = row.get("shipId")
-            if ship_id is None:
-                continue
-            picking_id = shipment_map.get(int(ship_id))
-            if not picking_id:
-                continue
-            fishbowl_id = int(row["id"])
-            picking = picking_model.browse(picking_id)
-            sales_line = self._resolve_sales_line_for_shipment_row(
-                row,
-                order_maps,
-                sales_line_external_map,
-            )
-            sale_line_id = sales_line.id if sales_line else False
-            product_id = sales_line.product_id.id if sales_line else None
-            if not product_id:
-                continue
-            unit_id = unit_map.get(int(row.get("uomId") or 0))
-            quantity_shipped = row.get("qtyShipped") or 0
-            move_values = {
-                "name": picking.name,
-                "product_id": product_id,
-                "product_uom_qty": float(quantity_shipped),
-                "product_uom": unit_id or self.env["product.product"].browse(product_id).uom_id.id,
-                "location_id": picking.location_id.id,
-                "location_dest_id": picking.location_dest_id.id,
-                "picking_id": picking.id,
-                "sale_line_id": sale_line_id or False,
-            }
-            move = move_model.get_or_create_by_external_id(
-                EXTERNAL_SYSTEM_CODE,
-                str(fishbowl_id),
-                move_values,
+        shipment_line_processed = 0
+        shipment_line_log_every = 10000
+        shipment_line_log_threshold = shipment_line_log_every
+        shipment_line_started_at = time.monotonic()
+        shipment_line_batch_size = 2000
+        for start_index in range(0, len(shipment_item_rows), shipment_line_batch_size):
+            batch_rows = shipment_item_rows[start_index : start_index + shipment_line_batch_size]
+            external_ids = [str(int(row["id"])) for row in batch_rows]
+            existing_map, stale_map, blocked = self._prefetch_external_id_records(
+                fishbowl_system.id,
                 RESOURCE_SHIPMENT_LINE,
+                external_ids,
+                "stock.move",
             )
-            if move.move_line_ids:
-                continue
-            move_line_model.create(
-                {
-                    "move_id": move.id,
-                    "product_id": move.product_id.id,
-                    "product_uom_id": move.product_uom.id,
-                    "qty_done": float(quantity_shipped),
-                    "location_id": move.location_id.id,
-                    "location_dest_id": move.location_dest_id.id,
-                }
-            )
+            create_values: list[dict[str, Any]] = []
+            create_external_ids: list[str] = []
+            move_line_payloads: dict[str, dict[str, Any]] = {}
+            batch_move_ids: dict[str, int] = {}
 
-        for picking in done_pickings:
-            self._finalize_picking(picking)
+            for row in batch_rows:
+                ship_id = row.get("shipId")
+                if ship_id is None:
+                    continue
+                picking_id = shipment_map.get(int(ship_id))
+                if not picking_id:
+                    continue
+                fishbowl_id = int(row["id"])
+                external_id_value = str(fishbowl_id)
+                if external_id_value in blocked:
+                    continue
+                picking = picking_model.browse(picking_id)
+                sales_line = self._resolve_sales_line_for_shipment_row(
+                    row,
+                    order_maps,
+                    sales_line_external_map,
+                )
+                sale_line_id = sales_line.id if sales_line else False
+                product_id = sales_line.product_id.id if sales_line else None
+                if not product_id:
+                    continue
+                product = self.env["product.product"].sudo().browse(product_id)
+                if not self._is_stockable_product(product):
+                    continue
+                unit_id = unit_map.get(int(row.get("uomId") or 0))
+                quantity_shipped = row.get("qtyShipped") or 0
+                move_values = {
+                    "product_id": product_id,
+                    "product_uom_qty": float(quantity_shipped),
+                    "product_uom": unit_id or product.uom_id.id,
+                    "location_id": picking.location_id.id,
+                    "location_dest_id": picking.location_dest_id.id,
+                    "picking_id": picking.id,
+                    "sale_line_id": sale_line_id or False,
+                }
+                move_line_payloads[external_id_value] = {
+                    "product_id": product_id,
+                    "product_uom_id": unit_id or product.uom_id.id,
+                    "qty_done": float(quantity_shipped),
+                    "location_id": picking.location_id.id,
+                    "location_dest_id": picking.location_dest_id.id,
+                }
+                existing_move_id = existing_map.get(external_id_value)
+                if existing_move_id:
+                    existing_move = move_model.browse(existing_move_id)
+                    if existing_move.state == "done":
+                        batch_move_ids[external_id_value] = existing_move_id
+                        continue
+                    existing_move.write(move_values)
+                    batch_move_ids[external_id_value] = existing_move_id
+                    continue
+                create_values.append(move_values)
+                create_external_ids.append(external_id_value)
+
+            if create_values:
+                created_moves = move_model.create(create_values)
+                external_id_payloads: list[dict[str, Any]] = []
+                for external_id_value, move in zip(create_external_ids, created_moves):
+                    batch_move_ids[external_id_value] = move.id
+                    stale_record = stale_map.pop(external_id_value, None)
+                    if stale_record:
+                        stale_record.write({"res_model": "stock.move", "res_id": move.id, "active": True})
+                        continue
+                    external_id_payloads.append(
+                        {
+                            "res_model": "stock.move",
+                            "res_id": move.id,
+                            "system_id": fishbowl_system.id,
+                            "resource": RESOURCE_SHIPMENT_LINE,
+                            "external_id": external_id_value,
+                            "active": True,
+                        }
+                    )
+                if external_id_payloads:
+                    self.env["external.id"].sudo().create(external_id_payloads)
+
+            for external_id_value, move_id in batch_move_ids.items():
+                move = move_model.browse(move_id)
+                if move.move_line_ids:
+                    continue
+                move_line_values = move_line_payloads.get(external_id_value)
+                if not move_line_values:
+                    continue
+                move_line_values["move_id"] = move.id
+                move_line_model.create(move_line_values)
+
+            shipment_line_processed += len(batch_rows)
+            if shipment_line_processed >= shipment_line_log_threshold:
+                elapsed = time.monotonic() - shipment_line_started_at
+                _logger.info(
+                    "Fishbowl import: shipment lines processed %s in %.2fs",
+                    shipment_line_processed,
+                    elapsed,
+                )
+                shipment_line_log_threshold += shipment_line_log_every
+            self._commit_and_clear()
+
+        if shipment_item_rows:
+            shipment_elapsed = time.monotonic() - shipment_line_started_at
+            _logger.info("Fishbowl import: shipment lines complete in %.2fs", shipment_elapsed)
+
+        if done_picking_ids:
+            finalize_started_at = time.monotonic()
+            total_pickings = len(done_picking_ids)
+            _logger.info("Fishbowl import: finalizing %s shipments", total_pickings)
+            finalized_count = 0
+            finalize_log_every = 500
+            for picking_id in done_picking_ids:
+                self._finalize_picking(picking_model.browse(picking_id))
+                finalized_count += 1
+                if finalized_count % finalize_log_every == 0:
+                    elapsed = time.monotonic() - finalize_started_at
+                    _logger.info(
+                        "Fishbowl import: finalized %s/%s shipments in %.2fs",
+                        finalized_count,
+                        total_pickings,
+                        elapsed,
+                    )
+                    self._commit_and_clear()
+            self._commit_and_clear()
+            finalize_elapsed = time.monotonic() - finalize_started_at
+            _logger.info("Fishbowl import: finalized %s shipments in %.2fs", total_pickings, finalize_elapsed)
 
     def _import_receipts(
         self,
@@ -633,9 +1370,7 @@ class FishbowlImporter(models.Model):
         receipt_status_map = self._load_status_map(client, "receiptstatus")
         done_statuses = {"received", "fulfilled"}
         done_status_ids = [
-            status_id
-            for status_id, status_name in receipt_status_map.items()
-            if status_name.lower() in done_statuses
+            status_id for status_id, status_name in receipt_status_map.items() if status_name.lower() in done_statuses
         ]
         if not done_status_ids:
             _logger.warning("No receipt statuses mapped for completion; skipping receipts.")
@@ -667,74 +1402,271 @@ class FishbowlImporter(models.Model):
         receipt_item_rows = client.fetch_all(receipt_query, receipt_params)
 
         unit_map = self._load_unit_map()
-        done_pickings: dict[int, models.Model] = {}
+        done_picking_ids: dict[int, int] = {}
+        receipt_line_processed = 0
+        receipt_line_log_every = 5000
+        receipt_line_log_threshold = receipt_line_log_every
+        receipt_line_started_at = time.monotonic()
+        receipt_line_batch_size = 2000
+        fishbowl_system = self._get_fishbowl_system()
+        receipt_ids = {
+            int(row.get("receiptId"))
+            for row in receipt_item_rows
+            if row.get("receiptId") is not None
+        }
+        receipt_existing_map: dict[str, int] = {}
+        receipt_stale_map: dict[str, models.Model] = {}
+        receipt_blocked: set[str] = set()
+        if receipt_ids:
+            receipt_external_ids = [str(value) for value in receipt_ids]
+            receipt_existing_map, receipt_stale_map, receipt_blocked = self._prefetch_external_id_records(
+                fishbowl_system.id,
+                RESOURCE_RECEIPT,
+                receipt_external_ids,
+                "stock.picking",
+            )
 
-        for row in receipt_item_rows:
-            receipt_id = row.get("receiptId")
-            if receipt_id is None:
-                continue
-            fishbowl_receipt_id = int(receipt_id)
-            picking = done_pickings.get(fishbowl_receipt_id)
-            if not picking:
-                purchase_order_id = order_maps["purchase_order"].get(int(row.get("poId") or 0))
-                partner_id = False
-                if purchase_order_id:
-                    partner_id = self.env["purchase.order"].sudo().browse(purchase_order_id).partner_id.id
-                values = {
-                    "picking_type_id": picking_type.id,
-                    "location_id": source_location.id,
-                    "location_dest_id": destination_location.id,
-                    "partner_id": partner_id or False,
-                    "origin": row.get("receiptId"),
-                    "purchase_id": purchase_order_id or False,
-                    "scheduled_date": row.get("dateReceived"),
-                    "date_done": row.get("dateReceived"),
+        for start_index in range(0, len(receipt_item_rows), receipt_line_batch_size):
+            batch_rows = receipt_item_rows[start_index : start_index + receipt_line_batch_size]
+            external_ids = [str(int(row["id"])) for row in batch_rows]
+            existing_map, stale_map, blocked = self._prefetch_external_id_records(
+                fishbowl_system.id,
+                RESOURCE_RECEIPT_LINE,
+                external_ids,
+                "stock.move",
+            )
+            create_values: list[dict[str, Any]] = []
+            create_external_ids: list[str] = []
+            move_line_payloads: dict[str, dict[str, Any]] = {}
+            batch_move_ids: dict[str, int] = {}
+
+            for row in batch_rows:
+                receipt_id = row.get("receiptId")
+                if receipt_id is None:
+                    continue
+                fishbowl_receipt_id = int(receipt_id)
+                receipt_external_id_value = str(fishbowl_receipt_id)
+                if receipt_external_id_value in receipt_blocked:
+                    continue
+                picking_id = done_picking_ids.get(fishbowl_receipt_id)
+                if not picking_id:
+                    purchase_order_id = order_maps["purchase_order"].get(int(row.get("poId") or 0))
+                    partner_id = False
+                    if purchase_order_id:
+                        partner_id = self.env["purchase.order"].sudo().browse(purchase_order_id).partner_id.id
+                    values = {
+                        "picking_type_id": picking_type.id,
+                        "location_id": source_location.id,
+                        "location_dest_id": destination_location.id,
+                        "partner_id": partner_id or False,
+                        "origin": row.get("receiptId"),
+                        "purchase_id": purchase_order_id or False,
+                        "scheduled_date": row.get("dateReceived"),
+                        "date_done": row.get("dateReceived"),
+                    }
+                    existing_picking_id = receipt_existing_map.get(receipt_external_id_value)
+                    if existing_picking_id:
+                        picking = picking_model.browse(existing_picking_id)
+                        if picking.picking_type_id.id != picking_type.id:
+                            _logger.warning(
+                                "Receipt %s has picking type %s (expected %s); skipping operation type update.",
+                                picking.name,
+                                picking.picking_type_id.display_name,
+                                picking_type.display_name,
+                            )
+                        update_values = values.copy()
+                        update_values.pop("picking_type_id", None)
+                        update_values.pop("location_id", None)
+                        update_values.pop("location_dest_id", None)
+                        self._write_if_changed(picking, update_values)
+                        picking_id = picking.id
+                        done_picking_ids[fishbowl_receipt_id] = picking_id
+                    else:
+                        picking = picking_model.get_or_create_by_external_id(
+                            EXTERNAL_SYSTEM_CODE,
+                            receipt_external_id_value,
+                            values,
+                            RESOURCE_RECEIPT,
+                        )
+                        picking_id = picking.id
+                        done_picking_ids[fishbowl_receipt_id] = picking_id
+
+                fishbowl_line_id = int(row["id"])
+                external_id_value = str(fishbowl_line_id)
+                if external_id_value in blocked:
+                    continue
+                product_id = self._resolve_product_from_receipt_row(row, order_maps, product_maps)
+                if not product_id:
+                    continue
+                product = self.env["product.product"].sudo().browse(product_id)
+                if not self._is_stockable_product(product):
+                    continue
+                unit_id = unit_map.get(int(row.get("uomId") or 0))
+                quantity_received = row.get("qty") or 0
+                picking = picking_model.browse(picking_id)
+                move_values = {
+                    "product_id": product_id,
+                    "product_uom_qty": float(quantity_received),
+                    "product_uom": unit_id or product.uom_id.id,
+                    "location_id": picking.location_id.id,
+                    "location_dest_id": picking.location_dest_id.id,
+                    "picking_id": picking.id,
+                    "purchase_line_id": order_maps["purchase_line"].get(int(row.get("poItemId") or 0)) or False,
                 }
-                picking = picking_model.get_or_create_by_external_id(
-                    EXTERNAL_SYSTEM_CODE,
-                    str(fishbowl_receipt_id),
-                    values,
-                    RESOURCE_RECEIPT,
-                )
-                done_pickings[fishbowl_receipt_id] = picking
+                move_line_payloads[external_id_value] = {
+                    "product_id": product_id,
+                    "product_uom_id": unit_id or product.uom_id.id,
+                    "qty_done": float(quantity_received),
+                    "location_id": picking.location_id.id,
+                    "location_dest_id": picking.location_dest_id.id,
+                }
+                existing_move_id = existing_map.get(external_id_value)
+                if existing_move_id:
+                    existing_move = move_model.browse(existing_move_id)
+                    if existing_move.state == "done":
+                        batch_move_ids[external_id_value] = existing_move_id
+                        continue
+                    existing_move.write(move_values)
+                    batch_move_ids[external_id_value] = existing_move_id
+                    continue
+                create_values.append(move_values)
+                create_external_ids.append(external_id_value)
 
-            fishbowl_line_id = int(row["id"])
-            product_id = self._resolve_product_from_receipt_row(row, order_maps, product_maps)
+            if create_values:
+                created_moves = move_model.create(create_values)
+                external_id_payloads: list[dict[str, Any]] = []
+                for external_id_value, move in zip(create_external_ids, created_moves):
+                    batch_move_ids[external_id_value] = move.id
+                    stale_record = stale_map.pop(external_id_value, None)
+                    if stale_record:
+                        stale_record.write({"res_model": "stock.move", "res_id": move.id, "active": True})
+                        continue
+                    external_id_payloads.append(
+                        {
+                            "res_model": "stock.move",
+                            "res_id": move.id,
+                            "system_id": fishbowl_system.id,
+                            "resource": RESOURCE_RECEIPT_LINE,
+                            "external_id": external_id_value,
+                            "active": True,
+                        }
+                    )
+                if external_id_payloads:
+                    self.env["external.id"].sudo().create(external_id_payloads)
+
+            for external_id_value, move_id in batch_move_ids.items():
+                move = move_model.browse(move_id)
+                if move.move_line_ids:
+                    continue
+                move_line_values = move_line_payloads.get(external_id_value)
+                if not move_line_values:
+                    continue
+                move_line_values["move_id"] = move.id
+                move_line_model.create(move_line_values)
+
+            receipt_line_processed += len(batch_rows)
+            if receipt_line_processed >= receipt_line_log_threshold:
+                elapsed = time.monotonic() - receipt_line_started_at
+                _logger.info(
+                    "Fishbowl import: receipt lines processed %s in %.2fs",
+                    receipt_line_processed,
+                    elapsed,
+                )
+                receipt_line_log_threshold += receipt_line_log_every
+            self._commit_and_clear()
+
+        if receipt_item_rows:
+            receipt_elapsed = time.monotonic() - receipt_line_started_at
+            _logger.info("Fishbowl import: receipt lines complete in %.2fs", receipt_elapsed)
+
+        if done_picking_ids:
+            finalize_started_at = time.monotonic()
+            total_pickings = len(done_picking_ids)
+            _logger.info("Fishbowl import: finalizing %s receipts", total_pickings)
+            finalized_count = 0
+            finalize_log_every = 500
+            for picking_id in done_picking_ids.values():
+                self._finalize_picking(picking_model.browse(picking_id))
+                finalized_count += 1
+                if finalized_count % finalize_log_every == 0:
+                    elapsed = time.monotonic() - finalize_started_at
+                    _logger.info(
+                        "Fishbowl import: finalized %s/%s receipts in %.2fs",
+                        finalized_count,
+                        total_pickings,
+                        elapsed,
+                    )
+                    self._commit_and_clear()
+            self._commit_and_clear()
+            finalize_elapsed = time.monotonic() - finalize_started_at
+            _logger.info("Fishbowl import: finalized %s receipts in %.2fs", total_pickings, finalize_elapsed)
+
+    def _import_on_hand(self, client: FishbowlClient, product_maps: dict[str, dict[int, int]]) -> None:
+        stock_location = self._get_location("internal")
+        quant_model = self.env["stock.quant"].sudo().with_context(IMPORT_CONTEXT, active_test=False)
+        product_model = self.env["product.product"].sudo().with_context(IMPORT_CONTEXT, active_test=False)
+        inventory_rows = client.fetch_all(
+            "SELECT partId, SUM(qtyOnHand) AS qtyOnHand FROM qtyinventorytotals GROUP BY partId"
+        )
+        if not inventory_rows:
+            _logger.warning("Fishbowl on-hand returned no rows; skipping on-hand sync.")
+            return
+        fishbowl_part_ids: set[int] = set()
+        for row in inventory_rows:
+            part_id_value = row.get("partId") or row.get("PARTID")
+            if part_id_value is None:
+                continue
+            fishbowl_part_ids.add(int(part_id_value))
+            product_id = product_maps["part"].get(int(part_id_value))
             if not product_id:
                 continue
-            unit_id = unit_map.get(int(row.get("uomId") or 0))
-            quantity_received = row.get("qty") or 0
-            move_values = {
-                "name": picking.name,
-                "product_id": product_id,
-                "product_uom_qty": float(quantity_received),
-                "product_uom": unit_id or self.env["product.product"].browse(product_id).uom_id.id,
-                "location_id": picking.location_id.id,
-                "location_dest_id": picking.location_dest_id.id,
-                "picking_id": picking.id,
-                "purchase_line_id": order_maps["purchase_line"].get(int(row.get("poItemId") or 0)) or False,
-            }
-            move = move_model.get_or_create_by_external_id(
-                EXTERNAL_SYSTEM_CODE,
-                str(fishbowl_line_id),
-                move_values,
-                RESOURCE_RECEIPT_LINE,
-            )
-            if move.move_line_ids:
+            product = product_model.browse(product_id)
+            if not self._is_stockable_product(product):
                 continue
-            move_line_model.create(
-                {
-                    "move_id": move.id,
-                    "product_id": move.product_id.id,
-                    "product_uom_id": move.product_uom.id,
-                    "qty_done": float(quantity_received),
-                    "location_id": move.location_id.id,
-                    "location_dest_id": move.location_dest_id.id,
-                }
-            )
+            qty_value = row.get("qtyOnHand") or row.get("QTYONHAND") or 0
+            target_quantity = float(qty_value)
+            current_quantity = product.with_context(active_test=False, location=stock_location.id).qty_available
+            delta_quantity = target_quantity - current_quantity
+            if float_is_zero(delta_quantity, precision_rounding=product.uom_id.rounding):
+                continue
+            quant_model._update_available_quantity(product, stock_location, delta_quantity)
 
-        for picking in done_pickings.values():
-            self._finalize_picking(picking)
+        # Clear any lingering on-hand quantities for parts no longer reported by Fishbowl.
+        missing_part_ids = set(product_maps["part"]) - fishbowl_part_ids
+        if missing_part_ids:
+            missing_product_ids = [
+                product_maps["part"][part_id]
+                for part_id in missing_part_ids
+                if part_id in product_maps["part"]
+            ]
+            cleared_count = 0
+            for batch in chunked(missing_product_ids, 1000):
+                group_rows = quant_model._read_group(
+                    [
+                        ("product_id", "in", batch),
+                        ("location_id", "=", stock_location.id),
+                        ("quantity", "!=", 0),
+                    ],
+                    ["product_id"],
+                    ["quantity:sum"],
+                )
+                if not group_rows:
+                    continue
+                for product, group_quantity in group_rows:
+                    if not product or not self._is_stockable_product(product):
+                        continue
+                    if float_is_zero(group_quantity, precision_rounding=product.uom_id.rounding):
+                        continue
+                    quant_model._update_available_quantity(product, stock_location, -float(group_quantity))
+                    cleared_count += 1
+            if cleared_count:
+                _logger.info("Fishbowl import: cleared on-hand for %s stale products", cleared_count)
+        self._commit_and_clear()
+
+    def _commit_and_clear(self) -> None:
+        self.env.cr.execute("SET LOCAL synchronous_commit TO OFF")
+        self.env.cr.commit()
+        self.env.clear()
 
     def _get_fishbowl_settings(self) -> FishbowlConnectionSettings:
         host = self._get_config_value("fishbowl.host", "ENV_OVERRIDE_CONFIG_PARAM__FISHBOWL__HOST")
@@ -876,16 +1808,9 @@ class FishbowlImporter(models.Model):
 
     def _map_part_type(self, part_type_name: str) -> str:
         mapping = {
-            "inventory": "consu",
             "service": "service",
             "labor": "service",
             "overhead": "service",
-            "non-inventory": "consu",
-            "internal use": "consu",
-            "capital equipment": "consu",
-            "shipping": "consu",
-            "tax": "consu",
-            "misc": "consu",
         }
         return mapping.get(part_type_name.lower(), "consu")
 
@@ -901,6 +1826,17 @@ class FishbowlImporter(models.Model):
             return bool(value)
         if value is None:
             return False
+        if isinstance(value, (bytes, bytearray, memoryview)):
+            raw_value = bytes(value)
+            if not raw_value:
+                return False
+            if all(byte in (0, 1) for byte in raw_value):
+                return any(byte == 1 for byte in raw_value)
+            try:
+                decoded = raw_value.decode().strip()
+            except Exception:
+                return any(raw_value)
+            return self._to_bool(decoded)
         if isinstance(value, (int, float)):
             return bool(value)
         value_str = str(value).strip().lower()
@@ -982,6 +1918,24 @@ class FishbowlImporter(models.Model):
             unit_map[int(unit.id)] = unit.id
         return unit_map
 
+    def _load_product_code_map(self) -> dict[str, int]:
+        product_rows = (
+            self.env["product.product"]
+            .sudo()
+            .with_context(active_test=False)
+            .search_read(
+                [("default_code", "!=", False)],
+                ["id", "default_code"],
+            )
+        )
+        product_map: dict[str, int] = {}
+        for row in product_rows:
+            default_code = str(row.get("default_code") or "").strip()
+            if not default_code:
+                continue
+            product_map[default_code] = int(row["id"])
+        return product_map
+
     def _compute_unit_ratios(self, unit_rows: list[dict[str, Any]], conversion_rows: list[dict[str, Any]]) -> dict[int, float]:
         reference_by_type: dict[int, int] = {}
         unit_ids_by_type: dict[int, list[int]] = {}
@@ -1048,6 +2002,127 @@ class FishbowlImporter(models.Model):
         query = f"SELECT {columns} FROM {table}{where_clause} ORDER BY id"
         return client.fetch_all(query, params)
 
+    def _stream_order_lines(
+        self,
+        client: FishbowlClient,
+        line_table: str,
+        order_table: str,
+        order_foreign_key: str,
+        order_date_column: str,
+        start_datetime: datetime | None,
+        *,
+        select_columns: str,
+        batch_size: int = 20000,
+    ) -> Iterator[list[dict[str, Any]]]:
+        last_id = 0
+        while True:
+            conditions: list[str] = ["l.id > %s"]
+            params: list[Any] = [last_id]
+            if start_datetime is not None:
+                conditions.append(f"o.{order_date_column} >= %s")
+                params.append(start_datetime)
+            where_clause = f" WHERE {' AND '.join(conditions)}"
+            query = (
+                f"SELECT {select_columns} FROM {line_table} l "
+                f"JOIN {order_table} o ON o.id = l.{order_foreign_key}"
+                f"{where_clause} ORDER BY l.id LIMIT %s"
+            )
+            params.append(batch_size)
+            rows = client.fetch_all(query, params)
+            if not rows:
+                break
+            yield rows
+            last_row_id = rows[-1].get("id") or rows[-1].get("ID")
+            last_id = int(last_row_id or last_id)
+
+    def _count_order_lines(
+        self,
+        client: FishbowlClient,
+        line_table: str,
+        order_table: str,
+        order_foreign_key: str,
+        order_date_column: str,
+        start_datetime: datetime | None,
+    ) -> int:
+        conditions: list[str] = []
+        params: list[Any] = []
+        if start_datetime is not None:
+            conditions.append(f"o.{order_date_column} >= %s")
+            params.append(start_datetime)
+        where_clause = f" WHERE {' AND '.join(conditions)}" if conditions else ""
+        query = (
+            f"SELECT COUNT(*) AS total FROM {line_table} l "
+            f"JOIN {order_table} o ON o.id = l.{order_foreign_key}"
+            f"{where_clause}"
+        )
+        result = client.fetch_all(query, params)
+        if not result:
+            return 0
+        total_value = result[0].get("total") or result[0].get("TOTAL") or 0
+        return int(total_value or 0)
+
+    def _prefetch_external_id_records(
+        self,
+        system_id: int,
+        resource: str,
+        external_ids: list[str],
+        expected_model: str,
+    ) -> tuple[dict[str, int], dict[str, models.Model], set[str]]:
+        if not external_ids:
+            return {}, {}, set()
+        external_id_model = self.env["external.id"].sudo()
+        records = external_id_model.search(
+            [
+                ("system_id", "=", system_id),
+                ("resource", "=", resource),
+                ("external_id", "in", external_ids),
+            ]
+        )
+        existing_map: dict[str, int] = {}
+        stale_map: dict[str, models.Model] = {}
+        blocked_ids: set[str] = set()
+        expected_model_env = self.env[expected_model].sudo()
+        for record in records:
+            if record.res_model and record.res_model != expected_model:
+                blocked_ids.add(record.external_id)
+                continue
+            if record.res_id:
+                existing = expected_model_env.browse(record.res_id).exists()
+                if existing:
+                    existing_map[record.external_id] = existing.id
+                    continue
+            stale_map[record.external_id] = record
+        return existing_map, stale_map, blocked_ids
+
+    def _prefetch_external_id_records_full(
+        self,
+        system_id: int,
+        resource: str,
+        expected_model: str,
+    ) -> tuple[dict[str, int], dict[str, models.Model], set[str]]:
+        external_id_model = self.env["external.id"].sudo()
+        records = external_id_model.search(
+            [
+                ("system_id", "=", system_id),
+                ("resource", "=", resource),
+            ]
+        )
+        existing_map: dict[str, int] = {}
+        stale_map: dict[str, models.Model] = {}
+        blocked_ids: set[str] = set()
+        expected_model_env = self.env[expected_model].sudo()
+        for record in records:
+            if record.res_model and record.res_model != expected_model:
+                blocked_ids.add(record.external_id)
+                continue
+            if record.res_id:
+                existing = expected_model_env.browse(record.res_id).exists()
+                if existing:
+                    existing_map[record.external_id] = existing.id
+                    continue
+            stale_map[record.external_id] = record
+        return existing_map, stale_map, blocked_ids
+
     def _fetch_rows_by_ids(
         self,
         client: FishbowlClient,
@@ -1078,16 +2153,93 @@ class FishbowlImporter(models.Model):
             results.extend(client.fetch_all(query, params))
         return results
 
-    def _resolve_product_from_sales_row(self, row: dict[str, Any], product_maps: dict[str, dict[int, int]]) -> int | None:
+    def _resolve_product_from_sales_row(
+        self,
+        row: dict[str, Any],
+        product_maps: dict[str, dict[int, int]],
+        product_code_map: dict[str, int] | None = None,
+    ) -> int | None:
         product_id = row.get("productId")
         if product_id is not None and int(product_id) in product_maps["product"]:
             return product_maps["product"][int(product_id)]
         product_number = str(row.get("productNum") or "").strip()
         if product_number:
-            product = self.env["product.product"].sudo().search([("default_code", "=", product_number)], limit=1)
+            if product_code_map is not None:
+                cached_id = product_code_map.get(product_number)
+                if cached_id:
+                    return cached_id
+            product = (
+                self.env["product.product"]
+                .sudo()
+                .with_context(active_test=False)
+                .search([("default_code", "=", product_number)], limit=1)
+            )
             if product:
                 return product.id
         return None
+
+    def _legacy_bucket_for_line(self, description: str, unit_price: float) -> str:
+        text = description.strip().lower()
+        if unit_price < 0:
+            return LEGACY_BUCKET_DISCOUNT
+        if any(keyword in text for keyword in ("ship", "freight", "ups", "fedex", "dhl", "usps")):
+            return LEGACY_BUCKET_SHIPPING
+        if any(keyword in text for keyword in ("fee", "handling", "service charge", "credit card", "cc fee")):
+            return LEGACY_BUCKET_FEE
+        if any(keyword in text for keyword in ("discount", "coupon", "promo", "rebate", "markdown")):
+            return LEGACY_BUCKET_DISCOUNT
+        if any(keyword in text for keyword in ("misc", "other", "adjustment")):
+            return LEGACY_BUCKET_MISC
+        return LEGACY_BUCKET_ADHOC
+
+    def _get_legacy_category(self) -> models.Model:
+        category_model = self.env["product.category"].sudo().with_context(IMPORT_CONTEXT)
+        category = category_model.search([("name", "=", "Legacy Fishbowl")], limit=1)
+        return category or category_model.create({"name": "Legacy Fishbowl"})
+
+    def _get_legacy_bucket_product_id(self, bucket: str) -> int:
+        bucket_map = {
+            LEGACY_BUCKET_SHIPPING: ("LEGACY-SHIPPING", "Legacy Shipping"),
+            LEGACY_BUCKET_FEE: ("LEGACY-FEE", "Legacy Fee"),
+            LEGACY_BUCKET_DISCOUNT: ("LEGACY-DISCOUNT", "Legacy Discount"),
+            LEGACY_BUCKET_MISC: ("LEGACY-MISC", "Legacy Misc Charge"),
+            LEGACY_BUCKET_ADHOC: ("LEGACY-ADHOC", "Legacy Ad-hoc Item"),
+        }
+        code, name = bucket_map.get(bucket, bucket_map[LEGACY_BUCKET_ADHOC])
+        product_model = self.env["product.product"].sudo().with_context(IMPORT_CONTEXT)
+        product = product_model.search([("default_code", "=", code)], limit=1)
+        if product:
+            return product.id
+        template_model = self.env["product.template"].sudo().with_context(IMPORT_CONTEXT)
+        values = {
+            "name": name,
+            "default_code": code,
+            "categ_id": self._get_legacy_category().id,
+            "sale_ok": False,
+            "purchase_ok": False,
+            "active": True,
+        }
+        values[self._product_type_field(template_model)] = "service"
+        template = template_model.create(values)
+        return template.product_variant_id.id
+
+    def _build_legacy_line_name(self, description: str, reference: str, fallback_product_id: int | None) -> str:
+        description_value = description.strip()
+        reference_value = reference.strip()
+        if reference_value and reference_value not in description_value:
+            line_name = f"{reference_value} - {description_value}" if description_value else reference_value
+        else:
+            line_name = description_value
+        if not line_name and fallback_product_id:
+            product = self.env["product.product"].sudo().browse(fallback_product_id)
+            line_name = product.display_name
+        return line_name
+
+    def _is_stockable_product(self, product: models.Model) -> bool:
+        if "is_storable" in product._fields:
+            return bool(product.is_storable)
+        type_field = "detailed_type" if "detailed_type" in product._fields else "type"
+        return getattr(product, type_field, "") == "product"
 
     def _resolve_sales_line_for_shipment_row(
         self,

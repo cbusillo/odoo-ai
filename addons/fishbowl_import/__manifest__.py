@@ -17,7 +17,6 @@
     ],
     "data": [
         "security/ir.model.access.csv",
-        "data/external_system.xml",
         "data/ir_cron.xml",
         "views/sale_order_views.xml",
         "views/purchase_order_views.xml",

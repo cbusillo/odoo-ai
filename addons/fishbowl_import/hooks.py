@@ -7,6 +7,7 @@ _logger = logging.getLogger(__name__)
 
 def _schedule_fishbowl_import(env: "api.Environment", *, reason: str) -> None:
     cron = env.ref("fishbowl_import.ir_cron_fishbowl_import", raise_if_not_found=False)
+    cron = cron.exists() if cron else env["ir.cron"]
     if not cron:
         _logger.warning("Fishbowl cron not found during %s hook", reason)
         return
@@ -17,6 +18,7 @@ def _schedule_fishbowl_import(env: "api.Environment", *, reason: str) -> None:
 
 
 def post_init_hook(env: "api.Environment") -> None:
+    env["fishbowl.importer"].sudo()._get_fishbowl_system()
     _schedule_fishbowl_import(env, reason="post_init")
 
 

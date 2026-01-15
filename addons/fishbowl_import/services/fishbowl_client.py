@@ -1,8 +1,6 @@
-from __future__ import annotations
-
-from dataclasses import dataclass
 import ssl
-from typing import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
+from dataclasses import dataclass
 
 import pymysql
 

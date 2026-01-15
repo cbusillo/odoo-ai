@@ -1,15 +1,11 @@
-#!/usr/bin/env python3
-from __future__ import annotations
-
 import argparse
 import logging
 import sys
+from collections.abc import Sequence
 from enum import IntEnum
 from pathlib import Path
-from typing import Sequence
 
 from pydantic import ValidationError
-
 from restore_from_upstream import LocalServerSettings, OdooRestorerError, OdooUpstreamRestorer
 
 logging.basicConfig(level=logging.INFO)

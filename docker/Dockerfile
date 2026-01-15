@@ -75,18 +75,24 @@ USER ubuntu
 # Development build stage - prod + dev dependencies
 FROM base AS development
 ARG PYTHON_VERSION
+ARG SITE_PACKAGES_PATH=/venv/lib/python${PYTHON_VERSION}/site-packages
+ARG UBUNTU_CODENAME
 WORKDIR /volumes/addons
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     apt-get update \
     && apt-get install -y --no-install-recommends \
-      software-properties-common \
-    && add-apt-repository -y ppa:xtradeb/apps \
+      ca-certificates curl gnupg lsb-release \
+    && mkdir -p /usr/share/keyrings \
+    && curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x82BB6851C64F6880" \
+      | gpg --dearmor -o /usr/share/keyrings/xtradeb-archive-keyring.gpg \
+    && if [ -z "$UBUNTU_CODENAME" ]; then UBUNTU_CODENAME="$(lsb_release -cs)"; fi \
+    && if [ -z "$UBUNTU_CODENAME" ]; then echo "Missing VERSION_CODENAME in /etc/os-release" >&2; exit 1; fi \
+    && echo "deb [signed-by=/usr/share/keyrings/xtradeb-archive-keyring.gpg] https://ppa.launchpadcontent.net/xtradeb/apps/ubuntu ${UBUNTU_CODENAME} main" \
+      > /etc/apt/sources.list.d/xtradeb-apps.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
-      chromium \
-      fonts-liberation \
-      libu2f-udev \
+      chromium fonts-liberation libu2f-udev \
     && rm -rf /var/lib/apt/lists/*
 
 # allow Odoo’s HttpCase to locate the browser
@@ -96,11 +102,10 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     /volumes/scripts/install_dev_requirements.sh
 
 # Ensure Odoo roots are discoverable by IDEs without shadowing stdlib.
-RUN site_packages="/venv/lib/python${PYTHON_VERSION}/site-packages" \
-    && printf '/odoo\n' > "${site_packages}/odoo_local.pth" \
-    && printf '/odoo/addons\n' > "${site_packages}/odoo_addons.pth" \
-    && printf '/opt/extra_addons\n' > "${site_packages}/odoo_enterprise.pth" \
-    && printf '/opt/extra_addons/OpenUpgrade\n' > "${site_packages}/upgrade_utils.pth"
+RUN printf '/odoo\n' > "${SITE_PACKAGES_PATH}/odoo_local.pth" \
+    && printf '/odoo/addons\n' > "${SITE_PACKAGES_PATH}/odoo_addons.pth" \
+    && printf '/opt/extra_addons\n' > "${SITE_PACKAGES_PATH}/odoo_enterprise.pth" \
+    && printf '/opt/extra_addons/OpenUpgrade\n' > "${SITE_PACKAGES_PATH}/upgrade_utils.pth"
 
 # Apply development patches for --dev mode issues
 COPY patches/dev /tmp/patches/dev

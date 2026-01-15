@@ -37,6 +37,67 @@ class ExternalSystem(models.Model):
         for system in self:
             system.external_id_count = len(system.external_ids)
 
+    @api.model
+    def ensure_system(
+        self,
+        *,
+        code: str,
+        name: str,
+        id_format: str | None = None,
+        sequence: int | None = None,
+        active: bool | None = None,
+        url: str | None = None,
+        applicable_model_xml_ids: tuple[str, ...] = (),
+    ) -> "odoo.model.external_system":
+        external_system_model = self.sudo().with_context(active_test=False)
+        system = external_system_model.search([("code", "=", code)], limit=1)
+        applicable_model_ids = self._resolve_applicable_model_ids(applicable_model_xml_ids)
+        if not system:
+            create_values: "odoo.values.external_system" = {
+                "name": name,
+                "code": code,
+            }
+            if id_format:
+                create_values["id_format"] = id_format
+            if sequence is not None:
+                create_values["sequence"] = sequence
+            if active is not None:
+                create_values["active"] = active
+            if url:
+                create_values["url"] = url
+            if applicable_model_ids:
+                create_values["applicable_model_ids"] = [(6, 0, applicable_model_ids)]
+            return external_system_model.create(create_values)
+
+        update_values: "odoo.values.external_system" = {}
+        if name and not system.name:
+            update_values["name"] = name
+        if url and not system.url:
+            update_values["url"] = url
+        if id_format and not system.id_format:
+            update_values["id_format"] = id_format
+        if sequence is not None and not system.sequence:
+            update_values["sequence"] = sequence
+        if active is True and not system.active:
+            update_values["active"] = True
+        if applicable_model_ids:
+            current_model_ids = set(system.applicable_model_ids.ids)
+            merged_model_ids = sorted(current_model_ids.union(applicable_model_ids))
+            if set(merged_model_ids) != current_model_ids:
+                update_values["applicable_model_ids"] = [(6, 0, merged_model_ids)]
+        if update_values:
+            system.write(update_values)
+        return system
+
+    @api.model
+    def _resolve_applicable_model_ids(self, xml_ids: tuple[str, ...]) -> list[int]:
+        model_id_list: list[int] = []
+        for xml_id in xml_ids:
+            record = self.env.ref(xml_id, raise_if_not_found=False)
+            if record:
+                model_id_list.append(record.id)
+        return model_id_list
+
     @api.ondelete(at_uninstall=False)
     def _unlink_prevent_when_has_ids(self) -> None:
         for rec in self:

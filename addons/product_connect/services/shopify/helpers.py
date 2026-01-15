@@ -145,7 +145,7 @@ class ShopifyApiError(OdooDataError):
         *,
         shopify_record: BaseModel | None = None,
         shopify_input: BaseModel | None = None,
-        odoo_record: OdooRecordInfo | None = None,
+        odoo_record: models.Model | OdooRecordInfo | None = None,
     ) -> None:
         super().__init__(message, odoo_record=odoo_record)
         self.shopify_record = shopify_record

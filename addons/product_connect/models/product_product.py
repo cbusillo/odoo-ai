@@ -22,10 +22,10 @@ class ProductProduct(models.Model):
 
     def update_quantity(self, quantity: float) -> None:
         stock_location_ref = "stock.stock_location_stock"
-        if not self.env.ref(stock_location_ref, raise_if_not_found=False):
+        stock_location = self.env.ref(stock_location_ref, raise_if_not_found=False)
+        stock_location = stock_location.exists() if stock_location else self.env["stock.location"]
+        if not stock_location:
             self.product_tmpl_id.notify_channel_on_error("Stock Location Not Found", stock_location_ref)
-        stock_location = self.env.ref(stock_location_ref)
-        if not stock_location.id:
             return
 
         for product in self:

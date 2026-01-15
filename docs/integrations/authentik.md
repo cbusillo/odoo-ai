@@ -18,6 +18,7 @@ Purpose
 - The `authentik_sso` addon overrides the Authentik auth link to request `id_token token`.
 - Launch URL for Authentik apps: `https://<odoo-host>/authentik/login`.
 - Required env: `ENV_OVERRIDE_AUTHENTIK__CLIENT_ID` and `ENV_OVERRIDE_AUTHENTIK__BASE_URL`.
+- Environment overrides are applied by `environment_overrides` during init/restore only.
 - Auto-provisioning requires `auth_signup.invitation_scope = b2c`.
 
 ## Group mapping

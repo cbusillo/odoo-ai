@@ -201,7 +201,7 @@ class OdooExecutor:
                     f"--workers={js_workers_default if is_js_test else tour_workers_default}",
                     f"--db-filter=^{db_name}$",
                     "--log-level=test",
-                    "--without-demo=all",
+                    "--without-demo",
                 ]
             )
             if is_tour_test:
@@ -223,7 +223,7 @@ class OdooExecutor:
                     "--workers=0",
                     f"--db-filter=^{db_name}$",
                     "--log-level=test",
-                    "--without-demo=all",
+                    "--without-demo",
                 ]
             )
 

@@ -3,7 +3,6 @@ import os
 import sys
 from pathlib import Path
 from shutil import disk_usage
-from typing import cast
 
 import click
 
@@ -50,8 +49,9 @@ def _emit_bottomline(latest: Path, as_json: bool) -> int:
         print(json.dumps(payload))
     else:
         click.echo(
-            "success={success} tests_run={tests_run} failures={failures} "
-            "errors={errors} skips={skips} session={session}".format(**payload)
+            "success={success} tests_run={tests_run} failures={failures} errors={errors} skips={skips} session={session}".format(
+                **payload
+            )
         )
     return 0 if is_success else 1
 
@@ -635,7 +635,11 @@ def plan_cmd(
             "strategy": plan.strategy,
         }
 
-    phases: list[PhaseName] = list(_PHASES) if phase == "all" else [cast(PhaseName, phase)]
+    if phase == "all":
+        phases = list(_PHASES)
+    else:
+        phase_name = next(value for value in _PHASES if value == phase)
+        phases = [phase_name]
     payload = {"schema": "plan.v1", "phases": {}}
     for phase_name in phases:
         if phase_name == "unit":

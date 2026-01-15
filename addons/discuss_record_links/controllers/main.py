@@ -1,7 +1,7 @@
 from odoo import http
 from odoo.http import request
 
-from ..models.config_util import load_config, extract_template_fields, render_template, parse_prefix, ModelCfg
+from ..models.config_util import ModelCfg, extract_template_fields, load_config, parse_prefix, render_template
 
 
 class DiscussRecordLinks(http.Controller):
@@ -13,11 +13,11 @@ class DiscussRecordLinks(http.Controller):
         model_filter, query = parse_prefix(term or "", cfg)
         tokens = [t for t in (query or "").strip().split() if t]
 
-        def build_domain(model_cfg: ModelCfg) -> list:
+        def build_domain(model_config: ModelCfg) -> list:
             if not tokens:
                 return []
             search_domain: list = []
-            search_fields = model_cfg.search or ["name"]
+            search_fields = model_config.search or ["name"]
             for t in tokens:
                 # OR across all fields for this single token
                 leaves: list = [[f, "ilike", t] for f in search_fields]

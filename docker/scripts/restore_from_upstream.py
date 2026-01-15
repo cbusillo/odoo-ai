@@ -572,7 +572,7 @@ class OdooUpstreamRestorer:
             "-d",
             self.local.db_name,
             "--no-http",
-            "--without-demo=all",
+            "--without-demo",
             "-i",
             "base",
         ]

@@ -173,6 +173,47 @@ def _run_upgrade_with_retry(settings: StackSettings, upgrade_subcommand: list[st
             time.sleep(2)
 
 
+def _run_module_subcommand(settings: StackSettings, subcommand: list[str], *, remote: bool) -> None:
+    if not remote and "web" in settings.services:
+        _run_compose(settings, ["stop", "web"], remote)
+        try:
+            _run_compose(settings, ["up", "-d", settings.script_runner_service], remote)
+            _wait_for_local_service(settings, settings.script_runner_service)
+            _run_upgrade_with_retry(settings, subcommand, remote=remote)
+        finally:
+            _run_compose(settings, ["up", "-d", "web"], remote)
+        return
+    if not remote:
+        _run_compose(settings, ["up", "-d", settings.script_runner_service], remote)
+        _wait_for_local_service(settings, settings.script_runner_service)
+    _run_upgrade_with_retry(settings, subcommand, remote=remote)
+
+
+def _build_module_subcommand(settings: StackSettings, module_argument: str, operation_flag: str) -> list[str]:
+    return [
+        "exec",
+        "-T",
+        settings.script_runner_service,
+        "bash",
+        "-lc",
+        f"{settings.odoo_bin_path} {operation_flag} {module_argument} -d $ODOO_DB_NAME --stop-after-init",
+    ]
+
+
+def _execute_module_action(
+    settings: StackSettings,
+    modules: tuple[str, ...],
+    *,
+    remote: bool,
+    operation_flag: str,
+) -> None:
+    if not modules:
+        return
+    module_argument = ",".join(dict.fromkeys(modules))
+    subcommand = _build_module_subcommand(settings, module_argument, operation_flag)
+    _run_module_subcommand(settings, subcommand, remote=remote)
+
+
 def execute_upgrade(settings: StackSettings, modules: tuple[str, ...], remote: bool) -> None:
     resolved_modules = modules
     if modules == (AUTO_INSTALLED_SENTINEL,):
@@ -184,55 +225,11 @@ def execute_upgrade(settings: StackSettings, modules: tuple[str, ...], remote: b
             return
     if not resolved_modules:
         raise ValueError("no modules configured for upgrade")
-    module_argument = ",".join(dict.fromkeys(resolved_modules))
-    upgrade_subcommand = [
-        "exec",
-        "-T",
-        settings.script_runner_service,
-        "bash",
-        "-lc",
-        f"{settings.odoo_bin_path} -u {module_argument} -d $ODOO_DB_NAME --stop-after-init",
-    ]
-    if not remote and "web" in settings.services:
-        _run_compose(settings, ["stop", "web"], remote)
-        try:
-            _run_compose(settings, ["up", "-d", settings.script_runner_service], remote)
-            _wait_for_local_service(settings, settings.script_runner_service)
-            _run_upgrade_with_retry(settings, upgrade_subcommand, remote=remote)
-        finally:
-            _run_compose(settings, ["up", "-d", "web"], remote)
-        return
-    if not remote:
-        _run_compose(settings, ["up", "-d", settings.script_runner_service], remote)
-        _wait_for_local_service(settings, settings.script_runner_service)
-    _run_upgrade_with_retry(settings, upgrade_subcommand, remote=remote)
+    _execute_module_action(settings, resolved_modules, remote=remote, operation_flag="-u")
 
 
 def execute_install(settings: StackSettings, modules: tuple[str, ...], remote: bool) -> None:
-    if not modules:
-        return
-    module_argument = ",".join(dict.fromkeys(modules))
-    install_subcommand = [
-        "exec",
-        "-T",
-        settings.script_runner_service,
-        "bash",
-        "-lc",
-        f"{settings.odoo_bin_path} -i {module_argument} -d $ODOO_DB_NAME --stop-after-init",
-    ]
-    if not remote and "web" in settings.services:
-        _run_compose(settings, ["stop", "web"], remote)
-        try:
-            _run_compose(settings, ["up", "-d", settings.script_runner_service], remote)
-            _wait_for_local_service(settings, settings.script_runner_service)
-            _run_upgrade_with_retry(settings, install_subcommand, remote=remote)
-        finally:
-            _run_compose(settings, ["up", "-d", "web"], remote)
-        return
-    if not remote:
-        _run_compose(settings, ["up", "-d", settings.script_runner_service], remote)
-        _wait_for_local_service(settings, settings.script_runner_service)
-    _run_upgrade_with_retry(settings, install_subcommand, remote=remote)
+    _execute_module_action(settings, modules, remote=remote, operation_flag="-i")
 
 
 def _installed_module_names(settings: StackSettings) -> set[str]:

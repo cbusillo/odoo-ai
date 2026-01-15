@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import os
 import re
@@ -713,6 +711,7 @@ def _coolify_env_value(app_ref: str, key: str) -> str | None:
             return value.strip()
     return None
 
+
 def _coolify_env_entries(app_ref: str) -> tuple[str, list[dict[str, object]]]:
     app_uuid = _coolify_find_app_uuid(app_ref)
     payload = _coolify_request(f"/api/v1/applications/{app_uuid}/envs")
@@ -786,9 +785,7 @@ def _delete_env(app_uuid: str, env_uuid: str) -> None:
 def _wait_for_web_ready(entry: str, env: str, app_ref: str) -> None:
     base_url = _coolify_env_value(app_ref, "ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL")
     if not base_url:
-        console.print(
-            f"{entry} {env}: ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL missing; skipping web readiness wait."
-        )
+        console.print(f"{entry} {env}: ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL missing; skipping web readiness wait.")
         return
     url = f"{base_url.rstrip('/')}/web/login"
     console.print(f"{entry} {env}: waiting for web login ({url})...")

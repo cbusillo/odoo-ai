@@ -27,16 +27,14 @@ DEFAULT_AUTHENTIK_NAME_CLAIMS = (
 class ResUsers(models.Model):
     _inherit = "res.users"
 
-    def _resolve_authentik_template_user(self) -> models.Model | None:
+    def _resolve_authentik_template_user(self) -> "odoo.model.res_users":
         template_user = self.env.ref(
             "authentik_sso.authentik_template_user",
             raise_if_not_found=False,
         )
-        if template_user and template_user.exists():
-            return template_user
-        return None
+        return template_user.exists() if template_user else self.env["res.users"]
 
-    def _create_user_from_template(self, values: dict[str, object]) -> models.Model:
+    def _create_user_from_template(self, values: dict[str, object]) -> "odoo.model.res_users":
         if self.env.context.get("oauth_use_internal_template"):
             template_user = self._resolve_authentik_template_user()
             if template_user:
@@ -57,43 +55,49 @@ class ResUsers(models.Model):
         return super()._create_user_from_template(values)
 
     @api.model
-    def _signup_create_user(self, values: dict[str, object]) -> models.Model:
+    def _signup_create_user(self, values: dict[str, object]) -> "odoo.model.res_users":
         if self.env.context.get("oauth_use_internal_template"):
             return self._create_user_from_template(values)
         return super()._signup_create_user(values)
 
-    def _authentik_provider_name(self) -> str:
+    @staticmethod
+    def _authentik_provider_name() -> str:
         raw_value = os.environ.get(f"{AUTHENTIK_PREFIX}PROVIDER_NAME")
         if raw_value is None:
             return DEFAULT_AUTHENTIK_PROVIDER_NAME
         cleaned = raw_value.strip()
         return cleaned or DEFAULT_AUTHENTIK_PROVIDER_NAME
 
-    def _authentik_group_claim(self) -> str:
+    @staticmethod
+    def _authentik_group_claim() -> str:
         raw_value = os.environ.get(f"{AUTHENTIK_PREFIX}GROUP_CLAIM")
         if raw_value is None:
             return DEFAULT_AUTHENTIK_GROUP_CLAIM
         return raw_value.strip()
 
-    def _authentik_user_id_claims(self) -> tuple[str, ...]:
+    @staticmethod
+    def _authentik_user_id_claims() -> tuple[str, ...]:
         raw_value = os.environ.get(f"{AUTHENTIK_PREFIX}USER_ID_CLAIMS")
         if raw_value is None:
             return DEFAULT_AUTHENTIK_USER_ID_CLAIMS
         return tuple(item.strip() for item in raw_value.split(",") if item.strip())
 
-    def _authentik_login_claims(self) -> tuple[str, ...]:
+    @staticmethod
+    def _authentik_login_claims() -> tuple[str, ...]:
         raw_value = os.environ.get(f"{AUTHENTIK_PREFIX}LOGIN_CLAIMS")
         if raw_value is None:
             return DEFAULT_AUTHENTIK_LOGIN_CLAIMS
         return tuple(item.strip() for item in raw_value.split(",") if item.strip())
 
-    def _authentik_name_claims(self) -> tuple[str, ...]:
+    @staticmethod
+    def _authentik_name_claims() -> tuple[str, ...]:
         raw_value = os.environ.get(f"{AUTHENTIK_PREFIX}NAME_CLAIMS")
         if raw_value is None:
             return DEFAULT_AUTHENTIK_NAME_CLAIMS
         return tuple(item.strip() for item in raw_value.split(",") if item.strip())
 
-    def _claim_to_string(self, value: object) -> str | None:
+    @staticmethod
+    def _claim_to_string(value: object) -> str | None:
         if value is None:
             return None
         if isinstance(value, str):
@@ -160,7 +164,7 @@ class ResUsers(models.Model):
 
     def _sync_authentik_groups(
         self,
-        oauth_user: models.Model,
+        oauth_user: "odoo.model.res_users",
         validation: dict[str, object],
         provider_id: int,
     ) -> None:
@@ -192,6 +196,7 @@ class ResUsers(models.Model):
 
         target_group_ids = set(matching_mappings.mapped("odoo_groups").ids)
         base_user_group = self.env.ref("base.group_user", raise_if_not_found=False)
+        base_user_group = base_user_group.exists() if base_user_group else self.env["res.groups"]
         if base_user_group:
             target_group_ids.add(base_user_group.id)
         else:
@@ -199,7 +204,7 @@ class ResUsers(models.Model):
             return
 
         managed_group_ids = set(mappings.mapped("odoo_groups").ids)
-        commands: list[Command] = [Command.link(group_id) for group_id in target_group_ids]
+        commands = [Command.link(group_id) for group_id in target_group_ids]
         for group_id in managed_group_ids - target_group_ids:
             commands.append(Command.unlink(group_id))
 
@@ -251,10 +256,10 @@ class ResUsers(models.Model):
                 if created_user:
                     self._sync_authentik_groups(created_user, normalized_validation, provider)
                 return login
-            except (SignupError, UserError):
+            except (SignupError, UserError) as error:
                 _logger.warning(
                     "OAuth signup failed for provider %s. Validation keys=%s",
                     provider,
                     ", ".join(sorted(normalized_validation.keys())),
                 )
-                raise access_denied_exception
+                raise access_denied_exception from error

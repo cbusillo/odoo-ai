@@ -2,12 +2,14 @@ import logging
 import os
 
 from odoo import models
-from odoo.exceptions import AccessError, UserError, ValidationError
+from odoo.exceptions import ValidationError
 
 _logger = logging.getLogger(__name__)
 
 CONFIG_PARAM_PREFIX = "ENV_OVERRIDE_CONFIG_PARAM__"
 SHOPIFY_PREFIX = "ENV_OVERRIDE_SHOPIFY__"
+AUTHENTIK_CONFIG_MODEL = "authentik.sso.config"
+AUTHENTIK_GROUP_MAPPING_MODEL = "authentik.sso.group.mapping"
 
 FALSE_VALUES = {"", "0", "false", "no", "off"}
 TRUE_VALUES = {"1", "true", "yes", "on"}
@@ -45,11 +47,21 @@ class EnvironmentOverrides(models.AbstractModel):
         self._apply_shopify_overrides()
 
     def _apply_authentik_overrides(self) -> None:
-        if "authentik.sso.config" not in self.env.registry:
+        authentik_config_model = self.env.get(AUTHENTIK_CONFIG_MODEL)
+        if authentik_config_model is None:
             return
-        self.env["authentik.sso.config"].sudo().apply_from_env()
-        if "authentik.sso.group.mapping" in self.env.registry:
-            self.env["authentik.sso.group.mapping"].sudo().ensure_default_mappings()
+
+        apply_from_env = getattr(authentik_config_model.sudo(), "apply_from_env", None)
+        if callable(apply_from_env):
+            apply_from_env()
+
+        group_mapping_model = self.env.get(AUTHENTIK_GROUP_MAPPING_MODEL)
+        if group_mapping_model is None:
+            return
+
+        ensure_default_mappings = getattr(group_mapping_model.sudo(), "ensure_default_mappings", None)
+        if callable(ensure_default_mappings):
+            ensure_default_mappings()
 
     def _apply_config_param_overrides(self) -> None:
         overrides: dict[str, str] = {}

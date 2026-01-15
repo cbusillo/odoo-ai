@@ -7,7 +7,12 @@ class ExternalIdMixin(models.AbstractModel):
     _name = "external.id.mixin"
     _description = "External ID Mixin"
 
-    external_ids = fields.One2many("external.id", "res_id", string="External IDs")
+    external_ids = fields.One2many(
+        "external.id",
+        "res_id",
+        string="External IDs",
+        domain=lambda self: [("res_model", "=", self._name)],
+    )
 
     def get_external_system_id(self, system_code: str, resource: str | None = None) -> str | None:
         self.ensure_one()

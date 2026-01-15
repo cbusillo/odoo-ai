@@ -129,7 +129,8 @@ class ExternalId(models.Model):
 
     @api.depends("res_model", "res_id")
     def _compute_reference(self) -> None:
-        for record in self:
+        records = self.with_context(default_res_model=False)
+        for record in records:
             if record.res_model and record.res_id:
                 record.reference = f"{record.res_model},{record.res_id}"
             else:

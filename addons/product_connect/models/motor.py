@@ -6,7 +6,7 @@ import zipfile
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Literal, Self, cast
+from typing import Self
 
 import qrcode
 from odoo import api, fields, models
@@ -354,7 +354,7 @@ class Motor(models.Model):
     def generate_qr_code(self) -> str:
         qr_code = qrcode.QRCode(
             version=1,
-            error_correction=cast(Literal[0, 1, 2, 3], qrcode.constants.ERROR_CORRECT_H),
+            error_correction=qrcode.constants.ERROR_CORRECT_H,
             box_size=20,
         )
         qr_code.add_data(self.motor_number)

@@ -38,6 +38,9 @@ Quick start
   uv run ops local doctor opw
   uv run ops local info opw --json
   uv run ops local shell opw
+  uv run ops local shell opw <<'PY'
+  env['res.users'].search([]).mapped('name')
+  PY
   uv run ops local exec opw -- /odoo/odoo-bin shell -d opw -c /volumes/config/_generated.conf
   uv run ops local up opw --build --no-cache
 
@@ -117,6 +120,8 @@ Behavior notes
 - `uv run ops local shell <target>` runs the Odoo shell inside the script-runner using
   the merged stack env and defaults (`-d $ODOO_DB_NAME -c /volumes/config/_generated.conf`).
   Pass extra args after `--` to override defaults (for example, `-- --log-level=debug`).
+  If you pipe stdin, ops stages it into a temporary shell file and invokes
+  `--shell-file` automatically.
 - `uv run ops ship prod <target> --after init` runs a prod bootstrap-only init
   via Coolify (sets the post-deploy command, deploys, waits for completion,
   then restores the previous post-deploy command). Requires the prod init guard.

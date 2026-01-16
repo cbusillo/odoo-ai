@@ -67,3 +67,18 @@ class TestEnvironmentOverrides(UnitTestCase):
         with _set_env(env_values):
             with self.assertRaises(ValidationError):
                 self.Overrides._apply_shopify_overrides()
+
+    def test_shopify_overrides_clears_config_when_incomplete(self) -> None:
+        self.ConfigParameter.set_param("shopify.shop_url_key", "store")
+        self.ConfigParameter.set_param("shopify.api_token", "token")
+        self.ConfigParameter.set_param("shopify.webhook_key", "hook")
+        self.ConfigParameter.set_param("shopify.api_version", "2025-01")
+
+        env_values = {"ENV_OVERRIDE_SHOPIFY__API_TOKEN": "token"}
+        with _set_env(env_values):
+            self.Overrides._apply_shopify_overrides()
+
+        self.assertFalse(self.ConfigParameter.get_param("shopify.shop_url_key"))
+        self.assertFalse(self.ConfigParameter.get_param("shopify.api_token"))
+        self.assertFalse(self.ConfigParameter.get_param("shopify.webhook_key"))
+        self.assertFalse(self.ConfigParameter.get_param("shopify.api_version"))

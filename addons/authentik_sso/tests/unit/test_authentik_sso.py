@@ -34,6 +34,17 @@ class TestAuthentikSso(UnitTestCase):
         self.assertEqual(normalized.get("email"), "user@example.com")
         self.assertEqual(normalized.get("name"), "user@example.com")
 
+    def test_normalize_authentik_validation_empty_claim_overrides(self) -> None:
+        payload = {"sub": "user-2", "email": "user2@example.com"}
+
+        with _set_env("ENV_OVERRIDE_AUTHENTIK__USER_ID_CLAIMS", " "):
+            with _set_env("ENV_OVERRIDE_AUTHENTIK__LOGIN_CLAIMS", " "):
+                normalized = self.Users._normalize_authentik_validation(payload)
+
+        self.assertEqual(normalized.get("user_id"), "user-2")
+        self.assertEqual(normalized.get("login"), "user2@example.com")
+        self.assertEqual(normalized.get("email"), "user2@example.com")
+
     def test_extract_authentik_groups(self) -> None:
         payload = {"groups": ["Admins", " Users ", ""]}
 

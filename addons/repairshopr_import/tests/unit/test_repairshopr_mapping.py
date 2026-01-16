@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+from ...models.repairshopr_importer import EXTERNAL_SYSTEM_CODE, RESOURCE_ESTIMATE, RESOURCE_PRODUCT
+
 from ..common_imports import UNIT_TAGS, tagged
 from ..fixtures.base import UnitTestCase
 
@@ -159,3 +161,118 @@ class TestRepairshoprMapping(UnitTestCase):
         self.assertIn("Comments:", description)
         self.assertIn("Inspection", description)
         self.assertIn("All good", description)
+
+    def test_fetch_line_items_handles_missing_payload(self) -> None:
+        class ClientStub:
+            def fetch_from_api(self, _endpoint: str, *, params: dict[str, str]) -> tuple[list[dict[str, object]] | None]:
+                return (None,)
+
+        line_items = self.importer._fetch_line_items(ClientStub(), estimate_id=10)
+
+        self.assertEqual(line_items, [])
+
+    def test_build_product_values_with_partial_payload(self) -> None:
+        product_record = SimpleNamespace(
+            id=404,
+            name=None,
+            description=None,
+            price_retail=None,
+            price_cost=None,
+            long_description=None,
+            disabled=False,
+            upc_code=None,
+            product_category=None,
+            category_path=None,
+        )
+
+        values_payload = self.importer._build_product_values(product_record)
+
+        self.assertEqual(values_payload["name"], "RepairShopr Product 404")
+        self.assertEqual(values_payload["list_price"], 0.0)
+        self.assertEqual(values_payload["standard_price"], 0.0)
+        self.assertEqual(values_payload["description"], "")
+        self.assertEqual(values_payload["description_sale"], "")
+        self.assertTrue(values_payload["active"])
+        self.assertNotIn("barcode", values_payload)
+
+    def test_import_products_is_idempotent(self) -> None:
+        class ClientStub:
+            def __init__(self, products: list[SimpleNamespace]) -> None:
+                self._products = products
+
+            def get_model(self, _model: object, *, updated_at: object = None) -> list[SimpleNamespace]:
+                return self._products
+
+        product_record = SimpleNamespace(
+            id=505,
+            name="Widget",
+            description="Widget",
+            price_retail=10.0,
+            price_cost=5.0,
+            long_description=None,
+            disabled=False,
+            upc_code=None,
+            product_category=None,
+            category_path=None,
+        )
+        client = ClientStub([product_record])
+
+        self.importer._import_products(client, None)
+        first_product = self.ProductTemplate.search_by_external_id(
+            EXTERNAL_SYSTEM_CODE,
+            "505",
+            RESOURCE_PRODUCT,
+        )
+        self.importer._import_products(client, None)
+        second_product = self.ProductTemplate.search_by_external_id(
+            EXTERNAL_SYSTEM_CODE,
+            "505",
+            RESOURCE_PRODUCT,
+        )
+
+        self.assertTrue(first_product)
+        self.assertEqual(first_product.id, second_product.id)
+        self.assertEqual(self.ProductTemplate.search_count([("name", "=", "Widget")]), 1)
+
+    def test_import_estimates_is_idempotent(self) -> None:
+        class ClientStub:
+            def __init__(self, estimates: list[SimpleNamespace]) -> None:
+                self._estimates = estimates
+
+            def get_model(self, _model: object, *, updated_at: object = None) -> list[SimpleNamespace]:
+                return self._estimates
+
+            def fetch_from_api(
+                self,
+                _endpoint: str,
+                *,
+                params: dict[str, str],
+            ) -> tuple[list[dict[str, object]]]:
+                return ([],)
+
+        estimate_record = SimpleNamespace(
+            id=606,
+            customer_id=707,
+            customer_business_then_name="Test Customer",
+            number="EST-606",
+            date=None,
+            created_at=None,
+            employee=None,
+        )
+        client = ClientStub([estimate_record])
+
+        self.importer._import_estimates(client, None)
+        first_order = self.env["sale.order"].search_by_external_id(
+            EXTERNAL_SYSTEM_CODE,
+            "606",
+            RESOURCE_ESTIMATE,
+        )
+        self.importer._import_estimates(client, None)
+        second_order = self.env["sale.order"].search_by_external_id(
+            EXTERNAL_SYSTEM_CODE,
+            "606",
+            RESOURCE_ESTIMATE,
+        )
+
+        self.assertTrue(first_order)
+        self.assertEqual(first_order.id, second_order.id)

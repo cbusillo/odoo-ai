@@ -4,7 +4,7 @@ x-odoo-base: &odoo-base
   # 2. Contains proprietary Odoo Enterprise source code
   # 3. To prevent accidental push: keep image name local (no registry prefix)
   # If registry push ever needed: refactor Dockerfile to use BuildKit secrets
-  image: ${DOCKER_IMAGE:-odoo-ai}:latest
+  image: ${DOCKER_IMAGE:-odoo-ai}:${DOCKER_IMAGE_TAG:-latest}
   pull_policy: never
   env_file:
     - .env

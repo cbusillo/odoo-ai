@@ -43,6 +43,9 @@ def compose_env() -> dict[str, str]:
         if dotenv_path.exists():
             env.update(parse_env_file(dotenv_path))
 
+    if _blank_to_none(env.get("TESTKIT_DISABLE_DEV_MODE")):
+        env.pop("ODOO_DEV_MODE", None)
+
     project_name = (_blank_to_none(env.get("ODOO_PROJECT_NAME")) or "odoo").strip()
     state_root_raw = _blank_to_none(env.get("ODOO_STATE_ROOT"))
     if state_root_raw is None:

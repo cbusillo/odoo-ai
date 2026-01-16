@@ -6,7 +6,7 @@ from shutil import disk_usage
 
 import click
 
-from tools.deployer.settings import load_stack_settings
+from tools.deployer.settings import discover_repo_root, load_stack_settings
 
 from .db import db_capacity
 from .docker_api import compose_env
@@ -84,19 +84,37 @@ def _normalize_stack_name(stack: str | None, env_file: Path | None) -> str | Non
     return None
 
 
+def _prefer_test_stack(stack: str | None, env_file: Path | None) -> str | None:
+    if not stack or env_file:
+        return stack
+    cleaned = stack.strip()
+    if not cleaned:
+        return None
+    if cleaned.endswith(("-local", "-dev", "-testing", "-prod", "-test")):
+        return cleaned
+    repo_root = discover_repo_root(Path.cwd())
+    candidate = f"{cleaned}-test"
+    candidate_env = repo_root / "docker" / "config" / f"{candidate}-local.env"
+    if candidate_env.exists():
+        return candidate
+    return cleaned
+
+
 def _apply_stack_env(stack: str | None, env_file: str | None) -> None:
     if not stack and not env_file:
         raise click.ClickException(
             "Missing required --stack or --env-file (e.g. --stack opw or --env-file docker/config/opw-local.env)."
         )
     env_path = Path(env_file).expanduser().resolve() if env_file else None
-    stack_name = _normalize_stack_name(stack, env_path)
+    preferred_stack = _prefer_test_stack(stack, env_path)
+    stack_name = _normalize_stack_name(preferred_stack, env_path)
     if stack_name is None:
         raise click.ClickException("Unable to resolve stack name; provide --stack or --env-file.")
     settings = load_stack_settings(stack_name, env_path)
     os.environ.update(settings.environment)
     os.environ["TESTKIT_ENV_FILE"] = str(settings.env_file)
     os.environ["ODOO_STACK_NAME"] = stack_name
+    os.environ["TESTKIT_DISABLE_DEV_MODE"] = "1"
 
 
 def _apply_shard_overrides(

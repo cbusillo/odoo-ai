@@ -27,6 +27,8 @@ docker-compose.yml
 
 - `opw-local`
 - `cm-local`
+- `opw-test-local`
+- `cm-test-local`
 
 ## Quick start
 

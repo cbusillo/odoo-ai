@@ -1,9 +1,11 @@
 import json
 import os
 import re
+import secrets
 import shlex
 import subprocess
 import sys
+import tempfile
 import time
 import tomllib
 import urllib.error
@@ -61,6 +63,8 @@ LOCAL_ACTIONS = (
     "openupgrade",
     "doctor",
     "info",
+    "exec",
+    "shell",
 )
 POST_SHIP_ACTIONS = ("none", "restore", "init", "upgrade")
 SHIP_ACTIONS = ("ship",)
@@ -86,6 +90,7 @@ COOLIFY_LOG_DEFAULT_PATTERNS = (
 )
 
 OPS_CONFIG_PATH = Path("docker/config/ops.toml")
+DEFAULT_ODOO_CONFIG_PATH = "/volumes/config/_generated.conf"
 
 
 @dataclass(frozen=True)
@@ -563,10 +568,10 @@ def _coolify_find_app_uuid(app_ref: str) -> str:
         choices = ", ".join(str(app.get("uuid") or app.get("id")) for app in matches)
         raise click.ClickException(f"Multiple Coolify apps named '{app_ref}': {choices}")
     match = matches[0]
-    uuid = match.get("uuid") or match.get("id")
-    if not uuid:
+    app_uuid_value = match.get("uuid") or match.get("id")
+    if not app_uuid_value:
         raise click.ClickException(f"Coolify app '{app_ref}' has no uuid/id in API response.")
-    uuid_str = str(uuid)
+    uuid_str = str(app_uuid_value)
     _COOLIFY_APP_CACHE[app_ref] = uuid_str
     return uuid_str
 
@@ -1217,6 +1222,122 @@ def _run_local_openupgrade(settings: StackSettings, *, dry_run: bool) -> None:
     _run_local_compose(settings, openupgrade_command, dry_run=False)
 
 
+def _create_env_script_file(environment: dict[str, str]) -> Path:
+    environment_lines: list[str] = []
+    for key in sorted(environment):
+        value = environment.get(key)
+        if value is None:
+            continue
+        environment_lines.append(f"export {key}={shlex.quote(value)}")
+    temporary_file_handle = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False)
+    try:
+        temporary_file_handle.write("\n".join(environment_lines) + "\n")
+    finally:
+        temporary_file_handle.close()
+    return Path(temporary_file_handle.name)
+
+
+def _normalize_exec_command(command: Sequence[str]) -> list[str]:
+    values = list(command)
+    if values and values[0] == "--":
+        values = values[1:]
+    return values
+
+
+def _command_has_option(command: Sequence[str], *, short: str, long: str) -> bool:
+    for item in command:
+        if item == short or item == long:
+            return True
+        if item.startswith(f"{long}="):
+            return True
+        if short and item.startswith(f"{short}="):
+            return True
+    return False
+
+
+def _run_local_shell(
+    settings: StackSettings,
+    command: Sequence[str],
+    *,
+    service: str | None,
+    skip_env: bool,
+    dry_run: bool,
+) -> None:
+    shell_args = _normalize_exec_command(command)
+    exec_command = [settings.odoo_bin_path, "shell"]
+
+    if not _command_has_option(shell_args, short="-d", long="--database"):
+        database_name = settings.environment.get("ODOO_DB_NAME")
+        if not database_name:
+            raise click.ClickException("Missing ODOO_DB_NAME; pass -d/--database explicitly.")
+        exec_command.extend(["-d", database_name])
+
+    if not _command_has_option(shell_args, short="-c", long="--config"):
+        config_path = settings.environment.get("ODOO_CONFIG") or DEFAULT_ODOO_CONFIG_PATH
+        exec_command.extend(["-c", config_path])
+
+    exec_command.extend(shell_args)
+    _run_local_exec(settings, exec_command, service=service, skip_env=skip_env, dry_run=dry_run)
+
+
+def _run_local_exec(
+    settings: StackSettings,
+    command: Sequence[str],
+    *,
+    service: str | None,
+    skip_env: bool,
+    dry_run: bool,
+) -> None:
+    exec_command = _normalize_exec_command(command)
+    if not exec_command:
+        raise click.ClickException("Provide a command after '--'.")
+    service_name = service or settings.script_runner_service
+    if service_name not in settings.services:
+        raise click.ClickException(f"Service '{service_name}' not found for local stack {settings.name}.")
+    if not dry_run:
+        _ensure_local_service(settings, service_name, dry_run=dry_run)
+    interactive_terminal = sys.stdin.isatty() and sys.stdout.isatty()
+    exec_arguments: list[str] = ["exec"]
+    if not interactive_terminal:
+        exec_arguments.append("-T")
+
+    env_script_path: Path | None = None
+    container_env_path: str | None = None
+    created_env_script = False
+    try:
+        if not skip_env:
+            unique_suffix = secrets.token_hex(16)
+            container_env_path = f"/tmp/ops-env-{unique_suffix}.sh"
+            if dry_run:
+                env_script_path = Path(tempfile.gettempdir()) / f"ops-env-{unique_suffix}.sh"
+            else:
+                env_script_path = _create_env_script_file(settings.environment)
+                created_env_script = True
+            _run_local_compose(
+                settings,
+                ["cp", str(env_script_path), f"{service_name}:{container_env_path}"],
+                dry_run=dry_run,
+            )
+            command_string = shlex.join(exec_command)
+            exec_command = ["sh", "-lc", f". {shlex.quote(container_env_path)}; exec {command_string}"]
+
+        exec_arguments.append(service_name)
+        exec_arguments.extend(exec_command)
+        _run_local_compose(settings, exec_arguments, dry_run=dry_run)
+    finally:
+        if created_env_script and env_script_path is not None:
+            try:
+                env_script_path.unlink()
+            except OSError:
+                console.print("Warning: failed to remove temporary env file.")
+        if container_env_path and not dry_run:
+            cleanup_arguments = ["exec", "-T", service_name, "rm", "-f", container_env_path]
+            try:
+                _run_local_compose(settings, cleanup_arguments, dry_run=False)
+            except CommandError:
+                console.print(f"Warning: failed to remove temp env file {container_env_path} in {service_name}.")
+
+
 def _run_local_action(
     target: str,
     action: str,
@@ -1225,20 +1346,26 @@ def _run_local_action(
     build: bool,
     no_cache: bool,
     json_output: bool,
+    command: Sequence[str],
+    service: str | None,
+    env_file: Path | None,
+    skip_env: bool,
 ) -> None:
     if action == "info":
         payloads: list[dict[str, object]] = []
         for entry in _targets_for(target):
             stack = _resolve_local_stack(entry)
-            env_file_path = _resolve_local_env_file(entry)
+            env_file_path = env_file if env_file is not None else _resolve_local_env_file(entry)
             settings = load_stack_settings(stack, env_file_path)
             payloads.append(_local_info_payload(settings))
         _emit_local_info(payloads, json_output=json_output)
         return
+    if action not in ("exec", "shell") and command:
+        raise click.ClickException("Extra arguments are only supported for the 'exec' and 'shell' actions.")
     no_cache_used = False
     for entry in _targets_for(target):
         stack = _resolve_local_stack(entry)
-        env_file_path = _resolve_local_env_file(entry)
+        env_file_path = env_file if env_file is not None else _resolve_local_env_file(entry)
         if action == "down":
             settings = load_stack_settings(stack, env_file_path)
             if dry_run:
@@ -1275,6 +1402,14 @@ def _run_local_action(
             settings = load_stack_settings(stack, env_file_path)
             _run_local_openupgrade(settings, dry_run=dry_run)
             console.print(f"{entry} local openupgrade complete")
+            continue
+        if action == "exec":
+            settings = load_stack_settings(stack, env_file_path)
+            _run_local_exec(settings, command, service=service, skip_env=skip_env, dry_run=dry_run)
+            continue
+        if action == "shell":
+            settings = load_stack_settings(stack, env_file_path)
+            _run_local_shell(settings, command, service=service, skip_env=skip_env, dry_run=dry_run)
             continue
         settings = load_stack_settings(stack, env_file_path)
         if dry_run:
@@ -1870,6 +2005,10 @@ def _execute(
     require_confirm: bool,
     json_output: bool = False,
     record_history: bool = False,
+    command: Sequence[str] = (),
+    service: str | None = None,
+    env_file: Path | None = None,
+    skip_env: bool = False,
 ) -> None:
     valid_targets = set(_target_names()) | {ALL_TARGET}
     if target not in valid_targets:
@@ -1892,6 +2031,10 @@ def _execute(
             build=build,
             no_cache=no_cache,
             json_output=json_output,
+            command=command,
+            service=service,
+            env_file=env_file,
+            skip_env=skip_env,
         )
         if record_history:
             _record_history(
@@ -1986,16 +2129,24 @@ def main(
 @main.command("local")
 @click.argument("action", type=click.Choice(LOCAL_ACTIONS, case_sensitive=False))
 @click.argument("target")
+@click.argument("command", nargs=-1, required=False)
 @click.option("--build/--no-build", default=False, help="Build image before local actions")
 @click.option("--no-cache", is_flag=True, help="Build without cache")
 @click.option("--json", "json_output", is_flag=True, help="Output info as JSON (info action only)")
+@click.option("--service", default=None, help="Service to exec into (exec action only)")
+@click.option("--env-file", "env_file", type=click.Path(path_type=Path), default=None)
+@click.option("--no-env", "skip_env", is_flag=True, help="Skip passing the merged stack env into exec")
 @click.option("--dry-run", is_flag=True)
 def local_command(
     action: str,
     target: str,
+    command: tuple[str, ...],
     build: bool,
     no_cache: bool,
     json_output: bool,
+    service: str | None,
+    env_file: Path | None,
+    skip_env: bool,
     dry_run: bool,
 ) -> None:
     if json_output and action != "info":
@@ -2015,6 +2166,10 @@ def local_command(
         require_confirm=False,
         json_output=json_output,
         record_history=True,
+        command=command,
+        service=service,
+        env_file=env_file,
+        skip_env=skip_env,
     )
 
 

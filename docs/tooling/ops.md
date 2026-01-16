@@ -37,6 +37,8 @@ Quick start
   uv run ops local openupgrade opw
   uv run ops local doctor opw
   uv run ops local info opw --json
+  uv run ops local shell opw
+  uv run ops local exec opw -- /odoo/odoo-bin shell -d opw -c /volumes/config/_generated.conf
   uv run ops local up opw --build --no-cache
 
   uv run ops ship testing opw
@@ -108,6 +110,13 @@ Behavior notes
 - `uv run ops local openupgrade` runs the OpenUpgrade pipeline against the current
   database without restoring from upstream and resets module versions for
   modules that have OpenUpgrade scripts so their scripts re-run.
+- `uv run ops local exec <target> -- <command>` runs a command in the script-runner
+  container using the merged stack env. The merged env is staged in a temporary file to
+  avoid exposing secrets in process args or dry-run output. Use `--service` to target a
+  different service or `--no-env` to skip passing the merged env into the exec.
+- `uv run ops local shell <target>` runs the Odoo shell inside the script-runner using
+  the merged stack env and defaults (`-d $ODOO_DB_NAME -c /volumes/config/_generated.conf`).
+  Pass extra args after `--` to override defaults (for example, `-- --log-level=debug`).
 - `uv run ops ship prod <target> --after init` runs a prod bootstrap-only init
   via Coolify (sets the post-deploy command, deploys, waits for completion,
   then restores the previous post-deploy command). Requires the prod init guard.

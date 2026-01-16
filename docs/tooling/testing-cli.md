@@ -53,3 +53,6 @@ Environment Flags
   `uv run test wait --json`.
 - `JS_COUNT_STRATEGY=runtime` — report executed Hoot test counts instead of
   definition counts.
+- `COVERAGE_PY=1` — enable targeted Python coverage collection for test runs.
+- `COVERAGE_MODULES=addon_a,addon_b` — limit coverage to specific addons; reports
+  land in `tmp/test-logs/<session>/coverage/`.

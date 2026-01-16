@@ -7,6 +7,7 @@ from collections.abc import Callable
 from typing import Literal, TypeVar
 from pathlib import Path
 
+from .coverage import finalize_coverage, prepare_coverage_directory
 from .db import cleanup_test_databases, create_template_from_production, get_production_db_name
 from .filestore import cleanup_filestores
 from .phases import PhaseOutcome
@@ -113,6 +114,7 @@ class TestSession:
     def _begin(self) -> None:
         self.session_dir, self.session_name, self.session_started = begin_session_dir()
         os.environ["TEST_LOG_SESSION"] = self.session_name or ""
+        prepare_coverage_directory(self.settings, self.session_dir)
         # Events stream
         from .events import EventStream
 
@@ -204,6 +206,14 @@ class TestSession:
             "counters_source": source_counts,
             "counters_source_total": sum(int(count_value or 0) for count_value in source_counts.values()),
         }
+
+        try:
+            coverage_payload = finalize_coverage(self.settings, self.session_dir)
+        except (OSError, RuntimeError, ValueError) as exc:
+            _log_suppressed("finalize coverage", exc)
+            coverage_payload = None
+        if coverage_payload:
+            aggregate["coverage"] = coverage_payload
 
         # Merge per-phase aggregate counters if present (best-effort)
         def _sum_counter(key: str) -> int:

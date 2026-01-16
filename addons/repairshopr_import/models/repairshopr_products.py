@@ -30,19 +30,19 @@ class RepairshoprImporter(models.Model):
             )
             values = self._build_product_values(product)
             if product_record:
-                safe_values = self._sanitize_update_values(product_model, product_record, values)
+                safe_values = self._sanitize_update_values(product_record, values)
                 safe_values, standard_price = self._extract_standard_price(safe_values)
                 self._write_product_values(product_record, safe_values, standard_price)
                 continue
             matched_record = self._match_existing_product(product_model, product)
             if matched_record:
                 merged_values = self._merge_values_for_existing_product(matched_record, values)
-                safe_values = self._sanitize_update_values(product_model, matched_record, merged_values)
+                safe_values = self._sanitize_update_values(matched_record, merged_values)
                 safe_values, standard_price = self._extract_standard_price(safe_values)
                 self._write_product_values(matched_record, safe_values, standard_price)
                 matched_record.set_external_id(EXTERNAL_SYSTEM_CODE, str(product.id), RESOURCE_PRODUCT)
                 continue
-            safe_values = self._sanitize_create_values(product_model, values)
+            safe_values = self._sanitize_create_values(values)
             safe_values, standard_price = self._extract_standard_price(safe_values)
             product_record = product_model.create(safe_values)
             if standard_price is not None:
@@ -155,11 +155,7 @@ class RepairshoprImporter(models.Model):
         if category_match_id:
             return product_model.browse(category_match_id)
 
-        candidate_ids = [
-            record_id
-            for row in candidate_data
-            if (record_id := self._coerce_record_id(row.get("id"))) is not None
-        ]
+        candidate_ids = [record_id for row in candidate_data if (record_id := self._coerce_record_id(row.get("id"))) is not None]
         if not exact_name_ids and len(candidate_ids) == 1:
             return product_model.browse(candidate_ids[0])
         if len(exact_name_ids) > 1 or len(candidate_ids) > 1:
@@ -186,9 +182,7 @@ class RepairshoprImporter(models.Model):
                 record_id = self._coerce_record_id(row.get("id"))
                 if record_id is None:
                     continue
-                normalized_candidate = self._normalize_text(
-                    str(row.get("description") or row.get("description_sale") or "")
-                )
+                normalized_candidate = self._normalize_text(str(row.get("description") or row.get("description_sale") or ""))
                 if normalized_candidate == normalized_description:
                     matching_ids.append(record_id)
             if len(matching_ids) == 1:
@@ -202,9 +196,7 @@ class RepairshoprImporter(models.Model):
     ) -> int | None:
         if not candidate_data or not category_names:
             return None
-        normalized_categories = {
-            self._normalize_text(category) for category in category_names if self._normalize_text(category)
-        }
+        normalized_categories = {self._normalize_text(category) for category in category_names if self._normalize_text(category)}
         if not normalized_categories:
             return None
         matching_ids: list[int] = []
@@ -242,7 +234,6 @@ class RepairshoprImporter(models.Model):
 
     def _sanitize_update_values(
         self,
-        product_model: "odoo.model.product_template",
         product_record: "odoo.model.product_template",
         values: "odoo.values.product_template",
     ) -> "odoo.values.product_template":
@@ -263,9 +254,9 @@ class RepairshoprImporter(models.Model):
                 existing_barcode,
             )
             return sanitized_values
-        duplicate = product_model.with_context(active_test=False).search(
-            [("barcode", "=", barcode_value), ("id", "!=", product_record.id)],
-            limit=1,
+        duplicate = self._find_barcode_variant(
+            barcode_value,
+            excluded_variant_ids=product_record.product_variant_ids.ids,
         )
         if duplicate:
             sanitized_values.pop("barcode", None)
@@ -279,7 +270,6 @@ class RepairshoprImporter(models.Model):
 
     def _sanitize_create_values(
         self,
-        product_model: "odoo.model.product_template",
         values: "odoo.values.product_template",
     ) -> "odoo.values.product_template":
         if not values:
@@ -288,7 +278,7 @@ class RepairshoprImporter(models.Model):
         barcode_value = sanitized_values.get("barcode")
         if not barcode_value:
             return sanitized_values
-        duplicate = product_model.with_context(active_test=False).search([("barcode", "=", barcode_value)], limit=1)
+        duplicate = self._find_barcode_variant(barcode_value, excluded_variant_ids=None)
         if duplicate:
             sanitized_values.pop("barcode", None)
             _logger.warning(
@@ -297,6 +287,17 @@ class RepairshoprImporter(models.Model):
                 duplicate.display_name,
             )
         return sanitized_values
+
+    def _find_barcode_variant(
+        self,
+        barcode_value: str,
+        excluded_variant_ids: list[int] | None,
+    ) -> "odoo.model.product_product":
+        product_variant_model = self.env["product.product"].sudo().with_context(active_test=False)
+        domain: list[tuple[str, str, object]] = [("barcode", "=", barcode_value)]
+        if excluded_variant_ids:
+            domain.append(("id", "not in", excluded_variant_ids))
+        return product_variant_model.search(domain, limit=1)
 
     @staticmethod
     def _extract_standard_price(

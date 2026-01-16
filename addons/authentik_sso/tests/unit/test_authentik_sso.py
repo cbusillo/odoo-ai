@@ -143,3 +143,25 @@ class TestAuthentikSso(UnitTestCase):
 
         warning_messages = " ".join(log_capture.output)
         self.assertIn("no mappings configured", warning_messages)
+
+    def test_ensure_default_mappings_does_not_override_custom_admin_mapping(self) -> None:
+        admin_user = self.env.ref("base.user_admin")
+        system_group = self.env.ref("base.group_system")
+        mapping = self.env.ref("authentik_sso.authentik_group_mapping_admins")
+
+        extra_group = self.env["res.groups"].create({"name": "Extra Admin"})
+        admin_user.write({"group_ids": [(4, extra_group.id)]})
+
+        mapping.write({"odoo_groups": [(6, 0, [system_group.id])]})
+        self.AuthentikMapping.ensure_default_mappings()
+        mapping = self.AuthentikMapping.browse(mapping.id)
+        self.assertIn(extra_group.id, mapping.odoo_groups.ids)
+
+        mapping.write({"odoo_groups": [(3, extra_group.id)]})
+        group_ids_before = set(mapping.odoo_groups.ids)
+        self.assertNotIn(extra_group.id, group_ids_before)
+
+        self.AuthentikMapping.ensure_default_mappings()
+        mapping = self.AuthentikMapping.browse(mapping.id)
+        group_ids_after = set(mapping.odoo_groups.ids)
+        self.assertEqual(group_ids_after, group_ids_before)

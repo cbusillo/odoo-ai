@@ -56,6 +56,13 @@ class AuthentikSsoGroupMapping(models.Model):
 
     @api.model
     def _default_admin_groups(self) -> list[int]:
+        admin_user = self.env.ref("base.user_admin", raise_if_not_found=False)
+        admin_user = admin_user.exists() if admin_user else self.env["res.users"]
+        if admin_user and admin_user.group_ids:
+            admin_group_ids = sorted(set(admin_user.group_ids.ids))
+            if admin_group_ids:
+                return admin_group_ids
+
         group_model = self.env["res.groups"].sudo()
         admin_groups = group_model.search([("name", "ilike", "Admin")])
         admin_groups |= group_model.search([("name", "ilike", "Manager")])
@@ -77,8 +84,8 @@ class AuthentikSsoGroupMapping(models.Model):
         if system_group:
             admin_groups |= system_group
 
-        unique_ids = sorted({group.id for group in admin_groups})
-        return unique_ids
+        group_ids = sorted({group.id for group in admin_groups})
+        return group_ids
 
     @api.model
     def ensure_default_mappings(self) -> None:
@@ -96,6 +103,7 @@ class AuthentikSsoGroupMapping(models.Model):
             )
 
         admin_group_name = self._resolve_admin_group_name()
+        admin_mapping_was_created = False
         admin_mapping = mapping_model.search(
             [
                 ("authentik_group", "=", admin_group_name),
@@ -104,6 +112,7 @@ class AuthentikSsoGroupMapping(models.Model):
             limit=1,
         )
         if not admin_mapping:
+            admin_mapping_was_created = True
             admin_mapping = mapping_model.create(
                 {
                     "authentik_group": admin_group_name,
@@ -118,12 +127,16 @@ class AuthentikSsoGroupMapping(models.Model):
         system_group = self.env.ref("base.group_system", raise_if_not_found=False)
         system_group = system_group.exists() if system_group else self.env["res.groups"]
         current_group_ids = set(admin_mapping.odoo_groups.ids)
-        allow_seed = not current_group_ids
+        allow_seed = admin_mapping_was_created
         if default_record and admin_mapping.id == default_record.id:
             if system_group and current_group_ids == {system_group.id}:
                 allow_seed = True
+        if not allow_seed:
+            return
 
-        if allow_seed:
-            admin_group_ids = self._default_admin_groups()
-            admin_mapping.write({"odoo_groups": [(6, 0, admin_group_ids)]})
-            _logger.info("Initialized Authentik admin group mapping with %d groups.", len(admin_group_ids))
+        admin_group_ids = self._default_admin_groups()
+        if not admin_group_ids:
+            return
+
+        admin_mapping.write({"odoo_groups": [(6, 0, admin_group_ids)]})
+        _logger.info("Initialized Authentik admin group mapping with %d groups.", len(admin_group_ids))

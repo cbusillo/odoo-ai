@@ -26,3 +26,4 @@ Purpose
 - `ENV_OVERRIDE_AUTHENTIK__GROUP_CLAIM` provides the claim with group names.
 - Configure mappings in Settings → Users & Companies → Authentik Group Mappings.
 - Include a fallback mapping for users without a group claim (default maps to base users).
+- The default `authentik Admins` mapping is seeded from `base.user_admin` group memberships; edit it to diverge.

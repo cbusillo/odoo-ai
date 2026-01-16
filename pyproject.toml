@@ -104,5 +104,5 @@ disable_error_code = ["name-defined"]
 [tool.pyright]
 typeCheckingMode = "basic"
 executionEnvironments = [
-    { root = "addons", reportMissingImports = "none", reportUndefinedVariable = "none" },
+    { root = "addons", reportMissingImports = "none", reportMissingTypeStubs = "none", reportUndefinedVariable = "none", reportUnknownArgumentType = "none", reportUnknownMemberType = "none", reportUnknownParameterType = "none", reportUnknownVariableType = "none" },
 ]

@@ -30,16 +30,23 @@ class RepairshoprImporter(models.Model):
             )
             values = self._build_product_values(product)
             if product_record:
-                product_record.write(values)
+                safe_values = self._sanitize_update_values(product_model, product_record, values)
+                safe_values, standard_price = self._extract_standard_price(safe_values)
+                self._write_product_values(product_record, safe_values, standard_price)
                 continue
             matched_record = self._match_existing_product(product_model, product)
             if matched_record:
                 merged_values = self._merge_values_for_existing_product(matched_record, values)
-                if merged_values:
-                    matched_record.write(merged_values)
+                safe_values = self._sanitize_update_values(product_model, matched_record, merged_values)
+                safe_values, standard_price = self._extract_standard_price(safe_values)
+                self._write_product_values(matched_record, safe_values, standard_price)
                 matched_record.set_external_id(EXTERNAL_SYSTEM_CODE, str(product.id), RESOURCE_PRODUCT)
                 continue
-            product_record = product_model.create(values)
+            safe_values = self._sanitize_create_values(product_model, values)
+            safe_values, standard_price = self._extract_standard_price(safe_values)
+            product_record = product_model.create(safe_values)
+            if standard_price is not None:
+                product_record.with_context(disable_auto_revaluation=True).write({"standard_price": standard_price})
             product_record.set_external_id(EXTERNAL_SYSTEM_CODE, str(product.id), RESOURCE_PRODUCT)
 
     def _build_product_values(self, product: repairshopr_models.Product) -> "odoo.values.product_template":
@@ -122,75 +129,98 @@ class RepairshoprImporter(models.Model):
         normalized_name = self._normalize_text(match_name)
         if not normalized_name:
             return product_model.browse()
-        candidates = product_model.search([("name", "ilike", match_name)], limit=25)
-        if not candidates:
+        candidate_data = product_model.search_read(
+            [("name", "ilike", match_name)],
+            ["name", "description", "description_sale", "categ_id"],
+            limit=25,
+        )
+        if not candidate_data:
             return product_model.browse()
         name_keys = self._build_name_keys(match_name, description_values)
-        exact_name_matches = candidates.filtered(
-            lambda record: self._normalize_text(record.name or "") in name_keys
-        )
-        if len(exact_name_matches) == 1:
-            return exact_name_matches
+        exact_name_ids: list[int] = []
+        for row in candidate_data:
+            record_id = self._coerce_record_id(row.get("id"))
+            if record_id is None:
+                continue
+            if self._normalize_text(str(row.get("name") or "")) in name_keys:
+                exact_name_ids.append(record_id)
+        if len(exact_name_ids) == 1:
+            return product_model.browse(exact_name_ids[0])
 
-        description_match = self._match_product_by_description(exact_name_matches or candidates, description_values)
-        if description_match:
-            return description_match
+        description_match_id = self._match_candidate_by_description(candidate_data, description_values)
+        if description_match_id:
+            return product_model.browse(description_match_id)
 
-        category_match = self._match_product_by_category(exact_name_matches or candidates, category_names)
-        if category_match:
-            return category_match
+        category_match_id = self._match_candidate_by_category(candidate_data, category_names)
+        if category_match_id:
+            return product_model.browse(category_match_id)
 
-        if len(exact_name_matches) == 0 and len(candidates) == 1:
-            return candidates
-        if len(exact_name_matches) > 1 or len(candidates) > 1:
+        candidate_ids = [
+            record_id
+            for row in candidate_data
+            if (record_id := self._coerce_record_id(row.get("id"))) is not None
+        ]
+        if not exact_name_ids and len(candidate_ids) == 1:
+            return product_model.browse(candidate_ids[0])
+        if len(exact_name_ids) > 1 or len(candidate_ids) > 1:
             _logger.warning(
                 "RepairShopr product name '%s' matched multiple products: %s",
                 match_name,
-                (exact_name_matches or candidates).ids,
+                exact_name_ids or candidate_ids,
             )
         return product_model.browse()
 
-    def _match_product_by_description(
+    def _match_candidate_by_description(
         self,
-        candidates: "odoo.model.product_template",
+        candidate_data: list[dict[str, object]],
         description_values: list[str],
-    ) -> "odoo.model.product_template":
-        if not candidates or not description_values:
-            return candidates.browse()
+    ) -> int | None:
+        if not candidate_data or not description_values:
+            return None
         for description_value in description_values:
             normalized_description = self._normalize_text(description_value)
             if not normalized_description:
                 continue
-            description_matches = candidates.browse()
-            for record in candidates:
-                normalized_record_description = self._normalize_text(record.description or record.description_sale or "")
-                if normalized_record_description != normalized_description:
+            matching_ids: list[int] = []
+            for row in candidate_data:
+                record_id = self._coerce_record_id(row.get("id"))
+                if record_id is None:
                     continue
-                description_matches |= record
-                if len(description_matches) > 1:
-                    break
-            if len(description_matches) == 1:
-                return description_matches
-        return candidates.browse()
+                normalized_candidate = self._normalize_text(
+                    str(row.get("description") or row.get("description_sale") or "")
+                )
+                if normalized_candidate == normalized_description:
+                    matching_ids.append(record_id)
+            if len(matching_ids) == 1:
+                return matching_ids[0]
+        return None
 
-    def _match_product_by_category(
+    def _match_candidate_by_category(
         self,
-        candidates: "odoo.model.product_template",
+        candidate_data: list[dict[str, object]],
         category_names: list[str],
-    ) -> "odoo.model.product_template":
-        if not candidates or not category_names:
-            return candidates.browse()
+    ) -> int | None:
+        if not candidate_data or not category_names:
+            return None
         normalized_categories = {
             self._normalize_text(category) for category in category_names if self._normalize_text(category)
         }
         if not normalized_categories:
-            return candidates.browse()
-        category_matches = candidates.filtered(
-            lambda record: self._normalize_text(record.categ_id.name or "") in normalized_categories
-        )
-        if len(category_matches) == 1:
-            return category_matches
-        return candidates.browse()
+            return None
+        matching_ids: list[int] = []
+        for row in candidate_data:
+            record_id = self._coerce_record_id(row.get("id"))
+            if record_id is None:
+                continue
+            category_info = row.get("categ_id")
+            if not category_info:
+                continue
+            category_name = category_info[1] if isinstance(category_info, (list, tuple)) and len(category_info) > 1 else ""
+            if self._normalize_text(str(category_name)) in normalized_categories:
+                matching_ids.append(record_id)
+        if len(matching_ids) == 1:
+            return matching_ids[0]
+        return None
 
     @staticmethod
     def _merge_values_for_existing_product(
@@ -209,6 +239,85 @@ class RepairshoprImporter(models.Model):
         if values.get("active") and not product_record.active:
             merged_values["active"] = True
         return merged_values
+
+    def _sanitize_update_values(
+        self,
+        product_model: "odoo.model.product_template",
+        product_record: "odoo.model.product_template",
+        values: "odoo.values.product_template",
+    ) -> "odoo.values.product_template":
+        if not values:
+            return values
+        sanitized_values: "odoo.values.product_template" = dict(values)
+        barcode_value = sanitized_values.get("barcode")
+        if not barcode_value:
+            return sanitized_values
+        existing_barcode = product_record.barcode or ""
+        if existing_barcode and existing_barcode != barcode_value:
+            sanitized_values.pop("barcode", None)
+            _logger.warning(
+                "RepairShopr product %s wants barcode %s but product %s already has %s; skipping barcode update.",
+                product_record.display_name,
+                barcode_value,
+                product_record.id,
+                existing_barcode,
+            )
+            return sanitized_values
+        duplicate = product_model.with_context(active_test=False).search(
+            [("barcode", "=", barcode_value), ("id", "!=", product_record.id)],
+            limit=1,
+        )
+        if duplicate:
+            sanitized_values.pop("barcode", None)
+            _logger.warning(
+                "RepairShopr barcode %s already assigned to product %s; skipping barcode update for %s.",
+                barcode_value,
+                duplicate.display_name,
+                product_record.display_name,
+            )
+        return sanitized_values
+
+    def _sanitize_create_values(
+        self,
+        product_model: "odoo.model.product_template",
+        values: "odoo.values.product_template",
+    ) -> "odoo.values.product_template":
+        if not values:
+            return values
+        sanitized_values: "odoo.values.product_template" = dict(values)
+        barcode_value = sanitized_values.get("barcode")
+        if not barcode_value:
+            return sanitized_values
+        duplicate = product_model.with_context(active_test=False).search([("barcode", "=", barcode_value)], limit=1)
+        if duplicate:
+            sanitized_values.pop("barcode", None)
+            _logger.warning(
+                "RepairShopr barcode %s already assigned to product %s; skipping barcode on new product.",
+                barcode_value,
+                duplicate.display_name,
+            )
+        return sanitized_values
+
+    @staticmethod
+    def _extract_standard_price(
+        values: "odoo.values.product_template",
+    ) -> tuple["odoo.values.product_template", float | None]:
+        if not values:
+            return values, None
+        sanitized_values: "odoo.values.product_template" = dict(values)
+        standard_price = sanitized_values.pop("standard_price", None)
+        return sanitized_values, standard_price
+
+    @staticmethod
+    def _write_product_values(
+        product_record: "odoo.model.product_template",
+        values: "odoo.values.product_template",
+        standard_price: float | None,
+    ) -> None:
+        if values:
+            product_record.write(values)
+        if standard_price is not None:
+            product_record.with_context(disable_auto_revaluation=True).write({"standard_price": standard_price})
 
     @staticmethod
     def _normalize_barcode(value: str | None) -> str | None:
@@ -230,6 +339,14 @@ class RepairshoprImporter(models.Model):
                 if normalized:
                     name_keys.add(normalized)
         return {name_key for name_key in name_keys if name_key}
+
+    @staticmethod
+    def _coerce_record_id(value: object) -> int | None:
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str) and value.isdigit():
+            return int(value)
+        return None
 
     def _get_product_variant_for_line_item(
         self,

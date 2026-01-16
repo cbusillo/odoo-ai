@@ -91,7 +91,6 @@ class TestAuthentikSso(UnitTestCase):
 
         self.Users._sync_authentik_groups(user, {"groups": ["Engineering"]}, provider.id)
 
-        engineering_group.invalidate_cache(["user_ids", "all_user_ids"])
         self.assertIn(user, engineering_group.user_ids)
         self.assertTrue(user.has_group("base.group_user"))
 
@@ -119,7 +118,6 @@ class TestAuthentikSso(UnitTestCase):
 
         self.Users._sync_authentik_groups(user, {}, provider.id)
 
-        fallback_group.invalidate_cache(["user_ids", "all_user_ids"])
         self.assertIn(user, fallback_group.user_ids)
 
     def test_sync_authentik_groups_without_mapping_logs_warning(self) -> None:

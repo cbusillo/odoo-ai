@@ -1,3 +1,4 @@
+from ...models import fishbowl_rows
 from ...models.fishbowl_import_constants import (
     LEGACY_BUCKET_ADHOC,
     LEGACY_BUCKET_DISCOUNT,
@@ -27,6 +28,10 @@ class TestFishbowlHelpers(UnitTestCase):
         self.assertEqual(self.Importer._legacy_bucket_for_line("random item", 5.0), LEGACY_BUCKET_ADHOC)
         self.assertEqual(self.Importer._legacy_bucket_for_line("discount", -1.0), LEGACY_BUCKET_DISCOUNT)
 
+    def test_legacy_bucket_for_line_non_standard_labels(self) -> None:
+        self.assertEqual(self.Importer._legacy_bucket_for_line("FedEx freight", 12.0), LEGACY_BUCKET_SHIPPING)
+        self.assertEqual(self.Importer._legacy_bucket_for_line("Credit card fee", 3.0), LEGACY_BUCKET_FEE)
+
     def test_build_legacy_line_name(self) -> None:
         line_name = self.Importer._build_legacy_line_name("Widget", "SKU-1", None)
         self.assertEqual(line_name, "SKU-1 - Widget")
@@ -37,3 +42,11 @@ class TestFishbowlHelpers(UnitTestCase):
         template_model = self.env["product.template"]
         field_name = self.Importer._product_type_field(template_model)
         self.assertIn(field_name, {"detailed_type", "type"})
+
+    def test_resolve_product_from_sales_row_missing_id(self) -> None:
+        row = fishbowl_rows.SalesOrderLineRow(id=1)
+        product_maps = {"product": {}}
+
+        product_id = self.Importer._resolve_product_from_sales_row(row, product_maps)
+
+        self.assertIsNone(product_id)

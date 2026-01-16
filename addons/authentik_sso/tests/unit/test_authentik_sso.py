@@ -83,3 +83,54 @@ class TestAuthentikSso(UnitTestCase):
         engineering_group.invalidate_cache(["user_ids", "all_user_ids"])
         self.assertIn(user, engineering_group.user_ids)
         self.assertTrue(user.has_group("base.group_user"))
+
+    def test_sync_authentik_groups_uses_fallback_mapping(self) -> None:
+        provider = self.env["auth.oauth.provider"].create(
+            {
+                "name": "Authentik",
+                "auth_endpoint": "https://auth.example.com/authorize",
+                "validation_endpoint": "https://auth.example.com/userinfo",
+                "body": "Login with Authentik",
+                "enabled": True,
+            }
+        )
+        fallback_group = self.env["res.groups"].create({"name": "Fallback Team"})
+        fallback_mapping = self.AuthentikMapping.search([("is_fallback", "=", True)], limit=1)
+        if not fallback_mapping:
+            fallback_mapping = self.AuthentikMapping.create({"is_fallback": True})
+        fallback_mapping.write({"odoo_groups": [(4, fallback_group.id)]})
+        user = self.env["res.users"].create(
+            {
+                "name": "Fallback User",
+                "login": "fallback_user",
+            }
+        )
+
+        self.Users._sync_authentik_groups(user, {}, provider.id)
+
+        fallback_group.invalidate_cache(["user_ids", "all_user_ids"])
+        self.assertIn(user, fallback_group.user_ids)
+
+    def test_sync_authentik_groups_without_mapping_logs_warning(self) -> None:
+        provider = self.env["auth.oauth.provider"].create(
+            {
+                "name": "Authentik",
+                "auth_endpoint": "https://auth.example.com/authorize",
+                "validation_endpoint": "https://auth.example.com/userinfo",
+                "body": "Login with Authentik",
+                "enabled": True,
+            }
+        )
+        self.AuthentikMapping.search([]).unlink()
+        user = self.env["res.users"].create(
+            {
+                "name": "No Mapping User",
+                "login": "no_mapping_user",
+            }
+        )
+
+        with self.assertLogs("odoo.addons.authentik_sso.models.res_users", level="WARNING") as log_capture:
+            self.Users._sync_authentik_groups(user, {"groups": ["Engineering"]}, provider.id)
+
+        warning_messages = " ".join(log_capture.output)
+        self.assertIn("no mappings configured", warning_messages)

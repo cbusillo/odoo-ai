@@ -2,8 +2,8 @@ from datetime import datetime
 
 from odoo import models
 
-from repairshopr_api import models as repairshopr_models
-from repairshopr_api.client import Client
+from ..services import repairshopr_sync_models as repairshopr_models
+from ..services.repairshopr_sync_client import RepairshoprSyncClient
 
 from .repairshopr_importer import DEFAULT_HELPDESK_TEAM_NAME, EXTERNAL_SYSTEM_CODE, IMPORT_CONTEXT, RESOURCE_TICKET
 
@@ -11,7 +11,7 @@ from .repairshopr_importer import DEFAULT_HELPDESK_TEAM_NAME, EXTERNAL_SYSTEM_CO
 class RepairshoprImporter(models.Model):
     _inherit = "repairshopr.importer"
 
-    def _import_tickets(self, repairshopr_client: Client, start_datetime: datetime | None) -> None:
+    def _import_tickets(self, repairshopr_client: RepairshoprSyncClient, start_datetime: datetime | None) -> None:
         ticket_model = self.env["helpdesk.ticket"].sudo().with_context(IMPORT_CONTEXT)
         helpdesk_team = self._get_helpdesk_team()
         tickets = repairshopr_client.get_model(repairshopr_models.Ticket, updated_at=start_datetime)

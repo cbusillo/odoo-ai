@@ -1,16 +1,16 @@
 from datetime import datetime
 
 from odoo import models
-from repairshopr_api import models as repairshopr_models
-from repairshopr_api.client import Client
 
+from ..services import repairshopr_sync_models as repairshopr_models
+from ..services.repairshopr_sync_client import RepairshoprSyncClient
 from .repairshopr_importer import EXTERNAL_SYSTEM_CODE, IMPORT_CONTEXT, RESOURCE_CONTACT, RESOURCE_CUSTOMER
 
 
 class RepairshoprImporter(models.Model):
     _inherit = "repairshopr.importer"
 
-    def _import_customers(self, repairshopr_client: Client, start_datetime: datetime | None) -> None:
+    def _import_customers(self, repairshopr_client: RepairshoprSyncClient, start_datetime: datetime | None) -> None:
         partner_model = self.env["res.partner"].sudo().with_context(IMPORT_CONTEXT)
         customers = repairshopr_client.get_model(repairshopr_models.Customer, updated_at=start_datetime)
         for customer in customers:

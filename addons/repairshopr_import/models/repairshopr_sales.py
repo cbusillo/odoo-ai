@@ -5,8 +5,8 @@ from typing import Any
 from odoo import fields, models
 from odoo.exceptions import UserError
 
-from repairshopr_api import models as repairshopr_models
-from repairshopr_api.client import Client
+from ..services import repairshopr_sync_models as repairshopr_models
+from ..services.repairshopr_sync_client import RepairshoprSyncClient
 
 from .repairshopr_importer import EXTERNAL_SYSTEM_CODE, IMPORT_CONTEXT, RESOURCE_ESTIMATE, RESOURCE_INVOICE
 
@@ -16,7 +16,7 @@ _logger = logging.getLogger(__name__)
 class RepairshoprImporter(models.Model):
     _inherit = "repairshopr.importer"
 
-    def _import_estimates(self, repairshopr_client: Client, start_datetime: datetime | None) -> None:
+    def _import_estimates(self, repairshopr_client: RepairshoprSyncClient, start_datetime: datetime | None) -> None:
         order_model = self.env["sale.order"].sudo().with_context(IMPORT_CONTEXT)
         estimates = repairshopr_client.get_model(repairshopr_models.Estimate, updated_at=start_datetime)
         for estimate in estimates:
@@ -48,7 +48,7 @@ class RepairshoprImporter(models.Model):
                 order_record = order_model.create(values)
                 order_record.set_external_id(EXTERNAL_SYSTEM_CODE, str(estimate.id), RESOURCE_ESTIMATE)
 
-    def _import_invoices(self, repairshopr_client: Client, start_datetime: datetime | None) -> None:
+    def _import_invoices(self, repairshopr_client: RepairshoprSyncClient, start_datetime: datetime | None) -> None:
         move_model = self.env["account.move"].sudo().with_context(IMPORT_CONTEXT)
         sales_journal = self._get_sales_journal()
         invoices = repairshopr_client.get_model(repairshopr_models.Invoice, updated_at=start_datetime)
@@ -135,7 +135,7 @@ class RepairshoprImporter(models.Model):
             values["narration"] = invoice.note
         return values
 
-    def _build_sale_order_lines(self, repairshopr_client: Client, estimate_id: int | None) -> list[tuple]:
+    def _build_sale_order_lines(self, repairshopr_client: RepairshoprSyncClient, estimate_id: int | None) -> list[tuple]:
         line_items = self._fetch_line_items(repairshopr_client, estimate_id=estimate_id)
         line_commands: list[tuple] = []
         for line_item_data in line_items:
@@ -144,7 +144,7 @@ class RepairshoprImporter(models.Model):
                 line_commands.append((0, 0, line_values))
         return line_commands
 
-    def _build_invoice_lines(self, repairshopr_client: Client, invoice_id: int | None) -> list[tuple]:
+    def _build_invoice_lines(self, repairshopr_client: RepairshoprSyncClient, invoice_id: int | None) -> list[tuple]:
         line_items = self._fetch_line_items(repairshopr_client, invoice_id=invoice_id)
         line_commands: list[tuple] = []
         for line_item_data in line_items:
@@ -190,19 +190,12 @@ class RepairshoprImporter(models.Model):
 
     @staticmethod
     def _fetch_line_items(
-        repairshopr_client: Client,
+        repairshopr_client: RepairshoprSyncClient,
         *,
         estimate_id: int | None = None,
         invoice_id: int | None = None,
     ) -> list[dict[str, Any]]:
-        query_parameters: dict[str, str] = {}
-        if estimate_id:
-            query_parameters["estimate_id"] = str(estimate_id)
-        if invoice_id:
-            query_parameters["invoice_id"] = str(invoice_id)
-        if not query_parameters:
-            return []
-        line_items = repairshopr_client.fetch_from_api("line_item", params=query_parameters)[0]
+        line_items = repairshopr_client.fetch_line_items(estimate_id=estimate_id, invoice_id=invoice_id)
         return list(line_items or [])
 
     def _get_sales_journal(self) -> "odoo.model.account_journal":

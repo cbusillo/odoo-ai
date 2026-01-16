@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .auth import setup_test_authentication
 from .browser import kill_browsers_and_zombies, restart_script_runner_with_orphan_cleanup
+from .coverage import build_coverage_run
 from .db import (
     clone_production_database,
     drop_and_create,
@@ -166,12 +167,17 @@ class OdooExecutor:
 
         module_flag = "-u" if use_production_clone else "-i"
 
+        coverage_run = build_coverage_run(self.settings, self.session_dir, modules_to_install)
+        combined_env: dict[str, str] = {}
+        if coverage_run:
+            combined_env.update(coverage_run.environment)
+        if extra_env:
+            combined_env.update({key: value for key, value in extra_env.items() if value is not None})
+
         command = ["docker", "compose", "run", "--rm"]
         # Per-shard environment injection (for slicer etc.)
-        if extra_env:
-            for env_key, env_value in extra_env.items():
-                if env_value is None:
-                    continue
+        if combined_env:
+            for env_key, env_value in combined_env.items():
                 command.extend(["-e", f"{env_key}={env_value}"])
         # pass-through debug/timeouts
         for env_var in ("JS_PRECHECK", "JS_DEBUG", "TOUR_TIMEOUT"):
@@ -184,48 +190,48 @@ class OdooExecutor:
             js_workers_default = int(self.settings.js_workers)
             if is_tour_test or is_js_test:
                 command.extend(["-e", f"TOUR_WARMUP={self.settings.tour_warmup}"])
-            command.extend(
-                [
-                    script_runner_service,
-                    "/odoo/odoo-bin",
-                    "-d",
-                    db_name,
-                    "--load=web",
-                    module_flag,
-                    modules_str,
-                    "--test-tags",
-                    test_tags_final,
-                    "--test-enable",
-                    "--stop-after-init",
-                    "--max-cron-threads=0",
-                    f"--workers={js_workers_default if is_js_test else tour_workers_default}",
-                    f"--db-filter=^{db_name}$",
-                    "--log-level=test",
-                    "--without-demo",
-                ]
-            )
+            runner_command = [
+                "/odoo/odoo-bin",
+                "-d",
+                db_name,
+                "--load=web",
+                module_flag,
+                modules_str,
+                "--test-tags",
+                test_tags_final,
+                "--test-enable",
+                "--stop-after-init",
+                "--max-cron-threads=0",
+                f"--workers={js_workers_default if is_js_test else tour_workers_default}",
+                f"--db-filter=^{db_name}$",
+                "--log-level=test",
+                "--without-demo",
+            ]
+            if coverage_run:
+                runner_command = coverage_run.command_prefix + runner_command
+            command.extend([script_runner_service, *runner_command])
             if is_tour_test:
                 command.append("--dev=assets")
         else:
-            command.extend(
-                [
-                    script_runner_service,
-                    "/odoo/odoo-bin",
-                    "-d",
-                    db_name,
-                    module_flag,
-                    modules_str,
-                    "--test-tags",
-                    test_tags_final,
-                    "--test-enable",
-                    "--stop-after-init",
-                    "--max-cron-threads=0",
-                    "--workers=0",
-                    f"--db-filter=^{db_name}$",
-                    "--log-level=test",
-                    "--without-demo",
-                ]
-            )
+            runner_command = [
+                "/odoo/odoo-bin",
+                "-d",
+                db_name,
+                module_flag,
+                modules_str,
+                "--test-tags",
+                test_tags_final,
+                "--test-enable",
+                "--stop-after-init",
+                "--max-cron-threads=0",
+                "--workers=0",
+                f"--db-filter=^{db_name}$",
+                "--log-level=test",
+                "--without-demo",
+            ]
+            if coverage_run:
+                runner_command = coverage_run.command_prefix + runner_command
+            command.extend([script_runner_service, *runner_command])
 
         phase_dir = self._phase_dir()
 

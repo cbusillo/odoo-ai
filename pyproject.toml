@@ -25,6 +25,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "coverage",
     "debugpy",
     "lxml-stubs",
     "types-Werkzeug",

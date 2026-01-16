@@ -65,3 +65,4 @@ class TestSettings(BaseSettings):
 
     # Coverage toggles (pass-through / future use)
     coverage_py: bool = Field(False, alias="COVERAGE_PY")
+    coverage_modules: str | None = Field(None, alias="COVERAGE_MODULES")

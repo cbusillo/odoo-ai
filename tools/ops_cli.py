@@ -1318,6 +1318,12 @@ def _run_local_exec(
                 ["cp", str(env_script_path), f"{service_name}:{container_env_path}"],
                 dry_run=dry_run,
             )
+            if not dry_run:
+                _run_local_compose(
+                    settings,
+                    ["exec", "-T", "--user", "root", service_name, "chmod", "644", container_env_path],
+                    dry_run=False,
+                )
             command_string = shlex.join(exec_command)
             exec_command = ["sh", "-lc", f". {shlex.quote(container_env_path)}; exec {command_string}"]
 
@@ -1331,7 +1337,7 @@ def _run_local_exec(
             except OSError:
                 console.print("Warning: failed to remove temporary env file.")
         if container_env_path and not dry_run:
-            cleanup_arguments = ["exec", "-T", service_name, "rm", "-f", container_env_path]
+            cleanup_arguments = ["exec", "-T", "--user", "root", service_name, "rm", "-f", container_env_path]
             try:
                 _run_local_compose(settings, cleanup_arguments, dry_run=False)
             except CommandError:

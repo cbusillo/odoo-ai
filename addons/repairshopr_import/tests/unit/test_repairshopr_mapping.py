@@ -164,9 +164,10 @@ class TestRepairshoprMapping(UnitTestCase):
     def test_fetch_line_items_handles_missing_payload(self) -> None:
         class ClientStub:
             @staticmethod
-            def fetch_from_api(_endpoint: str, *, params: dict[str, str]) -> tuple[list[dict[str, object]] | None]:
-                _ = params
-                return (None,)
+            def fetch_line_items(*, estimate_id: int | None = None, invoice_id: int | None = None) -> list[dict[str, object]] | None:
+                _ = estimate_id
+                _ = invoice_id
+                return None
 
         line_items = self.importer._fetch_line_items(ClientStub(), estimate_id=10)
 
@@ -246,13 +247,10 @@ class TestRepairshoprMapping(UnitTestCase):
                 return self._estimates
 
             @staticmethod
-            def fetch_from_api(
-                _endpoint: str,
-                *,
-                params: dict[str, str],
-            ) -> tuple[list[dict[str, object]]]:
-                _ = params
-                return ([],)
+            def fetch_line_items(*, estimate_id: int | None = None, invoice_id: int | None = None) -> list[dict[str, object]]:
+                _ = estimate_id
+                _ = invoice_id
+                return []
 
         estimate_record = SimpleNamespace(
             id=606,

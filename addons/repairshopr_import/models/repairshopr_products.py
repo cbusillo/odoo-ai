@@ -3,8 +3,9 @@ import re
 from datetime import datetime
 
 from odoo import models
-from repairshopr_api import models as repairshopr_models
-from repairshopr_api.client import Client
+
+from ..services import repairshopr_sync_models as repairshopr_models
+from ..services.repairshopr_sync_client import RepairshoprSyncClient
 
 from .repairshopr_importer import (
     DEFAULT_SERVICE_PRODUCT_CODE,
@@ -19,7 +20,7 @@ _logger = logging.getLogger(__name__)
 class RepairshoprImporter(models.Model):
     _inherit = "repairshopr.importer"
 
-    def _import_products(self, repairshopr_client: Client, start_datetime: datetime | None) -> None:
+    def _import_products(self, repairshopr_client: RepairshoprSyncClient, start_datetime: datetime | None) -> None:
         product_model = self.env["product.template"].sudo().with_context(IMPORT_CONTEXT)
         products = repairshopr_client.get_model(repairshopr_models.Product, updated_at=start_datetime)
         for product in products:

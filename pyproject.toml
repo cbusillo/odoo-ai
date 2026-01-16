@@ -17,7 +17,7 @@ dependencies = [
     "pydantic_settings",
     "questionary",
     "requests",
-    "repairshopr-api",
+    "PyMySQL==1.1.1",
     "ruff",
     "rich",
     "mypy",
@@ -93,10 +93,6 @@ plugins = ["pydantic.mypy"]
 module = ["odoo", "odoo.*"]
 ignore_missing_imports = true
 disable_error_code = ["name-defined"]
-
-[[tool.mypy.overrides]]
-module = ["repairshopr_api", "repairshopr_api.*"]
-ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["repairshopr_import", "repairshopr_import.*"]

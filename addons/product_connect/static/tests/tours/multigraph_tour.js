@@ -65,8 +65,8 @@ registry.category("web_tour.tours").add("test_multigraph_view", {
             },
         },
         {
-            content: "Graph view visible",
-            trigger: ".o_view_controller .o_graph_view",
+            content: "Graph or multigraph view visible",
+            trigger: ".o_view_controller .o_graph_view, .o_multigraph_renderer",
             timeout: 30000,
         },
         {

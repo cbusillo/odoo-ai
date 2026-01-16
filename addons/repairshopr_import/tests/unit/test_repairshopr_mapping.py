@@ -1,7 +1,6 @@
 from types import SimpleNamespace
 
 from ...models.repairshopr_importer import EXTERNAL_SYSTEM_CODE, RESOURCE_ESTIMATE, RESOURCE_PRODUCT
-
 from ..common_imports import UNIT_TAGS, tagged
 from ..fixtures.base import UnitTestCase
 
@@ -164,7 +163,8 @@ class TestRepairshoprMapping(UnitTestCase):
 
     def test_fetch_line_items_handles_missing_payload(self) -> None:
         class ClientStub:
-            def fetch_from_api(self, _endpoint: str, *, params: dict[str, str]) -> tuple[list[dict[str, object]] | None]:
+            @staticmethod
+            def fetch_from_api(_endpoint: str, *, params: dict[str, str]) -> tuple[list[dict[str, object]] | None]:
                 return (None,)
 
         line_items = self.importer._fetch_line_items(ClientStub(), estimate_id=10)
@@ -242,8 +242,8 @@ class TestRepairshoprMapping(UnitTestCase):
             def get_model(self, _model: object, *, updated_at: object = None) -> list[SimpleNamespace]:
                 return self._estimates
 
+            @staticmethod
             def fetch_from_api(
-                self,
                 _endpoint: str,
                 *,
                 params: dict[str, str],

@@ -4,7 +4,6 @@ from datetime import timedelta
 from typing import Any, Self
 
 from odoo import api, fields, models
-from odoo.osv import expression
 from odoo.exceptions import UserError, ValidationError
 
 from ..services.shopify.helpers import SyncMode
@@ -140,10 +139,10 @@ class ProductTemplate(models.Model):
     @api.model
     def _read_group(
         self,
-        domain: list,
+        domain: fields.Domain,
         groupby: tuple[str, ...] | list[str] = (),
         aggregates: tuple[str, ...] | list[str] = (),
-        having: list = (),
+        having: fields.Domain = (),
         offset: int = 0,
         limit: int | None = None,
         order: str | None = None,
@@ -182,10 +181,10 @@ class ProductTemplate(models.Model):
     @api.model
     def formatted_read_group(
         self,
-        domain: list,
+        domain: fields.Domain,
         groupby: tuple[str, ...] | list[str] = (),
         aggregates: tuple[str, ...] | list[str] = (),
-        having: list = (),
+        having: fields.Domain = (),
         offset: int = 0,
         limit: int | None = None,
         order: str | None = None,
@@ -205,7 +204,7 @@ class ProductTemplate(models.Model):
         self,
         groups: list[dict[str, Any]],
         field_names: tuple[str, ...] | list[str],
-        base_domain: list | None = None,
+        base_domain: fields.Domain | None = None,
     ) -> list[dict[str, Any]]:
         requested_field_names = set(field_names)
         weighted_list_price_requested = "list_price" in requested_field_names or "list_price:sum" in requested_field_names
@@ -215,13 +214,13 @@ class ProductTemplate(models.Model):
         if not weighted_list_price_requested and not weighted_standard_price_requested:
             return groups
         for group in groups:
-            group_domain = group.get("__domain")
+            group_domain: fields.Domain | None = group.get("__domain")
             output_prefix = ""
             if group_domain is None:
-                extra_domain = group.get("__extra_domain")
+                extra_domain: fields.Domain | None = group.get("__extra_domain")
                 if extra_domain is None or base_domain is None:
                     continue
-                group_domain = expression.AND([extra_domain, base_domain])
+                group_domain = fields.Domain(extra_domain) & fields.Domain(base_domain)
                 output_prefix = ":sum"
 
             products = self.search(group_domain)
@@ -241,8 +240,8 @@ class ProductTemplate(models.Model):
         groupby: tuple[str, ...] | list[str],
         aggregates: tuple[str, ...] | list[str],
         *,
-        base_domain: list,
-        having: list,
+        base_domain: fields.Domain,
+        having: fields.Domain,
         offset: int,
         limit: int | None,
         order: str | None,

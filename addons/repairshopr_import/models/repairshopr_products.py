@@ -161,10 +161,14 @@ class RepairshoprImporter(models.Model):
             normalized_description = self._normalize_text(description_value)
             if not normalized_description:
                 continue
-            description_matches = candidates.filtered(
-                lambda record: self._normalize_text(record.description or record.description_sale or "")
-                == normalized_description
-            )
+            description_matches = candidates.browse()
+            for record in candidates:
+                normalized_record_description = self._normalize_text(record.description or record.description_sale or "")
+                if normalized_record_description != normalized_description:
+                    continue
+                description_matches |= record
+                if len(description_matches) > 1:
+                    break
             if len(description_matches) == 1:
                 return description_matches
         return candidates.browse()
@@ -188,8 +192,8 @@ class RepairshoprImporter(models.Model):
             return category_matches
         return candidates.browse()
 
+    @staticmethod
     def _merge_values_for_existing_product(
-        self,
         product_record: "odoo.model.product_template",
         values: "odoo.values.product_template",
     ) -> "odoo.values.product_template":

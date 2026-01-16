@@ -175,6 +175,10 @@ class OdooExecutor:
             combined_env.update({key: value for key, value in extra_env.items() if value is not None})
 
         command = ["docker", "compose", "run", "--rm"]
+        if coverage_run:
+            host_session_dir = coverage_run.data_directory.parent.resolve()
+            container_session_dir = str(Path(coverage_run.container_directory).parent)
+            command.extend(["-v", f"{host_session_dir}:{container_session_dir}"])
         # Per-shard environment injection (for slicer etc.)
         if combined_env:
             for env_key, env_value in combined_env.items():

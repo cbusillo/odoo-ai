@@ -114,7 +114,17 @@ def finalize_coverage(settings: TestSettings, session_directory: Path) -> dict[s
     container_directory = _container_session_path(session_directory) / COVERAGE_DIRECTORY_NAME
     data_file = f"{container_directory}/.coverage"
     script_runner_service = get_script_runner_service()
-    base_command = ["docker", "compose", "run", "--rm", script_runner_service]
+    host_session_dir = session_directory.resolve()
+    container_session_dir = _container_session_path(session_directory)
+    base_command = [
+        "docker",
+        "compose",
+        "run",
+        "--rm",
+        "-v",
+        f"{host_session_dir}:{container_session_dir}",
+        script_runner_service,
+    ]
 
     combine_result = _run_coverage_command(
         base_command
@@ -188,4 +198,3 @@ def finalize_coverage(settings: TestSettings, session_directory: Path) -> dict[s
         "html": str((coverage_directory / "html").resolve()),
         "text": str((coverage_directory / "coverage.txt").resolve()),
     }
-

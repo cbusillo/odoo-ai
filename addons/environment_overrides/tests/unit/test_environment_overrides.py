@@ -34,11 +34,20 @@ class TestEnvironmentOverrides(UnitTestCase):
         self.assertEqual(_normalize_config_param_value("false"), "False")
         self.assertEqual(_normalize_config_param_value(" 123 "), "123")
 
+    def test_normalize_config_param_value_preserves_json_like_values(self) -> None:
+        self.assertEqual(_normalize_config_param_value("[1, 2]"), "[1, 2]")
+        self.assertEqual(_normalize_config_param_value('{"mode": "test"}'), '{"mode": "test"}')
+        self.assertEqual(_normalize_config_param_value("{not json}"), "{not json}")
+
     def test_parse_boolean(self) -> None:
         self.assertTrue(_parse_boolean(None, default=True))
         self.assertFalse(_parse_boolean(None, default=False))
         self.assertTrue(_parse_boolean("yes", default=False))
         self.assertFalse(_parse_boolean("0", default=True))
+
+    def test_parse_boolean_uses_default_for_unknown_values(self) -> None:
+        self.assertTrue(_parse_boolean("maybe", default=True))
+        self.assertFalse(_parse_boolean("maybe", default=False))
 
     def test_apply_config_param_overrides(self) -> None:
         with _set_env({"ENV_OVERRIDE_CONFIG_PARAM__TEST__VALUE": "true"}):

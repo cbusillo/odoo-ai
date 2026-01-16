@@ -101,14 +101,16 @@ class RepairshoprImporter(models.Model):
     ) -> "odoo.model.product_template":
         barcode_value = self._normalize_barcode(product.upc_code)
         if barcode_value:
-            barcode_matches = product_model.search([("barcode", "=", barcode_value)], limit=2)
-            if len(barcode_matches) == 1:
-                return barcode_matches
-            if len(barcode_matches) > 1:
+            variant_model = self.env["product.product"].sudo().with_context(active_test=False)
+            variant_matches = variant_model.search([("barcode", "=", barcode_value)], limit=2)
+            if len(variant_matches) == 1:
+                template_record = variant_matches.product_tmpl_id
+                return product_model.browse(template_record.id)
+            if len(variant_matches) > 1:
                 _logger.warning(
-                    "RepairShopr product barcode %s matched multiple products: %s",
+                    "RepairShopr product barcode %s matched multiple variants: %s",
                     barcode_value,
-                    barcode_matches.ids,
+                    variant_matches.ids,
                 )
                 return product_model.browse()
 
@@ -254,10 +256,10 @@ class RepairshoprImporter(models.Model):
                 existing_barcode,
             )
             return sanitized_values
-        duplicate = self._find_barcode_variant(
-            barcode_value,
-            excluded_variant_ids=product_record.product_variant_ids.ids,
-        )
+        excluded_variant_ids = None
+        if product_record.product_variant_id:
+            excluded_variant_ids = [product_record.product_variant_id.id]
+        duplicate = self._find_barcode_variant(barcode_value, excluded_variant_ids=excluded_variant_ids)
         if duplicate:
             sanitized_values.pop("barcode", None)
             _logger.warning(

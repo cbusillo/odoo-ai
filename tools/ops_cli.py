@@ -259,6 +259,8 @@ def _save_state(state: OpsState) -> None:
 
 
 def _record_history(state: OpsState) -> None:
+    if state.action in ("exec", "shell"):
+        return
     payload = _load_state_payload()
     updated = _update_payload_with_state(payload, state)
     history = _normalize_history(updated.get("history"))

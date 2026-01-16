@@ -114,14 +114,12 @@ Behavior notes
   database without restoring from upstream and resets module versions for
   modules that have OpenUpgrade scripts so their scripts re-run.
 - `uv run ops local exec <target> -- <command>` runs a command in the script-runner
-  container using the merged stack env. The merged env is staged in a temporary file to
-  avoid exposing secrets in process args or dry-run output. Use `--service` to target a
-  different service or `--no-env` to skip passing the merged env into the exec.
+  container using the merged stack env. Env values are forwarded by name (no values in
+  argv), so secrets are not echoed in process args or dry-run output. Use `--service` to
+  target a different service or `--no-env` to skip passing the merged env into the exec.
 - `uv run ops local shell <target>` runs the Odoo shell inside the script-runner using
   the merged stack env and defaults (`-d $ODOO_DB_NAME -c /volumes/config/_generated.conf`).
   Pass extra args after `--` to override defaults (for example, `-- --log-level=debug`).
-  If you pipe stdin, ops stages it into a temporary shell file and invokes
-  `--shell-file` automatically.
 - `uv run ops ship prod <target> --after init` runs a prod bootstrap-only init
   via Coolify (sets the post-deploy command, deploys, waits for completion,
   then restores the previous post-deploy command). Requires the prod init guard.

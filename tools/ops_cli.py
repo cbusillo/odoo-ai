@@ -1,11 +1,9 @@
 import json
 import os
 import re
-import secrets
 import shlex
 import subprocess
 import sys
-import tempfile
 import time
 import tomllib
 import urllib.error
@@ -1222,30 +1220,14 @@ def _run_local_openupgrade(settings: StackSettings, *, dry_run: bool) -> None:
     _run_local_compose(settings, openupgrade_command, dry_run=False)
 
 
-def _create_env_script_file(environment: dict[str, str]) -> Path:
-    environment_lines: list[str] = []
+def _compose_exec_env_arguments(environment: dict[str, str]) -> list[str]:
+    arguments: list[str] = []
     for key in sorted(environment):
         value = environment.get(key)
         if value is None:
             continue
-        environment_lines.append(f"export {key}={shlex.quote(value)}")
-    temporary_file_handle = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False)
-    try:
-        temporary_file_handle.write("\n".join(environment_lines) + "\n")
-    finally:
-        temporary_file_handle.close()
-    return Path(temporary_file_handle.name)
-
-
-def _create_shell_script_file(payload: str) -> Path:
-    temporary_file_handle = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False)
-    try:
-        temporary_file_handle.write(payload)
-        if not payload.endswith("\n"):
-            temporary_file_handle.write("\n")
-    finally:
-        temporary_file_handle.close()
-    return Path(temporary_file_handle.name)
+        arguments.extend(["-e", key])
+    return arguments
 
 
 def _normalize_exec_command(command: Sequence[str]) -> list[str]:
@@ -1276,14 +1258,6 @@ def _run_local_shell(
 ) -> None:
     shell_args = _normalize_exec_command(command)
     exec_command = [settings.odoo_bin_path, "shell"]
-    service_name = service or settings.script_runner_service
-    script_payload = ""
-    if not sys.stdin.isatty():
-        script_payload = sys.stdin.read()
-
-    shell_script_path: Path | None = None
-    container_shell_path: str | None = None
-    created_shell_script = False
 
     if not _command_has_option(shell_args, short="-d", long="--database"):
         database_name = settings.environment.get("ODOO_DB_NAME")
@@ -1295,42 +1269,8 @@ def _run_local_shell(
         config_path = settings.environment.get("ODOO_CONFIG") or DEFAULT_ODOO_CONFIG_PATH
         exec_command.extend(["-c", config_path])
 
-    try:
-        if script_payload:
-            unique_suffix = secrets.token_hex(16)
-            container_shell_path = f"/tmp/ops-shell-{unique_suffix}.py"
-            if dry_run:
-                shell_script_path = Path(tempfile.gettempdir()) / f"ops-shell-{unique_suffix}.py"
-            else:
-                shell_script_path = _create_shell_script_file(script_payload)
-                created_shell_script = True
-            _run_local_compose(
-                settings,
-                ["cp", str(shell_script_path), f"{service_name}:{container_shell_path}"],
-                dry_run=dry_run,
-            )
-            if not dry_run:
-                _run_local_compose(
-                    settings,
-                    ["exec", "-T", "--user", "root", service_name, "chmod", "644", container_shell_path],
-                    dry_run=False,
-                )
-            exec_command.extend(["--shell-file", container_shell_path])
-
-        exec_command.extend(shell_args)
-        _run_local_exec(settings, exec_command, service=service, skip_env=skip_env, dry_run=dry_run)
-    finally:
-        if created_shell_script and shell_script_path is not None:
-            try:
-                shell_script_path.unlink()
-            except OSError:
-                console.print("Warning: failed to remove temporary shell file.")
-        if container_shell_path and not dry_run:
-            cleanup_arguments = ["exec", "-T", "--user", "root", service_name, "rm", "-f", container_shell_path]
-            try:
-                _run_local_compose(settings, cleanup_arguments, dry_run=False)
-            except CommandError:
-                console.print(f"Warning: failed to remove temp shell file {container_shell_path} in {service_name}.")
+    exec_command.extend(shell_args)
+    _run_local_exec(settings, exec_command, service=service, skip_env=skip_env, dry_run=dry_run)
 
 
 def _run_local_exec(
@@ -1354,47 +1294,11 @@ def _run_local_exec(
     if not interactive_terminal:
         exec_arguments.append("-T")
 
-    env_script_path: Path | None = None
-    container_env_path: str | None = None
-    created_env_script = False
-    try:
-        if not skip_env:
-            unique_suffix = secrets.token_hex(16)
-            container_env_path = f"/tmp/ops-env-{unique_suffix}.sh"
-            if dry_run:
-                env_script_path = Path(tempfile.gettempdir()) / f"ops-env-{unique_suffix}.sh"
-            else:
-                env_script_path = _create_env_script_file(settings.environment)
-                created_env_script = True
-            _run_local_compose(
-                settings,
-                ["cp", str(env_script_path), f"{service_name}:{container_env_path}"],
-                dry_run=dry_run,
-            )
-            if not dry_run:
-                _run_local_compose(
-                    settings,
-                    ["exec", "-T", "--user", "root", service_name, "chmod", "644", container_env_path],
-                    dry_run=False,
-                )
-            command_string = shlex.join(exec_command)
-            exec_command = ["sh", "-lc", f". {shlex.quote(container_env_path)}; exec {command_string}"]
-
-        exec_arguments.append(service_name)
-        exec_arguments.extend(exec_command)
-        _run_local_compose(settings, exec_arguments, dry_run=dry_run)
-    finally:
-        if created_env_script and env_script_path is not None:
-            try:
-                env_script_path.unlink()
-            except OSError:
-                console.print("Warning: failed to remove temporary env file.")
-        if container_env_path and not dry_run:
-            cleanup_arguments = ["exec", "-T", "--user", "root", service_name, "rm", "-f", container_env_path]
-            try:
-                _run_local_compose(settings, cleanup_arguments, dry_run=False)
-            except CommandError:
-                console.print(f"Warning: failed to remove temp env file {container_env_path} in {service_name}.")
+    if not skip_env:
+        exec_arguments.extend(_compose_exec_env_arguments(settings.environment))
+    exec_arguments.append(service_name)
+    exec_arguments.extend(exec_command)
+    _run_local_compose(settings, exec_arguments, dry_run=dry_run)
 
 
 def _run_local_action(

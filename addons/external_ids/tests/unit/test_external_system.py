@@ -73,3 +73,32 @@ class TestExternalSystem(UnitTestCase):
 
         with self.assertRaises(ValidationError):
             system.unlink()
+
+    def test_ensure_system_creates_and_merges_models(self) -> None:
+        system = self.ExternalSystem.ensure_system(
+            code="fishbowl",
+            name="Fishbowl",
+            id_format=r"^\d+$",
+            sequence=60,
+            active=True,
+            applicable_model_xml_ids=("base.model_res_partner",),
+        )
+
+        self.assertEqual(system.code, "fishbowl")
+        self.assertEqual(system.name, "Fishbowl")
+        self.assertTrue(system.active)
+        self.assertIn(self.env.ref("base.model_res_partner"), system.applicable_model_ids)
+
+        system.active = False
+        system.invalidate_cache()
+
+        updated = self.ExternalSystem.ensure_system(
+            code="fishbowl",
+            name="Fishbowl",
+            active=True,
+            applicable_model_xml_ids=("product.model_product_template",),
+        )
+
+        self.assertEqual(updated.id, system.id)
+        self.assertTrue(updated.active)
+        self.assertIn(self.env.ref("product.model_product_template"), updated.applicable_model_ids)

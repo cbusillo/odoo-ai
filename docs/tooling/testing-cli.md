@@ -29,9 +29,9 @@ Commands
 - `uv run test validate --json` — verify all tests executed + summarize
   failures.
 - `--stack opw|cm` (or `--env-file docker/config/<stack>-local.env`) —
-  load the matching local stack env before running. When a `*-test-local` stack
-  exists (for example `cm-test-local`), `--stack cm` automatically prefers the
-  test stack. Use `--stack cm-local` to target the dev stack explicitly.
+  load the matching local stack env before running. When a `*-ci-local` stack
+  exists (for example `cm-ci-local`), `--stack cm` automatically prefers the
+  CI stack. Use `--stack cm-local` to target the dev stack explicitly.
 
 Scoping Flags
 

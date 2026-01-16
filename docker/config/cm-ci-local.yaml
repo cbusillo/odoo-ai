@@ -1,13 +1,13 @@
-# OPW test local compose overlay.
+# CM CI local compose overlay.
 # Applied after docker/config/base.yaml and before variant overlays.
 
 services:
   web:
     env_file:
-      - docker/config/opw-test-local.env
+      - docker/config/cm-ci-local.env
   script-runner:
     env_file:
-      - docker/config/opw-test-local.env
+      - docker/config/cm-ci-local.env
   database:
     env_file:
-      - docker/config/opw-test-local.env
+      - docker/config/cm-ci-local.env

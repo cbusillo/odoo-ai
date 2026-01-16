@@ -207,6 +207,4 @@ odoo.*.conf
 *.env*
 !*.env.example
 !docker/config/base.env
-!docker/config/cm-ci-local.env
-!docker/config/opw-ci-local.env
 .worktrees

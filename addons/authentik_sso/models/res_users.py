@@ -80,14 +80,16 @@ class ResUsers(models.Model):
         raw_value = os.environ.get(f"{AUTHENTIK_PREFIX}USER_ID_CLAIMS")
         if raw_value is None:
             return DEFAULT_AUTHENTIK_USER_ID_CLAIMS
-        return tuple(item.strip() for item in raw_value.split(",") if item.strip())
+        cleaned = tuple(item.strip() for item in raw_value.split(",") if item.strip())
+        return cleaned or DEFAULT_AUTHENTIK_USER_ID_CLAIMS
 
     @staticmethod
     def _authentik_login_claims() -> tuple[str, ...]:
         raw_value = os.environ.get(f"{AUTHENTIK_PREFIX}LOGIN_CLAIMS")
         if raw_value is None:
             return DEFAULT_AUTHENTIK_LOGIN_CLAIMS
-        return tuple(item.strip() for item in raw_value.split(",") if item.strip())
+        cleaned = tuple(item.strip() for item in raw_value.split(",") if item.strip())
+        return cleaned or DEFAULT_AUTHENTIK_LOGIN_CLAIMS
 
     @staticmethod
     def _authentik_name_claims() -> tuple[str, ...]:

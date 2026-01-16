@@ -38,10 +38,23 @@ class TestFishbowlHelpers(UnitTestCase):
         line_name = self.Importer._build_legacy_line_name("SKU-1 - Widget", "SKU-1", None)
         self.assertEqual(line_name, "SKU-1 - Widget")
 
+    def test_build_legacy_line_name_uses_fallback_product(self) -> None:
+        template = self.env["product.template"].create({"name": "Fallback Item"})
+        line_name = self.Importer._build_legacy_line_name("", "", template.product_variant_id.id)
+
+        self.assertEqual(line_name, template.product_variant_id.display_name)
+
     def test_product_type_field(self) -> None:
         template_model = self.env["product.template"]
         field_name = self.Importer._product_type_field(template_model)
         self.assertIn(field_name, {"detailed_type", "type"})
+
+    def test_get_legacy_bucket_product_id_creates_missing_product(self) -> None:
+        product_id = self.Importer._get_legacy_bucket_product_id("unknown")
+        product = self.env["product.product"].browse(product_id)
+
+        self.assertEqual(product.default_code, "LEGACY-ADHOC")
+        self.assertEqual(product.product_tmpl_id.categ_id.name, "Legacy Fishbowl")
 
     def test_resolve_product_from_sales_row_missing_id(self) -> None:
         row = fishbowl_rows.SalesOrderLineRow(id=1)

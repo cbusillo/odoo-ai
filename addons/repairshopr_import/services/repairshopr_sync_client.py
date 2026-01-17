@@ -380,11 +380,20 @@ class RepairshoprSyncClient:
         return [self._build_line_item(row) for row in rows]
 
     def _fetch_rows(self, query: str, parameters: Sequence[object] | None = None) -> list[dict[str, Any]]:
-        connection = self._require_connection()
-        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            cursor.execute(query, parameters)
-            rows = cursor.fetchall()
-        return list(rows)
+        for attempt in range(2):
+            connection = self._require_connection()
+            try:
+                with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                    cursor.execute(query, parameters)
+                    rows = cursor.fetchall()
+                return list(rows)
+            except (pymysql.err.OperationalError, pymysql.err.InterfaceError) as exc:
+                error_code = exc.args[0] if exc.args else None
+                if error_code not in {2006, 2013} or attempt:
+                    raise
+                _logger.warning("RepairShopr sync connection dropped; reconnecting and retrying query.")
+                self.close()
+        return []
 
     # noinspection DuplicatedCode
     # Mirrors Fishbowl SSL handling to keep connection logic self-contained.
@@ -401,6 +410,7 @@ class RepairshoprSyncClient:
             password=self._settings.password,
             database=self._settings.database,
             port=self._settings.port,
+            connect_timeout=10,
             charset="utf8mb4",
             autocommit=True,
             ssl=secure_context,

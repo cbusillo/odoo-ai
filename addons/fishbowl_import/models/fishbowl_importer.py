@@ -179,17 +179,17 @@ class FishbowlImporter(models.Model):
         except (AccessError, UserError, ValidationError, ValueError):
             _logger.exception("Failed to finalize picking %s", picking.name)
             return
-        updates: dict[str, Any] = {}
+        updates: "odoo.values.stock_picking" = {}
         if "date_done" in picking._fields:
             updates["date_done"] = target_date
         if updates:
             picking.write(updates)
-        move_updates: dict[str, Any] = {}
+        move_updates: "odoo.values.stock_move" = {}
         if "date" in picking.move_ids._fields:
             move_updates["date"] = target_date
         if move_updates:
             picking.move_ids.write(move_updates)
-        line_updates: dict[str, Any] = {}
+        line_updates: "odoo.values.stock_move_line" = {}
         if "date" in picking.move_line_ids._fields:
             line_updates["date"] = target_date
         if line_updates:
@@ -206,8 +206,11 @@ class FishbowlImporter(models.Model):
         )
 
     @staticmethod
-    def _write_if_changed(record: models.Model, values: dict[str, Any]) -> None:
-        changes: dict[str, Any] = {}
+    def _write_if_changed(
+        record: "odoo.model.product_product | odoo.model.product_template | odoo.model.stock_picking",
+        values: "odoo.values.product_product | odoo.values.product_template | odoo.values.stock_picking",
+    ) -> None:
+        changes: "odoo.values.product_product | odoo.values.product_template | odoo.values.stock_picking" = {}
         for field_name, value in values.items():
             if field_name not in record._fields:
                 continue
@@ -592,7 +595,7 @@ class FishbowlImporter(models.Model):
         if product:
             return product.id
         template_model = self.env["product.template"].sudo().with_context(IMPORT_CONTEXT)
-        values = {
+        values: "odoo.values.product_template" = {
             "name": name,
             "default_code": code,
             "categ_id": self._get_legacy_category().id,

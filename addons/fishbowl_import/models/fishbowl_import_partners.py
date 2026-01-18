@@ -57,7 +57,7 @@ class FishbowlImporterPartners(models.Model):
 
         for row in customer_rows:
             fishbowl_id = row.id
-            values = {
+            values: "odoo.values.res_partner" = {
                 "name": str(row.name or "").strip() or f"Customer {fishbowl_id}",
                 "ref": str(row.number or "").strip() or False,
                 "comment": row.note or False,
@@ -77,7 +77,7 @@ class FishbowlImporterPartners(models.Model):
 
         for row in vendor_rows:
             fishbowl_id = row.id
-            values = {
+            values: "odoo.values.res_partner" = {
                 "name": str(row.name or "").strip() or f"Vendor {fishbowl_id}",
                 "ref": str(row.accountNum or "").strip() or False,
                 "comment": row.note or False,
@@ -115,7 +115,7 @@ class FishbowlImporterPartners(models.Model):
             partner_type = address_type_mapping.get(address_type_name.lower(), "other")
             country_id = self._resolve_country_id(row.countryId, country_map)
             state_id = self._resolve_state_id(row.stateId, state_map, country_map, country_id)
-            values = {
+            values: "odoo.values.res_partner" = {
                 "parent_id": parent_id,
                 "type": partner_type,
                 "name": str(row.addressName or row.name or "").strip() or False,

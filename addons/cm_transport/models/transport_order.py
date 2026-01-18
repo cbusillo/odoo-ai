@@ -16,7 +16,7 @@ LAT_LONG_DIGITS = (10, 7)
 class TransportOrder(models.Model):
     _name = "transport.order"
     _description = "Transport Order"
-    _inherit = ["mail.thread", "mail.activity.mixin"]
+    _inherit = ["mail.thread", "mail.activity.mixin", "external.id.mixin"]
     _order = "arrival_date desc, id desc"
 
     name = fields.Char()
@@ -51,6 +51,15 @@ class TransportOrder(models.Model):
     location_latitude = fields.Float(digits=LAT_LONG_DIGITS)
     location_longitude = fields.Float(digits=LAT_LONG_DIGITS)
     device_notes = fields.Text(tracking=True)
+    cm_data_status_raw = fields.Char()
+    cm_data_location_name = fields.Char()
+    cm_data_location_id = fields.Integer()
+    cm_data_units = fields.Integer()
+    cm_data_notes = fields.Text()
+    cm_data_edit_notes = fields.Text()
+    cm_data_ocr_notes = fields.Text()
+    cm_data_discord_name = fields.Char()
+    cm_data_discord_id = fields.Char()
     devices = fields.One2many(
         "transport.order.device",
         "transport_order",

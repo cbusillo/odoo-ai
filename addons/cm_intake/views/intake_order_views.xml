@@ -37,6 +37,8 @@
                                 <list editable="bottom">
                                     <field name="device"/>
                                     <field name="has_case"/>
+                                    <field name="claim_number"/>
+                                    <field name="po_number"/>
                                     <field name="customer_stated_notes"/>
                                     <field name="products" widget="many2many_tags"/>
                                 </list>
@@ -44,8 +46,15 @@
                                     <group>
                                         <field name="device"/>
                                         <field name="has_case"/>
+                                        <field name="claim_number"/>
+                                        <field name="po_number"/>
                                         <field name="customer_stated_notes"/>
                                         <field name="products" widget="many2many_tags"/>
+                                    </group>
+                                    <group string="Restricted">
+                                        <field name="student_name"/>
+                                        <field name="guardian_name"/>
+                                        <field name="guardian_phone"/>
                                     </group>
                                 </form>
                             </field>
@@ -57,12 +66,4 @@
         </field>
     </record>
 
-    <record id="action_intake_orders" model="ir.actions.act_window">
-        <field name="name">Intake Orders</field>
-        <field name="res_model">intake.order</field>
-        <field name="view_mode">list,form</field>
-    </record>
-
-    <menuitem id="menu_intake_orders" name="Intake Orders"
-              parent="menu_cm_custom_root" action="action_intake_orders" sequence="20"/>
 </odoo>

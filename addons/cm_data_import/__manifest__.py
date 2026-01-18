@@ -1,0 +1,25 @@
+{
+    "name": "CM Data Import",
+    "version": "19.0.0.1",
+    "category": "Tools",
+    "summary": "Import CM data into Odoo",
+    "description": "Import CM data for schools, delivery logs, and operational workflows.",
+    "author": "Shiny Computers",
+    "maintainers": ["cbusillo"],
+    "license": "LGPL-3",
+    "depends": [
+        "base",
+        "contacts",
+        "external_ids",
+        "cm_transport",
+        "cm_school",
+    ],
+    "data": [
+        "security/ir.model.access.csv",
+        "data/ir_cron.xml",
+    ],
+    "installable": True,
+    "application": False,
+    "post_init_hook": "post_init_hook",
+    "uninstall_hook": "uninstall_hook",
+}

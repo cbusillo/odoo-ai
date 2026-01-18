@@ -57,12 +57,4 @@
         </field>
     </record>
 
-    <record id="action_diagnostic_orders" model="ir.actions.act_window">
-        <field name="name">Diagnostic Orders</field>
-        <field name="res_model">diagnostic.order</field>
-        <field name="view_mode">list,form</field>
-    </record>
-
-    <menuitem id="menu_diagnostic_orders" name="Diagnostic Orders"
-              parent="menu_cm_custom_root" action="action_diagnostic_orders" sequence="30"/>
 </odoo>

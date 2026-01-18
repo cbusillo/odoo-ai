@@ -1,0 +1,25 @@
+{
+    "name": "CM Device",
+    "version": "19.0.0.1",
+    "category": "Industries",
+    "summary": "Device models for Cell Mechanic",
+    "description": "Device catalog and identity records for Cell Mechanic workflows.",
+    "author": "Shiny Computers",
+    "maintainers": ["cbusillo"],
+    "license": "LGPL-3",
+    "depends": [
+        "account",
+        "base",
+        "contacts",
+        "product",
+        "mail",
+        "external_ids",
+    ],
+    "data": [
+        "security/ir.model.access.csv",
+        "views/device_views.xml",
+        "views/cm_device_actions.xml",
+    ],
+    "installable": True,
+    "application": False,
+}

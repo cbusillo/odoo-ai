@@ -48,6 +48,27 @@
                             <field name="device_notes" colspan="2"/>
                         </group>
                     </group>
+                    <group string="CM Data">
+                        <group>
+                            <field name="cm_data_status_raw"/>
+                            <field name="cm_data_location_name"/>
+                            <field name="cm_data_location_id"/>
+                            <field name="cm_data_units"/>
+                        </group>
+                        <group>
+                            <field name="cm_data_discord_name"/>
+                            <field name="cm_data_discord_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="cm_data_notes" colspan="2"/>
+                            <field name="cm_data_edit_notes" colspan="2"/>
+                        </group>
+                        <group>
+                            <field name="cm_data_ocr_notes" colspan="2"/>
+                        </group>
+                    </group>
                     <notebook>
                         <page string="Inbound Devices">
                             <field name="devices" domain="[('movement_type', '=', 'in')]"
@@ -94,12 +115,4 @@
         </field>
     </record>
 
-    <record id="action_transport_orders" model="ir.actions.act_window">
-        <field name="name">Transport Orders</field>
-        <field name="res_model">transport.order</field>
-        <field name="view_mode">list,form</field>
-    </record>
-
-    <menuitem id="menu_transport_orders" name="Transport Orders"
-              parent="menu_cm_custom_root" action="action_transport_orders" sequence="10"/>
 </odoo>

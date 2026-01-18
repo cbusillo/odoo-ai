@@ -19,6 +19,11 @@ class IntakeOrderDevice(models.Model):
     )
     has_case = fields.Boolean()
     customer_stated_notes = fields.Char()
+    claim_number = fields.Char()
+    po_number = fields.Char()
+    student_name = fields.Char()
+    guardian_name = fields.Char()
+    guardian_phone = fields.Char()
 
     products = fields.Many2many(
         "product.template",

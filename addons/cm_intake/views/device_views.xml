@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_device_form_intake" model="ir.ui.view">
+        <field name="name">device.form.intake</field>
+        <field name="model">device</field>
+        <field name="inherit_id" ref="cm_device.view_device_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Intake History">
+                    <field name="intake_orders">
+                        <list>
+                            <field name="intake_order"/>
+                            <field name="has_case"/>
+                            <field name="customer_stated_notes"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

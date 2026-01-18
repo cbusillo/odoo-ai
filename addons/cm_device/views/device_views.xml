@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_device_tree" model="ir.ui.view">
+        <field name="name">device.tree</field>
+        <field name="model">device</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="serial_number"/>
+                <field name="asset_tag"/>
+                <field name="asset_tag_secondary"/>
+                <field name="imei"/>
+                <field name="is_serial_unavailable"/>
+                <field name="model"/>
+                <field name="owner"/>
+                <field name="payer"/>
+                <field name="bin"/>
+                <field name="is_in_manufacturer_warranty"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_device_form" model="ir.ui.view">
+        <field name="name">device.form</field>
+        <field name="model">device</field>
+        <field name="arch" type="xml">
+            <form string="Device">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="serial_number"/>
+                            <field name="asset_tag"/>
+                            <field name="asset_tag_secondary"/>
+                            <field name="imei"/>
+                            <field name="is_serial_unavailable"/>
+                            <field name="model"/>
+                            <field name="owner"/>
+                            <field name="payer"/>
+                        </group>
+                        <group>
+                            <field name="bin"/>
+                            <field name="is_in_manufacturer_warranty"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Invoices">
+                            <field name="invoices" widget="many2many_tags"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+</odoo>

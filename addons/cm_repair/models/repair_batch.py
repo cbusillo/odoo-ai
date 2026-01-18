@@ -29,3 +29,15 @@ class RepairBatch(models.Model):
         "batch_id",
         string="Devices",
     )
+    repair_order_ids = fields.One2many(
+        "repair.order",
+        "batch_id",
+        string="Repair Orders",
+    )
+    ticket_ids = fields.Many2many(
+        "helpdesk.ticket",
+        "repair_batch_helpdesk_ticket_rel",
+        "batch_id",
+        "ticket_id",
+        string="Tickets",
+    )

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_shipping_profile_tree" model="ir.ui.view">
+        <field name="name">shipping.profile.tree</field>
+        <field name="model">shipping.profile</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="carrier_name"/>
+                <field name="service_name"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shipping_profile_form" model="ir.ui.view">
+        <field name="name">shipping.profile.form</field>
+        <field name="model">shipping.profile</field>
+        <field name="arch" type="xml">
+            <form string="Shipping Profile">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="partner_id"/>
+                            <field name="carrier_name"/>
+                        </group>
+                        <group>
+                            <field name="service_name"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="instruction_notes" colspan="2"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+</odoo>

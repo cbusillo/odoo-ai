@@ -1,0 +1,26 @@
+{
+    "name": "CM School",
+    "version": "19.0.0.1",
+    "category": "Industries",
+    "summary": "School and district partner extensions",
+    "description": "Partner roles and school metadata for Cell Mechanic.",
+    "author": "Shiny Computers",
+    "maintainers": ["cbusillo"],
+    "license": "LGPL-3",
+    "depends": [
+        "base",
+        "contacts",
+        "product",
+    ],
+    "data": [
+        "security/ir.model.access.csv",
+        "data/partner_roles.xml",
+        "views/res_partner_views.xml",
+        "views/account_routing_rule_views.xml",
+        "views/account_alias_views.xml",
+        "views/shipping_profile_views.xml",
+        "views/cm_school_actions.xml",
+    ],
+    "installable": True,
+    "application": False,
+}

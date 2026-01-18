@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from odoo import fields
 
@@ -27,8 +27,8 @@ class TestCmCustom(UnitTestCase):
         contact,
         *,
         state: str = "draft",
-        arrival_date: object = None,
-        departure_date: object = None,
+        arrival_date: datetime | None = None,
+        departure_date: datetime | None = None,
     ):
         return self.TransportOrder.create(
             {

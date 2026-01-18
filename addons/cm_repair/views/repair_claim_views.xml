@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_repair_claim_tree" model="ir.ui.view">
+        <field name="name">repair.claim.tree</field>
+        <field name="model">repair.claim</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="claim_number"/>
+                <field name="policy_number"/>
+                <field name="contact_name"/>
+                <field name="contact_phone"/>
+                <field name="replacement_value"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_repair_claim_form" model="ir.ui.view">
+        <field name="name">repair.claim.form</field>
+        <field name="model">repair.claim</field>
+        <field name="arch" type="xml">
+            <form string="Repair Claim">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="claim_number"/>
+                            <field name="policy_number"/>
+                            <field name="deductible_amount"/>
+                            <field name="replacement_value"/>
+                        </group>
+                        <group>
+                            <field name="contact_name"/>
+                            <field name="contact_phone"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="coverage_description" colspan="2"/>
+                        <field name="incident_description" colspan="2"/>
+                        <field name="shipping_address" colspan="2"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+</odoo>

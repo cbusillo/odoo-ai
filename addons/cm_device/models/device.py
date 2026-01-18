@@ -6,10 +6,12 @@ class Device(models.Model):
     _description = "Service Device"
     _inherit = ["mail.thread", "mail.activity.mixin", "external.id.mixin"]
     _order = "serial_number asc, id desc"
-
     _rec_name = "serial_number"
 
     serial_number = fields.Char(tracking=True)
+    asset_tag = fields.Char(tracking=True)
+    asset_tag_secondary = fields.Char(tracking=True)
+    imei = fields.Char(tracking=True)
     is_serial_unavailable = fields.Boolean(tracking=True)
     model = fields.Many2one(
         "device.model",
@@ -27,23 +29,6 @@ class Device(models.Model):
     )
     bin = fields.Char()
     is_in_manufacturer_warranty = fields.Boolean()
-    transport_orders = fields.One2many(
-        "transport.order.device",
-        "device",
-    )
-    intake_orders = fields.One2many(
-        "intake.order.device",
-        "device",
-    )
-    diagnostic_orders = fields.One2many(
-        "diagnostic.order.device",
-        "device",
-    )
-    repair_batch_lines = fields.One2many(
-        "repair.batch.device",
-        "device_id",
-        string="Repair Batches",
-    )
     invoices = fields.Many2many(
         "account.move",
         "device_account_move_rel",

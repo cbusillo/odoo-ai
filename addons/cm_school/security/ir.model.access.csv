@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_cm_partner_role_user,cm.partner.role.user,model_cm_partner_role,base.group_user,1,1,1,1
+access_account_routing_rule_user,account.routing.rule.user,model_account_routing_rule,base.group_user,1,1,1,1
+access_account_alias_user,account.alias.user,model_account_alias,base.group_user,1,1,1,1
+access_shipping_profile_user,shipping.profile.user,model_shipping_profile,base.group_user,1,1,1,1

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_identifier_index_tree" model="ir.ui.view">
+        <field name="name">identifier.index.tree</field>
+        <field name="model">identifier.index</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="identifier_type"/>
+                <field name="identifier_value"/>
+                <field name="identifier_normalized"/>
+                <field name="res_model"/>
+                <field name="res_id"/>
+                <field name="source_system"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_identifier_index_form" model="ir.ui.view">
+        <field name="name">identifier.index.form</field>
+        <field name="model">identifier.index</field>
+        <field name="arch" type="xml">
+            <form string="Identifier">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="identifier_type"/>
+                            <field name="identifier_value"/>
+                            <field name="identifier_normalized"/>
+                        </group>
+                        <group>
+                            <field name="res_model"/>
+                            <field name="res_id"/>
+                            <field name="source_system"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="notes" colspan="2"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+</odoo>

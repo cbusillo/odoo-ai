@@ -91,7 +91,9 @@ class RepairshoprImporter(models.Model):
         include_line_clear: bool,
     ) -> "odoo.values.sale_order":
         order_model = self.env["sale.order"].sudo().with_context(IMPORT_CONTEXT)
-        default_values = order_model.default_get(["pricelist_id", "company_id", "team_id", "user_id"])
+        default_values: "odoo.values.sale_order" = order_model.default_get(
+            ["pricelist_id", "company_id", "team_id", "user_id"]
+        )
         order_lines = list(line_commands)
         if include_line_clear:
             order_lines = [(5, 0, 0)] + order_lines
@@ -116,7 +118,7 @@ class RepairshoprImporter(models.Model):
         include_line_clear: bool,
     ) -> "odoo.values.account_move":
         move_model = self.env["account.move"].sudo().with_context(IMPORT_CONTEXT)
-        default_values = move_model.default_get(["currency_id", "company_id"])
+        default_values: "odoo.values.account_move" = move_model.default_get(["currency_id", "company_id"])
         invoice_lines = list(line_commands)
         if include_line_clear:
             invoice_lines = [(5, 0, 0)] + invoice_lines

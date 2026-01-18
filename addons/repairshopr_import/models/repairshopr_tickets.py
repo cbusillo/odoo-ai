@@ -60,12 +60,14 @@ class RepairshoprImporter(models.Model):
         team = team_model.search([("name", "=", DEFAULT_HELPDESK_TEAM_NAME)], limit=1)
         if team:
             return team
-        default_values = team_model.default_get(["assign_method", "privacy_visibility", "company_id", "member_ids"])
+        default_values: "odoo.values.helpdesk_team" = team_model.default_get(
+            ["assign_method", "privacy_visibility", "company_id", "member_ids"]
+        )
         if not default_values.get("company_id"):
             default_values["company_id"] = self.env.company.id
         if not default_values.get("member_ids"):
             default_values["member_ids"] = [(6, 0, [self.env.user.id])]
-        values = {
+        values: "odoo.values.helpdesk_team" = {
             **default_values,
             "name": DEFAULT_HELPDESK_TEAM_NAME,
         }
@@ -86,8 +88,10 @@ class RepairshoprImporter(models.Model):
         )
         if stage:
             return stage
-        default_values = stage_model.default_get(["legend_blocked", "legend_done", "legend_normal", "sequence"])
-        values = {
+        default_values: "odoo.values.helpdesk_stage" = stage_model.default_get(
+            ["legend_blocked", "legend_done", "legend_normal", "sequence"]
+        )
+        values: "odoo.values.helpdesk_stage" = {
             **default_values,
             "name": status_name,
             "team_ids": [(6, 0, [helpdesk_team.id])],

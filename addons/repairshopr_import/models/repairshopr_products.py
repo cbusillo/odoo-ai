@@ -372,7 +372,7 @@ class RepairshoprImporter(models.Model):
         template_model = self.env["product.template"].sudo().with_context(IMPORT_CONTEXT)
         product_template = template_model.search([("default_code", "=", DEFAULT_SERVICE_PRODUCT_CODE)], limit=1)
         if not product_template:
-            values: dict[str, object] = {
+            values: "odoo.values.product_template" = {
                 "name": fallback_name or "RepairShopr Service",
                 "default_code": DEFAULT_SERVICE_PRODUCT_CODE,
                 "list_price": 0.0,

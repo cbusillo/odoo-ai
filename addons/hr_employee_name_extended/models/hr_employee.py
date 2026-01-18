@@ -44,7 +44,7 @@ class HrEmployee(models.Model):
         return recs
 
     @api.model
-    def default_get(self, fields_list: list[str]) -> dict[str, str | int | bool]:
+    def default_get(self, fields_list: list[str]) -> "odoo.values.hr_employee":
         values = super().default_get(fields_list)
         if "name_format" in fields_list:
             icp = self.env["ir.config_parameter"].sudo()

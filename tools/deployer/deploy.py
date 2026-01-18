@@ -200,6 +200,18 @@ def _build_module_subcommand(settings: StackSettings, module_argument: str, oper
     ]
 
 
+def _build_module_subcommand_flags(settings: StackSettings, flags: list[str]) -> list[str]:
+    module_argument = " ".join(flags)
+    return [
+        "exec",
+        "-T",
+        settings.script_runner_service,
+        "bash",
+        "-lc",
+        f"{settings.odoo_bin_path} {module_argument} -d $ODOO_DB_NAME --stop-after-init",
+    ]
+
+
 def _execute_module_action(
     settings: StackSettings,
     modules: tuple[str, ...],
@@ -230,6 +242,32 @@ def execute_upgrade(settings: StackSettings, modules: tuple[str, ...], remote: b
 
 def execute_install(settings: StackSettings, modules: tuple[str, ...], remote: bool) -> None:
     _execute_module_action(settings, modules, remote=remote, operation_flag="-i")
+
+
+def execute_upgrade_install(
+    settings: StackSettings,
+    update_modules: tuple[str, ...],
+    install_modules: tuple[str, ...],
+    remote: bool,
+) -> None:
+    resolved_update_modules = update_modules
+    if update_modules == (AUTO_INSTALLED_SENTINEL,):
+        resolved_update_modules = _installed_local_modules(settings)
+        if not resolved_update_modules:
+            logging.getLogger("deploy.workflow").info(
+                "auto module upgrade skipped because no installed local modules were detected.",
+            )
+    resolved_update_modules = tuple(dict.fromkeys(resolved_update_modules))
+    resolved_install_modules = tuple(dict.fromkeys(install_modules))
+    if not resolved_update_modules and not resolved_install_modules:
+        return
+    flags: list[str] = []
+    if resolved_update_modules:
+        flags.append(f"-u {','.join(resolved_update_modules)}")
+    if resolved_install_modules:
+        flags.append(f"-i {','.join(resolved_install_modules)}")
+    subcommand = _build_module_subcommand_flags(settings, flags)
+    _run_module_subcommand(settings, subcommand, remote=remote)
 
 
 def _installed_module_names(settings: StackSettings) -> set[str]:
@@ -339,7 +377,6 @@ def deploy_stack(
                 "installing missing modules: %s",
                 ", ".join(install_modules),
             )
-            execute_install(settings, install_modules, remote)
         update_modules = settings.update_modules
         if update_modules == (AUTO_INSTALLED_SENTINEL,):
             try:
@@ -349,15 +386,8 @@ def deploy_stack(
                     "auto module upgrade skipped because installed local modules could not be determined: %s",
                     error,
                 )
-            else:
-                if update_modules:
-                    execute_upgrade(settings, update_modules, remote)
-                else:
-                    logging.getLogger("deploy.workflow").info(
-                        "auto module upgrade skipped because no installed local modules were detected.",
-                    )
-        else:
-            execute_upgrade(settings, update_modules, remote)
+                update_modules = ()
+        execute_upgrade_install(settings, update_modules, install_modules, remote)
     if skip_health_check:
         return
     run_health_check(settings, remote, health_timeout_seconds)

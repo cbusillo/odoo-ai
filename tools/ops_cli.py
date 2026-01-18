@@ -30,8 +30,7 @@ from tools.deployer.compose_ops import local_compose_command, local_compose_env
 from tools.deployer.deploy import (
     _wait_for_local_service,
     deploy_stack,
-    execute_install,
-    execute_upgrade,
+    execute_upgrade_install,
     resolve_install_modules,
 )
 from tools.deployer.health import HealthcheckError
@@ -1168,8 +1167,7 @@ def _run_local_upgrade(settings: StackSettings, *, dry_run: bool) -> None:
     install_modules = resolve_install_modules(settings, remote=False)
     if install_modules:
         console.print(f"Installing missing local modules: {', '.join(install_modules)}")
-        execute_install(settings, install_modules, remote=False)
-    execute_upgrade(settings, settings.update_modules, remote=False)
+    execute_upgrade_install(settings, settings.update_modules, install_modules, remote=False)
 
 
 def _run_local_openupgrade(settings: StackSettings, *, dry_run: bool) -> None:

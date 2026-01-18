@@ -1,5 +1,4 @@
 from odoo import api, fields, models
-from typing import Any
 from .config_util import load_config
 
 
@@ -13,7 +12,7 @@ class ResConfigSettings(models.TransientModel):
     )
 
     @api.model
-    def get_values(self) -> dict[str, Any]:
+    def get_values(self) -> "odoo.values.res_config_settings":
         return super().get_values()
 
     @api.depends()

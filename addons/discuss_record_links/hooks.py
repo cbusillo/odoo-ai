@@ -37,7 +37,7 @@ def _seed_optional_configs(env: Environment) -> None:
         model_id = _resolve_model_id(env, default_config.model)
         if not model_id:
             continue
-        values = {
+        values: "odoo.values.discuss_record_link_config" = {
             "active": True,
             "prefix": default_config.prefix,
             "label": default_config.label,

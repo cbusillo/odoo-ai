@@ -2,7 +2,7 @@ import logging
 import re
 from datetime import datetime, UTC
 from enum import StrEnum
-from typing import TypeVar, Self, Any, Protocol
+from typing import TypeVar, Self, Protocol
 
 from odoo import models
 from odoo.exceptions import UserError
@@ -203,7 +203,10 @@ class ShopifyStaleRunTimeout(Exception):
     pass
 
 
-def write_if_changed(record: models.BaseModel, vals: dict[str, Any]) -> bool:
+def write_if_changed(
+    record: "odoo.model.product_product | odoo.model.product_template | odoo.model.sale_order | odoo.model.sale_order_line | odoo.model.res_partner",
+    vals: "odoo.values.product_product | odoo.values.product_template | odoo.values.sale_order | odoo.values.sale_order_line | odoo.values.res_partner",
+) -> bool:
     remaining_values = vals.copy()
 
     for field_name, new_value in list(remaining_values.items()):

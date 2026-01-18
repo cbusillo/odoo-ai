@@ -126,7 +126,7 @@ class ProductTemplate(models.Model):
     shopify_product_admin_url = fields.Char(compute="_compute_shopify_urls", store=True, string="Shopify Product Admin Link")
 
     @api.model
-    def default_get(self, fields_list: list[str]) -> dict[str, Any]:
+    def default_get(self, fields_list: list[str]) -> "odoo.values.product_template":
         defaults = super().default_get(fields_list)
 
         source = self.env.context.get("default_source")

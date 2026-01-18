@@ -143,7 +143,7 @@ class ShopifySync(models.TransientModel):
         self._safe_commit()
         return syncs
 
-    def unlink(self) -> models.BaseModel:
+    def unlink(self) -> "odoo.model.shopify_sync":
         self.env["mail.activity"].search([("res_id", "in", self.ids)]).unlink()
         self.env["mail.message"].search([("res_id", "in", self.ids)]).unlink()
 

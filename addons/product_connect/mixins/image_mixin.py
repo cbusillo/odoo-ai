@@ -36,13 +36,13 @@ class ImageMixin(models.AbstractModel):
                 self.env["shopify.sync"].create_and_run_async({"mode": SyncMode.EXPORT_CHANGED_PRODUCTS})
 
     @api.model_create_multi
-    def create(self, vals_list: list[dict]) -> "odoo.model.image_mixin":
+    def create(self, vals_list: list["odoo.values.image_mixin"]) -> "odoo.model.image_mixin":
         records = super().create(vals_list)
         if records._name == "product.image" and not self.env.context.get("skip_shopify_sync"):
             records._mark_for_shopify_product_export()
         return records
 
-    def write(self, vals: dict) -> bool:
+    def write(self, vals: "odoo.values.image_mixin") -> bool:
         res = super().write(vals)
         if {"image_1920", "sequence"} & vals.keys() and not self.env.context.get("skip_shopify_sync"):
             self._mark_for_shopify_product_export()

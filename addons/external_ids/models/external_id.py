@@ -1,5 +1,3 @@
-from typing import Any
-
 from odoo import models, fields, api
 from odoo.exceptions import ValidationError
 
@@ -64,7 +62,7 @@ class ExternalId(models.Model):
     )
 
     @api.model
-    def default_get(self, fields_list: list[str]) -> dict[str, Any]:
+    def default_get(self, fields_list: list[str]) -> "odoo.values.external_id":
         values = super().default_get(fields_list)
         ctx = self.env.context or {}
         # Robust defaults for inline one2many creation from parent forms

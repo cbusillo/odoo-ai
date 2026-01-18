@@ -37,7 +37,7 @@ class FishbowlImporterUnits(models.Model):
             if not reference_unit_id or reference_unit_id != fishbowl_unit_id:
                 continue
             name = str(row.name or "").strip() or f"Unit {fishbowl_unit_id}"
-            values: "odoo.values.uom_uom" = {
+            values = {
                 "name": name,
                 "relative_factor": 1.0,
                 "relative_uom_id": False,
@@ -67,7 +67,7 @@ class FishbowlImporterUnits(models.Model):
             if ratio is None:
                 ratio = 1.0
                 _logger.warning("Missing conversion ratio for Fishbowl unit %s; defaulting to 1.0", fishbowl_unit_id)
-            values: "odoo.values.uom_uom" = {
+            values = {
                 "name": name,
                 "relative_factor": float(ratio),
                 "relative_uom_id": reference_odoo_id,

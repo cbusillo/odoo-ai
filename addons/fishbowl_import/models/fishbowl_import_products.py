@@ -84,7 +84,7 @@ class FishbowlImporterProducts(models.Model):
             unit_id = unit_map.get(row.uomId or 0)
             part_type_name = part_type_map.get(row.typeId or 0, "")
             product_type = self._map_part_type(part_type_name)
-            values: "odoo.values.product_template" = {
+            values = {
                 "name": str(row.description or row.num or "").strip() or f"Part {fishbowl_id}",
                 "default_code": str(row.num or "").strip() or False,
                 "description": row.details or False,
@@ -134,7 +134,7 @@ class FishbowlImporterProducts(models.Model):
                 continue
             variant = self.env["product.product"].browse(variant_id)
             template = template_model.browse(variant.product_tmpl_id.id)
-            values: "odoo.values.product_template" = {
+            values: dict[str, object] = {
                 "name": str(row.description or row.num or template.name).strip(),
                 "active": True,
                 "sale_ok": True,

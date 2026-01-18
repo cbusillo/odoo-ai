@@ -1,6 +1,8 @@
 import logging
 import time
 from datetime import datetime
+from typing import Any
+
 from odoo import models
 
 from ..services.fishbowl_client import FishbowlClient
@@ -74,7 +76,7 @@ class FishbowlImporterShipments(models.Model):
             partner_id = False
             if sale_order_id:
                 partner_id = self.env["sale.order"].sudo().browse(sale_order_id).partner_id.id
-            values: "odoo.values.stock_picking" = {
+            values = {
                 "picking_type_id": picking_type.id,
                 "location_id": source_location.id,
                 "location_dest_id": destination_location.id,
@@ -96,7 +98,7 @@ class FishbowlImporterShipments(models.Model):
                         picking.picking_type_id.display_name,
                         picking_type.display_name,
                     )
-                update_values: "odoo.values.stock_picking" = dict(values)
+                update_values = values.copy()
                 update_values.pop("picking_type_id", None)
                 update_values.pop("location_id", None)
                 update_values.pop("location_dest_id", None)
@@ -161,9 +163,9 @@ class FishbowlImporterShipments(models.Model):
                 external_ids,
                 "stock.move",
             )
-            create_values: list["odoo.values.stock_move"] = []
+            create_values: list[dict[str, Any]] = []
             create_external_ids: list[str] = []
-            move_line_payloads: dict[str, "odoo.values.stock_move_line"] = {}
+            move_line_payloads: dict[str, dict[str, Any]] = {}
             batch_move_ids: dict[str, int] = {}
 
             # noinspection DuplicatedCode
@@ -193,7 +195,7 @@ class FishbowlImporterShipments(models.Model):
                     continue
                 unit_id = unit_map.get(row.uomId or 0)
                 quantity_shipped = row.qtyShipped or 0
-                move_values: "odoo.values.stock_move" = {
+                move_values = {
                     "product_id": product_id,
                     "product_uom_qty": float(quantity_shipped),
                     "product_uom": unit_id or product.uom_id.id,
@@ -225,7 +227,7 @@ class FishbowlImporterShipments(models.Model):
             # noinspection DuplicatedCode
             if create_values:
                 created_moves = move_model.create(create_values)
-                external_id_payloads: list["odoo.values.external_id"] = []
+                external_id_payloads: list[dict[str, Any]] = []
                 for external_id_value, move in zip(create_external_ids, created_moves, strict=True):
                     batch_move_ids[external_id_value] = move.id
                     stale_record = stale_map.pop(external_id_value, None)

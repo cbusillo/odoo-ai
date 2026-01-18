@@ -1,6 +1,7 @@
 import logging
 import time
 from datetime import datetime
+from typing import Any
 
 from odoo import models
 
@@ -45,7 +46,7 @@ class FishbowlImporterReceipts(models.Model):
 
         status_placeholders = ", ".join(["%s"] * len(done_status_ids))
         receipt_conditions = ["ri.dateReceived IS NOT NULL", f"r.statusId IN ({status_placeholders})"]
-        receipt_params: list[int | datetime] = list(done_status_ids)
+        receipt_params: list[Any] = list(done_status_ids)
         if start_datetime:
             receipt_conditions.append("ri.dateReceived >= %s")
             receipt_params.append(start_datetime)
@@ -90,9 +91,9 @@ class FishbowlImporterReceipts(models.Model):
                 external_ids,
                 "stock.move",
             )
-            create_values: list["odoo.values.stock_move"] = []
+            create_values: list[dict[str, Any]] = []
             create_external_ids: list[str] = []
-            move_line_payloads: dict[str, "odoo.values.stock_move_line"] = {}
+            move_line_payloads: dict[str, dict[str, Any]] = {}
             batch_move_ids: dict[str, int] = {}
 
             for row in batch_rows:
@@ -109,7 +110,7 @@ class FishbowlImporterReceipts(models.Model):
                     partner_id = False
                     if purchase_order_id:
                         partner_id = self.env["purchase.order"].sudo().browse(purchase_order_id).partner_id.id
-                    values: "odoo.values.stock_picking" = {
+                    values = {
                         "picking_type_id": picking_type.id,
                         "location_id": source_location.id,
                         "location_dest_id": destination_location.id,
@@ -129,7 +130,7 @@ class FishbowlImporterReceipts(models.Model):
                                 picking.picking_type_id.display_name,
                                 picking_type.display_name,
                             )
-                        update_values: "odoo.values.stock_picking" = dict(values)
+                        update_values = values.copy()
                         update_values.pop("picking_type_id", None)
                         update_values.pop("location_id", None)
                         update_values.pop("location_dest_id", None)
@@ -159,7 +160,7 @@ class FishbowlImporterReceipts(models.Model):
                 unit_id = unit_map.get(row.uomId or 0)
                 quantity_received = row.qty or 0
                 picking = picking_model.browse(picking_id)
-                move_values: "odoo.values.stock_move" = {
+                move_values = {
                     "product_id": product_id,
                     "product_uom_qty": float(quantity_received),
                     "product_uom": unit_id or product.uom_id.id,
@@ -191,7 +192,7 @@ class FishbowlImporterReceipts(models.Model):
             # noinspection DuplicatedCode
             if create_values:
                 created_moves = move_model.create(create_values)
-                external_id_payloads: list["odoo.values.external_id"] = []
+                external_id_payloads: list[dict[str, Any]] = []
                 for external_id_value, move in zip(create_external_ids, created_moves, strict=True):
                     batch_move_ids[external_id_value] = move.id
                     stale_record = stale_map.pop(external_id_value, None)

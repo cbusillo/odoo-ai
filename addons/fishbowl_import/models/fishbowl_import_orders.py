@@ -98,7 +98,7 @@ class FishbowlImporterOrders(models.Model):
             if not partner_id:
                 continue
             order_state = self._map_sales_state(sales_status_map.get(row.statusId or 0, ""))
-            values: "odoo.values.sale_order" = {
+            values = {
                 "name": str(row.num or f"SO-{fishbowl_id}"),
                 "partner_id": partner_id,
                 "partner_invoice_id": partner_id,
@@ -160,7 +160,7 @@ class FishbowlImporterOrders(models.Model):
                     product_code_map,
                 )
                 unresolved_sales_product_ids.update(missing_product_ids - mapped_product_ids)
-            create_values: list["odoo.values.sale_order_line"] = []
+            create_values: list[dict[str, object]] = []
             create_external_ids: list[str] = []
 
             for row in sales_line_rows:
@@ -195,7 +195,7 @@ class FishbowlImporterOrders(models.Model):
                         reference=str(row.productNum or ""),
                         fallback_product_id=product_id,
                     )
-                values: "odoo.values.sale_order_line" = {
+                values = {
                     "order_id": order_id,
                     "product_id": product_id or False,
                     "name": line_name or False,
@@ -215,7 +215,7 @@ class FishbowlImporterOrders(models.Model):
 
             if create_values:
                 created_lines = sale_line_model.create(create_values)
-                external_id_payloads: list["odoo.values.external_id"] = []
+                external_id_payloads: list[dict[str, object]] = []
                 for external_id_value, line in zip(create_external_ids, created_lines, strict=True):
                     sales_line_map[int(external_id_value)] = line.id
                     sales_existing_map[external_id_value] = line.id
@@ -266,7 +266,7 @@ class FishbowlImporterOrders(models.Model):
             if not partner_id:
                 continue
             order_state = self._map_purchase_state(purchase_status_map.get(row.statusId or 0, ""))
-            values: "odoo.values.purchase_order" = {
+            values = {
                 "name": str(row.num or f"PO-{fishbowl_id}"),
                 "partner_id": partner_id,
                 "date_order": row.dateIssued or row.dateCreated,
@@ -324,7 +324,7 @@ class FishbowlImporterOrders(models.Model):
                     product_code_map,
                 )
                 unresolved_purchase_part_ids.update(missing_part_ids - mapped_part_ids)
-            create_values: list["odoo.values.purchase_order_line"] = []
+            create_values: list[dict[str, object]] = []
             create_external_ids: list[str] = []
 
             # noinspection DuplicatedCode
@@ -361,7 +361,7 @@ class FishbowlImporterOrders(models.Model):
                         reference=str(row.partNum or ""),
                         fallback_product_id=product_id,
                     )
-                values: "odoo.values.purchase_order_line" = {
+                values = {
                     "order_id": order_id,
                     "product_id": product_id or False,
                     "name": line_name or False,
@@ -381,7 +381,7 @@ class FishbowlImporterOrders(models.Model):
 
             if create_values:
                 created_lines = purchase_line_model.create(create_values)
-                external_id_payloads: list["odoo.values.external_id"] = []
+                external_id_payloads: list[dict[str, object]] = []
                 for external_id_value, line in zip(create_external_ids, created_lines, strict=True):
                     purchase_line_map[int(external_id_value)] = line.id
                     purchase_existing_map[external_id_value] = line.id
@@ -548,7 +548,7 @@ class FishbowlImporterOrders(models.Model):
         if product:
             return product.id
         template_model = self.env["product.template"].sudo().with_context(IMPORT_CONTEXT)
-        values: "odoo.values.product_template" = {
+        values = {
             "name": name,
             "default_code": code,
             "categ_id": self._get_legacy_category().id,

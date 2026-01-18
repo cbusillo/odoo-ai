@@ -105,7 +105,7 @@ class AuthentikSsoConfig(models.AbstractModel):
                 _logger.info("Authentik overrides missing; provider '%s' not found.", provider_name)
             return
 
-        values = {
+        values: "odoo.values.auth_oauth_provider" = {
             "name": provider_name,
             "client_id": client_id,
             "auth_endpoint": authorization_endpoint,

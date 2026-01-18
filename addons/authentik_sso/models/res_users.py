@@ -34,7 +34,7 @@ class ResUsers(models.Model):
         )
         return template_user.exists() if template_user else self.env["res.users"]
 
-    def _create_user_from_template(self, values: dict[str, object]) -> "odoo.model.res_users":
+    def _create_user_from_template(self, values: "odoo.values.res_users") -> "odoo.model.res_users":
         if self.env.context.get("oauth_use_internal_template"):
             template_user = self._resolve_authentik_template_user()
             if template_user:
@@ -55,7 +55,7 @@ class ResUsers(models.Model):
         return super()._create_user_from_template(values)
 
     @api.model
-    def _signup_create_user(self, values: dict[str, object]) -> "odoo.model.res_users":
+    def _signup_create_user(self, values: "odoo.values.res_users") -> "odoo.model.res_users":
         if self.env.context.get("oauth_use_internal_template"):
             return self._create_user_from_template(values)
         return super()._signup_create_user(values)

@@ -1,6 +1,7 @@
 import logging
 import time
 from datetime import datetime
+
 from odoo import models
 
 from ..services.fishbowl_client import FishbowlClient

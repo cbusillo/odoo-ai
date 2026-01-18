@@ -6,7 +6,6 @@ from odoo import models
 
 from ..services import repairshopr_sync_models as repairshopr_models
 from ..services.repairshopr_sync_client import RepairshoprSyncClient
-
 from .repairshopr_importer import (
     DEFAULT_SERVICE_PRODUCT_CODE,
     EXTERNAL_SYSTEM_CODE,

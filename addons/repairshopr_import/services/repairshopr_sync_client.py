@@ -11,7 +11,6 @@ import pymysql
 
 from . import repairshopr_sync_models as repairshopr_models
 
-
 CUSTOMER_TABLE = "repairshopr_data_customer"
 CONTACT_TABLE = "repairshopr_data_customercontact"
 PRODUCT_TABLE = "repairshopr_data_product"
@@ -410,7 +409,6 @@ class RepairshoprSyncClient:
             password=self._settings.password,
             database=self._settings.database,
             port=self._settings.port,
-            connect_timeout=10,
             charset="utf8mb4",
             autocommit=True,
             ssl=secure_context,

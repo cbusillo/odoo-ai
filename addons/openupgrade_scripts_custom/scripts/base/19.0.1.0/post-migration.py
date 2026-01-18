@@ -1,8 +1,12 @@
+import logging
+
 from odoo import SUPERUSER_ID, api
 from odoo.api import Environment
 from odoo.modules.module import get_module_path
 from odoo.sql_db import Cursor
 from openupgradelib import openupgrade
+
+logger = logging.getLogger(__name__)
 
 
 def _cleanup_web_editor_metadata(env: Environment) -> None:
@@ -134,6 +138,39 @@ def _ensure_env(cursor_or_env: Cursor | Environment) -> Environment:
     return api.Environment(cursor_or_env, SUPERUSER_ID, {})
 
 
+def _ensure_not_null_constraint(env: Environment, table_name: str, column_name: str) -> None:
+    env.cr.execute(
+        "SELECT is_nullable FROM information_schema.columns "
+        "WHERE table_schema = 'public' AND table_name = %s AND column_name = %s",
+        (table_name, column_name),
+    )
+    row = env.cr.fetchone()
+    if not row or row[0] != "YES":
+        return
+
+    env.cr.execute(
+        f"SELECT COUNT(*) FROM {table_name} WHERE {column_name} IS NULL",
+    )
+    null_count = env.cr.fetchone()[0]
+    if null_count:
+        logger.warning(
+            "Skipping NOT NULL constraint for %s.%s; %s NULL rows remain.",
+            table_name,
+            column_name,
+            null_count,
+        )
+        return
+
+    env.cr.execute(
+        f"ALTER TABLE {table_name} ALTER COLUMN {column_name} SET NOT NULL",
+    )
+
+
+def _enforce_required_picking_policy_constraints(env: Environment) -> None:
+    _ensure_not_null_constraint(env, "res_config_settings", "default_picking_policy")
+    _ensure_not_null_constraint(env, "sale_order", "picking_policy")
+
+
 @openupgrade.migrate()
 def migrate(cr: Cursor, version: str) -> None:
     """Post-migration hook for base (19.0.1.0)."""
@@ -142,3 +179,4 @@ def migrate(cr: Cursor, version: str) -> None:
     _fix_ir_rule_user_groups_field(env)
     _fix_user_groups_view_field(env)
     _cleanup_web_editor_metadata(env)
+    _enforce_required_picking_policy_constraints(env)

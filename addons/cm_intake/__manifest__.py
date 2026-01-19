@@ -1,0 +1,26 @@
+{
+    "name": "CM Intake",
+    "version": "19.0.0.1",
+    "category": "Industries",
+    "summary": "Intake workflow for Cell Mechanic",
+    "description": "Device intake workflow and intake order tracking.",
+    "author": "Shiny Computers",
+    "maintainers": ["cbusillo"],
+    "license": "LGPL-3",
+    "depends": [
+        "base",
+        "contacts",
+        "mail",
+        "product",
+        "cm_device",
+        "cm_transport",
+    ],
+    "data": [
+        "security/ir.model.access.csv",
+        "views/device_views.xml",
+        "views/intake_order_views.xml",
+        "views/cm_intake_actions.xml",
+    ],
+    "installable": True,
+    "application": False,
+}

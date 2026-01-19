@@ -4,8 +4,9 @@ x-odoo-base: &odoo-base
   # 2. Contains proprietary Odoo Enterprise source code
   # 3. To prevent accidental push: keep image name local (no registry prefix)
   # If registry push ever needed: refactor Dockerfile to use BuildKit secrets
-  image: ${DOCKER_IMAGE:-odoo-ai}:latest
+  image: ${DOCKER_IMAGE:-odoo-ai}:${DOCKER_IMAGE_TAG:-latest}
   pull_policy: never
+  restart: unless-stopped
   env_file:
     - .env
 
@@ -73,7 +74,6 @@ services:
       - ${RESTORE_SSH_DIR:-/home/ubuntu/.ssh}:/root/.ssh:ro
     command: tail -f /dev/null
     working_dir: /opt/project
-    restart: unless-stopped
     shm_size: "2gb"
     healthcheck:
       <<: *healthcheck-defaults

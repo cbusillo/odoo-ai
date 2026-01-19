@@ -12,19 +12,18 @@ _logger = logging.getLogger(__name__)
 class TestMinimalTour(TourTestCase):
     """Minimal test to debug tour infrastructure"""
 
-    def test_http_port_available(self):
+    def test_http_port_available(self) -> None:
         """Test that we can get the HTTP port in multi-worker mode"""
         port = self.http_port()
         _logger.info(f"HTTP Port: {port}")
         self.assertIsNotNone(port, "HTTP port should be available")
         self.assertGreater(port, 0, "HTTP port should be positive")
 
-    def test_browser_can_start(self):
+    def test_browser_can_start(self) -> None:
         """Test that browser environment is configured properly"""
         # Instead of trying to start Chrome directly (which has SIGTRAP issues in test framework),
         # verify that the browser environment is configured and executable exists
         import os
-        import shutil
 
         # Check if Chrome executable exists
         chrome_path = "/usr/bin/chromium"
@@ -32,7 +31,15 @@ class TestMinimalTour(TourTestCase):
         self.assertTrue(os.access(chrome_path, os.X_OK), f"Chrome executable not executable at {chrome_path}")
 
         # Check if chrome binary is in PATH
-        chrome_in_path = shutil.which("chromium")
+        chrome_command: str = "chromium"
+        chrome_in_path = None
+        for path_entry in os.environ.get("PATH", "").split(os.pathsep):
+            if not path_entry:
+                continue
+            candidate = os.path.join(path_entry, chrome_command)
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                chrome_in_path = candidate
+                break
         self.assertIsNotNone(chrome_in_path, "chromium not found in PATH")
 
         # Verify CHROME_BIN environment variable is set correctly

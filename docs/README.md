@@ -24,6 +24,7 @@ Routing
   @docs/style/javascript.md, @docs/style/testing.md)
 - Integrations: @docs/integrations/README.md (Shopify:
   @docs/integrations/shopify.md)
+- Data sources: @docs/data-sources/README.md
 - Tooling: @docs/tooling/codex-cli.md, @docs/tooling/odoo-intelligence.md,
   @docs/tooling/ops.md, @docs/tooling/docker.md
 - Architecture: @docs/ARCHITECTURE.md, @docs/resources.md

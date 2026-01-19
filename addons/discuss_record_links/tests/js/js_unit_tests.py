@@ -1,9 +1,10 @@
 import time
-from odoo.addons.product_connect.tests.common_imports import tagged, JS_TAGS  # reuse shared tags
+
+from odoo.addons.product_connect.tests.common_imports import JS_TAGS, tagged  # reuse shared tags
 
 try:
     import requests  # type: ignore
-except Exception:  # pragma: no cover - optional dependency in some CI images
+except ImportError:  # pragma: no cover - optional dependency in some CI images
     requests = None  # type: ignore
 from odoo.addons.product_connect.tests.fixtures.base import TourTestCase  # stable base with test user
 
@@ -15,8 +16,9 @@ def _unit_test_error_checker(message: str) -> bool:
 @tagged(*JS_TAGS, "discuss_record_links")
 class DiscussRecordLinksJSTests(TourTestCase):
     def _get_test_login(self) -> str:
-        if hasattr(self, "test_user") and self.test_user:
+        if hasattr(self, "test_user") and self.test_user and self.test_user.login:
             return self.test_user.login
+        return "tour_test_user"
 
     def test_hoot_desktop(self) -> None:
         url = "/web/tests?headless=1&loglevel=2&timeout=30000&filter=%40discuss_record_links&autorun=1"
@@ -31,7 +33,7 @@ class DiscussRecordLinksJSTests(TourTestCase):
                     r = requests.get(full, timeout=3)
                     if r.status_code < 500:
                         break
-                except Exception:  # requests.RequestException, but requests may be vendored
+                except requests.RequestException:
                     pass
                 time.sleep(0.5)
 

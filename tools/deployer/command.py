@@ -54,7 +54,6 @@ def _run_process_with_streamed_stderr(
         list(command),
         cwd=str(cwd) if cwd is not None else None,
         env=dict(env) if env is not None else None,
-        stdout=None,
         stderr=subprocess.PIPE,
         text=True,
         bufsize=1,
@@ -67,7 +66,7 @@ def _run_process_with_streamed_stderr(
                 stderr_chunks.append(line)
         returncode = process.wait()
     stderr_text = "".join(stderr_chunks) if stderr_chunks else None
-    return subprocess.CompletedProcess(list(command), returncode, stdout=None, stderr=stderr_text)
+    return subprocess.CompletedProcess(list(command), returncode, stderr=stderr_text)
 
 
 def run_process(
@@ -104,7 +103,6 @@ def run_process(
                     list(command),
                     cwd=str(cwd) if cwd is not None else None,
                     env=dict(env) if env is not None else None,
-                    stdout=None,
                     stderr=subprocess.PIPE if is_docker else None,
                     text=True,
                 )

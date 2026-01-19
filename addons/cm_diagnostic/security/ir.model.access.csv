@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_diagnostic_order_user,diagnostic.order.user,model_diagnostic_order,base.group_user,1,1,1,1
+access_diagnostic_order_device_user,diagnostic.order.device.user,model_diagnostic_order_device,base.group_user,1,1,1,1
+access_diagnostic_test_user,diagnostic.test.user,model_diagnostic_test,base.group_user,1,1,1,1

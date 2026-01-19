@@ -11,18 +11,18 @@ import subprocess
 import sys
 import textwrap
 import time
+from collections.abc import Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from enum import Enum, IntEnum
 from pathlib import Path
-from typing import Annotated, Optional, Sequence
 
 import psycopg2
 from passlib.context import CryptContext
 from psycopg2 import sql
 from psycopg2.extensions import connection
 from pydantic import Field, SecretStr, ValidationError, field_validator, model_validator
-from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logging.basicConfig(level=logging.INFO)
 _logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ class ExitCode(IntEnum):
     RESTORE_FAILED = 40
 
 
-def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Restore or bootstrap an Odoo database/filestore")
     parser.add_argument("--env-file", type=Path, default=None, help="Optional env file to load settings from")
     parser.add_argument(
@@ -72,10 +72,10 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
 
-    env_file: Optional[Path] = args.env_file
+    env_file: Path | None = args.env_file
     if env_file is None:
         candidate = Path(".env")
         if candidate.exists():
@@ -234,6 +234,8 @@ def _normalize_path(value: object) -> Path | None:
     return Path(expanded)
 
 
+
+
 class LocalServerSettings(BaseSettings):
     # noinspection Pydantic
     model_config = SettingsConfigDict(case_sensitive=False)
@@ -247,13 +249,13 @@ class LocalServerSettings(BaseSettings):
     filestore_owner: str | None = Field(None, alias="ODOO_FILESTORE_OWNER")
     restore_ssh_dir: Path | None = Field(None, alias="RESTORE_SSH_DIR")
     restore_ssh_key: Path | None = Field(None, alias="RESTORE_SSH_KEY")
-    base_url: str | None = Field(None, alias="ODOO_BASE_URL")
     # Script/runtime toggles
-    disable_cron: bool = Field(True, alias="SANITIZE_DISABLE_CRON")
+    disable_cron: bool = Field(True, alias="ENV_OVERRIDE_DISABLE_CRON")
     project_name: str = Field("odoo", alias="ODOO_PROJECT_NAME")
     odoo_version: str | None = Field(None, alias="ODOO_VERSION")
     addons_path: str | None = Field(None, alias="ODOO_ADDONS_PATH")
     addon_repositories: str | None = Field(None, alias="ODOO_ADDON_REPOSITORIES")
+    install_modules: str | None = Field(None, alias="ODOO_INSTALL_MODULES")
     update_modules: str | None = Field(None, alias="ODOO_UPDATE_MODULES")
     update_modules_legacy: str | None = Field(None, alias="ODOO_UPDATE")
     local_addons_dirs: str | None = Field(None, alias="LOCAL_ADDONS_DIRS")
@@ -269,10 +271,10 @@ class LocalServerSettings(BaseSettings):
 
     @field_validator(
         "filestore_owner",
-        "base_url",
         "odoo_version",
         "addons_path",
         "addon_repositories",
+        "install_modules",
         "update_modules",
         "update_modules_legacy",
         "local_addons_dirs",
@@ -324,44 +326,11 @@ class UpstreamServerSettings(BaseSettings):
     filestore_path: Path = Field(..., alias="ODOO_UPSTREAM_FILESTORE_PATH")
 
 
-class ShopifySettings(BaseSettings):
-    # noinspection Pydantic
-    model_config = SettingsConfigDict(case_sensitive=False)
-    shop_url_key: str = Field(..., alias="SHOPIFY_STORE_URL_KEY")
-    api_token: SecretStr = Field(..., alias="SHOPIFY_API_TOKEN")
-    api_version: str = Field(..., alias="SHOPIFY_API_VERSION")
-    webhook_key: str = Field(..., alias="SHOPIFY_WEBHOOK_KEY")
-    production_indicators: Annotated[list[str], NoDecode, Field(alias="PRODUCTION_INDICATORS")] = ["production", "live", "prod-"]
-
-    @field_validator("production_indicators", mode="before")
-    @classmethod
-    def parse_production_indicators(cls, value: object) -> list[str]:
-        if value is None:
-            return ["production", "live", "prod-"]
-        if isinstance(value, str):
-            cleaned = [item.strip() for item in value.split(",") if item.strip()]
-            return cleaned or ["production", "live", "prod-"]
-        if isinstance(value, list):
-            return [str(item).strip() for item in value if str(item).strip()]
-        return ["production", "live", "prod-"]
-
-    def validate_safe_environment(self) -> None:
-        shop_url_lower = self.shop_url_key.lower()
-        for indicator in self.production_indicators:
-            if indicator in shop_url_lower:
-                raise OdooDatabaseUpdateError(
-                    f"SAFETY CHECK FAILED: shop_url_key '{self.shop_url_key}' appears to be production. "
-                    f"This script should only run on development/test environments. "
-                    f"Found production indicator: '{indicator}'. Database will be dropped for safety."
-                )
-        _logger.info(f"SAFETY CHECK PASSED: {self.production_indicators} not in shop_url_key.")
-
-
 class OdooUpstreamRestorer:
     def __init__(
         self,
         local: LocalServerSettings,
-        upstream: Optional[UpstreamServerSettings],
+        upstream: UpstreamServerSettings | None,
         env_file: Path | None,
     ) -> None:
         self.local = local
@@ -371,7 +340,7 @@ class OdooUpstreamRestorer:
         self.os_env["PGPASSWORD"] = self.local.db_password.get_secret_value()
         if self.local.restore_ssh_dir:
             self.os_env["RESTORE_SSH_DIR"] = str(self.local.restore_ssh_dir)
-        self._ssh_identity: Optional[Path] = None
+        self._ssh_identity: Path | None = None
         if self.upstream:
             resolved_key = self._resolve_restore_ssh_key()
             self._ssh_identity = resolved_key
@@ -490,8 +459,13 @@ class OdooUpstreamRestorer:
         )
         self.run_command(dump_cmd)
         _logger.info("Upstream database dump and transfer completed.")
-        self.terminate_all_db_connections()
-        self.run_command(f"dropdb --if-exists -h {local_host} -U {local_user} {local_db}")
+        self._set_database_allow_connections(False)
+        try:
+            self.terminate_all_db_connections()
+            self.run_command(f"dropdb --if-exists -h {local_host} -U {local_user} {local_db}")
+        except OdooRestorerError:
+            self._set_database_allow_connections(True)
+            raise
         self.run_command(f"createdb -h {local_host} -U {local_user} {local_db}")
         _logger.info("Restoring database into %s", self.local.db_name)
         restore_cmd = (
@@ -535,6 +509,20 @@ class OdooUpstreamRestorer:
                 )
                 conn.commit()
         _logger.info("All database connections terminated.")
+
+    def _set_database_allow_connections(self, allow_connections: bool) -> None:
+        if not self.database_exists():
+            return
+        with self._connect_with_retry("postgres") as conn:
+            conn.autocommit = True
+            with conn.cursor() as cursor:
+                allow_value = sql.SQL("true") if allow_connections else sql.SQL("false")
+                query = sql.SQL("ALTER DATABASE {} WITH ALLOW_CONNECTIONS {}")
+                cursor.execute(query.format(sql.Identifier(self.local.db_name), allow_value))
+        if allow_connections:
+            _logger.info("Re-enabled connections for database %s", self.local.db_name)
+        else:
+            _logger.info("Disabled new connections for database %s", self.local.db_name)
 
     def _reset_db_connection(self) -> None:
         if self.local.db_conn:
@@ -584,7 +572,7 @@ class OdooUpstreamRestorer:
             "-d",
             self.local.db_name,
             "--no-http",
-            "--without-demo=all",
+            "--without-demo",
             "-i",
             "base",
         ]
@@ -671,21 +659,6 @@ class OdooUpstreamRestorer:
         ]
         if disable_cron:
             sql_calls.append(SqlCall("ir.cron", KeyValuePair("active", False)))
-        if self.local.base_url:
-            sql_calls.append(
-                SqlCall(
-                    "ir.config_parameter",
-                    KeyValuePair("value", self.local.base_url),
-                    KeyValuePair("key", "web.base.url"),
-                )
-            )
-            sql_calls.append(
-                SqlCall(
-                    "ir.config_parameter",
-                    KeyValuePair("value", "True"),
-                    KeyValuePair("key", "web.base.url.freeze"),
-                )
-            )
 
         _logger.info("Sanitizing database...")
         # noinspection PyUnresolvedReferences  # call_odoo_sql exists on this class; PyCharm false positive.
@@ -701,167 +674,19 @@ class OdooUpstreamRestorer:
                 errors = "\n".join(f"- {cron[7]} (id: {cron[0]})" for cron in active_crons)
                 raise OdooDatabaseUpdateError(f"Error: The following cron jobs are still active after sanitization:\n{errors}")
 
-    def update_shopify_config(self) -> None:
-        try:
-            if self.env_file and self.env_file.exists():
-                # noinspection PyArgumentList
-                settings = ShopifySettings(_env_file=self.env_file)
-            else:
-                # noinspection PyArgumentList
-                settings = ShopifySettings()
-        except ValidationError:
-            _logger.info("Shopify envs missing; clearing Shopify config.")
-            self.clear_shopify_config()
-            return
-
-        shop_url_key = (settings.shop_url_key or "").strip()
-        api_token = settings.api_token.get_secret_value().strip()
-        webhook_key = (settings.webhook_key or "").strip()
-        api_version = (settings.api_version or "").strip()
-
-        if not shop_url_key or not api_token or not webhook_key or not api_version:
-            _logger.info("Shopify envs incomplete; clearing Shopify config.")
-            self.clear_shopify_config()
-            return
-
-        # Safety check: prevent setting production values, allow replacing production with development
-        settings.shop_url_key = shop_url_key
-        settings.validate_safe_environment()
-        production_indicators = settings.production_indicators
-        # noinspection PyUnresolvedReferences  # call_odoo_sql exists on this class; PyCharm false positive.
-        call_odoo_sql = self.call_odoo_sql
-
-        # Log what we're doing for transparency
-        current_shop_url_key = call_odoo_sql(
-            SqlCall("ir.config_parameter", KeyValuePair("value"), KeyValuePair("key", "shopify.shop_url_key")),
-            SqlCallType.SELECT,
-        )
-
-        if current_shop_url_key and current_shop_url_key[0]:
-            current_value = current_shop_url_key[0][0]
-            _logger.info(f"Replacing shop_url_key: '{current_value}' → '{shop_url_key}'")
-        else:
-            _logger.info(f"Setting shop_url_key to: '{shop_url_key}'")
-
-        sql_calls: list[SqlCall] = [
-            SqlCall(
-                "ir.config_parameter",
-                KeyValuePair("value", shop_url_key),
-                KeyValuePair("key", "shopify.shop_url_key"),
-            ),
-            SqlCall(
-                "ir.config_parameter",
-                KeyValuePair("value", api_token),
-                KeyValuePair("key", "shopify.api_token"),
-            ),
-            SqlCall(
-                "ir.config_parameter",
-                KeyValuePair("value", webhook_key),
-                KeyValuePair("key", "shopify.webhook_key"),
-            ),
-            SqlCall(
-                "ir.config_parameter",
-                KeyValuePair("value", api_version),
-                KeyValuePair("key", "shopify.api_version"),
-            ),
-            SqlCall(
-                "ir.config_parameter",
-                KeyValuePair("value", "True"),
-                KeyValuePair("key", "shopify.test_store"),
-            ),
-        ]
-        _logger.info("Updating Shopify configuration...")
-        for sql_call in sql_calls:
-            _logger.debug(f"Executing SQL call: {sql_call}")
-            try:
-                call_odoo_sql(sql_call, SqlCallType.UPDATE)
-            except psycopg2.Error as error:
-                raise OdooDatabaseUpdateError(f"Failed to update Shopify configuration: {error}") from error
-
-        legacy_keys = ("shopify.shop_url", "shopify.store_url")
-        for key in legacy_keys:
-            result = call_odoo_sql(
-                SqlCall("ir.config_parameter", KeyValuePair("value"), KeyValuePair("key", key)),
-                SqlCallType.SELECT,
-            )
-            if result and result[0]:
-                value = (result[0][0] or "").strip().lower()
-                for indicator in production_indicators:
-                    if indicator and indicator in value:
-                        raise OdooDatabaseUpdateError(
-                            f"Safety check failed: {key} still contains production indicator '{indicator}'."
-                        )
-                with self.local.db_conn.cursor() as cursor:
-                    cursor.execute("DELETE FROM ir_config_parameter WHERE key = %s", (key,))
-                _logger.info("Removed legacy Shopify config key %s", key)
-
-        sanitized_keys = ["shopify.shop_url_key"]
-        for key in sanitized_keys:
-            result = call_odoo_sql(
-                SqlCall("ir.config_parameter", KeyValuePair("value"), KeyValuePair("key", key)),
-                SqlCallType.SELECT,
-            )
-            value = (result[0][0].strip() if result and result[0] else "").lower()
-            for indicator in production_indicators:
-                if indicator and indicator in value:
-                    raise OdooDatabaseUpdateError(
-                        f"Safety check failed: {key} still contains production indicator '{indicator}'."
-                    )
-
-    def clear_shopify_config(self) -> None:
-        self.connect_to_db()
-        keys = (
-            "shopify.shop_url_key",
-            "shopify.api_token",
-            "shopify.webhook_key",
-            "shopify.api_version",
-            "shopify.test_store",
-            "shopify.shop_url",
-            "shopify.store_url",
-        )
-        with self.local.db_conn.cursor() as cursor:
-            cursor.execute("DELETE FROM ir_config_parameter WHERE key = ANY(%s)", (list(keys),))
-            self.local.db_conn.commit()
-        _logger.info("Cleared Shopify configuration keys: %s", ", ".join(keys))
-
-    def clear_shopify_ids(self) -> None:
-        with self.local.db_conn.cursor() as cursor:
-            cursor.execute(
-                "SELECT column_name FROM information_schema.columns "
-                "WHERE table_name = 'product_product' AND column_name LIKE 'shopify%'"
-            )
-            existing_fields = [row[0] for row in cursor.fetchall()]
-
-        fields_to_clear = [
-            "shopify_created_at",
-            "shopify_last_exported",
-            "shopify_last_exported_at",
-            "shopify_condition_id",
-            "shopify_variant_id",
-            "shopify_product_id",
-            "shopify_ebay_category_id",
-        ]
-
-        for field in fields_to_clear:
-            if field in existing_fields:
-                sql_call = SqlCall("product.product", KeyValuePair(field))
-                try:
-                    # noinspection PyUnresolvedReferences  # call_odoo_sql exists on this class; PyCharm false positive.
-                    call_odoo_sql = self.call_odoo_sql
-                    call_odoo_sql(sql_call, SqlCallType.UPDATE)
-                except psycopg2.Error as error:
-                    raise OdooDatabaseUpdateError(f"Failed to clear Shopify ID {field}: {error}") from error
-            else:
-                _logger.info(f"Skipping field {field} - does not exist in database")
-
     def drop_database(self) -> None:
         _logger.info("Rolling back database update: dropping database")
-        self.terminate_all_db_connections()
-        local_host = shlex.quote(self.local.host)
-        local_user = shlex.quote(self.local.db_user)
-        local_db = shlex.quote(self.local.db_name)
-        drop_cmd = f"dropdb --if-exists -h {local_host} -U {local_user} {local_db}"
-        self.run_command(drop_cmd)
+        self._set_database_allow_connections(False)
+        try:
+            self.terminate_all_db_connections()
+            local_host = shlex.quote(self.local.host)
+            local_user = shlex.quote(self.local.db_user)
+            local_db = shlex.quote(self.local.db_name)
+            drop_cmd = f"dropdb --if-exists -h {local_host} -U {local_user} {local_db}"
+            self.run_command(drop_cmd)
+        except OdooRestorerError:
+            self._set_database_allow_connections(True)
+            raise
 
     # --- Sanity checks ---
     def assert_core_schema_healthy(self) -> None:
@@ -906,9 +731,9 @@ class OdooUpstreamRestorer:
             command += ["--config", str(generated_config_path)]
         return command
 
-    def _run_odoo_shell(self, script: str) -> None:
+    def _run_odoo_shell(self, script: str, label: str) -> None:
         command = self._odoo_shell_command()
-        _logger.info("Executing odoo shell for GPT user provisioning: %s", " ".join(command))
+        _logger.info("Executing odoo shell for %s: %s", label, " ".join(command))
         try:
             subprocess.run(
                 command,
@@ -917,7 +742,37 @@ class OdooUpstreamRestorer:
                 check=True,
             )
         except subprocess.CalledProcessError as error:
-            raise OdooRestorerError("Failed to execute Odoo shell for GPT provisioning.") from error
+            raise OdooRestorerError(f"Failed to execute Odoo shell for {label}.") from error
+
+    def apply_environment_overrides(self) -> None:
+        payload = {
+            "db": self.local.db_name,
+        }
+        script = textwrap.dedent("""
+import json
+from odoo import api, SUPERUSER_ID
+from odoo.modules.registry import Registry
+
+payload = json.loads('__PAYLOAD__')
+registry = Registry(payload['db'])
+with registry.cursor() as cr:
+    env = api.Environment(cr, SUPERUSER_ID, {})
+    if 'environment.overrides' in env.registry:
+        env['environment.overrides'].sudo().apply_from_env()
+        cr.commit()
+    else:
+        print('Environment overrides addon not installed; skipping overrides.')
+    if 'authentik.sso.config' in env.registry:
+        env['authentik.sso.config'].sudo().apply_from_env()
+        cr.commit()
+    else:
+        print('Authentik SSO addon not installed; skipping Authentik overrides.')
+""").replace("__PAYLOAD__", json.dumps(payload))
+
+        try:
+            self._run_odoo_shell(script, "environment overrides")
+        except OdooRestorerError as error:
+            raise OdooDatabaseUpdateError("Failed to apply environment overrides.") from error
 
     def ensure_gpt_users(self) -> None:
         secret = self.local.odoo_key
@@ -1083,7 +938,7 @@ with registry.cursor() as cr:
     cr.commit()
 """)
         script = script.replace("__PAYLOAD__", json.dumps(payload))
-        self._run_odoo_shell(script)
+        self._run_odoo_shell(script, "GPT user provisioning")
         self._reset_db_connection()
 
     def ensure_admin_user(self) -> None:
@@ -1098,7 +953,7 @@ with registry.cursor() as cr:
         _, partner_id = row
 
         set_password = False
-        password_plain: Optional[str] = None
+        password_plain: str | None = None
         if self.local.admin_password:
             candidate = self.local.admin_password.get_secret_value().strip()
             if candidate:
@@ -1157,7 +1012,7 @@ with registry.cursor() as cr:
 """).replace("__PAYLOAD__", json.dumps(payload))
 
         _logger.info("Hardening admin credentials (password=%s, email=%s)", set_password, set_email)
-        self._run_odoo_shell(script)
+        self._run_odoo_shell(script, "admin hardening")
         self._reset_db_connection()
 
     def bootstrap_database(self, *, do_sanitize: bool) -> None:
@@ -1187,7 +1042,8 @@ with registry.cursor() as cr:
         else:
             _logger.info("Base schema already present; skipping base install step.")
 
-        self.update_addons()
+        self.install_addons(reason="bootstrap install")
+        self.update_addons(reason="bootstrap upgrade")
         self._reset_db_connection()
         self.connect_to_db()
 
@@ -1196,6 +1052,12 @@ with registry.cursor() as cr:
             self.local.db_conn.commit()
         else:
             _logger.info("Skipping sanitization per --no-sanitize flag.")
+
+        try:
+            self.apply_environment_overrides()
+        except OdooDatabaseUpdateError:
+            self.drop_database()
+            raise
 
         self.ensure_admin_user()
         self.connect_to_db()
@@ -1394,13 +1256,35 @@ with registry.cursor() as cr:
                     addons_paths.append(auto_dir)
         return addons_paths
 
-    def _default_modules_for_project(self) -> list[str]:
-        raw = (self.local.auto_modules_raw or "").strip()
-        if not raw or raw.upper() == "AUTO":
+    @staticmethod
+    def _split_module_list(raw: str | None) -> list[str]:
+        raw_value = (raw or "").strip()
+        if not raw_value or raw_value.upper() == "AUTO":
             return []
-        separator = "," if "," in raw else ":"
-        modules = [item.strip() for item in raw.split(separator) if item.strip()]
-        return modules
+        separator = "," if "," in raw_value else ":"
+        return [item.strip() for item in raw_value.split(separator) if item.strip()]
+
+    def _resolve_install_modules(self) -> tuple[list[str], str]:
+        install_modules = self._split_module_list(self.local.install_modules)
+        if install_modules:
+            return install_modules, "ODOO_INSTALL_MODULES"
+        auto_modules = self._split_module_list(self.local.auto_modules_raw)
+        if auto_modules:
+            return auto_modules, "ODOO_AUTO_MODULES"
+        return [], "none"
+
+    def install_addons(self, reason: str | None = None) -> None:
+        install_modules, modules_source_label = self._resolve_install_modules()
+        if not install_modules:
+            _logger.info("No install modules configured; skipping addon install.")
+            return
+        if reason:
+            modules_source_label = f"{modules_source_label} ({reason})"
+        self._apply_module_updates(
+            install_modules,
+            modules_source_label=modules_source_label,
+            update_existing=False,
+        )
 
     def update_addons(self, explicit_modules: Sequence[str] | None = None, reason: str | None = None) -> None:
         mods_env = (self.local.update_modules or "").strip()
@@ -1411,67 +1295,82 @@ with registry.cursor() as cr:
             if not desired:
                 _logger.info("No explicit modules provided; skipping addon update.")
                 return
+            modules_source_label = "explicit module list"
             if reason:
-                _logger.info("Updating addons for %s: %s", reason, ", ".join(desired))
-            else:
-                _logger.info("Updating addons: %s", ", ".join(desired))
+                modules_source_label = f"{modules_source_label} ({reason})"
         elif not mods_env or mods_env.upper() == "AUTO":
-            project_defaults = self._default_modules_for_project()
-            if project_defaults:
-                desired = project_defaults
+            local_module_paths = self._resolve_local_module_paths()
+            local_modules = set(local_module_paths)
+            if not local_modules:
+                _logger.info("ODOO_UPDATE_MODULES unset/AUTO and no local modules detected; skipping addon update.")
+                return
+            installed_modules = self._installed_modules()
+            installed_local_modules = sorted(local_modules & installed_modules)
+            if not installed_local_modules:
+                _logger.info("ODOO_UPDATE_MODULES unset/AUTO and no installed local modules detected; skipping.")
+                return
+            mode_label = mods_env.upper() if mods_env else "AUTO"
+            desired_set = set(installed_local_modules)
+            pending = list(installed_local_modules)
+            while pending:
+                module_name = pending.pop()
+                addon_path = local_module_paths.get(module_name)
+                if not addon_path:
+                    continue
+                for dependency_name in self._load_manifest_dependencies(addon_path):
+                    if dependency_name not in local_modules:
+                        continue
+                    if dependency_name not in desired_set:
+                        desired_set.add(dependency_name)
+                        pending.append(dependency_name)
+            missing_dependencies = sorted(name for name in desired_set if name not in installed_modules)
+            if missing_dependencies:
                 _logger.info(
-                    "ODOO_UPDATE_MODULES=%s; using project defaults: %s",
-                    mods_env.upper() if mods_env else "AUTO",
-                    ", ".join(desired),
+                    "ODOO_UPDATE_MODULES=%s; auto-detected %d installed local modules; "
+                    "will install missing local deps: %s",
+                    mode_label,
+                    len(installed_local_modules),
+                    ", ".join(missing_dependencies),
                 )
             else:
-                local_module_paths = self._resolve_local_module_paths()
-                local_modules = set(local_module_paths)
-                if not local_modules:
-                    _logger.info("ODOO_UPDATE_MODULES unset/AUTO and no local modules detected; skipping addon update.")
-                    return
-                installed_modules = self._installed_modules()
-                installed_local_modules = sorted(local_modules & installed_modules)
-                if not installed_local_modules:
-                    _logger.info(
-                        "ODOO_UPDATE_MODULES unset/AUTO and no installed local modules detected; skipping addon update."
-                    )
-                    return
-                mode_label = mods_env.upper() if mods_env else "AUTO"
-                desired_set = set(installed_local_modules)
-                pending = list(installed_local_modules)
-                while pending:
-                    module_name = pending.pop()
-                    addon_path = local_module_paths.get(module_name)
-                    if not addon_path:
-                        continue
-                    for dependency_name in self._load_manifest_dependencies(addon_path):
-                        if dependency_name not in local_modules:
-                            continue
-                        if dependency_name not in desired_set:
-                            desired_set.add(dependency_name)
-                            pending.append(dependency_name)
-                missing_dependencies = sorted(name for name in desired_set if name not in installed_modules)
-                if missing_dependencies:
-                    _logger.info(
-                        "ODOO_UPDATE_MODULES=%s; auto-detected %d installed local modules; "
-                        "will install missing local deps: %s",
-                        mode_label,
-                        len(installed_local_modules),
-                        ", ".join(missing_dependencies),
-                    )
-                else:
-                    _logger.info(
-                        "ODOO_UPDATE_MODULES=%s; auto-detected %d installed local modules for upgrade.",
-                        mode_label,
-                        len(installed_local_modules),
-                    )
-                desired = sorted(desired_set)
+                _logger.info(
+                    "ODOO_UPDATE_MODULES=%s; auto-detected %d installed local modules for upgrade.",
+                    mode_label,
+                    len(installed_local_modules),
+                )
+            desired = sorted(desired_set)
+            modules_source_label = f"ODOO_UPDATE_MODULES={mode_label}"
         else:
             desired = [module_name.strip() for module_name in mods_env.split(",") if module_name.strip()]
             if not desired:
                 _logger.info("ODOO_UPDATE_MODULES is empty after parsing; skipping.")
                 return
+            modules_source_label = "ODOO_UPDATE_MODULES"
+
+        if explicit_modules is not None:
+            _logger.info("Updating addons: %s", ", ".join(desired))
+        elif reason:
+            _logger.info("Updating addons for %s: %s", reason, ", ".join(desired))
+        else:
+            _logger.info("Updating addons: %s", ", ".join(desired))
+
+        self._apply_module_updates(
+            desired,
+            modules_source_label=modules_source_label,
+            local_module_paths=local_module_paths,
+        )
+
+    def _apply_module_updates(
+        self,
+        desired: Sequence[str],
+        *,
+        modules_source_label: str,
+        update_existing: bool = True,
+        local_module_paths: dict[str, Path] | None = None,
+    ) -> None:
+        if not desired:
+            _logger.info("No addons requested for %s; skipping.", modules_source_label)
+            return
 
         addons_paths = self._resolve_addons_paths()
         _logger.info(
@@ -1497,31 +1396,14 @@ with registry.cursor() as cr:
                 if not present:
                     missing_fs.append(name)
 
-        if explicit_modules is not None:
-            modules_source_label = "explicit module list"
-            if reason:
-                modules_source_label = f"{modules_source_label} ({reason})"
-            if missing_fs:
-                _logger.warning(
-                    "Modules from %s not found on disk and will be skipped: %s",
-                    modules_source_label,
-                    ", ".join(missing_fs),
-                )
-            if not found:
-                _logger.info(
-                    "No valid modules from %s found on disk; skipping.",
-                    modules_source_label,
-                )
-        else:
-            if missing_fs:
-                _logger.warning(
-                    "Modules listed in ODOO_UPDATE_MODULES not found on disk and will be skipped: %s",
-                    ", ".join(missing_fs),
-                )
-            if not found:
-                _logger.info("No valid modules from ODOO_UPDATE_MODULES found on disk; skipping.")
-
+        if missing_fs:
+            _logger.warning(
+                "Modules from %s not found on disk and will be skipped: %s",
+                modules_source_label,
+                ", ".join(missing_fs),
+            )
         if not found:
+            _logger.info("No valid modules from %s found on disk; skipping.", modules_source_label)
             return
 
         self.connect_to_db()
@@ -1535,7 +1417,7 @@ with registry.cursor() as cr:
                 rows[name] = state
 
         to_install = [name for name in found if name not in rows or rows.get(name) in ("uninstalled", "to remove")]
-        to_update = list(found)
+        to_update = list(found) if update_existing else []
 
         odoo_bin = "/odoo/odoo-bin"
         if not Path(odoo_bin).exists():
@@ -1560,7 +1442,7 @@ with registry.cursor() as cr:
             cmd_parts += ["--config", generated_config_path]
 
         command = " ".join(cmd_parts)
-        _logger.info(f"Installing: {to_install if to_install else 'none'}; Updating: {to_update if to_update else 'none'}")
+        _logger.info("Installing: %s; Updating: %s", to_install or "none", to_update or "none")
         try:
             self.run_command(command)
         except subprocess.CalledProcessError as update_error:
@@ -1614,7 +1496,8 @@ with registry.cursor() as cr:
             )
         return scripts_paths, framework_path
 
-    def _collect_openupgrade_modules(self, scripts_path: Path) -> list[str]:
+    @staticmethod
+    def _collect_openupgrade_modules(scripts_path: Path) -> list[str]:
         module_names: list[str] = []
         for entry in scripts_path.iterdir():
             if not entry.is_dir():
@@ -1773,6 +1656,8 @@ with registry.cursor() as cr:
                 self.drop_database()
                 raise
 
+        self.install_addons(reason="restore install")
+
         if self.local.openupgrade_enabled and self.local.openupgrade_skip_update_addons:
             _logger.info("OpenUpgrade enabled; skipping update_addons per OPENUPGRADE_SKIP_UPDATE_ADDONS.")
             if self._should_refresh_website_after_openupgrade():
@@ -1782,17 +1667,14 @@ with registry.cursor() as cr:
                     reason="OpenUpgrade 19 website refresh",
                 )
         else:
-            self.update_addons()
+            self.update_addons(reason="restore upgrade")
         self.connect_to_db()
 
-        if do_sanitize:
-            try:
-                self.update_shopify_config()
-                self.clear_shopify_ids()
-                self.local.db_conn.commit()
-            except OdooDatabaseUpdateError:
-                self.drop_database()
-                raise
+        try:
+            self.apply_environment_overrides()
+        except OdooDatabaseUpdateError:
+            self.drop_database()
+            raise
 
         self.assert_core_schema_healthy()
         self.ensure_gpt_users()

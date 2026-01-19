@@ -1,7 +1,7 @@
 import logging
 import traceback
 
-from odoo import api, models, fields
+from odoo import api, fields, models
 from odoo.addons.mail.models.mail_thread import MailThread
 from pydantic import BaseModel
 
@@ -17,7 +17,7 @@ class NotificationHistory(models.Model):
     channel = fields.Many2one("discuss.channel", required=True)
 
     @api.model_create_multi
-    def create(self, vals_list: list[dict]) -> "odoo.model.notification_history":
+    def create(self, vals_list: list["odoo.values.notification_history"]) -> "odoo.model.notification_history":
         history_records = super().create(vals_list)
         self.cleanup()
         return history_records

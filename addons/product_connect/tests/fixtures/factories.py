@@ -40,8 +40,11 @@ class ProductFactory:
         return env["product.template"].with_context(skip_shopify_sync=True).create(defaults)
 
     @staticmethod
-    def create_batch(env: Environment, count: int = 5, **kwargs: OdooValue) -> list["odoo.model.product_template"]:
-        return [ProductFactory.create(env, **kwargs) for _ in range(count)]
+    def create_batch(env: Environment, count: int = 5, **kwargs: OdooValue) -> "odoo.model.product_template":
+        product_ids: list[int] = []
+        for _ in range(count):
+            product_ids.append(ProductFactory.create(env, **kwargs).id)
+        return env["product.template"].with_context(skip_shopify_sync=True).browse(product_ids)
 
     @staticmethod
     def create_with_variants(env: Environment, variant_count: int = 3, **kwargs: OdooValue) -> "odoo.model.product_template":
@@ -106,10 +109,10 @@ class PartnerFactory:
     @staticmethod
     def create_with_contacts(
         env: Environment, contact_count: int = 2, **kwargs: OdooValue
-    ) -> tuple["odoo.model.res_partner", list["odoo.model.res_partner"]]:
+    ) -> tuple["odoo.model.res_partner", "odoo.model.res_partner"]:
         company = PartnerFactory.create_company(env, **kwargs)
 
-        contacts = []
+        contacts = env["res.partner"].browse()
         for i in range(contact_count):
             contact = PartnerFactory.create(
                 env,
@@ -117,7 +120,7 @@ class PartnerFactory:
                 name=f"Contact {i + 1}",
                 type="contact",
             )
-            contacts.append(contact)
+            contacts |= contact
 
         return company, contacts
 
@@ -505,10 +508,10 @@ class ProductAttributeFactory:
     @staticmethod
     def create_with_values(
         env: Environment, value_count: int = 3, **kwargs: OdooValue
-    ) -> tuple["odoo.model.product_attribute", list["odoo.model.product_attribute_value"]]:
+    ) -> tuple["odoo.model.product_attribute", "odoo.model.product_attribute_value"]:
         attribute = ProductAttributeFactory.create(env, **kwargs)
 
-        values = []
+        values = env["product.attribute.value"].browse()
         for i in range(value_count):
             value = env["product.attribute.value"].create(
                 {
@@ -517,7 +520,7 @@ class ProductAttributeFactory:
                     "sequence": 10 + i,
                 }
             )
-            values.append(value)
+            values |= value
 
         return attribute, values
 

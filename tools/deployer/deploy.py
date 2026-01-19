@@ -10,7 +10,7 @@ from .command import CommandError, run_process
 from .compose_ops import local_compose, local_compose_command, local_compose_env, remote_compose_command
 from .health import HealthcheckError, wait_for_health
 from .remote import ensure_remote_directory, run_remote, upload_file
-from .settings import AUTO_INSTALLED_SENTINEL, StackSettings, discover_local_modules
+from .settings import AUTO_INSTALLED_SENTINEL, StackSettings, discover_local_modules, split_modules
 
 
 def _run_compose(settings: StackSettings, args: list[str], remote: bool) -> None:
@@ -173,6 +173,59 @@ def _run_upgrade_with_retry(settings: StackSettings, upgrade_subcommand: list[st
             time.sleep(2)
 
 
+def _run_module_subcommand(settings: StackSettings, subcommand: list[str], *, remote: bool) -> None:
+    if not remote and "web" in settings.services:
+        _run_compose(settings, ["stop", "web"], remote)
+        try:
+            _run_compose(settings, ["up", "-d", settings.script_runner_service], remote)
+            _wait_for_local_service(settings, settings.script_runner_service)
+            _run_upgrade_with_retry(settings, subcommand, remote=remote)
+        finally:
+            _run_compose(settings, ["up", "-d", "web"], remote)
+        return
+    if not remote:
+        _run_compose(settings, ["up", "-d", settings.script_runner_service], remote)
+        _wait_for_local_service(settings, settings.script_runner_service)
+    _run_upgrade_with_retry(settings, subcommand, remote=remote)
+
+
+def _build_module_subcommand(settings: StackSettings, module_argument: str, operation_flag: str) -> list[str]:
+    return [
+        "exec",
+        "-T",
+        settings.script_runner_service,
+        "bash",
+        "-lc",
+        f"{settings.odoo_bin_path} {operation_flag} {module_argument} -d $ODOO_DB_NAME --stop-after-init",
+    ]
+
+
+def _build_module_subcommand_flags(settings: StackSettings, flags: list[str]) -> list[str]:
+    module_argument = " ".join(flags)
+    return [
+        "exec",
+        "-T",
+        settings.script_runner_service,
+        "bash",
+        "-lc",
+        f"{settings.odoo_bin_path} {module_argument} -d $ODOO_DB_NAME --stop-after-init",
+    ]
+
+
+def _execute_module_action(
+    settings: StackSettings,
+    modules: tuple[str, ...],
+    *,
+    remote: bool,
+    operation_flag: str,
+) -> None:
+    if not modules:
+        return
+    module_argument = ",".join(dict.fromkeys(modules))
+    subcommand = _build_module_subcommand(settings, module_argument, operation_flag)
+    _run_module_subcommand(settings, subcommand, remote=remote)
+
+
 def execute_upgrade(settings: StackSettings, modules: tuple[str, ...], remote: bool) -> None:
     resolved_modules = modules
     if modules == (AUTO_INSTALLED_SENTINEL,):
@@ -184,31 +237,40 @@ def execute_upgrade(settings: StackSettings, modules: tuple[str, ...], remote: b
             return
     if not resolved_modules:
         raise ValueError("no modules configured for upgrade")
-    module_argument = ",".join(dict.fromkeys(resolved_modules))
-    upgrade_subcommand = [
-        "exec",
-        "-T",
-        settings.script_runner_service,
-        "bash",
-        "-lc",
-        f"{settings.odoo_bin_path} -u {module_argument} -d $ODOO_DB_NAME --stop-after-init",
-    ]
-    if not remote and "web" in settings.services:
-        _run_compose(settings, ["stop", "web"], remote)
-        try:
-            _run_compose(settings, ["up", "-d", settings.script_runner_service], remote)
-            _wait_for_local_service(settings, settings.script_runner_service)
-            _run_upgrade_with_retry(settings, upgrade_subcommand, remote=remote)
-        finally:
-            _run_compose(settings, ["up", "-d", "web"], remote)
+    _execute_module_action(settings, resolved_modules, remote=remote, operation_flag="-u")
+
+
+def execute_install(settings: StackSettings, modules: tuple[str, ...], remote: bool) -> None:
+    _execute_module_action(settings, modules, remote=remote, operation_flag="-i")
+
+
+def execute_upgrade_install(
+    settings: StackSettings,
+    update_modules: tuple[str, ...],
+    install_modules: tuple[str, ...],
+    remote: bool,
+) -> None:
+    resolved_update_modules = update_modules
+    if update_modules == (AUTO_INSTALLED_SENTINEL,):
+        resolved_update_modules = _installed_local_modules(settings)
+        if not resolved_update_modules:
+            logging.getLogger("deploy.workflow").info(
+                "auto module upgrade skipped because no installed local modules were detected.",
+            )
+    resolved_update_modules = tuple(dict.fromkeys(resolved_update_modules))
+    resolved_install_modules = tuple(dict.fromkeys(install_modules))
+    if not resolved_update_modules and not resolved_install_modules:
         return
-    if not remote:
-        _run_compose(settings, ["up", "-d", settings.script_runner_service], remote)
-        _wait_for_local_service(settings, settings.script_runner_service)
-    _run_upgrade_with_retry(settings, upgrade_subcommand, remote=remote)
+    flags: list[str] = []
+    if resolved_update_modules:
+        flags.append(f"-u {','.join(resolved_update_modules)}")
+    if resolved_install_modules:
+        flags.append(f"-i {','.join(resolved_install_modules)}")
+    subcommand = _build_module_subcommand_flags(settings, flags)
+    _run_module_subcommand(settings, subcommand, remote=remote)
 
 
-def _installed_local_modules(settings: StackSettings) -> tuple[str, ...]:
+def _installed_module_names(settings: StackSettings) -> set[str]:
     container_name = f"{settings.compose_project}-database-1"
     db_name = settings.environment.get("ODOO_DB_NAME")
     db_user = settings.environment.get("ODOO_DB_USER")
@@ -253,10 +315,26 @@ def _installed_local_modules(settings: StackSettings) -> tuple[str, ...]:
     else:
         raise ValueError(f"Failed to query installed modules after retries; database may be restarting. {last_error}")
     installed = {line.strip() for line in (result.stdout or "").splitlines() if line.strip()}
+    return installed
+
+
+def _installed_local_modules(settings: StackSettings) -> tuple[str, ...]:
+    installed = _installed_module_names(settings)
     if not installed:
         return ()
     local_modules = set(discover_local_modules(settings.environment, settings.repo_root))
     return tuple(sorted(installed & local_modules))
+
+
+def resolve_install_modules(settings: StackSettings, remote: bool) -> tuple[str, ...]:
+    install_modules = split_modules(settings.environment.get("ODOO_INSTALL_MODULES"))
+    if not install_modules:
+        return ()
+    if remote:
+        return tuple(dict.fromkeys(install_modules))
+    installed = _installed_module_names(settings)
+    missing = [module for module in install_modules if module not in installed]
+    return tuple(missing)
 
 
 def run_health_check(settings: StackSettings, remote: bool, timeout_seconds: int) -> None:
@@ -293,6 +371,12 @@ def deploy_stack(
     execute_compose_pull(settings, remote)
     execute_compose_up(settings, remote)
     if not skip_upgrade:
+        install_modules = resolve_install_modules(settings, remote)
+        if install_modules:
+            logging.getLogger("deploy.workflow").info(
+                "installing missing modules: %s",
+                ", ".join(install_modules),
+            )
         update_modules = settings.update_modules
         if update_modules == (AUTO_INSTALLED_SENTINEL,):
             try:
@@ -302,15 +386,8 @@ def deploy_stack(
                     "auto module upgrade skipped because installed local modules could not be determined: %s",
                     error,
                 )
-            else:
-                if update_modules:
-                    execute_upgrade(settings, update_modules, remote)
-                else:
-                    logging.getLogger("deploy.workflow").info(
-                        "auto module upgrade skipped because no installed local modules were detected.",
-                    )
-        else:
-            execute_upgrade(settings, update_modules, remote)
+                update_modules = ()
+        execute_upgrade_install(settings, update_modules, install_modules, remote)
     if skip_health_check:
         return
     run_health_check(settings, remote, health_timeout_seconds)

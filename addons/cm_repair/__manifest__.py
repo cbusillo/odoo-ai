@@ -1,0 +1,28 @@
+{
+    "name": "CM Repair",
+    "version": "19.0.0.1",
+    "category": "Industries",
+    "summary": "Repair workflow for Cell Mechanic",
+    "description": "Repair batches and issues for device servicing.",
+    "author": "Shiny Computers",
+    "maintainers": ["cbusillo"],
+    "license": "LGPL-3",
+    "depends": [
+        "base",
+        "external_ids",
+        "helpdesk",
+        "mail",
+        "product",
+        "repair",
+        "cm_device",
+    ],
+    "data": [
+        "security/ir.model.access.csv",
+        "views/device_views.xml",
+        "views/repair_batch_views.xml",
+        "views/repair_claim_views.xml",
+        "views/cm_repair_actions.xml",
+    ],
+    "installable": True,
+    "application": False,
+}

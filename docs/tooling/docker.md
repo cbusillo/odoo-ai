@@ -42,10 +42,12 @@ Tips
 
 - `DEPLOY_COMPOSE_FILES` accepts colon- or comma-delimited values. Example:
   `DEPLOY_COMPOSE_FILES=docker/config/base.yaml:docker/config/opw-local.yaml`.
-- `ODOO_UPDATE_MODULES` accepts a comma/colon list of modules to upgrade.
-- `ODOO_AUTO_MODULES=AUTO` enables auto-upgrade based on local addons; set
-  `LOCAL_ADDONS_DIRS=/volumes/addons` (colon/comma delimited) to control the
-  search roots.
+- `ODOO_INSTALL_MODULES` accepts a comma/colon list of modules to install on
+  init/restore (fallback: `ODOO_AUTO_MODULES`).
+- `ODOO_UPDATE_MODULES` accepts a comma/colon list of modules to upgrade; set
+  `ODOO_UPDATE_MODULES=AUTO` to update all installed local addons.
+- `LOCAL_ADDONS_DIRS=/volumes/addons` (colon/comma delimited) controls the
+  auto-update search roots.
 - `ODOO_ADDON_REPOSITORIES` accepts a comma-separated list of addon repos
   (cloned into `/opt/extra_addons/<repo>`). These are cloned with
   `GITHUB_TOKEN`.
@@ -86,7 +88,8 @@ assembles the correct file order automatically.
   instead of named volumes. Coolify rewrites named volumes per app, which
   bypasses `driver_opts` bindings. The Coolify apps point at
   `docker/coolify/<app>.yml` with hard-coded host paths so the bind mounts are
-  enforced.
+  enforced. These files are standalone and are not generated from
+  `docker-compose.yml` or the `docker/config/*.yaml` overlays used locally.
 - Keep `ODOO_LOGFILE` pointed inside `/volumes/logs/` (e.g.
   `/volumes/logs/odoo.log`) so log rotation targets the bind-mounted directory.
 - Remote hosts are managed in Coolify; local stacks should keep state under

@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_repair_issue_user,repair.issue.user,model_repair_issue,base.group_user,1,1,1,1
+access_repair_batch_user,repair.batch.user,model_repair_batch,base.group_user,1,1,1,1
+access_repair_batch_device_user,repair.batch.device.user,model_repair_batch_device,base.group_user,1,1,1,1
+access_repair_batch_device_part_user,repair.batch.device.part.user,model_repair_batch_device_part,base.group_user,1,1,1,1
+access_repair_batch_device_issue_user,repair.batch.device.issue.user,model_repair_batch_device_issue,base.group_user,1,1,1,1
+access_repair_claim_user,repair.claim.user,model_repair_claim,base.group_user,1,1,1,1

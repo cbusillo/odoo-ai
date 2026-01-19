@@ -1,18 +1,5 @@
-from . import (
-    device,
-    repair_batch,
-    repair_batch_device,
-    repair_batch_device_issue,
-    repair_batch_device_part,
-    device_model,
-    device_model_family,
-    diagnostic_order,
-    diagnostic_order_device,
-    diagnostic_test,
-    intake_order,
-    intake_order_device,
-    repair_issue,
-    res_partner,
-    transport_order,
-    transport_order_device,
-)
+from . import res_partner
+from . import helpdesk_ticket
+from . import account_move
+from . import product_template
+from . import identifier_index

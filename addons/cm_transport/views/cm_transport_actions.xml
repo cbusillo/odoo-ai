@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="action_transport_orders" model="ir.actions.act_window">
+        <field name="name">Transport Orders</field>
+        <field name="res_model">transport.order</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

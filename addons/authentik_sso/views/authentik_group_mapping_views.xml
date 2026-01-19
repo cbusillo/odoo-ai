@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_authentik_group_mapping_list" model="ir.ui.view">
+        <field name="name">authentik.sso.group.mapping.list</field>
+        <field name="model">authentik.sso.group.mapping</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="sequence" widget="handle"/>
+                <field name="authentik_group"/>
+                <field name="odoo_groups" widget="many2many_tags"/>
+                <field name="is_fallback"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_authentik_group_mapping_form" model="ir.ui.view">
+        <field name="name">authentik.sso.group.mapping.form</field>
+        <field name="model">authentik.sso.group.mapping</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="active"/>
+                        <field name="sequence"/>
+                        <field name="is_fallback"/>
+                        <field name="authentik_group" placeholder="authentik Admins"/>
+                        <field name="odoo_groups" widget="many2many_tags"/>
+                    </group>
+                    <group>
+                        <div class="o_form_label">Fallback mappings apply when the Authentik token has no group claim.</div>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_authentik_group_mapping" model="ir.actions.act_window">
+        <field name="name">Authentik Group Mappings</field>
+        <field name="res_model">authentik.sso.group.mapping</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem
+        id="menu_authentik_group_mapping"
+        name="Authentik Group Mappings"
+        parent="base.menu_users"
+        action="action_authentik_group_mapping"
+        groups="base.group_system"
+        sequence="80"/>
+</odoo>

@@ -186,7 +186,7 @@ class TestOrderImporter(IntegrationTestCase):
         self.assertEqual(result, Decimal("50.00"))
 
         result = OrderImporter._get_amount_for_order_currency(None, CurrencyCode.USD)  # type: ignore[arg-type]
-        self.assertEqual(result, Decimal("0"))
+        self.assertEqual(result, Decimal("0.00"))
 
     def test_get_discount_allocation_amount(self) -> None:
         line = OrderLineItemFields(
@@ -234,7 +234,7 @@ class TestOrderImporter(IntegrationTestCase):
         )
 
         result = OrderImporter._get_discount_allocation_amount(line_no_discounts, CurrencyCode.USD)
-        self.assertEqual(result, Decimal("0"))
+        self.assertEqual(result, Decimal("0.00"))
 
     @patch.object(CustomerImporter, "import_customer")
     def test_import_order_basic(self, mock_import_customer: MagicMock) -> None:

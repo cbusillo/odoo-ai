@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_res_partner_form_cm_school" model="ir.ui.view">
+        <field name="name">res.partner.form.cm.school</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet/notebook" position="inside">
+                <page string="School Data">
+                    <group>
+                        <group>
+                            <field name="cm_partner_role_ids" widget="many2many_tags"/>
+                            <field name="cm_data_ticket_name"/>
+                            <field name="cm_data_label_names"/>
+                        </group>
+                        <group>
+                            <field name="cm_data_location_drop"/>
+                            <field name="cm_data_priority_flag"/>
+                            <field name="cm_data_on_delivery_schedule"/>
+                            <field name="cm_data_shipping_enable"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="cm_data_contact_sort_order"/>
+                        </group>
+                        <group>
+                            <field name="cm_data_contact_notes" colspan="2"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

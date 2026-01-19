@@ -1,4 +1,4 @@
-from typing import Self
+from typing import Any, Self
 
 from odoo import api, fields, models
 
@@ -7,7 +7,12 @@ class ExternalIdMixin(models.AbstractModel):
     _name = "external.id.mixin"
     _description = "External ID Mixin"
 
-    external_ids = fields.One2many("external.id", "res_id", string="External IDs")
+    external_ids = fields.One2many(
+        "external.id",
+        "res_id",
+        string="External IDs",
+        domain=lambda self: [("res_model", "=", self._name)],
+    )
 
     def get_external_system_id(self, system_code: str, resource: str | None = None) -> str | None:
         self.ensure_one()
@@ -115,6 +120,58 @@ class ExternalIdMixin(models.AbstractModel):
             },
         }
 
+    @api.model
+    def get_or_create_by_external_id(
+        self,
+        system_code: str,
+        external_id_value: str,
+        values: dict[str, Any],
+        resource: str | None = None,
+    ) -> Self:
+        sanitized_external_id = (external_id_value or "").strip()
+        record = self.search_by_external_id(system_code, sanitized_external_id, resource)
+        if record and record.exists():
+            record.write(values)
+            return record
+
+        System = self.env["external.system"].sudo()
+        ExternalId = self.env["external.id"].sudo()
+        system = System.search([("code", "=", system_code)], limit=1)
+        if not system:
+            raise ValueError(f"External system with code '{system_code}' not found")
+
+        resource_key = resource or "default"
+        external_id_record = ExternalId.search(
+            [
+                ("system_id", "=", system.id),
+                ("resource", "=", resource_key),
+                ("external_id", "=", sanitized_external_id),
+            ],
+            limit=1,
+        )
+        if external_id_record:
+            if external_id_record.res_model and external_id_record.res_model != self._name:
+                raise ValueError(
+                    f"External ID '{sanitized_external_id}' already belongs to {external_id_record.res_model}"
+                )
+            existing_record = self.browse(external_id_record.res_id).exists()
+            if existing_record:
+                existing_record.write(values)
+                return existing_record
+            record = self.create(values)
+            external_id_record.write(
+                {
+                    "res_model": self._name,
+                    "res_id": record.id,
+                    "active": True,
+                }
+            )
+            return record
+
+        record = self.create(values)
+        record.set_external_id(system_code, sanitized_external_id, resource)
+        return record
+
     @staticmethod
     def _extract_numeric_id(external_id_value: str) -> str:
         # Convert GraphQL-style GIDs like gid://shopify/Product/123456 to 123456
@@ -171,7 +228,7 @@ class ExternalIdMixin(models.AbstractModel):
         }
         try:
             return template.format(**tokens)
-        except Exception:
+        except (KeyError, ValueError):
             return None
 
     def action_open_external_url(self) -> "odoo.values.ir_actions_act_url | odoo.values.ir_actions_client":
@@ -181,7 +238,7 @@ class ExternalIdMixin(models.AbstractModel):
         resource = (self.env.context or {}).get("external_resource")
         url = self.get_external_url(system_code, kind, resource)
         if not url:
-            return {
+            notification_action = {
                 "type": "ir.actions.client",
                 "tag": "display_notification",
                 "params": {
@@ -190,4 +247,5 @@ class ExternalIdMixin(models.AbstractModel):
                     "type": "warning",
                 },
             }
+            return notification_action
         return {"type": "ir.actions.act_url", "url": url, "target": "new"}

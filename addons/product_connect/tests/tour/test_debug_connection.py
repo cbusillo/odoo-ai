@@ -14,7 +14,7 @@ _logger = logging.getLogger(__name__)
 class TestDebugConnection(TourTestCase):
     """Debug connectivity between browser and Odoo server"""
 
-    def test_server_is_listening(self):
+    def test_server_is_listening(self) -> None:
         """Check if Odoo server is actually listening on the expected port"""
         port = self.http_port()
         _logger.info(f"Expected HTTP port: {port}")
@@ -61,7 +61,7 @@ class TestDebugConnection(TourTestCase):
             except subprocess.TimeoutExpired:
                 _logger.warning(f"HTTP check timed out for {url}; proceeding (socket connectivity already verified)")
 
-    def test_browser_url_format(self):
+    def test_browser_url_format(self) -> None:
         """Check what URL format the browser is actually using"""
         # Get the base URL that would be used
         port = self.http_port()
@@ -73,7 +73,7 @@ class TestDebugConnection(TourTestCase):
         _logger.info(f"Environment HOST: {os.environ.get('HOST', 'not set')}")
 
         # Try to get the URL from Odoo's test framework
-        import odoo.tools.config as config
+        from odoo.tools import config
 
         _logger.info(f"Odoo config http_interface: {config.get('http_interface', 'not set')}")
         _logger.info(f"Odoo config http_port: {config.get('http_port', 'not set')}")

@@ -24,7 +24,9 @@ Commands
 - Gate: `uv run test run --json` all phases; require `success: true`.
 - Stack selection: `--stack opw|cm` (or
   `--env-file docker/config/<stack>-local.env`) to load the correct local
-  stack env before running tests.
+  stack env before running tests. If a `*-ci-local` stack exists (for example
+  `cm-ci-local`), `--stack cm` uses it by default so tests do not interrupt
+  dev stacks. Use `--stack cm-local` to target the dev stack explicitly.
   Stack/env-file selection is required for test runs.
 
 - The canonical command list (phase entry points, detached mode, JSON output)

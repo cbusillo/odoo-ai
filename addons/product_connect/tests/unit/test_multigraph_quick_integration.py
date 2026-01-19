@@ -41,18 +41,18 @@ class TestMultigraphQuickIntegration(UnitTestCase):
     def test_multigraph_data_query_works(self) -> None:
         domain = [("is_ready_for_sale", "=", True)]
 
-        data = self.env["product.template"].read_group(
+        data = self.env["product.template"].formatted_read_group(
             domain=domain,
-            fields=["initial_price_total", "initial_cost_total", "initial_quantity"],
+            aggregates=["initial_price_total:sum", "initial_cost_total:sum", "initial_quantity:sum"],
             groupby=["is_ready_for_sale_last_enabled_date:day"],
         )
 
         self.assertGreater(len(data), 0)
 
         first_group = data[0]
-        self.assertIn("initial_price_total", first_group)
-        self.assertIn("initial_cost_total", first_group)
-        self.assertIn("initial_quantity", first_group)
+        self.assertIn("initial_price_total:sum", first_group)
+        self.assertIn("initial_cost_total:sum", first_group)
+        self.assertIn("initial_quantity:sum", first_group)
 
     def test_multigraph_view_renders_without_server_error(self) -> None:
         view = self.env.ref("product_connect.view_product_processing_multigraph")

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="action_account_routing_rules" model="ir.actions.act_window">
+        <field name="name">Account Routing Rules</field>
+        <field name="res_model">account.routing.rule</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_account_aliases" model="ir.actions.act_window">
+        <field name="name">Account Aliases</field>
+        <field name="res_model">account.alias</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_shipping_profiles" model="ir.actions.act_window">
+        <field name="name">Shipping Profiles</field>
+        <field name="res_model">shipping.profile</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

@@ -198,6 +198,9 @@ odoo.*.conf
 /tmp/*
 !/tmp/README.md
 
+# Internal-only docs (untracked)
+docs/internal/
+
 
 # Claude Code agent stack files (recursion prevention)
 .claude/

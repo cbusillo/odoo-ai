@@ -15,6 +15,10 @@ When
 - Canonical guide: docs/integrations/shopify.md
 - Do not modify generated files: `addons/product_connect/services/shopify/gql/*`
 
+## Authentik
+
+- Canonical guide: docs/integrations/authentik.md
+
 ## ShipStation
 
 - Status: analysis; document progress in a dedicated page if/when implemented

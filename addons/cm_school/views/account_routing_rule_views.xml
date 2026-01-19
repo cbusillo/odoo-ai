@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_account_routing_rule_tree" model="ir.ui.view">
+        <field name="name">account.routing.rule.tree</field>
+        <field name="model">account.routing.rule</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="billing_path"/>
+                <field name="requires_estimate"/>
+                <field name="pricelist_id"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_account_routing_rule_form" model="ir.ui.view">
+        <field name="name">account.routing.rule.form</field>
+        <field name="model">account.routing.rule</field>
+        <field name="arch" type="xml">
+            <form string="Account Routing Rule">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="partner_id"/>
+                            <field name="billing_path"/>
+                        </group>
+                        <group>
+                            <field name="requires_estimate"/>
+                            <field name="pricelist_id"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="default_line_item_ids" widget="many2many_tags"/>
+                        <field name="notes" colspan="2"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+</odoo>

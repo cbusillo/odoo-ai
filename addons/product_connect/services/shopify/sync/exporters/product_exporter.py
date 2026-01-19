@@ -112,7 +112,7 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
             and odoo_product.shopify_product_id
             and not odoo_product.shopify_next_export
         ):
-            ordered_odoo_images = sorted(odoo_product.images, key=image_order_key)
+            ordered_odoo_images = odoo_product.images.sorted(key=image_order_key)
             shopify_product_gid = format_shopify_gid_from_id("Product", odoo_product.shopify_product_id)
             self._reorder_shopify_media(odoo_product, shopify_product_gid, ordered_odoo_images)
             odoo_product.shopify_last_exported_at = fields.Datetime.now()
@@ -318,7 +318,7 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
         self,
         odoo_product: "odoo.model.product_product",
         shopify_product_gid: str,
-        ordered_odoo_images: list["odoo.model.product_image"],
+        ordered_odoo_images: "odoo.model.product_image",
     ) -> None:
         client = self.service.client
 
@@ -328,7 +328,7 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
                 moves.append(
                     MoveInput(
                         id=format_shopify_gid_from_id("MediaImage", odoo_image.shopify_media_id),
-                        newPosition=str(new_position),
+                        newPosition=new_position,
                     )
                 )
 

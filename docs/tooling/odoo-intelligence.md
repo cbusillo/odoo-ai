@@ -18,6 +18,9 @@ When not to use
 
 - If the ORM cannot boot or the database is corrupted; use raw `docker exec` or
   SQL for emergency debugging.
+- For local filesystem reads. `odoo-intelligence` file helpers read inside the
+  running Odoo containers (e.g., `/opt/project`, `/volumes/addons`), not your
+  host workspace.
 
 Tool order
 

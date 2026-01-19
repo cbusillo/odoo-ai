@@ -142,13 +142,10 @@ def discover_local_modules(environment: dict[str, str], repo_root: Path) -> tupl
 AUTO_INSTALLED_SENTINEL = "__AUTO_INSTALLED__"
 
 
-def resolve_update_modules(config: "StackConfig", environment: dict[str, str]) -> tuple[str, ...]:
+def resolve_update_modules(config: "StackConfig") -> tuple[str, ...]:
     update_source = config.update_modules_raw or config.update_modules_legacy
     if update_source and update_source.strip().upper() not in {"AUTO", ""}:
         return split_modules(update_source)
-    auto_modules = (environment.get("ODOO_AUTO_MODULES") or "").strip()
-    if auto_modules and auto_modules.upper() != "AUTO":
-        return split_modules(auto_modules)
     return (AUTO_INSTALLED_SENTINEL,)
 
 
@@ -182,7 +179,7 @@ class StackConfig(BaseModel):
     image_variable_raw: str | None = Field(None, alias="DEPLOY_IMAGE_VARIABLE")
     project_name: str | None = Field(None, alias="ODOO_PROJECT_NAME")
     docker_image: str | None = Field(None, alias="DOCKER_IMAGE")
-    base_url: str | None = Field(None, alias="ODOO_BASE_URL")
+    base_url: str | None = Field(None, alias="ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL")
     update_modules_raw: str | None = Field(None, alias="ODOO_UPDATE_MODULES")
     update_modules_legacy: str | None = Field(None, alias="ODOO_UPDATE")
     github_token: str | None = Field(None, alias="GITHUB_TOKEN")
@@ -456,7 +453,7 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
     docker_context = compute_docker_context(repo_root, config)
     registry_image = compute_registry_image(config)
     healthcheck_url = compute_healthcheck_url(config)
-    update_modules = resolve_update_modules(config, raw_environment)
+    update_modules = resolve_update_modules(config)
     services = compute_services(config)
     script_runner_service = compute_script_runner(config)
     odoo_bin_path = compute_odoo_bin(config)

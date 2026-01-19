@@ -11,7 +11,8 @@ class TestMultigraphBrowser(TourTestCase):
 
         # Check that the action exists
         action = self.env.ref("product_connect.action_product_processing_analytics", raise_if_not_found=False)
-        self.assertIsNotNone(action, "Multigraph action should exist")
+        action = action.exists() if action else self.env["ir.actions.act_window"]
+        self.assertTrue(action, "Multigraph action should exist")
 
         # Check that the action has the expected configuration
         self.assertEqual(action.res_model, "product.template")

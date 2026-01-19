@@ -37,6 +37,28 @@ title: TODO / Optimization Ideas
     `OCA/OpenUpgrade@19.0` references if no longer needed.
   - After `opw-prod` promotion: remove `ODOO_UPSTREAM_*` env vars from
     `opw-prod` (no upstream once the docker prod becomes source of truth).
+  - After `opw-prod` promotion: set `ENV_OVERRIDE_DISABLE_CRON=false` in
+    Coolify so production cron jobs resume.
+  - After `opw-prod` promotion: uninstall `environment_overrides` and remove it
+    from `ODOO_INSTALL_MODULES` in `opw-prod`.
+
+## Stack Migration (CM)
+
+- Draft CM prod cutover checklist and validate the prod gate.
+- CM testing-prod readiness:
+  - Run JetBrains inspections on changed scope + git scope.
+  - Human click-through and integration testing on `cm-testing`.
+  - Schedule a cutover window once testing sign-off is complete.
+  - During cutover: restore new `cm-prod` from upstream, verify, then move
+    `connectmotors.com` to the new host.
+  - After cutover: block restore tooling on live prod (guard env + script).
+  - After `cm-prod` promotion: set `allow_prod_init = false` for `cm` in
+    `docker/config/ops.toml` (or remove the flag entirely) to prevent prod
+    bootstraps.
+  - After `cm-prod` promotion: set `ENV_OVERRIDE_DISABLE_CRON=false` in Coolify
+    so production cron jobs resume.
+  - After `cm-prod` promotion: uninstall `environment_overrides` and
+    `fishbowl_import`, and remove them from `ODOO_INSTALL_MODULES` in `cm-prod`.
 
 ## Health Checks
 

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import os
 import re
@@ -29,7 +27,12 @@ except ImportError:  # pragma: no cover - optional for arrow-key TUI
 
 from tools.deployer.command import CommandError, run_process
 from tools.deployer.compose_ops import local_compose_command, local_compose_env
-from tools.deployer.deploy import _wait_for_local_service, deploy_stack, execute_upgrade
+from tools.deployer.deploy import (
+    _wait_for_local_service,
+    deploy_stack,
+    execute_upgrade_install,
+    resolve_install_modules,
+)
 from tools.deployer.health import HealthcheckError
 from tools.deployer.helpers import get_git_commit
 from tools.deployer.settings import (
@@ -57,6 +60,8 @@ LOCAL_ACTIONS = (
     "openupgrade",
     "doctor",
     "info",
+    "exec",
+    "shell",
 )
 POST_SHIP_ACTIONS = ("none", "restore", "init", "upgrade")
 SHIP_ACTIONS = ("ship",)
@@ -71,8 +76,18 @@ POST_DEPLOY_TIMEOUT_DEFAULT = 7200.0
 WEB_READY_INTERVAL_DEFAULT = 15.0
 WEB_READY_TIMEOUT_DEFAULT = 900.0
 LOCAL_INFO_SCHEMA_VERSION = 1
+COOLIFY_LOG_DEFAULT_PATTERNS = (
+    r"environment_overrides",
+    r"Applying \d+ environment config parameter overrides",
+    r"Shopify overrides",
+    r"Authentik overrides",
+    r"Upstream overwrite completed successfully\.",
+    r"Bootstrap completed successfully\.",
+    r"Addon update completed successfully\.",
+)
 
 OPS_CONFIG_PATH = Path("docker/config/ops.toml")
+DEFAULT_ODOO_CONFIG_PATH = "/volumes/config/_generated.conf"
 
 
 @dataclass(frozen=True)
@@ -93,6 +108,12 @@ class OpsConfig:
     coolify_host: str
     coolify_auto_deploy: bool
     targets: dict[str, dict[str, object]]
+
+
+@dataclass(frozen=True)
+class PostDeploySettings:
+    command: str | None
+    container: str | None
 
 
 _OPS_CONFIG: OpsConfig | None = None
@@ -237,6 +258,8 @@ def _save_state(state: OpsState) -> None:
 
 
 def _record_history(state: OpsState) -> None:
+    if state.action in ("exec", "shell"):
+        return
     payload = _load_state_payload()
     updated = _update_payload_with_state(payload, state)
     history = _normalize_history(updated.get("history"))
@@ -362,6 +385,13 @@ def _env_value(key: str, *, default: str | None = None) -> str | None:
     return repo_env.get(key, default)
 
 
+def _is_truthy(raw: str | None) -> bool:
+    if raw is None:
+        return False
+    normalized = raw.strip().lower()
+    return normalized in {"1", "true", "yes", "on"}
+
+
 def _target_names() -> list[str]:
     config = _load_ops_config()
     return sorted(config.targets.keys())
@@ -377,6 +407,28 @@ def _target_config(target: str) -> dict[str, object]:
         return dict(config.targets[target])
     except KeyError as error:
         raise click.ClickException(f"Unknown target: {target}") from error
+
+
+def _allow_prod_init(target: str) -> bool:
+    env_value = _env_value("OPS_ALLOW_PROD_INIT")
+    if _is_truthy(env_value):
+        return True
+    if target == ALL_TARGET:
+        return all(_allow_prod_init(entry) for entry in _target_names())
+    target_config = _target_config(target)
+    allow_value = target_config.get("allow_prod_init")
+    return bool(allow_value)
+
+
+def _allow_prod_restore(target: str) -> bool:
+    env_value = _env_value("OPS_ALLOW_PROD_RESTORE")
+    if _is_truthy(env_value):
+        return True
+    if target == ALL_TARGET:
+        return all(_allow_prod_restore(entry) for entry in _target_names())
+    target_config = _target_config(target)
+    allow_value = target_config.get("allow_prod_restore")
+    return bool(allow_value)
 
 
 def _resolve_local_stack(target: str) -> str:
@@ -484,6 +536,23 @@ def _coolify_update_application(app_ref: str, payload: dict[str, object]) -> Non
     _coolify_request(f"/api/v1/applications/{app_uuid}", method="PATCH", body=payload)
 
 
+def _normalize_post_deploy_value(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)
+
+
+def _coolify_post_deploy_settings(app_ref: str) -> PostDeploySettings:
+    app_uuid = _coolify_find_app_uuid(app_ref)
+    payload = _coolify_request(f"/api/v1/applications/{app_uuid}")
+    if not isinstance(payload, dict):
+        return PostDeploySettings(command=None, container=None)
+    return PostDeploySettings(
+        command=_normalize_post_deploy_value(payload.get("post_deployment_command")),
+        container=_normalize_post_deploy_value(payload.get("post_deployment_command_container")),
+    )
+
+
 def _coolify_find_app_uuid(app_ref: str) -> str:
     if _looks_like_uuid(app_ref):
         return app_ref
@@ -498,10 +567,10 @@ def _coolify_find_app_uuid(app_ref: str) -> str:
         choices = ", ".join(str(app.get("uuid") or app.get("id")) for app in matches)
         raise click.ClickException(f"Multiple Coolify apps named '{app_ref}': {choices}")
     match = matches[0]
-    uuid = match.get("uuid") or match.get("id")
-    if not uuid:
+    app_uuid_value = match.get("uuid") or match.get("id")
+    if not app_uuid_value:
         raise click.ClickException(f"Coolify app '{app_ref}' has no uuid/id in API response.")
-    uuid_str = str(uuid)
+    uuid_str = str(app_uuid_value)
     _COOLIFY_APP_CACHE[app_ref] = uuid_str
     return uuid_str
 
@@ -597,6 +666,33 @@ def _coolify_deployment_logs(app_ref: str) -> list[str]:
     return []
 
 
+def _compile_log_patterns(patterns: Sequence[str]) -> list[re.Pattern[str]]:
+    compiled: list[re.Pattern[str]] = []
+    for pattern in patterns:
+        try:
+            compiled.append(re.compile(pattern))
+        except re.error as error:
+            raise click.ClickException(f"Invalid regex pattern '{pattern}': {error}") from error
+    return compiled
+
+
+def _select_coolify_log_lines(
+    log_lines: list[str],
+    patterns: Sequence[str],
+    *,
+    show_all: bool,
+    tail: int,
+) -> list[str]:
+    if show_all:
+        if tail <= 0:
+            return log_lines
+        return log_lines[-tail:]
+
+    effective_patterns = patterns or COOLIFY_LOG_DEFAULT_PATTERNS
+    compiled = _compile_log_patterns(effective_patterns)
+    return [line for line in log_lines if any(regex.search(line) for regex in compiled)]
+
+
 def _coolify_env_value(app_ref: str, key: str) -> str | None:
     app_uuid = _coolify_find_app_uuid(app_ref)
     try:
@@ -620,10 +716,80 @@ def _coolify_env_value(app_ref: str, key: str) -> str | None:
     return None
 
 
+def _coolify_env_entries(app_ref: str) -> tuple[str, list[dict[str, object]]]:
+    app_uuid = _coolify_find_app_uuid(app_ref)
+    payload = _coolify_request(f"/api/v1/applications/{app_uuid}/envs")
+    if not isinstance(payload, list):
+        raise click.ClickException(f"Unexpected env payload for {app_ref}.")
+    env_entries: list[dict[str, object]] = [entry for entry in payload if isinstance(entry, dict)]
+    return app_uuid, env_entries
+
+
+def _parse_coolify_app_refs(apps: str) -> list[str]:
+    app_refs = [item.strip() for item in apps.split(",") if item.strip()]
+    if not app_refs:
+        raise click.ClickException("Provide at least one app name via --apps.")
+    return app_refs
+
+
+def _parse_coolify_key_filter(keys: str | None) -> set[str] | None:
+    if not keys:
+        return None
+    return {item.strip() for item in keys.split(",") if item.strip()}
+
+
+def _filter_coolify_env_entries(
+    entries: Iterable[dict[str, object]],
+    *,
+    include_preview: bool,
+    key_filter: set[str] | None,
+    prefixes: tuple[str, ...],
+) -> list[tuple[dict[str, object], str]]:
+    matches: list[tuple[dict[str, object], str]] = []
+    for entry in entries:
+        if not include_preview and entry.get("is_preview"):
+            continue
+        key = entry.get("key")
+        if not isinstance(key, str):
+            continue
+        if key_filter is not None and key not in key_filter:
+            continue
+        if prefixes and not any(key.startswith(prefix) for prefix in prefixes):
+            continue
+        matches.append((entry, key))
+    return matches
+
+
+def _env_entry_value(entry: dict[str, object]) -> str:
+    value = entry.get("real_value") or entry.get("value")
+    if isinstance(value, str):
+        return value
+    return ""
+
+
+def _env_entry_flags(entry: dict[str, object]) -> dict[str, object]:
+    flags: dict[str, object] = {}
+    for flag in ("is_preview", "is_literal", "is_multiline", "is_shown_once", "is_buildtime"):
+        if flag in entry:
+            flags[flag] = bool(entry[flag])
+    return flags
+
+
+def _create_or_update_env(app_uuid: str, payload: dict[str, object], *, exists: bool) -> None:
+    path = f"/api/v1/applications/{app_uuid}/envs"
+    method = "PATCH" if exists else "POST"
+    _coolify_request(path, method=method, body=payload)
+
+
+def _delete_env(app_uuid: str, env_uuid: str) -> None:
+    path = f"/api/v1/applications/{app_uuid}/envs/{env_uuid}"
+    _coolify_request(path, method="DELETE")
+
+
 def _wait_for_web_ready(entry: str, env: str, app_ref: str) -> None:
-    base_url = _coolify_env_value(app_ref, "ODOO_BASE_URL")
+    base_url = _coolify_env_value(app_ref, "ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL")
     if not base_url:
-        console.print(f"{entry} {env}: ODOO_BASE_URL missing; skipping web readiness wait.")
+        console.print(f"{entry} {env}: ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL missing; skipping web readiness wait.")
         return
     url = f"{base_url.rstrip('/')}/web/login"
     console.print(f"{entry} {env}: waiting for web login ({url})...")
@@ -998,7 +1164,10 @@ def _run_local_upgrade(settings: StackSettings, *, dry_run: bool) -> None:
     if dry_run:
         return
     _ensure_local_service(settings, settings.script_runner_service, dry_run=dry_run)
-    execute_upgrade(settings, settings.update_modules, remote=False)
+    install_modules = resolve_install_modules(settings, remote=False)
+    if install_modules:
+        console.print(f"Installing missing local modules: {', '.join(install_modules)}")
+    execute_upgrade_install(settings, settings.update_modules, install_modules, remote=False)
 
 
 def _run_local_openupgrade(settings: StackSettings, *, dry_run: bool) -> None:
@@ -1008,8 +1177,8 @@ def _run_local_openupgrade(settings: StackSettings, *, dry_run: bool) -> None:
             try:
                 _run_local_compose(settings, arguments, dry_run=False)
                 return
-            except CommandError as exc:
-                last_error = exc
+            except CommandError as command_error:
+                last_error = command_error
                 if attempt_number >= attempts:
                     raise
                 delay_seconds = 2 ** (attempt_number - 1)
@@ -1051,6 +1220,87 @@ def _run_local_openupgrade(settings: StackSettings, *, dry_run: bool) -> None:
     _run_local_compose(settings, openupgrade_command, dry_run=False)
 
 
+def _compose_exec_env_arguments(environment: dict[str, str]) -> list[str]:
+    arguments: list[str] = []
+    for key in sorted(environment):
+        value = environment.get(key)
+        if value is None:
+            continue
+        arguments.extend(["-e", key])
+    return arguments
+
+
+def _normalize_exec_command(command: Sequence[str]) -> list[str]:
+    values = list(command)
+    if values and values[0] == "--":
+        values = values[1:]
+    return values
+
+
+def _command_has_option(command: Sequence[str], *, short: str, long: str) -> bool:
+    for item in command:
+        if item == short or item == long:
+            return True
+        if item.startswith(f"{long}="):
+            return True
+        if short and item.startswith(f"{short}="):
+            return True
+    return False
+
+
+def _run_local_shell(
+    settings: StackSettings,
+    command: Sequence[str],
+    *,
+    service: str | None,
+    skip_env: bool,
+    dry_run: bool,
+) -> None:
+    shell_args = _normalize_exec_command(command)
+    exec_command = [settings.odoo_bin_path, "shell"]
+
+    if not _command_has_option(shell_args, short="-d", long="--database"):
+        database_name = settings.environment.get("ODOO_DB_NAME")
+        if not database_name:
+            raise click.ClickException("Missing ODOO_DB_NAME; pass -d/--database explicitly.")
+        exec_command.extend(["-d", database_name])
+
+    if not _command_has_option(shell_args, short="-c", long="--config"):
+        config_path = settings.environment.get("ODOO_CONFIG") or DEFAULT_ODOO_CONFIG_PATH
+        exec_command.extend(["-c", config_path])
+
+    exec_command.extend(shell_args)
+    _run_local_exec(settings, exec_command, service=service, skip_env=skip_env, dry_run=dry_run)
+
+
+def _run_local_exec(
+    settings: StackSettings,
+    command: Sequence[str],
+    *,
+    service: str | None,
+    skip_env: bool,
+    dry_run: bool,
+) -> None:
+    exec_command = _normalize_exec_command(command)
+    if not exec_command:
+        raise click.ClickException("Provide a command after '--'.")
+    service_name = service or settings.script_runner_service
+    if service_name not in settings.services:
+        raise click.ClickException(f"Service '{service_name}' not found for local stack {settings.name}.")
+    if not dry_run:
+        _ensure_local_service(settings, service_name, dry_run=dry_run)
+    interactive_terminal = sys.stdin.isatty() and sys.stdout.isatty()
+    exec_arguments: list[str] = ["exec"]
+    if not interactive_terminal:
+        exec_arguments.append("-T")
+
+    if not skip_env:
+        exec_arguments.extend(_compose_exec_env_arguments(settings.environment))
+    exec_arguments.append(service_name)
+    exec_arguments.extend(exec_command)
+    _run_local_compose(settings, exec_arguments, dry_run=dry_run)
+
+
 def _run_local_action(
     target: str,
     action: str,
@@ -1059,20 +1309,26 @@ def _run_local_action(
     build: bool,
     no_cache: bool,
     json_output: bool,
+    command: Sequence[str],
+    service: str | None,
+    env_file: Path | None,
+    skip_env: bool,
 ) -> None:
     if action == "info":
         payloads: list[dict[str, object]] = []
         for entry in _targets_for(target):
             stack = _resolve_local_stack(entry)
-            env_file_path = _resolve_local_env_file(entry)
+            env_file_path = env_file if env_file is not None else _resolve_local_env_file(entry)
             settings = load_stack_settings(stack, env_file_path)
             payloads.append(_local_info_payload(settings))
         _emit_local_info(payloads, json_output=json_output)
         return
+    if action not in ("exec", "shell") and command:
+        raise click.ClickException("Extra arguments are only supported for the 'exec' and 'shell' actions.")
     no_cache_used = False
     for entry in _targets_for(target):
         stack = _resolve_local_stack(entry)
-        env_file_path = _resolve_local_env_file(entry)
+        env_file_path = env_file if env_file is not None else _resolve_local_env_file(entry)
         if action == "down":
             settings = load_stack_settings(stack, env_file_path)
             if dry_run:
@@ -1109,6 +1365,14 @@ def _run_local_action(
             settings = load_stack_settings(stack, env_file_path)
             _run_local_openupgrade(settings, dry_run=dry_run)
             console.print(f"{entry} local openupgrade complete")
+            continue
+        if action == "exec":
+            settings = load_stack_settings(stack, env_file_path)
+            _run_local_exec(settings, command, service=service, skip_env=skip_env, dry_run=dry_run)
+            continue
+        if action == "shell":
+            settings = load_stack_settings(stack, env_file_path)
+            _run_local_shell(settings, command, service=service, skip_env=skip_env, dry_run=dry_run)
             continue
         settings = load_stack_settings(stack, env_file_path)
         if dry_run:
@@ -1174,6 +1438,28 @@ def _run_ship(
     if env == "prod":
         if require_confirm and not Confirm.ask("Ship to prod?", default=False):
             return
+        if post_action == "init":
+            if not _allow_prod_init(target):
+                raise click.ClickException(
+                    "Post-deploy init is disabled for prod. Set allow_prod_init=true in docker/config/ops.toml or "
+                    "OPS_ALLOW_PROD_INIT=1 to proceed."
+                )
+            if require_confirm and not Confirm.ask(
+                "Run prod bootstrap after deploy? This will wipe existing data.",
+                default=False,
+            ):
+                return
+        if post_action == "restore":
+            if not _allow_prod_restore(target):
+                raise click.ClickException(
+                    "Post-deploy restore is disabled for prod. Set allow_prod_restore=true in docker/config/ops.toml "
+                    "or OPS_ALLOW_PROD_RESTORE=1 to proceed."
+                )
+            if require_confirm and not Confirm.ask(
+                "Run prod restore after deploy? This will overwrite existing data.",
+                default=False,
+            ):
+                return
         for entry in _targets_for(target):
             _run_prod_gate(entry, dry_run=dry_run, skip_tests=skip_tests)
     elif env == "testing":
@@ -1185,8 +1471,18 @@ def _run_ship(
     auto_deploy = _load_ops_config().coolify_auto_deploy
     wait_enabled = wait_deploy and (deploy or auto_deploy) and env in ("dev", "testing", "prod")
     if post_action:
-        if post_action in {"restore", "init"} and env not in ("dev", "testing"):
-            raise click.ClickException("Post-deploy restore/init is only supported for dev/testing.")
+        if post_action in {"restore", "init"} and env not in ("dev", "testing", "prod"):
+            raise click.ClickException("Post-deploy restore/init is only supported for dev/testing/prod.")
+        if post_action == "init" and env == "prod" and not _allow_prod_init(target):
+            raise click.ClickException(
+                "Post-deploy init is disabled for prod. Set allow_prod_init=true in docker/config/ops.toml or "
+                "OPS_ALLOW_PROD_INIT=1 to proceed."
+            )
+        if post_action == "restore" and env == "prod" and not _allow_prod_restore(target):
+            raise click.ClickException(
+                "Post-deploy restore is disabled for prod. Set allow_prod_restore=true in docker/config/ops.toml "
+                "or OPS_ALLOW_PROD_RESTORE=1 to proceed."
+            )
         if post_action == "upgrade" and env not in ("dev", "testing", "prod"):
             raise click.ClickException("Post-deploy upgrade is only supported for dev/testing/prod.")
         if not wait_enabled:
@@ -1207,6 +1503,7 @@ def _run_ship(
             before_keys[entry] = _deployment_key(_coolify_latest_deployment(app_ref))
 
     post_apps: list[str] = []
+    post_settings: dict[str, PostDeploySettings] = {}
     if post_action:
         command = "python3 /volumes/scripts/restore_from_upstream.py"
         if post_action == "init":
@@ -1218,6 +1515,7 @@ def _run_ship(
             if not app_ref:
                 console.print(f"No Coolify app ref for {entry} {env}; skipping post-deploy {post_action}.")
                 continue
+            post_settings[app_ref] = _coolify_post_deploy_settings(app_ref)
             _coolify_update_application(
                 app_ref,
                 {
@@ -1274,11 +1572,14 @@ def _run_ship(
     finally:
         if post_apps:
             for app_ref in post_apps:
+                settings = post_settings.get(app_ref)
+                if settings is None:
+                    continue
                 _coolify_update_application(
                     app_ref,
                     {
-                        "post_deployment_command": "true",
-                        "post_deployment_command_container": "script-runner",
+                        "post_deployment_command": settings.command,
+                        "post_deployment_command_container": settings.container,
                     },
                 )
 
@@ -1579,10 +1880,17 @@ def _interactive(*, dry_run: bool, remember: bool, wait_deploy: bool) -> None:
             action_default = state.action if state.action in action_choices else action_choices[0]
             action = _prompt_choice("Action", action_choices, action_default)
             deploy = state.deploy
-            if action == "ship" and env in ("dev", "testing"):
+            if action == "ship" and env in ("dev", "testing", "prod"):
                 deploy = Confirm.ask("Trigger Coolify deploy after push?", default=True)
                 serial = Confirm.ask("Deploy serially?", default=False)
-                post_action = _prompt_choice("After deploy", POST_SHIP_ACTIONS, "none")
+                post_action_choices = list(POST_SHIP_ACTIONS)
+                if env == "prod":
+                    post_action_choices = ["none", "upgrade"]
+                    if _allow_prod_restore(target):
+                        post_action_choices.append("restore")
+                    if _allow_prod_init(target):
+                        post_action_choices.append("init")
+                post_action = _prompt_choice("After deploy", post_action_choices, "none")
             if env == "local" and action in ("up", "init", "restore"):
                 if questionary and sys.stdin.isatty():
                     build_choice = questionary.select("Build image?", choices=["No", "Yes"], default="No").ask()
@@ -1660,6 +1968,10 @@ def _execute(
     require_confirm: bool,
     json_output: bool = False,
     record_history: bool = False,
+    command: Sequence[str] = (),
+    service: str | None = None,
+    env_file: Path | None = None,
+    skip_env: bool = False,
 ) -> None:
     valid_targets = set(_target_names()) | {ALL_TARGET}
     if target not in valid_targets:
@@ -1669,6 +1981,11 @@ def _execute(
 
     if action in LOCAL_ACTIONS:
         if env != "local":
+            if action == "init":
+                raise click.ClickException(
+                    "Init is only supported for local. Use 'uv run ops local init <target>' for local or "
+                    "'uv run ops ship <env> <target> --after init' for dev/testing/prod."
+                )
             raise click.ClickException("Local actions are only valid for env=local.")
         _run_local_action(
             target,
@@ -1677,6 +1994,10 @@ def _execute(
             build=build,
             no_cache=no_cache,
             json_output=json_output,
+            command=command,
+            service=service,
+            env_file=env_file,
+            skip_env=skip_env,
         )
         if record_history:
             _record_history(
@@ -1771,16 +2092,24 @@ def main(
 @main.command("local")
 @click.argument("action", type=click.Choice(LOCAL_ACTIONS, case_sensitive=False))
 @click.argument("target")
+@click.argument("command", nargs=-1, required=False)
 @click.option("--build/--no-build", default=False, help="Build image before local actions")
 @click.option("--no-cache", is_flag=True, help="Build without cache")
 @click.option("--json", "json_output", is_flag=True, help="Output info as JSON (info action only)")
+@click.option("--service", default=None, help="Service to exec into (exec action only)")
+@click.option("--env-file", "env_file", type=click.Path(path_type=Path), default=None)
+@click.option("--no-env", "skip_env", is_flag=True, help="Skip passing the merged stack env into exec")
 @click.option("--dry-run", is_flag=True)
 def local_command(
     action: str,
     target: str,
+    command: tuple[str, ...],
     build: bool,
     no_cache: bool,
     json_output: bool,
+    service: str | None,
+    env_file: Path | None,
+    skip_env: bool,
     dry_run: bool,
 ) -> None:
     if json_output and action != "info":
@@ -1800,6 +2129,10 @@ def local_command(
         require_confirm=False,
         json_output=json_output,
         record_history=True,
+        command=command,
+        service=service,
+        env_file=env_file,
+        skip_env=skip_env,
     )
 
 
@@ -1880,6 +2213,226 @@ def gate_command(target: str, skip_tests: bool, dry_run: bool, confirm: bool) ->
 @click.option("--timeout", type=float, default=STATUS_TIMEOUT_DEFAULT, help="Timeout in seconds")
 def status_command(env: str, target: str, wait: bool, interval: float, timeout: float) -> None:
     _run_status(target, env, wait=wait, interval=interval, timeout=timeout)
+
+
+@main.group("coolify")
+def coolify_group() -> None:
+    """Coolify helpers."""
+
+
+@coolify_group.command("env-set")
+@click.option("--apps", required=True, help="Comma-separated list of Coolify app names")
+@click.option("--env", "env_pairs", multiple=True, help="KEY=VALUE pair (repeatable)")
+@click.option("--env-file", "env_file", type=click.Path(path_type=Path), default=None)
+@click.option("--prefix", "prefixes", multiple=True, help="Only include keys with this prefix")
+@click.option("--keys", default=None, help="Comma-separated list of keys to include")
+@click.option("--include-preview", is_flag=True, help="Update preview env entries too")
+@click.option("--dry-run", is_flag=True)
+def coolify_env_set(
+    apps: str,
+    env_pairs: tuple[str, ...],
+    env_file: Path | None,
+    prefixes: tuple[str, ...],
+    keys: str | None,
+    include_preview: bool,
+    dry_run: bool,
+) -> None:
+    app_refs = _parse_coolify_app_refs(apps)
+
+    key_filter = _parse_coolify_key_filter(keys)
+
+    updates: dict[str, str] = {}
+    if env_file:
+        values = parse_env_file(env_file)
+        for key, value in values.items():
+            if key_filter is not None and key not in key_filter:
+                continue
+            if prefixes and not any(key.startswith(prefix) for prefix in prefixes):
+                continue
+            updates[key] = value
+
+    for pair in env_pairs:
+        if "=" not in pair:
+            raise click.ClickException(f"Invalid --env '{pair}'. Use KEY=VALUE.")
+        key, value = pair.split("=", 1)
+        key = key.strip()
+        if not key:
+            raise click.ClickException(f"Invalid --env '{pair}'. Key is empty.")
+        updates[key] = value
+
+    if not updates:
+        raise click.ClickException("No env vars to set. Provide --env or --env-file with filters.")
+
+    for app_ref in app_refs:
+        app_uuid, entries = _coolify_env_entries(app_ref)
+        env_by_key: dict[str, dict[str, object]] = {}
+        for entry, key in _filter_coolify_env_entries(
+            entries,
+            include_preview=include_preview,
+            key_filter=None,
+            prefixes=(),
+        ):
+            env_by_key[key] = entry
+
+        for key, value in sorted(updates.items()):
+            entry = env_by_key.get(key)
+            payload: dict[str, object] = {
+                "key": key,
+                "value": value,
+            }
+            if entry:
+                payload.update(_env_entry_flags(entry))
+            if dry_run:
+                console.print(f"[dry-run] {app_ref}: set {key}")
+                continue
+            _create_or_update_env(app_uuid, payload, exists=bool(entry))
+            console.print(f"{app_ref}: set {key}")
+
+
+@coolify_group.command("env-get")
+@click.option("--apps", required=True, help="Comma-separated list of Coolify app names")
+@click.option("--prefix", "prefixes", multiple=True, help="Only include keys with this prefix")
+@click.option("--keys", default=None, help="Comma-separated list of keys to include")
+@click.option("--include-preview", is_flag=True, help="Include preview env entries")
+@click.option("--show-values", is_flag=True, help="Show raw values (may include secrets)")
+@click.option("--json", "json_output", is_flag=True)
+def coolify_env_get(
+    apps: str,
+    prefixes: tuple[str, ...],
+    keys: str | None,
+    include_preview: bool,
+    show_values: bool,
+    json_output: bool,
+) -> None:
+    app_refs = _parse_coolify_app_refs(apps)
+
+    key_filter = _parse_coolify_key_filter(keys)
+
+    output: dict[str, list[dict[str, str]]] = {}
+    for app_ref in app_refs:
+        _app_uuid, entries = _coolify_env_entries(app_ref)
+        app_output: list[dict[str, str]] = []
+        for entry, key in _filter_coolify_env_entries(
+            entries,
+            include_preview=include_preview,
+            key_filter=key_filter,
+            prefixes=prefixes,
+        ):
+            value = _env_entry_value(entry) if show_values else "REDACTED"
+            label = key
+            if include_preview and entry.get("is_preview"):
+                label = f"{key} (preview)"
+            app_output.append({"key": label, "value": value})
+        output[app_ref] = app_output
+
+    if json_output:
+        console.print_json(json.dumps(output, indent=2))
+        return
+
+    for app_ref in app_refs:
+        console.print(f"[{app_ref}]", markup=False)
+        for entry in output.get(app_ref, []):
+            console.print(f"{entry['key']}={entry['value']}", markup=False)
+
+
+@coolify_group.command("logs")
+@click.option("--apps", required=True, help="Comma-separated list of Coolify app names")
+@click.option(
+    "--pattern",
+    "patterns",
+    multiple=True,
+    help="Regex pattern to filter log lines (repeatable). Defaults to override/post-deploy markers.",
+)
+@click.option("--all", "show_all", is_flag=True, help="Show full logs instead of filtering")
+@click.option(
+    "--tail",
+    type=int,
+    default=200,
+    show_default=True,
+    help="Number of lines to show when --all is set (0 for all).",
+)
+@click.option("--json", "json_output", is_flag=True)
+def coolify_logs(
+    apps: str,
+    patterns: tuple[str, ...],
+    show_all: bool,
+    tail: int,
+    json_output: bool,
+) -> None:
+    if tail < 0:
+        raise click.ClickException("--tail must be >= 0.")
+
+    app_references = _parse_coolify_app_refs(apps)
+    log_output: dict[str, list[str]] = {}
+    for app_reference in app_references:
+        log_lines = _coolify_deployment_logs(app_reference)
+        selected_lines = _select_coolify_log_lines(
+            log_lines,
+            patterns,
+            show_all=show_all,
+            tail=tail,
+        )
+        log_output[app_reference] = selected_lines
+
+    if json_output:
+        console.print_json(json.dumps(log_output, indent=2))
+        return
+
+    for app_reference in app_references:
+        console.print(f"[{app_reference}]", markup=False)
+        selected_lines = log_output.get(app_reference, [])
+        if not selected_lines:
+            if show_all:
+                console.print("no log lines available", markup=False)
+            else:
+                console.print("no matching log lines (use --all to show full logs)", markup=False)
+            continue
+        for line in selected_lines:
+            console.print(line, markup=False)
+
+
+@coolify_group.command("env-unset")
+@click.option("--apps", required=True, help="Comma-separated list of Coolify app names")
+@click.option("--keys", default=None, help="Comma-separated list of keys to delete")
+@click.option("--prefix", "prefixes", multiple=True, help="Delete keys with this prefix")
+@click.option("--include-preview", is_flag=True, help="Include preview env entries")
+@click.option("--dry-run", is_flag=True)
+def coolify_env_unset(
+    apps: str,
+    keys: str | None,
+    prefixes: tuple[str, ...],
+    include_preview: bool,
+    dry_run: bool,
+) -> None:
+    app_refs = _parse_coolify_app_refs(apps)
+
+    key_filter = _parse_coolify_key_filter(keys)
+
+    if key_filter is None and not prefixes:
+        raise click.ClickException("Provide --keys or --prefix for env-unset.")
+
+    for app_ref in app_refs:
+        app_uuid, entries = _coolify_env_entries(app_ref)
+        matches = _filter_coolify_env_entries(
+            entries,
+            include_preview=include_preview,
+            key_filter=key_filter,
+            prefixes=prefixes,
+        )
+
+        if not matches:
+            console.print(f"{app_ref}: no matching env vars to delete")
+            continue
+
+        for entry, key in matches:
+            env_uuid = entry.get("uuid")
+            if not isinstance(env_uuid, str):
+                continue
+            if dry_run:
+                console.print(f"[dry-run] {app_ref}: delete {key}")
+                continue
+            _delete_env(app_uuid, env_uuid)
+            console.print(f"{app_ref}: deleted {key}")
 
 
 if __name__ == "__main__":

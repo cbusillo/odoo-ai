@@ -25,7 +25,7 @@ class ExternalSystemUrl(models.Model):
     )
     template = fields.Char(
         required=True,
-        help=("URL template with tokens like {id}, {gid}, {model}, {name}, {code}, {base}. Example: {base}/admin/products/{id}"),
+        help="URL template with tokens like {id}, {gid}, {model}, {name}, {code}, {base}. Example: {base}/admin/products/{id}",
     )
 
     _code_unique_per_system = models.Constraint(

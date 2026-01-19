@@ -7,6 +7,9 @@ the linked docs, then keep prompts lean.
 
 - Use the documentation table of contents (`docs/README.md`) to grab handles
   instead of copying long excerpts.
+- Ops entrypoint: `uv run ops` for up/down/init/restore/build/ship/gate
+  workflows (docs `docs/tooling/ops.md`; CLI `tools/ops_cli.py`; config
+  `docker/config/ops.toml`).
 - Before changing code, open the matching style page (`docs/style/python.md`, `docs/style/javascript.md`,
   `docs/style/testing.md`).
 - Clarify your role expectations with @docs/roles.md (analyst, engineer,
@@ -99,6 +102,8 @@ the linked docs, then keep prompts lean.
 - Use Codex built-ins for routine file reads/searches and `apply_patch`; reserve
   JetBrains automation for IDE-only tasks.
 - Sandbox/approval profiles are documented in `docs/tooling/codex-cli.md`.
+- Coolify env edits should go through `uv run ops coolify env-set` / `env-get`
+  / `env-unset` instead of ad-hoc scripts.
 
 ## Domain Notes
 

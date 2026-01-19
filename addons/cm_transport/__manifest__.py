@@ -1,0 +1,25 @@
+{
+    "name": "CM Transport",
+    "version": "19.0.0.1",
+    "category": "Industries",
+    "summary": "Transport workflow for Cell Mechanic",
+    "description": "Transport orders and device movement tracking.",
+    "author": "Shiny Computers",
+    "maintainers": ["cbusillo"],
+    "license": "LGPL-3",
+    "depends": [
+        "base",
+        "contacts",
+        "mail",
+        "external_ids",
+        "cm_device",
+    ],
+    "data": [
+        "security/ir.model.access.csv",
+        "views/device_views.xml",
+        "views/transport_order_views.xml",
+        "views/cm_transport_actions.xml",
+    ],
+    "installable": True,
+    "application": False,
+}

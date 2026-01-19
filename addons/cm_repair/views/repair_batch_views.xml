@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_repair_batch_tree" model="ir.ui.view">
+        <field name="name">repair.batch.tree</field>
+        <field name="model">repair.batch</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="state"/>
+                <field name="start_date"/>
+                <field name="finish_date"/>
+                <field name="bin"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_repair_batch_form" model="ir.ui.view">
+        <field name="name">repair.batch.form</field>
+        <field name="model">repair.batch</field>
+        <field name="arch" type="xml">
+            <form string="Repair Batch">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="state"/>
+                        </group>
+                        <group>
+                            <field name="start_date"/>
+                            <field name="finish_date"/>
+                            <field name="bin"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Devices">
+                            <field name="device_line_ids">
+                                <list editable="bottom">
+                                    <field name="device_id"/>
+                                    <field name="state"/>
+                                    <field name="start_date"/>
+                                    <field name="finish_date"/>
+                                </list>
+                                <form string="Repair Device">
+                                    <group>
+                                        <field name="device_id"/>
+                                        <field name="state"/>
+                                        <field name="start_date"/>
+                                        <field name="finish_date"/>
+                                    </group>
+                                    <notebook>
+                                        <page string="Issues">
+                                            <field name="issue_line_ids">
+                                                <list editable="bottom">
+                                                    <field name="issue_id"/>
+                                                    <field name="is_confirmed"/>
+                                                </list>
+                                                <form string="Device Issue">
+                                                    <group>
+                                                        <field name="issue_id"/>
+                                                        <field name="is_confirmed"/>
+                                                    </group>
+                                                </form>
+                                            </field>
+                                        </page>
+                                        <page string="Parts">
+                                            <field name="part_ids">
+                                                <list editable="bottom">
+                                                    <field name="product_id"/>
+                                                    <field name="is_pulled"/>
+                                                    <field name="usage_state"/>
+                                                </list>
+                                                <form string="Device Part">
+                                                    <group>
+                                                        <field name="product_id"/>
+                                                        <field name="is_pulled"/>
+                                                        <field name="usage_state"/>
+                                                    </group>
+                                                </form>
+                                            </field>
+                                        </page>
+                                    </notebook>
+                                </form>
+                            </field>
+                        </page>
+                        <page string="Repair Orders">
+                            <field name="repair_order_ids">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="product_id"/>
+                                    <field name="state"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Tickets">
+                            <field name="ticket_ids" widget="many2many_tags"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+</odoo>

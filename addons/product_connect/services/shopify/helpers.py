@@ -2,7 +2,7 @@ import logging
 import re
 from datetime import datetime, UTC
 from enum import StrEnum
-from typing import TypeVar, Self, Any
+from typing import TypeVar, Self, Protocol
 
 from odoo import models
 from odoo.exceptions import UserError
@@ -12,6 +12,12 @@ from .gql.base_model import BaseModel
 
 
 T = TypeVar("T")
+
+
+class OdooRecordInfo(Protocol):
+    id: int | None
+    name: str | None
+    default_code: str | None
 
 _logger = logging.getLogger(__name__)
 
@@ -86,13 +92,11 @@ class SyncMode(StrEnum):
 
     @classmethod
     def choices(cls) -> list[tuple[str, str]]:
-        from typing import cast
-
-        return cast(list[tuple[str, str]], [(m.value, m.display_name) for m in cls])
+        return [(m.value, m.display_name) for m in cls]
 
 
 class OdooDataError(UserError):
-    def __init__(self, message: str, odoo_record: models.Model | None = None) -> None:
+    def __init__(self, message: str, odoo_record: models.Model | OdooRecordInfo | None = None) -> None:
         super().__init__(message)
         self.odoo_record = odoo_record
 
@@ -105,7 +109,8 @@ class OdooDataError(UserError):
     @property
     def odoo_product_id(self) -> str:
         if self.odoo_record:
-            return getattr(self.odoo_record, "id", "")
+            record_id = getattr(self.odoo_record, "id", None)
+            return str(record_id) if record_id is not None else ""
         return ""
 
     @property
@@ -140,7 +145,7 @@ class ShopifyApiError(OdooDataError):
         *,
         shopify_record: BaseModel | None = None,
         shopify_input: BaseModel | None = None,
-        odoo_record: models.Model | None = None,
+        odoo_record: models.Model | OdooRecordInfo | None = None,
     ) -> None:
         super().__init__(message, odoo_record=odoo_record)
         self.shopify_record = shopify_record
@@ -198,7 +203,10 @@ class ShopifyStaleRunTimeout(Exception):
     pass
 
 
-def write_if_changed(record: models.BaseModel, vals: dict[str, Any]) -> bool:
+def write_if_changed(
+    record: "odoo.model.product_product | odoo.model.product_template | odoo.model.sale_order | odoo.model.sale_order_line | odoo.model.res_partner",
+    vals: "odoo.values.product_product | odoo.values.product_template | odoo.values.sale_order | odoo.values.sale_order_line | odoo.values.res_partner",
+) -> bool:
     remaining_values = vals.copy()
 
     for field_name, new_value in list(remaining_values.items()):

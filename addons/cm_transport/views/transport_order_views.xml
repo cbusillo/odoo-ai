@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_transport_order_tree" model="ir.ui.view">
+        <field name="name">transport.order.tree</field>
+        <field name="model">transport.order</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="state"/>
+                <field name="arrival_date"/>
+                <field name="scheduled_date"/>
+                <field name="departure_date"/>
+                <field name="employee"/>
+                <field name="client"/>
+                <field name="contact"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_transport_order_form" model="ir.ui.view">
+        <field name="name">transport.order.form</field>
+        <field name="model">transport.order</field>
+        <field name="arch" type="xml">
+            <form string="Transport Order">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="state"/>
+                            <field name="employee"/>
+                            <field name="client"/>
+                            <field name="contact"/>
+                        </group>
+                        <group>
+                            <field name="arrival_date"/>
+                            <field name="scheduled_date"/>
+                            <field name="departure_date"/>
+                            <field name="quantity_in_counted"/>
+                            <field name="quantity_out"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="location_latitude"/>
+                            <field name="location_longitude"/>
+                        </group>
+                        <group>
+                            <field name="device_notes" colspan="2"/>
+                        </group>
+                    </group>
+                    <group string="CM Data">
+                        <group>
+                            <field name="cm_data_status_raw"/>
+                            <field name="cm_data_location_name"/>
+                            <field name="cm_data_location_id"/>
+                            <field name="cm_data_units"/>
+                        </group>
+                        <group>
+                            <field name="cm_data_discord_name"/>
+                            <field name="cm_data_discord_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="cm_data_notes" colspan="2"/>
+                            <field name="cm_data_edit_notes" colspan="2"/>
+                        </group>
+                        <group>
+                            <field name="cm_data_ocr_notes" colspan="2"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Inbound Devices">
+                            <field name="devices" domain="[('movement_type', '=', 'in')]"
+                                   context="{'default_movement_type': 'in'}">
+                                <list editable="bottom">
+                                    <field name="device"/>
+                                    <field name="movement_type"/>
+                                    <field name="verification_scan"/>
+                                    <field name="scan_date"/>
+                                </list>
+                                <form string="Inbound Device">
+                                    <group>
+                                        <field name="device"/>
+                                        <field name="movement_type"/>
+                                        <field name="verification_scan"/>
+                                        <field name="scan_date"/>
+                                    </group>
+                                </form>
+                            </field>
+                        </page>
+                        <page string="Outbound Devices">
+                            <field name="devices" domain="[('movement_type', '=', 'out')]"
+                                   context="{'default_movement_type': 'out'}">
+                                <list editable="bottom">
+                                    <field name="device"/>
+                                    <field name="movement_type"/>
+                                    <field name="verification_scan"/>
+                                    <field name="scan_date"/>
+                                </list>
+                                <form string="Outbound Device">
+                                    <group>
+                                        <field name="device"/>
+                                        <field name="movement_type"/>
+                                        <field name="verification_scan"/>
+                                        <field name="scan_date"/>
+                                    </group>
+                                </form>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+</odoo>

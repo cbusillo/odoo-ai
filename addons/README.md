@@ -6,6 +6,7 @@ deployment tooling in one place while still letting you isolate client-specific 
 ## Current Addons
 
 - **`product_connect`** - Example addon demonstrating advanced patterns (e-commerce, Shopify integration)
+- **`repairshopr_import`** - RepairShopr migration importer (customers, tickets, estimates, invoices)
 
 Private addons (not stored in this repo) are pulled during build using
 `ODOO_ADDON_REPOSITORIES`.

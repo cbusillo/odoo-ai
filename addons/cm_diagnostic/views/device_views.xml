@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_device_form_diagnostic" model="ir.ui.view">
+        <field name="name">device.form.diagnostic</field>
+        <field name="model">device</field>
+        <field name="inherit_id" ref="cm_device.view_device_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Diagnostic History">
+                    <field name="diagnostic_orders">
+                        <list>
+                            <field name="diagnostic_order"/>
+                            <field name="state"/>
+                            <field name="start_date"/>
+                            <field name="finish_date"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

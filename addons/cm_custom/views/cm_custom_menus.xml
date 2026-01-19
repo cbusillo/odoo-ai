@@ -1,4 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
     <menuitem id="menu_cm_custom_root" name="CM Operations" sequence="50"/>
+    <menuitem id="menu_transport_orders" name="Transport Orders"
+              parent="menu_cm_custom_root" action="cm_transport.action_transport_orders" sequence="10"/>
+    <menuitem id="menu_intake_orders" name="Intake Orders"
+              parent="menu_cm_custom_root" action="cm_intake.action_intake_orders" sequence="20"/>
+    <menuitem id="menu_diagnostic_orders" name="Diagnostic Orders"
+              parent="menu_cm_custom_root" action="cm_diagnostic.action_diagnostic_orders" sequence="30"/>
+    <menuitem id="menu_repair_batches" name="Repair Batches"
+              parent="menu_cm_custom_root" action="cm_repair.action_repair_batches" sequence="40"/>
+    <menuitem id="menu_repair_claims" name="Repair Claims"
+              parent="menu_cm_custom_root" action="cm_repair.action_repair_claims" sequence="50"/>
+    <menuitem id="menu_devices" name="Devices"
+              parent="menu_cm_custom_root" action="cm_device.action_devices" sequence="70"/>
+    <menuitem id="menu_cm_custom_config" name="CM Configuration"
+              parent="menu_cm_custom_root" sequence="90"/>
+    <menuitem id="menu_account_routing_rules" name="Account Routing Rules"
+              parent="menu_cm_custom_config" action="cm_school.action_account_routing_rules" sequence="10"/>
+    <menuitem id="menu_account_aliases" name="Account Aliases"
+              parent="menu_cm_custom_config" action="cm_school.action_account_aliases" sequence="20"/>
+    <menuitem id="menu_shipping_profiles" name="Shipping Profiles"
+              parent="menu_cm_custom_config" action="cm_school.action_shipping_profiles" sequence="30"/>
+    <menuitem id="menu_identifier_index" name="Identifier Index"
+              parent="menu_cm_custom_config" action="cm_custom.action_identifier_index" sequence="40"/>
 </odoo>

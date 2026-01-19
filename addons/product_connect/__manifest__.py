@@ -28,6 +28,7 @@
         "hr_employee_name_extended",
         "discuss_record_links",
         "disable_odoo_online",
+        "authentik_sso",
     ],
     "summary": "Connect to product sources and manage motor parts inventory with Shopify integration",
     "description": """

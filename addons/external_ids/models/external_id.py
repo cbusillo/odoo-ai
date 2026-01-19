@@ -1,5 +1,3 @@
-from typing import Any
-
 from odoo import models, fields, api
 from odoo.exceptions import ValidationError
 
@@ -64,7 +62,7 @@ class ExternalId(models.Model):
     )
 
     @api.model
-    def default_get(self, fields_list: list[str]) -> dict[str, Any]:
+    def default_get(self, fields_list: list[str]) -> "odoo.values.external_id":
         values = super().default_get(fields_list)
         ctx = self.env.context or {}
         # Robust defaults for inline one2many creation from parent forms
@@ -108,7 +106,7 @@ class ExternalId(models.Model):
         if default_model:
             try:
                 label = self.env[default_model]._description or default_model
-            except Exception:  # pragma: no cover
+            except KeyError:  # pragma: no cover
                 label = default_model
             return [(default_model, label)]
 
@@ -117,7 +115,7 @@ class ExternalId(models.Model):
         for model_name in self.env:
             try:
                 model = self.env[model_name]
-            except Exception:  # pragma: no cover - defensive registry guard
+            except KeyError:  # pragma: no cover - defensive registry guard
                 continue
             if getattr(model, "_abstract", False) or getattr(model, "_transient", False):
                 continue
@@ -129,7 +127,8 @@ class ExternalId(models.Model):
 
     @api.depends("res_model", "res_id")
     def _compute_reference(self) -> None:
-        for record in self:
+        records = self.with_context(default_res_model=False)
+        for record in records:
             if record.res_model and record.res_id:
                 record.reference = f"{record.res_model},{record.res_id}"
             else:

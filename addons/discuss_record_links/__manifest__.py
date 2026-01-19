@@ -8,7 +8,7 @@
     "depends": [
         "base",
         "mail",
-        "stock",
+        "product",
         "web",
         "html_editor",
     ],
@@ -18,6 +18,7 @@
         "views/record_link_config_views.xml",
         "views/res_config_settings_view.xml",
     ],
+    "post_init_hook": "post_init_hook",
     "assets": {
         "web.assets_backend": [
             "discuss_record_links/static/src/js/*.js",

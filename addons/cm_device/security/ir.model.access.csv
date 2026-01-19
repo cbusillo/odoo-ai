@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_device_user,device.user,model_device,base.group_user,1,1,1,1
+access_device_model_user,device.model.user,model_device_model,base.group_user,1,1,1,1
+access_device_model_family_user,device.model.family.user,model_device_model_family,base.group_user,1,1,1,1

@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_intake_order_user,intake.order.user,model_intake_order,base.group_user,1,1,1,1
+access_intake_order_device_user,intake.order.device.user,model_intake_order_device,base.group_user,1,1,1,1

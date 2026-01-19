@@ -34,8 +34,8 @@ class EbayOrderData(BaseModel):
     latest_delivery_date: datetime | None = None
     earliest_delivery_date: datetime | None = None
 
-    # noinspection PyMethodParameters
     @field_validator("latest_delivery_date", "earliest_delivery_date", mode="before")
+    @classmethod
     def parse_datetime(cls, value: str | datetime | None) -> datetime | None:
         if value is None or isinstance(value, datetime):
             return value
@@ -76,7 +76,7 @@ class OrderImporter(ShopifyBaseImporter[OrderFields]):
     @staticmethod
     def _get_amount_for_order_currency(price_set: MoneyBagFields, order_currency: CurrencyCode) -> Decimal:
         if not price_set:
-            return Decimal("0")
+            return Decimal("0.0")
         if (
             price_set.shop_money
             and price_set.shop_money.currency_code
@@ -86,7 +86,7 @@ class OrderImporter(ShopifyBaseImporter[OrderFields]):
             return price_set.shop_money.amount
         if price_set.presentment_money:
             return price_set.presentment_money.amount
-        return Decimal("0")
+        return Decimal("0.0")
 
     @staticmethod
     def _get_discount_allocation_amount(line: OrderLineItemFields, order_currency: CurrencyCode) -> Decimal:
@@ -96,7 +96,7 @@ class OrderImporter(ShopifyBaseImporter[OrderFields]):
                 for allocation in line.discount_allocations
                 if allocation and allocation.allocated_amount_set
             ),
-            Decimal("0"),
+            Decimal("0.0"),
         )
 
     def _fetch_page(self, client: Client, query: str | None, cursor: str | None) -> ShopifyPage[OrderFields]:

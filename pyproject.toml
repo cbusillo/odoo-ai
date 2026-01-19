@@ -9,11 +9,15 @@ description = "AI-powered Odoo 18 Enterprise development framework"
 requires-python = ">=3.13"
 
 dependencies = [
+    "ariadne-codegen",
     "psutil==5.9.8",
     "click",
+    "graphql-core",
     "pydantic",
     "pydantic_settings",
     "questionary",
+    "requests",
+    "PyMySQL==1.1.1",
     "ruff",
     "rich",
     "mypy",
@@ -21,7 +25,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "coverage",
     "debugpy",
+    "lxml-stubs",
+    "types-Werkzeug",
     "pip",
     "pydevd-odoo",
     "pydevd-pycharm",
@@ -29,6 +36,7 @@ dev = [
     "setuptools",
     "types-geoip2",
     "types-Pillow",
+    "types-PyMySQL",
     "types-psycopg2",
     "types-requests",
     "watchdog",
@@ -80,3 +88,18 @@ known-first-party = ["tools"]
 [tool.mypy]
 python_version = "3.13"
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["odoo", "odoo.*"]
+ignore_missing_imports = true
+disable_error_code = ["name-defined"]
+
+[[tool.mypy.overrides]]
+module = ["repairshopr_import", "repairshopr_import.*"]
+disable_error_code = ["name-defined"]
+
+[tool.pyright]
+typeCheckingMode = "basic"
+executionEnvironments = [
+    { root = "addons", reportMissingImports = "none", reportMissingTypeStubs = "none", reportUndefinedVariable = "none" },
+]

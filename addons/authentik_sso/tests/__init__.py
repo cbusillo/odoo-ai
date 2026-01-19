@@ -1,0 +1,2 @@
+"""Authentik SSO tests."""
+

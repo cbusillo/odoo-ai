@@ -29,8 +29,9 @@ Commands
 - `uv run test validate --json` — verify all tests executed + summarize
   failures.
 - `--stack opw|cm` (or `--env-file docker/config/<stack>-local.env`) —
-  load the matching local stack env before running. Stack/env-file selection
-  is required for test runs.
+  load the matching local stack env before running. When a `*-ci-local` stack
+  exists (for example `cm-ci-local`), `--stack cm` automatically prefers the
+  CI stack. Use `--stack cm-local` to target the dev stack explicitly.
 
 Scoping Flags
 
@@ -53,3 +54,7 @@ Environment Flags
   `uv run test wait --json`.
 - `JS_COUNT_STRATEGY=runtime` — report executed Hoot test counts instead of
   definition counts.
+- `COVERAGE_PY=1` — enable targeted Python coverage collection for test runs.
+- `COVERAGE_MODULES=addon_a,addon_b` — limit coverage to specific addons; reports
+  land in `tmp/test-logs/<session>/coverage/`.
+- `ODOO_DEV_MODE` is cleared during test runs to avoid autoreload interruptions.

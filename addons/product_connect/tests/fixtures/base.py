@@ -77,7 +77,7 @@ class UnitTestCase(_ShopifyMockMixin, TransactionCase):
             mock_client.return_value = instance
             yield instance
 
-    def assertRecordValues(self, record: BaseModel, expected_values: dict) -> None:
+    def assertRecordValues(self, record: BaseModel, expected_values: dict, msg: str | None = None) -> None:
         for field, expected in expected_values.items():
             actual = record[field]
             if hasattr(actual, "id"):
@@ -85,7 +85,8 @@ class UnitTestCase(_ShopifyMockMixin, TransactionCase):
             elif hasattr(actual, "ids"):
                 actual = actual.ids
 
-            self.assertEqual(actual, expected, f"Field '{field}' mismatch: expected {expected}, got {actual}")
+            message = msg or f"Field '{field}' mismatch: expected {expected}, got {actual}"
+            self.assertEqual(actual, expected, message)
 
 
 def _get_or_create_geo_data(env: Environment) -> tuple[Any, Any, Any]:
@@ -164,9 +165,12 @@ class IntegrationTestCase(_ShopifyMockMixin, _BaseDataMixin, TransactionCase):
         config_param.set_param("shopify.test_store", "1")
 
     @staticmethod
-    def mock_shopify_response(data: dict | None = None, errors: list | None = None) -> dict:
-        response = {"data": data or {}}
-        if errors:
+    def mock_shopify_response(
+        data: dict[str, object] | None = None,
+        errors: list[dict[str, str]] | None = None,
+    ) -> dict[str, dict[str, object] | list[dict[str, str]]]:
+        response: dict[str, dict[str, object] | list[dict[str, str]]] = {"data": data or {}}
+        if errors is not None:
             response["errors"] = errors
         return response
 
@@ -179,7 +183,7 @@ class MultiWorkerHttpCase(HttpCase):
     """HttpCase that works with multi-worker mode (--workers > 0)."""
 
     @classmethod
-    def http_port(cls):
+    def http_port(cls) -> int | None:
         """Override to work with PreforkServer in multi-worker mode."""
         import odoo.service.server
 
@@ -194,7 +198,7 @@ class MultiWorkerHttpCase(HttpCase):
 
         # Handle multi-worker mode (PreforkServer)
         # Use the configured port from tools.config
-        import odoo.tools.config as config
+        from odoo.tools import config
 
         return int(config.get("http_port", 8069))
 
@@ -239,7 +243,7 @@ class TourTestCase(MultiWorkerHttpCase):
             # Make the stock manager group optional to avoid hard dependency in JS/tour tests.
             try:
                 stock_manager = cls.env.ref("stock.group_stock_manager")
-            except Exception:  # ValueError when external id not found
+            except ValueError:  # External ID not found when stock isn't installed
                 stock_manager = None
 
             group_ids = [system_group.id] + ([stock_manager.id] if stock_manager else [])
@@ -267,7 +271,7 @@ class TourTestCase(MultiWorkerHttpCase):
             system_group = cls.env.ref("base.group_system")
             try:
                 stock_manager = cls.env.ref("stock.group_stock_manager")
-            except Exception:
+            except ValueError:
                 stock_manager = None
             to_add = []
             if system_group not in test_user.group_ids:
@@ -337,7 +341,8 @@ class TourTestCase(MultiWorkerHttpCase):
             except Exception as outer:
                 _logger.warning(f"Warm-up setup skipped due to error: {outer}")
 
-    def _setup_browser_environment(self) -> None:
+    @staticmethod
+    def _setup_browser_environment() -> None:
         """Configure browser environment for headless operation."""
         import os
 

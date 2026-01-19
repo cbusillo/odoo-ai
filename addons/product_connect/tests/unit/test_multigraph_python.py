@@ -51,55 +51,67 @@ class TestMultigraphPython(UnitTestCase):
         result = (
             self.env["product.template"]
             .with_context(skip_shopify_sync=False)
-            .read_group(
+            .formatted_read_group(
                 domain=[
                     ("is_ready_for_sale", "=", True),
                     ("id", "in", [p.id for p in self.products_with_metrics]),
                 ],
-                fields=["initial_price_total:sum", "initial_cost_total:sum", "initial_quantity:sum"],
+                aggregates=["initial_price_total:sum", "initial_cost_total:sum", "initial_quantity:sum"],
                 groupby=["is_ready_for_sale_last_enabled_date:month"],
             )
         )
 
         self.assertEqual(len(result), 2, "Should have 2 months of data")
 
-        jan_data = next((r for r in result if "January" in r.get("is_ready_for_sale_last_enabled_date:month", "")), None)
-        self.assertIsNotNone(jan_data)
-        self.assertGreater(jan_data["initial_price_total"], 0, "January price total should be > 0")
-        self.assertGreater(jan_data["initial_cost_total"], 0, "January cost total should be > 0")
-        self.assertGreater(jan_data["initial_quantity"], 0, "January quantity should be > 0")
+        def groupby_label(value: object) -> str:
+            if isinstance(value, (tuple, list)) and len(value) == 2:
+                return str(value[1])
+            return str(value or "")
+
+        january_data = next(
+            (
+                group
+                for group in result
+                if "January" in groupby_label(group.get("is_ready_for_sale_last_enabled_date:month"))
+            ),
+            None,
+        )
+        self.assertIsNotNone(january_data)
+        self.assertGreater(january_data["initial_price_total:sum"], 0, "January price total should be > 0")
+        self.assertGreater(january_data["initial_cost_total:sum"], 0, "January cost total should be > 0")
+        self.assertGreater(january_data["initial_quantity:sum"], 0, "January quantity should be > 0")
 
     def test_multigraph_with_domain_filter(self) -> None:
         result = (
             self.env["product.template"]
             .with_context(skip_shopify_sync=False)
-            .read_group(
+            .formatted_read_group(
                 domain=[
                     ("is_ready_for_sale", "=", True),
                     ("initial_price_total", ">", 12000),
                     ("id", "in", [p.id for p in self.products_with_metrics]),
                 ],
-                fields=["initial_price_total:sum", "initial_quantity:sum"],
+                aggregates=["initial_price_total:sum", "initial_quantity:sum"],
                 groupby=["is_ready_for_sale_last_enabled_date:month"],
             )
         )
 
         self.assertGreater(len(result), 0, "Should have at least one result")
-        total_price = sum(r["initial_price_total"] for r in result)
+        total_price = sum(r["initial_price_total:sum"] for r in result)
         self.assertGreater(total_price, 0)
         all_products_result = (
             self.env["product.template"]
             .with_context(skip_shopify_sync=False)
-            .read_group(
+            .formatted_read_group(
                 domain=[
                     ("is_ready_for_sale", "=", True),
                     ("id", "in", [p.id for p in self.products_with_metrics]),
                 ],
-                fields=["initial_price_total:sum"],
+                aggregates=["initial_price_total:sum"],
                 groupby=["is_ready_for_sale_last_enabled_date:month"],
             )
         )
-        all_total = sum(r["initial_price_total"] for r in all_products_result)
+        all_total = sum(r["initial_price_total:sum"] for r in all_products_result)
         self.assertLess(total_price, all_total, "Filtered total should be less than all products total")
 
     def test_multigraph_multiple_groupby(self) -> None:
@@ -115,18 +127,18 @@ class TestMultigraphPython(UnitTestCase):
                 }
             )
 
-        result = self.env["product.template"].read_group(
+        result = self.env["product.template"].formatted_read_group(
             domain=[("is_ready_for_sale", "=", True)],
-            fields=["initial_price_total:sum"],
+            aggregates=["initial_price_total:sum"],
             groupby=["is_ready_for_sale_last_enabled_date:month", "categ_id"],
         )
 
         self.assertGreater(len(result), 2, "Should have more groups with category grouping")
 
     def test_multigraph_empty_data(self) -> None:
-        result = self.env["product.template"].read_group(
+        result = self.env["product.template"].formatted_read_group(
             domain=[("id", "=", 0)],
-            fields=["initial_price_total:sum", "initial_cost_total:sum"],
+            aggregates=["initial_price_total:sum", "initial_cost_total:sum"],
             groupby=["is_ready_for_sale_last_enabled_date:month"],
         )
 
@@ -144,15 +156,15 @@ class TestMultigraphPython(UnitTestCase):
             is_ready_for_sale_last_enabled_date="2024-03-01",
         )
 
-        result = self.env["product.template"].read_group(
+        result = self.env["product.template"].formatted_read_group(
             domain=[("id", "=", product_null.id)],
-            fields=["initial_price_total:sum", "initial_cost_total:sum", "initial_quantity:sum"],
+            aggregates=["initial_price_total:sum", "initial_cost_total:sum", "initial_quantity:sum"],
             groupby=["is_ready_for_sale_last_enabled_date:month"],
         )
 
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]["initial_price_total"], 0.0)
-        self.assertEqual(result[0]["initial_quantity"], 0)
+        self.assertEqual(result[0]["initial_price_total:sum"], 0.0)
+        self.assertEqual(result[0]["initial_quantity:sum"], 0)
 
     def test_multigraph_monetary_formatting(self) -> None:
         field_price = self.env["product.template"]._fields["initial_price_total"]
@@ -162,15 +174,15 @@ class TestMultigraphPython(UnitTestCase):
         self.assertEqual(field_cost.type, "float")
 
     def test_multigraph_date_intervals(self) -> None:
-        result_day = self.env["product.template"].read_group(
+        result_day = self.env["product.template"].formatted_read_group(
             domain=[("is_ready_for_sale", "=", True)],
-            fields=["initial_price_total:sum"],
+            aggregates=["initial_price_total:sum"],
             groupby=["is_ready_for_sale_last_enabled_date:day"],
         )
 
-        result_month = self.env["product.template"].read_group(
+        result_month = self.env["product.template"].formatted_read_group(
             domain=[("is_ready_for_sale", "=", True)],
-            fields=["initial_price_total:sum"],
+            aggregates=["initial_price_total:sum"],
             groupby=["is_ready_for_sale_last_enabled_date:month"],
         )
 
@@ -187,9 +199,9 @@ class TestMultigraphPython(UnitTestCase):
 
         ProductTemplate = self.env["product.template"].with_user(test_user)
 
-        result = ProductTemplate.read_group(
+        result = ProductTemplate.formatted_read_group(
             domain=[],
-            fields=["initial_price_total:sum"],
+            aggregates=["initial_price_total:sum"],
             groupby=["is_ready_for_sale_last_enabled_date:month"],
         )
 

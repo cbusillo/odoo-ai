@@ -10,6 +10,7 @@
       <excludeFolder url="file://$MODULE_DIR$/.code" />
       <excludeFolder url="file://$MODULE_DIR$/.claude" />
       <excludeFolder url="file://$MODULE_DIR$/.codex" />
+      <excludeFolder url="file://$MODULE_DIR$/docs/internal/data" />
     </content>
     <orderEntry type="jdk" jdkName="Remote 3.13 Docker (odoo-ai:latest)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

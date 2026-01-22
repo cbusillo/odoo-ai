@@ -14,7 +14,7 @@ from ...gql import (
     MediaStatus,
     MoveInput,
 )
-from ...gql.enums import ProductStatus, WeightUnit, LocalizableContentType
+from ...gql.enums import FileContentType, ProductStatus, WeightUnit, LocalizableContentType
 from ...gql.input_types import (
     ProductSetInput,
     ProductVariantSetInput,
@@ -279,6 +279,7 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
             shopify_product_set_input.files = [
                 FileSetInput(
                     alt=odoo_product.name,
+                    content_type=FileContentType.IMAGE,
                     originalSource=f"{image_source_base_url}/web/image/product.image/{odoo_image.id}/image_1920",
                 )
                 for odoo_image in sorted(odoo_product.images, key=image_order_key)

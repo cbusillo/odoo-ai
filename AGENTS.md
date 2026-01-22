@@ -57,6 +57,8 @@ the linked docs, then keep prompts lean.
   rather than pasting large snippets.
 - Preserve history (`git mv`, minimal diffs) and avoid destructive git actions
   unless the operator explicitly directs them.
+- Never commit `.env` files (including `docker/config/*-local.env`); they are
+  local-only inputs for ops/docker workflows.
 - Keep branch/worktree hygiene per @docs/roles.md (clean up Code-created
   branches as you go).
 

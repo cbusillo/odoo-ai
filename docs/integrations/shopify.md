@@ -77,6 +77,13 @@ uv run python docker/scripts/generate_shopify_models.py
 See `addons/product_connect/services/shopify/service.py` and
 `addons/product_connect/controllers/shopify_webhook.py` for the lookup logic.
 
+## Images
+
+- Shopify exports use public image URLs. Product image attachments must be
+  public so Shopify can fetch them.
+- Exporters use the `/web/image` route for product image URLs; `/odoo/image`
+  requires authentication in Odoo 19 and will redirect to `/web/login`.
+
 ## Related Guides
 
 - `docs/odoo/security.md#http-controllers` — controller security patterns.

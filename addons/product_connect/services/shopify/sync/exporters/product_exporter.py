@@ -275,10 +275,11 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
         )
 
         if not odoo_product.shopify_product_id or images_need_update:
+            image_source_base_url = self.odoo_base_url.rstrip("/")
             shopify_product_set_input.files = [
                 FileSetInput(
                     alt=odoo_product.name,
-                    originalSource=self.odoo_base_url + "/odoo/image/product.image/" + str(odoo_image.id) + "/image_1920",
+                    originalSource=f"{image_source_base_url}/web/image/product.image/{odoo_image.id}/image_1920",
                 )
                 for odoo_image in sorted(odoo_product.images, key=image_order_key)
             ]

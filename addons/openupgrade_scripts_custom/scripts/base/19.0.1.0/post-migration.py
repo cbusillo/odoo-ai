@@ -171,6 +171,27 @@ def _enforce_required_picking_policy_constraints(env: Environment) -> None:
     _ensure_not_null_constraint(env, "sale_order", "picking_policy")
 
 
+def _make_product_image_attachments_public(env: Environment) -> None:
+    env.cr.execute(
+        "SELECT COUNT(*) FROM ir_attachment "
+        "WHERE res_model = 'product.image' "
+        "  AND res_field = 'image_1920' "
+        "  AND (public IS DISTINCT FROM TRUE)",
+    )
+    pending_count = env.cr.fetchone()[0]
+    if not pending_count:
+        return
+
+    env.cr.execute(
+        "UPDATE ir_attachment "
+        "SET public = TRUE "
+        "WHERE res_model = 'product.image' "
+        "  AND res_field = 'image_1920' "
+        "  AND (public IS DISTINCT FROM TRUE)",
+    )
+    logger.info("Marked %s product image attachments as public for Shopify exports.", pending_count)
+
+
 @openupgrade.migrate()
 def migrate(cr: Cursor, version: str) -> None:
     """Post-migration hook for base (19.0.1.0)."""
@@ -180,3 +201,4 @@ def migrate(cr: Cursor, version: str) -> None:
     _fix_user_groups_view_field(env)
     _cleanup_web_editor_metadata(env)
     _enforce_required_picking_policy_constraints(env)
+    _make_product_image_attachments_public(env)

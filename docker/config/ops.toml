@@ -12,3 +12,7 @@ allow_prod_restore = true
 
 [targets.cm]
 allow_prod_init = true
+
+[targets.dm]
+allow_prod_init = true
+include_in_all = false

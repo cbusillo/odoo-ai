@@ -27,6 +27,7 @@ docker-compose.yml
 
 - `opw-local`
 - `cm-local`
+- `dm-local`
 - `opw-ci-local`
 - `cm-ci-local`
 

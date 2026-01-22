@@ -61,9 +61,11 @@ import site
 
 paths = [
     "/odoo",
+    "/odoo/addons",
     "/volumes/addons",
+    "/opt/project/addons",
     "/opt/extra_addons",
-    "/opt/odoo-upgrade",
+    "/opt/extra_addons/OpenUpgrade",
 ]
 
 site_packages = Path(site.getsitepackages()[0])

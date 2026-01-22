@@ -11,6 +11,7 @@
                 <field name="name"/>
                 <field name="code"/>
                 <field name="res_model_id"/>
+                <field name="base_url"/>
                 <field name="template"/>
             </list>
         </field>
@@ -32,6 +33,7 @@
                         <group>
                             <field name="res_model_id" placeholder="Limit to a model (optional)"/>
                             <field name="sequence"/>
+                            <field name="base_url" placeholder="Optional base override"/>
                         </group>
                     </group>
                     <group>

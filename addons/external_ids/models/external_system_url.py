@@ -17,6 +17,10 @@ class ExternalSystemUrl(models.Model):
         help="Optional: resource key (e.g., product, variant, customer, address) to select the corresponding external ID",
         index=True,
     )
+    base_url = fields.Char(
+        string="Base URL Override",
+        help="Optional base URL override for this template. Defaults to the system base URL.",
+    )
     res_model_id = fields.Many2one(
         "ir.model",
         string="Applies To Model",

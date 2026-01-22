@@ -224,7 +224,7 @@ class ExternalIdMixin(models.AbstractModel):
             "model": self._name,
             "name": self.display_name,
             "code": system.code,
-            "base": system.url or "",
+            "base": (getattr(urls, "base_url", False) or system.url or ""),
         }
         try:
             return template.format(**tokens)

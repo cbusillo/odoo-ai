@@ -20,6 +20,7 @@
         "disable_odoo_online",
         "discuss_record_links",
         "external_ids",
+        "environment_banner",
         "helpdesk",
         "hr_employee_name_extended",
         "mail",

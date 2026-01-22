@@ -8,6 +8,7 @@
         "base",
         "product",
         "web",
+        "environment_banner",
         "web_tour",
         "website_sale",
         "base_automation",

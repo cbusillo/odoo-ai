@@ -1,0 +1,21 @@
+.environment-banner {
+  z-index: 9999;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  color: white;
+
+  &.environment-dev {
+    background-color: #F97316; // Orange 500
+  }
+
+  &.environment-testing {
+    background-color: #EAB308; // Yellow 500
+  }
+
+  &.environment-localhost {
+    background-color: #EF4444; // Red 500
+  }
+
+  &.environment-other {
+    background-color: #EF4444; // Red 500
+  }
+}

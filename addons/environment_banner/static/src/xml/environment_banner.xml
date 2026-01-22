@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="environment_banner.EnvironmentBanner">
+        <t t-if="state.showBanner">
+            <div t-attf-class="{{bannerClasses}}">
+                <div class="banner-content">
+                    <i class="fa fa-exclamation-triangle" aria-hidden="true"/>
+                    <span t-out="bannerText"/>
+                    <span>(<t t-out="state.hostname"/>)</span>
+                    <i class="fa fa-exclamation-triangle" aria-hidden="true"/>
+                </div>
+            </div>
+        </t>
+    </t>
+</templates>

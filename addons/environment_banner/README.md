@@ -12,4 +12,4 @@ Set these configuration parameters to control behavior:
   `*` wildcards allowed)
 
 If no production hostnames are configured, the banner only shows for hosts that
-look like dev/testing/localhost or include `.local`/`-local`.
+look like dev/testing/localhost or include `.local`/`-local` labels.

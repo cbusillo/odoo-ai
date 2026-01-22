@@ -22,6 +22,19 @@ const hostnamePatternToRegularExpression = (pattern) => {
 
 const matchesHostnamePattern = (hostname, pattern) => hostnamePatternToRegularExpression(pattern).test(hostname)
 
+const hasEnvironmentLabel = (hostname, label) => {
+    const dottedLabel = `.${label}.`
+    const dashedLabel = `-${label}.`
+    return (
+        hostname.startsWith(`${label}.`)
+        || hostname.includes(dottedLabel)
+        || hostname.endsWith(`.${label}`)
+        || hostname.startsWith(`${label}-`)
+        || hostname.includes(dashedLabel)
+        || hostname.endsWith(`-${label}`)
+    )
+}
+
 const getEnvironmentBannerConfig = () => {
     const config = session["environment_banner"] || {}
     return {
@@ -31,16 +44,19 @@ const getEnvironmentBannerConfig = () => {
 }
 
 const resolveEnvironmentName = (hostname) => {
-    if (hostname.includes("dev.")) {
+    if (hasEnvironmentLabel(hostname, "dev")) {
         return "dev"
     }
-    if (hostname.includes("testing.")) {
+    if (hasEnvironmentLabel(hostname, "testing")) {
         return "testing"
     }
+    const hasLocalSuffix = hostname.endsWith(".local") || hostname.includes(".local.")
+    const hasLocalLabel = hostname.endsWith("-local") || hostname.includes("-local.")
+
     if (
         hostname.includes("localhost")
-        || hostname.includes(".local")
-        || hostname.includes("-local")
+        || hasLocalSuffix
+        || hasLocalLabel
         || hostname === "127.0.0.1"
         || hostname === "::1"
     ) {

@@ -31,8 +31,8 @@ No shim module.
 
 ## Candidates for extraction
 
-- Shopify sync: client addon for now (`opw_shopify`), promote to shared later if
-  another client adopts it (promotion requires a rename migration).
+- Shopify sync: shared first-class addon (`shopify_sync`).
+- OPW-only extensions (if needed): `opw_shopify_<suffix>` as thin wrappers.
 - Motors system: shared addon candidate now that OPW + DM are marine.
 
 ## Migration plan

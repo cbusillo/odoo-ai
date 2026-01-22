@@ -99,5 +99,7 @@ No shim module.
 
 ## Open questions
 
-- Should Shopify sync be shared now or kept OPW-only until reuse is proven?
-- Should motors be kept inside `opw_custom` or split into `opw_motors`?
+- For `shopify_sync`, what functionality should be in the shared addon, and what
+  (if anything) should remain OPW-only in `opw_shopify_*` addons?
+- Motors: should it be extracted as a shared addon now, or kept OPW-only (inside
+  `opw_custom` or split into `opw_motors`)?

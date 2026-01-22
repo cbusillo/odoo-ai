@@ -25,11 +25,18 @@ Core Rules
     - Public data shapes (`TypedDict`, dataclasses, Pydantic models) and other
       “external contract” objects.
 - Prefer type inference for local variables when the type is obvious.
-- Add local annotations only when they materially improve clarity/tooling (e.g.
-  complex unions, containers, third-party `Any` leaks, or ORM/SQL rows where the
-  IDE cannot infer types correctly). Favor annotations for ambiguous empty
-  containers (e.g., `records: list[...] = []`).
+- Add local annotations only when they materially improve clarity/tooling.
+    - Required local annotations:
+        - Ambiguous empty containers (e.g., `records: list[...] = []`).
+        - Odoo values payload dicts when assigned to a variable so PyCharm
+          validates keys/types (e.g., `values: "odoo.values.sale_order" = {...}`).
+          Do not introduce a variable solely for typing when an inline dict literal
+          can be passed directly to `create(...)`/`write(...)`.
+    - Optional local annotations:
+        - Complex unions, third-party `Any` leaks, or ORM/SQL rows where the IDE
+          cannot infer types correctly.
 - f‑strings only; no `%` or `str.format()`.
+- Use PEP 604 union syntax (`str | None`) instead of `Optional[str]`.
 - Early returns encouraged to reduce nesting.
 - Prefer small, single‑purpose functions and modules.
 - Do not run Python directly; use Odoo env and `uv run` tasks.
@@ -46,8 +53,9 @@ Odoo Plugin “Magic Types” (PyCharm)
 - Prefer the plugin’s magic types over `cast(...)`. Avoid `cast(...)` unless there is no reasonable magic-type
   annotation available.
 - The plugin resolves recordset types from `self.env["..."]` without extra imports. Use explicit annotations only
-  when the IDE cannot infer the type (for example: empty `list`/`dict`/`set` initializers) or when it materially
-  improves readability.
+  when the IDE cannot infer the type (for example: empty `list`/`dict`/`set` initializers), when it materially
+  improves readability, or when building Odoo values payload dicts to validate keys/types. Inline dict literals
+  passed directly to `create(...)`/`write(...)` do not require a separate typed variable.
 - You can use magic types as string annotations directly; `TYPE_CHECKING` imports are optional and only needed if
   you want autocomplete in non-Odoo tooling.
 

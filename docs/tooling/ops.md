@@ -88,13 +88,14 @@ Conventions
 
 Targets & environments
 
-- Targets: `opw`, `cm`, `all`.
+- Targets: the keys under `[targets]` in `docker/config/ops.toml`, plus `all`.
+  `all` expands to targets with `include_in_all = true` (default).
 - Environments: `local`, `dev`, `testing`, `prod`.
 
 Behavior notes
 
 - Local actions run deployer helpers directly and use the stack env files
-  (`docker/config/opw-local.env`, `docker/config/cm-local.env`).
+  (`docker/config/{target}-local.env`).
 - `uv run ops local info` prints machine-readable stack metadata (paths + identifiers
   only; no secrets) derived from `load_stack_settings()`.
 - Restore/init runs `docker/scripts/restore_from_upstream.py` (restore/boot,
@@ -105,21 +106,23 @@ Behavior notes
   target stack.
 - `uv run ops local down` removes orphaned containers and anonymous volumes for
   the target stack while preserving named volumes.
-- `uv run ops local upgrade` runs module upgrades using the stack's configured module
-  list (AUTO by default) without rebuilding the image. If `ODOO_INSTALL_MODULES` is set,
-  it installs any missing modules from that list before upgrading. This applies to local
-  and remote deploy upgrades.
+- `uv run ops local upgrade` runs module upgrades using the stack's configured
+  module list (AUTO by default) without rebuilding the image. If
+  `ODOO_INSTALL_MODULES` is set, it installs any missing modules from that list
+  before upgrading. This applies to local and remote deploy upgrades.
 - `uv run ops local upgrade-restart` runs the upgrade then restarts the web service.
 - `uv run ops local openupgrade` runs the OpenUpgrade pipeline against the current
   database without restoring from upstream and resets module versions for
   modules that have OpenUpgrade scripts so their scripts re-run.
 - `uv run ops local exec <target> -- <command>` runs a command in the script-runner
-  container using the merged stack env. Env values are forwarded by name (no values in
-  argv), so secrets are not echoed in process args or dry-run output. Use `--service` to
-  target a different service or `--no-env` to skip passing the merged env into the exec.
-- `uv run ops local shell <target>` runs the Odoo shell inside the script-runner using
-  the merged stack env and defaults (`-d $ODOO_DB_NAME -c /volumes/config/_generated.conf`).
-  Pass extra args after `--` to override defaults (for example, `-- --log-level=debug`).
+  container using the merged stack env. Env values are forwarded by name (no
+  values in argv), so secrets are not echoed in process args or dry-run output.
+  Use `--service` to target a different service or `--no-env` to skip passing
+  the merged env into the exec.
+- `uv run ops local shell <target>` runs the Odoo shell inside the script-runner
+  using the merged stack env and defaults (`-d $ODOO_DB_NAME -c
+  /volumes/config/_generated.conf`). Pass extra args after `--` to override
+  defaults (for example, `-- --log-level=debug`).
 - `uv run ops ship prod <target> --after init` runs a prod bootstrap-only init
   via Coolify (sets the post-deploy command, deploys, waits for completion,
   then restores the previous post-deploy command). Requires the prod init guard.

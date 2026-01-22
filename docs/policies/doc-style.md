@@ -22,6 +22,15 @@ Structure
 - Prefer a short Purpose line, then 2-5 concise sections.
 - Short headings; minimal examples; consistent anchor names.
 
+Markdown Tables
+
+- Use leading and trailing pipes for all table rows.
+- Pad each cell with at least one space on both sides, adding extra spaces as
+  needed to align columns for raw Markdown readability.
+- Keep the header separator aligned with the column width; use colons for
+  alignment when needed.
+- When unsure, prefer the PyCharm Markdown formatter output.
+
 Handles
 
 - Use path+anchor: @docs/odoo/orm.md#batch-operations; avoid pasting large

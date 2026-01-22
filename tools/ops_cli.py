@@ -397,6 +397,17 @@ def _target_names() -> list[str]:
     return sorted(config.targets.keys())
 
 
+def _default_target_names() -> list[str]:
+    config = _load_ops_config()
+    targets: list[str] = []
+    for target_name in sorted(config.targets.keys()):
+        target_config = config.targets.get(target_name)
+        if isinstance(target_config, dict) and not bool(target_config.get("include_in_all", True)):
+            continue
+        targets.append(target_name)
+    return targets
+
+
 def _target_choices() -> list[str]:
     return [*_target_names(), ALL_TARGET]
 
@@ -414,7 +425,7 @@ def _allow_prod_init(target: str) -> bool:
     if _is_truthy(env_value):
         return True
     if target == ALL_TARGET:
-        return all(_allow_prod_init(entry) for entry in _target_names())
+        return all(_allow_prod_init(entry) for entry in _targets_for(target))
     target_config = _target_config(target)
     allow_value = target_config.get("allow_prod_init")
     return bool(allow_value)
@@ -425,7 +436,7 @@ def _allow_prod_restore(target: str) -> bool:
     if _is_truthy(env_value):
         return True
     if target == ALL_TARGET:
-        return all(_allow_prod_restore(entry) for entry in _target_names())
+        return all(_allow_prod_restore(entry) for entry in _targets_for(target))
     target_config = _target_config(target)
     allow_value = target_config.get("allow_prod_restore")
     return bool(allow_value)
@@ -480,7 +491,10 @@ def _stack_env_exists(stack_name: str) -> bool:
 
 def _targets_for(target: str) -> list[str]:
     if target == ALL_TARGET:
-        return _target_names()
+        targets = _default_target_names()
+        if not targets:
+            raise click.ClickException("No targets are configured for 'all'.")
+        return targets
     return [target]
 
 

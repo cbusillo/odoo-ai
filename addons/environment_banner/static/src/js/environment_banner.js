@@ -37,7 +37,13 @@ const resolveEnvironmentName = (hostname) => {
     if (hostname.includes("testing.")) {
         return "testing"
     }
-    if (hostname.includes("localhost") || hostname === "127.0.0.1" || hostname === "::1") {
+    if (
+        hostname.includes("localhost")
+        || hostname.includes(".local")
+        || hostname.includes("-local")
+        || hostname === "127.0.0.1"
+        || hostname === "::1"
+    ) {
         return "localhost"
     }
     return "other"

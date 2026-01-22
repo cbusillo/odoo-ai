@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="action_cm_data_pricing_audit" model="ir.actions.act_window">
+        <field name="name">CM Data Pricing Audit</field>
+        <field name="res_model">integration.cm_data.pricing.audit</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{"group_by": ["issue_type", "catalog_code"]}</field>
+    </record>
+
+    <menuitem id="menu_cm_data_pricing_audit" name="CM Data Pricing Audit"
+              parent="cm_custom.menu_cm_custom_config"
+              groups="base.group_system"
+              action="action_cm_data_pricing_audit" sequence="88"/>
+</odoo>

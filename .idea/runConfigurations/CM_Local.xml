@@ -6,6 +6,7 @@
     <PathMappingSettings>
       <option name="pathMappings">
         <list>
+          <mapping local-root="$PROJECT_DIR$" remote-root="/opt/project" />
           <mapping local-root="$PROJECT_DIR$/addons" remote-root="/volumes/addons" />
         </list>
       </option>

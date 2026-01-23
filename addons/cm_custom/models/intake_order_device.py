@@ -22,7 +22,7 @@ class IntakeOrderDevice(models.Model):
 
     products = fields.Many2many(
         "product.template",
-        "intake_order_device_product_rel",
+        "cm_custom_intake_order_device_product_rel",
         "intake_order_device_id",
         "product_id",
     )

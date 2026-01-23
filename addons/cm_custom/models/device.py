@@ -44,9 +44,10 @@ class Device(models.Model):
         "device_id",
         string="Repair Batches",
     )
+
     invoices = fields.Many2many(
         "account.move",
-        "device_account_move_rel",
+        "cm_custom_device_account_move_rel",
         "device_id",
         "move_id",
         domain="[('move_type', 'in', ['out_invoice', 'out_refund'])]",

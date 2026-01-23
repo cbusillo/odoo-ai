@@ -12,15 +12,16 @@ class DeviceModel(models.Model):
         "device.model.family",
         ondelete="set null",
     )
+
     products = fields.Many2many(
         "product.template",
-        "device_model_product_rel",
+        "cm_custom_device_model_product_rel",
         "device_model_id",
         "product_id",
     )
     substitute_products = fields.Many2many(
         "product.template",
-        "device_model_substitute_product_rel",
+        "cm_custom_device_model_substitute_product_rel",
         "device_model_id",
         "product_id",
     )

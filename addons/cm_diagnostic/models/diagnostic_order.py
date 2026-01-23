@@ -9,7 +9,7 @@ DIAGNOSTIC_ORDER_STATES = [
 
 
 class DiagnosticOrder(models.Model):
-    _name = "diagnostic.order"
+    _name = "service.diagnostic.order"
     _description = "Diagnostic Order"
     _inherit = ["mail.thread", "mail.activity.mixin"]
     _order = "start_date desc, id desc"
@@ -25,6 +25,6 @@ class DiagnosticOrder(models.Model):
     bin = fields.Char()  # TODO: needs to link to model
 
     devices = fields.One2many(
-        "diagnostic.order.device",
+        "service.diagnostic.order.device",
         "diagnostic_order",
     )

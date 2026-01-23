@@ -7,13 +7,13 @@ DIAGNOSTIC_ORDER_DEVICE_STATES = [
 
 
 class DiagnosticOrderDevice(models.Model):
-    _name = "diagnostic.order.device"
+    _name = "service.diagnostic.order.device"
     _description = "Diagnostic Order Device"
     _inherit = ["mail.thread", "mail.activity.mixin"]
     _order = "diagnostic_order, id"
 
     diagnostic_order = fields.Many2one(
-        "diagnostic.order",
+        "service.diagnostic.order",
         required=True,
         ondelete="cascade",
     )
@@ -26,13 +26,13 @@ class DiagnosticOrderDevice(models.Model):
     start_date = fields.Datetime()
     finish_date = fields.Datetime()
     device = fields.Many2one(
-        "device",
+        "service.device",
         required=True,
         ondelete="restrict",
     )
     tests = fields.Many2many(
-        "diagnostic.test",
-        "diagnostic_order_device_test_rel",
+        "service.diagnostic.test",
+        "service_diagnostic_order_device_test_rel",
         "diagnostic_order_device_id",
         "test_id",
     )

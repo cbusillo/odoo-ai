@@ -2,9 +2,9 @@ from odoo import fields, models
 
 
 class Device(models.Model):
-    _inherit = "device"
+    _inherit = "service.device"
 
     diagnostic_orders = fields.One2many(
-        "diagnostic.order.device",
+        "service.diagnostic.order.device",
         "device",
     )

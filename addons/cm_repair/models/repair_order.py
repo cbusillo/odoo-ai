@@ -5,7 +5,7 @@ class RepairOrder(models.Model):
     _inherit = "repair.order"
 
     batch_id = fields.Many2one(
-        "repair.batch",
+        "service.repair.batch",
         ondelete="set null",
         string="Repair Batch",
     )

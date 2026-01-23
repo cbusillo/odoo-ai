@@ -9,7 +9,7 @@ REPAIR_BATCH_STATES = [
 
 
 class RepairBatch(models.Model):
-    _name = "repair.batch"
+    _name = "service.repair.batch"
     _description = "Repair Batch"
     _inherit = ["mail.thread", "mail.activity.mixin"]
     _order = "start_date desc, id desc"
@@ -25,7 +25,7 @@ class RepairBatch(models.Model):
     finish_date = fields.Datetime(tracking=True)
     bin = fields.Char()
     device_line_ids = fields.One2many(
-        "repair.batch.device",
+        "service.repair.batch.device",
         "batch_id",
         string="Devices",
     )

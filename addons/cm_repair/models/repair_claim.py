@@ -2,7 +2,7 @@ from odoo import fields, models
 
 
 class RepairClaim(models.Model):
-    _name = "repair.claim"
+    _name = "service.repair.claim"
     _description = "Repair Claim"
     _inherit = ["mail.thread", "mail.activity.mixin", "external.id.mixin"]
     _order = "claim_number, id"

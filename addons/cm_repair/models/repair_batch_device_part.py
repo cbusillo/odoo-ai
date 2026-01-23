@@ -7,13 +7,13 @@ REPAIR_BATCH_PART_USAGE_STATES = [
 
 
 class RepairBatchDevicePart(models.Model):
-    _name = "repair.batch.device.part"
+    _name = "service.repair.batch.device.part"
     _description = "Repair Batch Device Part"
     _order = "id desc"
     _rec_name = "product_id"
 
     device_line_id = fields.Many2one(
-        "repair.batch.device",
+        "service.repair.batch.device",
         required=True,
         ondelete="cascade",
     )

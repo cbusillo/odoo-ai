@@ -2,13 +2,13 @@
 <odoo>
     <record id="action_repair_batches" model="ir.actions.act_window">
         <field name="name">Repair Batches</field>
-        <field name="res_model">repair.batch</field>
+        <field name="res_model">service.repair.batch</field>
         <field name="view_mode">list,form</field>
     </record>
 
     <record id="action_repair_claims" model="ir.actions.act_window">
         <field name="name">Repair Claims</field>
-        <field name="res_model">repair.claim</field>
+        <field name="res_model">service.repair.claim</field>
         <field name="view_mode">list,form</field>
     </record>
 </odoo>

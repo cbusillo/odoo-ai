@@ -7,19 +7,19 @@ REPAIR_BATCH_DEVICE_STATES = [
 
 
 class RepairBatchDevice(models.Model):
-    _name = "repair.batch.device"
+    _name = "service.repair.batch.device"
     _description = "Repair Batch Device"
     _inherit = ["mail.thread", "mail.activity.mixin"]
     _order = "start_date desc, id desc"
     _rec_name = "device_id"
 
     batch_id = fields.Many2one(
-        "repair.batch",
+        "service.repair.batch",
         required=True,
         ondelete="cascade",
     )
     device_id = fields.Many2one(
-        "device",
+        "service.device",
         required=True,
         ondelete="restrict",
     )
@@ -32,11 +32,11 @@ class RepairBatchDevice(models.Model):
     start_date = fields.Datetime(tracking=True)
     finish_date = fields.Datetime(tracking=True)
     issue_line_ids = fields.One2many(
-        "repair.batch.device.issue",
+        "service.repair.batch.device.issue",
         "device_line_id",
     )
     part_ids = fields.One2many(
-        "repair.batch.device.part",
+        "service.repair.batch.device.part",
         "device_line_id",
     )
 

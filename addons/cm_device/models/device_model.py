@@ -2,14 +2,15 @@ from odoo import fields, models
 
 
 class DeviceModel(models.Model):
-    _name = "device.model"
+    _name = "service.device.model"
     _description = "Device Model"
+    _inherit = ["external.id.mixin"]
     _order = "number, id"
     _rec_name = "number"
 
     number = fields.Char()
     family = fields.Many2one(
-        "device.model.family",
+        "service.device.model.family",
         ondelete="set null",
     )
     products = fields.Many2many(
@@ -25,6 +26,6 @@ class DeviceModel(models.Model):
         "product_id",
     )
     devices = fields.One2many(
-        "device",
+        "service.device",
         "model",
     )

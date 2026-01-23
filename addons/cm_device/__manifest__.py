@@ -11,6 +11,7 @@
         "account",
         "base",
         "contacts",
+        "maintenance",
         "product",
         "mail",
         "external_ids",

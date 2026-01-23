@@ -2,7 +2,7 @@ from odoo import fields, models
 
 
 class Device(models.Model):
-    _name = "device"
+    _name = "service.device"
     _description = "Service Device"
     _inherit = ["mail.thread", "mail.activity.mixin", "external.id.mixin"]
     _order = "serial_number asc, id desc"
@@ -14,7 +14,7 @@ class Device(models.Model):
     imei = fields.Char(tracking=True)
     is_serial_unavailable = fields.Boolean(tracking=True)
     model = fields.Many2one(
-        "device.model",
+        "service.device.model",
         required=True,
         ondelete="restrict",
     )

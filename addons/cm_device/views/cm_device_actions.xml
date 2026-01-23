@@ -2,7 +2,7 @@
 <odoo>
     <record id="action_devices" model="ir.actions.act_window">
         <field name="name">Devices</field>
-        <field name="res_model">device</field>
+        <field name="res_model">service.device</field>
         <field name="view_mode">list,form</field>
     </record>
 </odoo>

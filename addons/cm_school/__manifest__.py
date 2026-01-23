@@ -10,6 +10,8 @@
     "depends": [
         "base",
         "contacts",
+        "cm_device",
+        "external_ids",
         "product",
     ],
     "data": [
@@ -19,6 +21,12 @@
         "views/account_routing_rule_views.xml",
         "views/account_alias_views.xml",
         "views/shipping_profile_views.xml",
+        "views/billing_requirement_views.xml",
+        "views/billing_context_views.xml",
+        "views/billing_policy_views.xml",
+        "views/billing_contract_views.xml",
+        "views/pricing_catalog_views.xml",
+        "views/pricing_matrix_views.xml",
         "views/cm_school_actions.xml",
     ],
     "installable": True,

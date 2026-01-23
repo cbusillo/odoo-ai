@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cm_billing_policy_list" model="ir.ui.view">
+        <field name="name">school.billing.policy.list</field>
+        <field name="model">school.billing.policy</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="policy_type"/>
+                <field name="labor_rate"/>
+                <field name="parts_markup_percent"/>
+                <field name="cap_amount"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cm_billing_policy_form" model="ir.ui.view">
+        <field name="name">school.billing.policy.form</field>
+        <field name="model">school.billing.policy</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="code"/>
+                            <field name="policy_type"/>
+                            <field name="sequence"/>
+                        </group>
+                        <group>
+                            <field name="company_id"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <group string="Labor">
+                        <group>
+                            <field name="labor_product_id"/>
+                            <field name="labor_rate"/>
+                        </group>
+                        <group>
+                            <field name="rate_entry_mode"/>
+                            <field name="target_hourly_rate"/>
+                        </group>
+                    </group>
+                    <group string="Parts">
+                        <group>
+                            <field name="parts_markup_percent"/>
+                            <field name="quantity_rounding"/>
+                        </group>
+                    </group>
+                    <group string="Caps">
+                        <group>
+                            <field name="cap_amount"/>
+                            <field name="cap_labor_amount"/>
+                        </group>
+                        <group>
+                            <field name="cap_behavior"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+</odoo>

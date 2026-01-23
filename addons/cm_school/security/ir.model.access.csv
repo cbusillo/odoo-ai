@@ -1,5 +1,11 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_cm_partner_role_user,cm.partner.role.user,model_cm_partner_role,base.group_user,1,1,1,1
+access_school_partner_role_user,school.partner.role.user,model_school_partner_role,base.group_user,1,1,1,1
 access_account_routing_rule_user,account.routing.rule.user,model_account_routing_rule,base.group_user,1,1,1,1
 access_account_alias_user,account.alias.user,model_account_alias,base.group_user,1,1,1,1
 access_shipping_profile_user,shipping.profile.user,model_shipping_profile,base.group_user,1,1,1,1
+access_school_billing_requirement_user,school.billing.requirement.user,model_school_billing_requirement,base.group_user,1,1,1,1
+access_school_billing_context_user,school.billing.context.user,model_school_billing_context,base.group_user,1,1,1,1
+access_school_billing_policy_user,school.billing.policy.user,model_school_billing_policy,base.group_user,1,1,1,1
+access_school_billing_contract_user,school.billing.contract.user,model_school_billing_contract,base.group_user,1,1,1,1
+access_school_pricing_catalog_user,school.pricing.catalog.user,model_school_pricing_catalog,base.group_user,1,1,1,1
+access_school_pricing_matrix_user,school.pricing.matrix.user,model_school_pricing_matrix,base.group_user,1,1,1,1

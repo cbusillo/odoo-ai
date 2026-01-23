@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cm_pricing_catalog_list" model="ir.ui.view">
+        <field name="name">school.pricing.catalog.list</field>
+        <field name="model">school.pricing.catalog</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="sequence"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="partner_id"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cm_pricing_catalog_form" model="ir.ui.view">
+        <field name="name">school.pricing.catalog.form</field>
+        <field name="model">school.pricing.catalog</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="code"/>
+                            <field name="partner_id"/>
+                        </group>
+                        <group>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="notes"/>
+                    </group>
+                    <notebook>
+                        <page string="Pricing Lines">
+                            <field name="line_ids">
+                                <list>
+                                    <field name="model_label"/>
+                                    <field name="repair_label"/>
+                                    <field name="price"/>
+                                    <field name="currency_id"/>
+                                    <field name="active"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+</odoo>

@@ -2,8 +2,8 @@ from odoo import fields, models
 
 
 class PartnerRole(models.Model):
-    _name = "cm.partner.role"
-    _description = "CM Partner Role"
+    _name = "school.partner.role"
+    _description = "School Partner Role"
     _order = "name"
 
     name = fields.Char(required=True)

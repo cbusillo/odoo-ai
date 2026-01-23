@@ -2,4 +2,10 @@ from . import partner_role
 from . import res_partner
 from . import account_routing_rule
 from . import account_alias
+from . import billing_requirement
+from . import billing_context
+from . import billing_policy
+from . import billing_contract
+from . import pricing_catalog
+from . import pricing_matrix
 from . import shipping_profile

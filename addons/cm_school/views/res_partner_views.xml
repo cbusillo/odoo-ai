@@ -9,7 +9,7 @@
                 <page string="School Data">
                     <group>
                         <group>
-                            <field name="cm_partner_role_ids" widget="many2many_tags"/>
+                            <field name="partner_role_ids" widget="many2many_tags"/>
                             <field name="cm_data_ticket_name"/>
                             <field name="cm_data_label_names"/>
                         </group>
@@ -27,6 +27,22 @@
                         <group>
                             <field name="cm_data_contact_notes" colspan="2"/>
                         </group>
+                    </group>
+                </page>
+                <page string="Billing">
+                    <group>
+                        <field name="billing_contract_ids">
+                            <list>
+                                <field name="name"/>
+                                <field name="policy_id"/>
+                                <field name="context_id"/>
+                                <field name="pricelist_id"/>
+                                <field name="date_start"/>
+                                <field name="date_end"/>
+                                <field name="sequence"/>
+                                <field name="active"/>
+                            </list>
+                        </field>
                     </group>
                 </page>
             </xpath>

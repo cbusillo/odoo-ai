@@ -17,4 +17,40 @@
         <field name="res_model">shipping.profile</field>
         <field name="view_mode">list,form</field>
     </record>
+
+    <record id="action_billing_requirements" model="ir.actions.act_window">
+        <field name="name">Billing Requirements</field>
+        <field name="res_model">school.billing.requirement</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_billing_contexts" model="ir.actions.act_window">
+        <field name="name">Billing Contexts</field>
+        <field name="res_model">school.billing.context</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_billing_policies" model="ir.actions.act_window">
+        <field name="name">Billing Policies</field>
+        <field name="res_model">school.billing.policy</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_billing_contracts" model="ir.actions.act_window">
+        <field name="name">Billing Contracts</field>
+        <field name="res_model">school.billing.contract</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_pricing_catalogs" model="ir.actions.act_window">
+        <field name="name">Pricing Catalogs</field>
+        <field name="res_model">school.pricing.catalog</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_pricing_matrix" model="ir.actions.act_window">
+        <field name="name">Pricing Matrix</field>
+        <field name="res_model">school.pricing.matrix</field>
+        <field name="view_mode">list,form</field>
+    </record>
 </odoo>

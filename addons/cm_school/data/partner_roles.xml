@@ -1,30 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo noupdate="1">
-    <record id="cm_partner_role_district" model="cm.partner.role">
+    <record id="school_partner_role_district" model="school.partner.role">
         <field name="name">District</field>
         <field name="code">district</field>
     </record>
-    <record id="cm_partner_role_school" model="cm.partner.role">
+    <record id="school_partner_role_school" model="school.partner.role">
         <field name="name">School</field>
         <field name="code">school</field>
     </record>
-    <record id="cm_partner_role_contact" model="cm.partner.role">
+    <record id="school_partner_role_contact" model="school.partner.role">
         <field name="name">School Contact</field>
         <field name="code">school_contact</field>
     </record>
-    <record id="cm_partner_role_payer" model="cm.partner.role">
+    <record id="school_partner_role_payer" model="school.partner.role">
         <field name="name">Payer</field>
         <field name="code">payer</field>
     </record>
-    <record id="cm_partner_role_pickup" model="cm.partner.role">
+    <record id="school_partner_role_pickup" model="school.partner.role">
         <field name="name">Pickup</field>
         <field name="code">pickup</field>
     </record>
-    <record id="cm_partner_role_dropoff" model="cm.partner.role">
+    <record id="school_partner_role_dropoff" model="school.partner.role">
         <field name="name">Dropoff</field>
         <field name="code">dropoff</field>
     </record>
-    <record id="cm_partner_role_insurance" model="cm.partner.role">
+    <record id="school_partner_role_insurance" model="school.partner.role">
         <field name="name">Insurance</field>
         <field name="code">insurance</field>
     </record>

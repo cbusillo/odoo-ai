@@ -2,18 +2,18 @@ from odoo import fields, models
 
 
 class IntakeOrderDevice(models.Model):
-    _name = "intake.order.device"
+    _name = "service.intake.order.device"
     _description = "Intake Order Device"
     _inherit = ["mail.thread", "mail.activity.mixin"]
     _order = "intake_order, id"
 
     intake_order = fields.Many2one(
-        "intake.order",
+        "service.intake.order",
         required=True,
         ondelete="cascade",
     )
     device = fields.Many2one(
-        "device",
+        "service.device",
         required=True,
         ondelete="restrict",
     )

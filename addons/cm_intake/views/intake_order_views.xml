@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
     <record id="view_intake_order_tree" model="ir.ui.view">
-        <field name="name">intake.order.tree</field>
-        <field name="model">intake.order</field>
+        <field name="name">service.intake.order.tree</field>
+        <field name="model">service.intake.order</field>
         <field name="arch" type="xml">
             <list>
                 <field name="state"/>
@@ -15,8 +15,8 @@
     </record>
 
     <record id="view_intake_order_form" model="ir.ui.view">
-        <field name="name">intake.order.form</field>
-        <field name="model">intake.order</field>
+        <field name="name">service.intake.order.form</field>
+        <field name="model">service.intake.order</field>
         <field name="arch" type="xml">
             <form string="Intake Order">
                 <sheet>

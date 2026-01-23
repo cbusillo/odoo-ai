@@ -7,7 +7,7 @@ INTAKE_ORDER_STATES = [
 
 
 class IntakeOrder(models.Model):
-    _name = "intake.order"
+    _name = "service.intake.order"
     _description = "Intake Order"
     _inherit = ["mail.thread", "mail.activity.mixin"]
     _order = "id desc"
@@ -25,7 +25,7 @@ class IntakeOrder(models.Model):
         ondelete="restrict",
     )
     transport_order = fields.Many2one(
-        "transport.order",
+        "service.transport.order",
         ondelete="set null",
     )
     client = fields.Many2one(
@@ -34,6 +34,6 @@ class IntakeOrder(models.Model):
     )
     finish_date = fields.Datetime()
     devices = fields.One2many(
-        "intake.order.device",
+        "service.intake.order.device",
         "intake_order",
     )

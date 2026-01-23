@@ -11,14 +11,16 @@ def _schedule_cm_data_import(environment: "api.Environment", *, reason: str) -> 
     if not cron:
         _logger.warning("CM data cron not found during %s hook", reason)
         return
-    cron.sudo().write({
-        "active": True,
-        "nextcall": fields.Datetime.now(),
-    })
+    cron.sudo().write(
+        {
+            "active": True,
+            "nextcall": fields.Datetime.now(),
+        }
+    )
 
 
 def post_init_hook(environment: "api.Environment") -> None:
-    environment["cm.data.importer"].sudo()._get_cm_data_system()
+    environment["integration.cm_data.importer"].sudo()._get_cm_data_system()
     _schedule_cm_data_import(environment, reason="post_init")
 
 

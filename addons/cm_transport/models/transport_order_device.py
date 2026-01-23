@@ -7,18 +7,18 @@ TRANSPORT_MOVEMENT_TYPES = [
 
 
 class TransportOrderDevice(models.Model):
-    _name = "transport.order.device"
+    _name = "service.transport.order.device"
     _description = "Transport Order Device"
     _inherit = ["mail.thread", "mail.activity.mixin"]
     _order = "transport_order, id"
 
     transport_order = fields.Many2one(
-        "transport.order",
+        "service.transport.order",
         required=True,
         ondelete="cascade",
     )
     device = fields.Many2one(
-        "device",
+        "service.device",
         required=True,
         ondelete="restrict",
     )

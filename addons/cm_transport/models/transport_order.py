@@ -14,7 +14,7 @@ LAT_LONG_DIGITS = (10, 7)
 
 
 class TransportOrder(models.Model):
-    _name = "transport.order"
+    _name = "service.transport.order"
     _description = "Transport Order"
     _inherit = ["mail.thread", "mail.activity.mixin", "external.id.mixin"]
     _order = "arrival_date desc, id desc"
@@ -61,6 +61,6 @@ class TransportOrder(models.Model):
     cm_data_discord_name = fields.Char()
     cm_data_discord_id = fields.Char()
     devices = fields.One2many(
-        "transport.order.device",
+        "service.transport.order.device",
         "transport_order",
     )

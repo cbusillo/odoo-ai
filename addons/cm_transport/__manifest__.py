@@ -10,6 +10,7 @@
     "depends": [
         "base",
         "contacts",
+        "fleet",
         "mail",
         "external_ids",
         "cm_device",

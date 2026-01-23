@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cm_data_pricing_audit_list" model="ir.ui.view">
+        <field name="name">integration.cm_data.pricing.audit.list</field>
+        <field name="model">integration.cm_data.pricing.audit</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="catalog_code"/>
+                <field name="catalog_name"/>
+                <field name="catalog_id" optional="hide"/>
+                <field name="partner_id"/>
+                <field name="product_id"/>
+                <field name="issue_type"/>
+                <field name="model_label"/>
+                <field name="repair_label"/>
+                <field name="source_price"/>
+                <field name="product_price"/>
+                <field name="currency_id"/>
+                <field name="source_file"/>
+                <field name="message"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cm_data_pricing_audit_form" model="ir.ui.view">
+        <field name="name">integration.cm_data.pricing.audit.form</field>
+        <field name="model">integration.cm_data.pricing.audit</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="catalog_id"/>
+                            <field name="catalog_code"/>
+                            <field name="catalog_name"/>
+                            <field name="partner_id"/>
+                            <field name="product_id"/>
+                        </group>
+                        <group>
+                            <field name="issue_type"/>
+                            <field name="model_label"/>
+                            <field name="repair_label"/>
+                            <field name="currency_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="source_price"/>
+                            <field name="product_price"/>
+                            <field name="source_batch"/>
+                            <field name="source_file"/>
+                        </group>
+                        <group>
+                            <field name="source_catalog_id"/>
+                            <field name="source_line_id"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="message"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+</odoo>

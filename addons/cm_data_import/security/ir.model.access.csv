@@ -1,2 +1,10 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_cm_data_importer,cm.data.importer,model_cm_data_importer,base.group_system,1,1,1,1
+access_cm_data_importer,integration.cm_data.importer,model_integration_cm_data_importer,base.group_system,1,1,1,1
+access_cm_data_direction,integration.cm_data.direction,model_integration_cm_data_direction,base.group_system,1,1,1,1
+access_cm_data_shipping_instruction,integration.cm_data.shipping.instruction,model_integration_cm_data_shipping_instruction,base.group_system,1,1,1,1
+access_cm_data_note,integration.cm_data.note,model_integration_cm_data_note,base.group_system,1,1,1,1
+access_cm_data_password,integration.cm_data.password,model_integration_cm_data_password,base.group_system,1,1,1,1
+access_cm_data_price_list,integration.cm_data.price.list,model_integration_cm_data_price_list,base.group_system,1,1,1,1
+access_cm_data_pricing_audit,integration.cm_data.pricing.audit,model_integration_cm_data_pricing_audit,base.group_system,1,1,1,1
+access_cm_data_pto_usage,integration.cm_data.pto.usage,model_integration_cm_data_pto_usage,base.group_system,1,1,1,1
+access_cm_data_vacation_usage,integration.cm_data.vacation.usage,model_integration_cm_data_vacation_usage,base.group_system,1,1,1,1

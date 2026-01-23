@@ -21,6 +21,18 @@
               parent="menu_cm_custom_config" action="cm_school.action_account_aliases" sequence="20"/>
     <menuitem id="menu_shipping_profiles" name="Shipping Profiles"
               parent="menu_cm_custom_config" action="cm_school.action_shipping_profiles" sequence="30"/>
+    <menuitem id="menu_billing_policies" name="Billing Policies"
+              parent="menu_cm_custom_config" action="cm_school.action_billing_policies" sequence="40"/>
+    <menuitem id="menu_billing_contexts" name="Billing Contexts"
+              parent="menu_cm_custom_config" action="cm_school.action_billing_contexts" sequence="50"/>
+    <menuitem id="menu_billing_requirements" name="Billing Requirements"
+              parent="menu_cm_custom_config" action="cm_school.action_billing_requirements" sequence="60"/>
+    <menuitem id="menu_billing_contracts" name="Billing Contracts"
+              parent="menu_cm_custom_config" action="cm_school.action_billing_contracts" sequence="70"/>
+    <menuitem id="menu_pricing_catalogs" name="Pricing Catalogs"
+              parent="menu_cm_custom_config" action="cm_school.action_pricing_catalogs" sequence="80"/>
+    <menuitem id="menu_pricing_matrix" name="Pricing Matrix"
+              parent="menu_cm_custom_config" action="cm_school.action_pricing_matrix" sequence="85"/>
     <menuitem id="menu_identifier_index" name="Identifier Index"
-              parent="menu_cm_custom_config" action="cm_custom.action_identifier_index" sequence="40"/>
+              parent="menu_cm_custom_config" action="cm_custom.action_identifier_index" sequence="90"/>
 </odoo>

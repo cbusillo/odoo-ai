@@ -6,6 +6,7 @@ IDENTIFIER_TYPES = [
     ("asset_tag_secondary", "Asset Tag (Secondary)"),
     ("imei", "IMEI"),
     ("claim", "Claim Number"),
+    ("call", "Call Number"),
     ("po", "PO Number"),
     ("ticket", "Ticket Number"),
     ("invoice", "Invoice Number"),

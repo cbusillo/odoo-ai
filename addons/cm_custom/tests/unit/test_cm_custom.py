@@ -8,10 +8,14 @@ from ..fixtures.base import UnitTestCase
 
 @tagged(*UNIT_TAGS)
 class TestCmCustom(UnitTestCase):
-    def _create_partner(self, name: str):
+    def _create_partner(self, name: str) -> "odoo.model.res_partner":
         return self.Partner.create({"name": name})
 
-    def _create_device(self, owner, serial_number: str):
+    def _create_device(
+        self,
+        owner: "odoo.model.res_partner",
+        serial_number: str,
+    ) -> "odoo.model.service_device":
         device_model = self.DeviceModel.create({"number": f"MODEL-{serial_number}"})
         return self.Device.create(
             {
@@ -23,13 +27,13 @@ class TestCmCustom(UnitTestCase):
 
     def _create_transport_order(
         self,
-        client,
-        contact,
+        client: "odoo.model.res_partner",
+        contact: "odoo.model.res_partner",
         *,
         state: str = "draft",
         arrival_date: datetime | None = None,
         departure_date: datetime | None = None,
-    ):
+    ) -> "odoo.model.service_transport_order":
         return self.TransportOrder.create(
             {
                 "client": client.id,

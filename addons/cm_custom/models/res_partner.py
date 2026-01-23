@@ -21,29 +21,29 @@ class ResPartner(models.Model):
         ondelete="set null",
     )
     average_time_on_location_per_device = fields.Float(compute="_compute_average_time")
-    devices = fields.One2many("device", "owner")
+    devices = fields.One2many("service.device", "owner")
     devices_at_depot = fields.Many2many(
-        "device",
+        "service.device",
         compute="_compute_devices_at_depot",
     )
-    transport_orders = fields.One2many("transport.order", "client")
-    intake_orders = fields.One2many("intake.order", "client")
+    transport_orders = fields.One2many("service.transport.order", "client")
+    intake_orders = fields.One2many("service.intake.order", "client")
     diagnostic_orders = fields.Many2many(
-        "diagnostic.order",
+        "service.diagnostic.order",
         compute="_compute_diagnostic_orders",
     )
     qc_orders = fields.Many2many(
-        "repair.batch.device",
+        "service.repair.batch.device",
         compute="_compute_qc_orders",
     )
     repair_batch_devices = fields.Many2many(
-        "repair.batch.device",
+        "service.repair.batch.device",
         compute="_compute_repair_batch_devices",
     )
 
     repair_batches = fields.Many2many(
-        "repair.batch",
-        "partner_repair_batch_rel",
+        "service.repair.batch",
+        "partner_service_repair_batch_rel",
         "partner_id",
         "batch_id",
     )

@@ -1,26 +1,9 @@
 from odoo import fields, models
 
 
-class AccountMove(models.Model):
-    _inherit = "account.move"
+class SaleOrder(models.Model):
+    _inherit = "sale.order"
 
-    device_ids = fields.Many2many(
-        "service.device",
-        "device_account_move_rel",
-        "move_id",
-        "device_id",
-        string="Devices",
-    )
-    source_ticket_id = fields.Many2one(
-        "helpdesk.ticket",
-        ondelete="set null",
-        string="Source Ticket",
-    )
-    repair_batch_id = fields.Many2one(
-        "service.repair.batch",
-        ondelete="set null",
-        string="Repair Batch",
-    )
     billing_contract_id = fields.Many2one(
         "school.billing.contract",
         ondelete="set null",
@@ -37,4 +20,11 @@ class AccountMove(models.Model):
         related="billing_contract_id.context_id",
         store=True,
         readonly=True,
+    )
+    billing_pricelist_id = fields.Many2one(
+        "product.pricelist",
+        related="billing_contract_id.pricelist_id",
+        store=True,
+        readonly=True,
+        string="Billing Pricelist",
     )

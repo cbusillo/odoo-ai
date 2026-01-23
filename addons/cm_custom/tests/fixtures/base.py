@@ -16,12 +16,11 @@ class UnitTestCase(TransactionCase):
             )
         )
         cls.Partner = cls.env["res.partner"]
-        cls.DeviceModel = cls.env["device.model"]
-        cls.Device = cls.env["device"]
-        cls.TransportOrder = cls.env["transport.order"]
-        cls.TransportOrderDevice = cls.env["transport.order.device"]
-        cls.DiagnosticOrder = cls.env["diagnostic.order"]
-        cls.DiagnosticOrderDevice = cls.env["diagnostic.order.device"]
-        cls.RepairBatch = cls.env["repair.batch"]
-        cls.RepairBatchDevice = cls.env["repair.batch.device"]
-
+        cls.DeviceModel = cls.env["service.device.model"]
+        cls.Device = cls.env["service.device"]
+        cls.TransportOrder = cls.env["service.transport.order"]
+        cls.TransportOrderDevice = cls.env["service.transport.order.device"]
+        cls.DiagnosticOrder = cls.env["service.diagnostic.order"]
+        cls.DiagnosticOrderDevice = cls.env["service.diagnostic.order.device"]
+        cls.RepairBatch = cls.env["service.repair.batch"]
+        cls.RepairBatchDevice = cls.env["service.repair.batch.device"]

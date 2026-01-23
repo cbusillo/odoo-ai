@@ -3,7 +3,7 @@ import os
 import time
 from collections.abc import Callable, Iterator
 from datetime import datetime
-from typing import Any
+from typing import Any, Protocol
 
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
@@ -28,6 +28,10 @@ _logger = logging.getLogger(__name__)
 RowParser = Callable[[list[dict[str, object]]], list[Any]] | TypeAdapter[list[Any]]
 
 
+class _RowWithId(Protocol):
+    id: object
+
+
 # noinspection SqlResolve
 class FishbowlImporter(models.Model):
     _name = "fishbowl.importer"
@@ -44,34 +48,49 @@ class FishbowlImporter(models.Model):
     @api.model
     def _run_import(self, *, update_last_sync: bool, start_datetime: datetime | None = None) -> None:
         fishbowl_settings = self._get_fishbowl_settings()
-        run_started_at = fields.Datetime.now()
-        if start_datetime is None and update_last_sync:
+        sync_started_at = fields.Datetime.now()
+        use_last_sync_at = self._use_last_sync_at()
+        if start_datetime is None and update_last_sync and use_last_sync_at:
             start_datetime = self._get_last_sync_at()
         max_retries = int(os.environ.get("FISHBOWL_IMPORT_SERIALIZATION_RETRIES", "3"))
         retry_sleep = float(os.environ.get("FISHBOWL_IMPORT_SERIALIZATION_SLEEP", "5"))
         attempt = 0
         while True:
             try:
-                self._get_fishbowl_system()
+                fishbowl_system = self._get_fishbowl_system()
                 with FishbowlClient(fishbowl_settings) as client:
                     total_started_at = time.monotonic()
                     phase_started_at = time.monotonic()
-                    self._import_units_of_measure(client)
+                    self._import_units_of_measure(client, fishbowl_system, sync_started_at)
                     _logger.info("Fishbowl import: units in %.2fs", time.monotonic() - phase_started_at)
                     phase_started_at = time.monotonic()
-                    partner_maps = self._import_partners(client)
+                    partner_maps = self._import_partners(client, fishbowl_system, sync_started_at)
                     _logger.info("Fishbowl import: partners in %.2fs", time.monotonic() - phase_started_at)
                     phase_started_at = time.monotonic()
-                    product_maps = self._import_products(client)
+                    product_maps = self._import_products(client, fishbowl_system, sync_started_at)
                     _logger.info("Fishbowl import: products in %.2fs", time.monotonic() - phase_started_at)
                     phase_started_at = time.monotonic()
-                    order_maps = self._import_orders(client, partner_maps, product_maps, start_datetime)
+                    order_maps = self._import_orders(
+                        client,
+                        partner_maps,
+                        product_maps,
+                        start_datetime,
+                        fishbowl_system,
+                        sync_started_at,
+                    )
                     _logger.info("Fishbowl import: orders in %.2fs", time.monotonic() - phase_started_at)
                     phase_started_at = time.monotonic()
-                    self._import_shipments(client, order_maps, start_datetime)
+                    self._import_shipments(client, order_maps, start_datetime, fishbowl_system, sync_started_at)
                     _logger.info("Fishbowl import: shipments in %.2fs", time.monotonic() - phase_started_at)
                     phase_started_at = time.monotonic()
-                    self._import_receipts(client, order_maps, product_maps, start_datetime)
+                    self._import_receipts(
+                        client,
+                        order_maps,
+                        product_maps,
+                        start_datetime,
+                        fishbowl_system,
+                        sync_started_at,
+                    )
                     _logger.info("Fishbowl import: receipts in %.2fs", time.monotonic() - phase_started_at)
                     phase_started_at = time.monotonic()
                     self._import_on_hand(client, product_maps)
@@ -100,13 +119,208 @@ class FishbowlImporter(models.Model):
                 self._record_last_run("failed", str(exc))
                 raise
         self._record_last_run("success", "")
-        if update_last_sync:
-            self._set_last_sync_at(run_started_at)
+        if update_last_sync and use_last_sync_at:
+            self._set_last_sync_at(sync_started_at)
 
     def _commit_and_clear(self) -> None:
         self.env.cr.execute("SET LOCAL synchronous_commit TO OFF")
         self.env.cr.commit()
         self.env.clear()
+
+    def _get_external_id_record(
+        self,
+        system: "odoo.model.external_system",
+        external_id_value: str,
+        resource: str,
+    ) -> "odoo.model.external_id":
+        return self.env["external.id"].sudo().search(
+            [
+                ("system_id", "=", system.id),
+                ("resource", "=", resource),
+                ("external_id", "=", external_id_value),
+            ],
+            limit=1,
+        )
+
+    def _should_process_external_row(
+        self,
+        system: "odoo.model.external_system",
+        external_id_value: str,
+        resource: str,
+        updated_at: datetime | None,
+    ) -> bool:
+        if updated_at is None:
+            return True
+        external_id_record = self._get_external_id_record(system, external_id_value, resource)
+        if not external_id_record or not external_id_record.last_sync:
+            return True
+        return external_id_record.last_sync < updated_at
+
+    def _mark_external_id_synced(
+        self,
+        system: "odoo.model.external_system",
+        external_id_value: str,
+        resource: str,
+        sync_timestamp: datetime,
+    ) -> None:
+        external_id_record = self._get_external_id_record(system, external_id_value, resource)
+        if not external_id_record:
+            return
+        external_id_record.write({"last_sync": sync_timestamp})
+
+    def _mark_external_ids_synced(
+        self,
+        system_id: int,
+        resource: str,
+        external_ids: list[str],
+        sync_timestamp: datetime,
+    ) -> None:
+        if not external_ids:
+            return
+        unique_ids = sorted(set(external_ids))
+        external_id_model = self.env["external.id"].sudo()
+        records = external_id_model.search(
+            [
+                ("system_id", "=", system_id),
+                ("resource", "=", resource),
+                ("external_id", "in", unique_ids),
+            ]
+        )
+        if records:
+            records.write({"last_sync": sync_timestamp})
+
+    def _create_stock_moves_with_external_ids(
+        self,
+        move_model: "odoo.model.stock_move",
+        *,
+        create_values: list["odoo.values.stock_move"],
+        create_external_ids: list[str],
+        stale_map: dict[str, "odoo.model.external_id"],
+        system_id: int,
+        resource: str,
+    ) -> dict[str, int]:
+        if not create_values:
+            return {}
+        created_moves = move_model.create(create_values)
+        external_id_payloads: list["odoo.values.external_id"] = []
+        created_map: dict[str, int] = {}
+        for external_id_value, move in zip(create_external_ids, created_moves, strict=True):
+            created_map[external_id_value] = move.id
+            stale_record = stale_map.pop(external_id_value, None)
+            if stale_record:
+                stale_record.write({"res_model": "stock.move", "res_id": move.id, "active": True})
+                continue
+            external_id_payloads.append(
+                {
+                    "res_model": "stock.move",
+                    "res_id": move.id,
+                    "system_id": system_id,
+                    "resource": resource,
+                    "external_id": external_id_value,
+                    "active": True,
+                }
+            )
+        if external_id_payloads:
+            self.env["external.id"].sudo().create(external_id_payloads)
+        return created_map
+
+    @staticmethod
+    def _init_stock_move_batch() -> tuple[
+        list["odoo.values.stock_move"],
+        list[str],
+        dict[str, "odoo.values.stock_move_line"],
+        dict[str, int],
+        list[str],
+    ]:
+        return [], [], {}, {}, []
+
+    def _prepare_stock_move_batch(
+        self,
+        system_id: int,
+        resource: str,
+        batch_rows: list[_RowWithId],
+    ) -> tuple[
+        dict[str, int],
+        dict[str, "odoo.model.external_id"],
+        set[str],
+        list["odoo.values.stock_move"],
+        list[str],
+        dict[str, "odoo.values.stock_move_line"],
+        dict[str, int],
+        list[str],
+    ]:
+        external_ids = [str(row.id) for row in batch_rows]
+        existing_map, stale_map, blocked = self._prefetch_external_id_records(
+            system_id,
+            resource,
+            external_ids,
+            "stock.move",
+        )
+        (
+            create_values,
+            create_external_ids,
+            move_line_payloads,
+            batch_move_ids,
+            processed_external_ids,
+        ) = self._init_stock_move_batch()
+        return (
+            existing_map,
+            stale_map,
+            blocked,
+            create_values,
+            create_external_ids,
+            move_line_payloads,
+            batch_move_ids,
+            processed_external_ids,
+        )
+
+    @staticmethod
+    def _ensure_stock_move_lines(
+        move_model: "odoo.model.stock_move",
+        move_line_model: "odoo.model.stock_move_line",
+        move_ids_by_external_id: dict[str, int],
+        move_line_payloads: dict[str, "odoo.values.stock_move_line"],
+    ) -> None:
+        if not move_ids_by_external_id or not move_line_payloads:
+            return
+        for external_id_value, move_id in move_ids_by_external_id.items():
+            move = move_model.browse(move_id)
+            if move.move_line_ids:
+                continue
+            move_line_values = move_line_payloads.get(external_id_value)
+            if not move_line_values:
+                continue
+            move_line_values["move_id"] = move.id
+            move_line_model.create(move_line_values)
+
+    def _get_or_create_by_external_id_with_sync(
+        self,
+        record_model: "odoo.model.external_id_mixin",
+        system: "odoo.model.external_system",
+        external_id_value: str,
+        values: dict[str, object],
+        *,
+        resource: str,
+        updated_at: datetime | None,
+        sync_started_at: datetime,
+    ) -> "odoo.model.external_id_mixin":
+        if updated_at and not self._should_process_external_row(system, external_id_value, resource, updated_at):
+            existing_record = record_model.search_by_external_id(
+                EXTERNAL_SYSTEM_CODE,
+                external_id_value,
+                resource,
+            )
+            if existing_record:
+                return existing_record
+        record = record_model.get_or_create_by_external_id(
+            EXTERNAL_SYSTEM_CODE,
+            external_id_value,
+            values,
+            resource,
+        )
+        sync_timestamp = updated_at or sync_started_at
+        self._mark_external_id_synced(system, external_id_value, resource, sync_timestamp)
+        return record
 
     def _get_fishbowl_settings(self) -> FishbowlConnectionSettings:
         host = self._get_config_value("fishbowl.host", "ENV_OVERRIDE_CONFIG_PARAM__FISHBOWL__HOST")
@@ -151,6 +365,32 @@ class FishbowlImporter(models.Model):
         if not value:
             return default
         return self._to_bool(value)
+
+    def _get_config_int(self, key: str, env_key: str, *, default: int) -> int:
+        parameter_model = self.env["ir.config_parameter"].sudo()
+        value = parameter_model.get_param(key) or ""
+        if not value:
+            value = os.environ.get(env_key, "")
+        if not value:
+            return default
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    def _use_last_sync_at(self) -> bool:
+        return self._get_config_bool(
+            "fishbowl.use_last_sync_at",
+            "ENV_OVERRIDE_CONFIG_PARAM__FISHBOWL__USE_LAST_SYNC_AT",
+            default=True,
+        )
+
+    def _get_commit_interval(self) -> int:
+        return self._get_config_int(
+            "fishbowl.commit_interval",
+            "ENV_OVERRIDE_CONFIG_PARAM__FISHBOWL__COMMIT_INTERVAL",
+            default=50,
+        )
 
     def _get_last_sync_at(self) -> datetime | None:
         parameter_model = self.env["ir.config_parameter"].sudo()
@@ -277,6 +517,8 @@ class FishbowlImporter(models.Model):
             return "lot"
         return "none"
 
+    # noinspection DuplicatedCode
+    # Duplicated with RepairShopr importer to keep parsing local and avoid cross-addon coupling.
     @staticmethod
     def _to_bool(value: object) -> bool:
         if value in (True, False):
@@ -391,7 +633,7 @@ class FishbowlImporter(models.Model):
         start_datetime: datetime | None,
         *,
         select_columns: str,
-        batch_size: int = 2000,
+        batch_size: int = 500,
     ) -> Iterator[list[dict[str, Any]]]:
         last_id = 0
         while True:
@@ -508,7 +750,7 @@ class FishbowlImporter(models.Model):
         record_ids: list[int],
         *,
         select_columns: str | None = None,
-        batch_size: int = 1000,
+        batch_size: int = 500,
         extra_where: str | None = None,
         extra_params: list[Any] | None = None,
         row_parser: RowParser | None = None,
@@ -595,7 +837,7 @@ class FishbowlImporter(models.Model):
         if product:
             return product.id
         template_model = self.env["product.template"].sudo().with_context(IMPORT_CONTEXT)
-        values: "odoo.values.product_template" = {
+        values = {
             "name": name,
             "default_code": code,
             "categ_id": self._get_legacy_category().id,

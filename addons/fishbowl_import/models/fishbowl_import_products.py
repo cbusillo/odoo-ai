@@ -9,13 +9,28 @@ from .fishbowl_import_constants import EXTERNAL_SYSTEM_CODE, IMPORT_CONTEXT, RES
 
 _logger = logging.getLogger(__name__)
 
+CUSTOM_FIELD_ALLOWLIST = {
+    "MPN": "x_mpn",
+    "Model Number": "x_model_number",
+    "Old SKU": "x_old_sku",
+    "Sync to RS": "x_sync_to_repairshopr",
+    "WAG API Mapping": "x_wag_api_mapping",
+    "Sample Serial": "x_sample_serial",
+}
+CUSTOM_FIELD_BOOLEAN_NAMES = {"Sync to RS"}
+
 
 # External Fishbowl schema; SQL resolver has no catalog.
 # noinspection SqlResolve
 class FishbowlImporterProducts(models.Model):
     _inherit = "fishbowl.importer"
 
-    def _import_products(self, client: FishbowlClient) -> dict[str, dict[int, int]]:
+    def _import_products(
+        self,
+        client: FishbowlClient,
+        fishbowl_system: "odoo.model.external_system",
+        sync_started_at: datetime,
+    ) -> dict[str, dict[int, int]]:
         part_type_map = self._load_part_type_map(client)
         part_rows = self._fetch_rows(
             client,
@@ -47,6 +62,8 @@ class FishbowlImporterProducts(models.Model):
             sales_price_map,
             template_model,
             part_product_map,
+            fishbowl_system,
+            sync_started_at,
         )
         self._upsert_product_rows(
             product_rows,
@@ -55,6 +72,18 @@ class FishbowlImporterProducts(models.Model):
             template_model,
             part_product_map,
             product_product_map,
+            fishbowl_system,
+            sync_started_at,
+        )
+
+        self._apply_custom_fields(
+            client,
+            part_ids,
+            [row.id for row in product_rows],
+            {
+                "part": part_product_map,
+                "product": product_product_map,
+            },
         )
 
         return {
@@ -78,13 +107,15 @@ class FishbowlImporterProducts(models.Model):
         part_price_map: dict[int, float],
         template_model: "odoo.model.product_template",
         part_product_map: dict[int, int],
+        fishbowl_system: "odoo.model.external_system",
+        sync_started_at: datetime,
     ) -> None:
         for row in part_rows:
             fishbowl_id = row.id
             unit_id = unit_map.get(row.uomId or 0)
             part_type_name = part_type_map.get(row.typeId or 0, "")
             product_type = self._map_part_type(part_type_name)
-            values: "odoo.values.product_template" = {
+            values = {
                 "name": str(row.description or row.num or "").strip() or f"Part {fishbowl_id}",
                 "default_code": str(row.num or "").strip() or False,
                 "description": row.details or False,
@@ -104,12 +135,16 @@ class FishbowlImporterProducts(models.Model):
             list_price = part_price_map.get(fishbowl_id)
             if list_price is not None and float(list_price) != 0:
                 values["list_price"] = float(list_price)
-            template = template_model.get_or_create_by_external_id(
-                EXTERNAL_SYSTEM_CODE,
+            template_record = self._get_or_create_by_external_id_with_sync(
+                template_model,
+                fishbowl_system,
                 str(fishbowl_id),
                 values,
-                RESOURCE_PART,
+                resource=RESOURCE_PART,
+                updated_at=None,
+                sync_started_at=sync_started_at,
             )
+            template = template_model.browse(template_record.id)
             if standard_price is not None and float(standard_price) != 0 and template.product_variant_id:
                 variant = template.product_variant_id.sudo().with_context(IMPORT_CONTEXT)
                 self._write_if_changed(variant, {"standard_price": float(standard_price)})
@@ -123,6 +158,8 @@ class FishbowlImporterProducts(models.Model):
         template_model: "odoo.model.product_template",
         part_product_map: dict[int, int],
         product_product_map: dict[int, int],
+        fishbowl_system: "odoo.model.external_system",
+        sync_started_at: datetime,
     ) -> None:
         for row in product_rows:
             fishbowl_id = row.id
@@ -134,7 +171,7 @@ class FishbowlImporterProducts(models.Model):
                 continue
             variant = self.env["product.product"].browse(variant_id)
             template = template_model.browse(variant.product_tmpl_id.id)
-            values: "odoo.values.product_template" = {
+            values = {
                 "name": str(row.description or row.num or template.name).strip(),
                 "active": True,
                 "sale_ok": True,
@@ -154,6 +191,12 @@ class FishbowlImporterProducts(models.Model):
                 values["uom_id"] = unit_id
             self._write_if_changed(template, values)
             template.set_external_id(EXTERNAL_SYSTEM_CODE, str(fishbowl_id), RESOURCE_PRODUCT)
+            self._mark_external_id_synced(
+                fishbowl_system,
+                str(fishbowl_id),
+                RESOURCE_PRODUCT,
+                sync_started_at,
+            )
             product_product_map[fishbowl_id] = variant_id
 
     def _import_missing_products(
@@ -164,10 +207,12 @@ class FishbowlImporterProducts(models.Model):
         unit_map: dict[int, int],
         product_maps: dict[str, dict[int, int]],
         product_code_map: dict[str, int],
+        fishbowl_system: "odoo.model.external_system",
+        sync_started_at: datetime,
     ) -> set[int]:
         if not missing_product_ids:
             return set()
-        product_rows: list[fishbowl_rows.ProductRow] = self._fetch_rows_by_ids(
+        product_rows = self._fetch_rows_by_ids(
             client,
             "product",
             "id",
@@ -184,7 +229,7 @@ class FishbowlImporterProducts(models.Model):
                 continue
             part_ids.append(part_id)
         missing_part_ids = [part_id for part_id in part_ids if part_id not in product_maps["part"]]
-        part_rows: list[fishbowl_rows.PartRow] = self._fetch_rows_by_ids(
+        part_rows = self._fetch_rows_by_ids(
             client,
             "part",
             "id",
@@ -217,6 +262,8 @@ class FishbowlImporterProducts(models.Model):
                 part_price_map,
                 template_model,
                 product_maps["part"],
+                fishbowl_system,
+                sync_started_at,
             )
             self._update_product_code_map_from_part_rows(part_rows, product_maps["part"], product_code_map)
         self._upsert_product_rows(
@@ -226,8 +273,19 @@ class FishbowlImporterProducts(models.Model):
             template_model,
             product_maps["part"],
             product_maps["product"],
+            fishbowl_system,
+            sync_started_at,
         )
         self._update_product_code_map_from_product_rows(product_rows, product_maps["product"], product_code_map)
+        self._apply_custom_fields(
+            client,
+            part_ids,
+            [row.id for row in product_rows],
+            {
+                "part": product_maps.get("part", {}),
+                "product": product_maps.get("product", {}),
+            },
+        )
         mapped_product_ids = {row.id for row in product_rows if row.id in product_maps["product"]}
         if mapped_product_ids:
             _logger.info("Fishbowl import: hydrated %s missing products", len(mapped_product_ids))
@@ -241,10 +299,12 @@ class FishbowlImporterProducts(models.Model):
         unit_map: dict[int, int],
         product_maps: dict[str, dict[int, int]],
         product_code_map: dict[str, int],
+        fishbowl_system: "odoo.model.external_system",
+        sync_started_at: datetime,
     ) -> set[int]:
         if not missing_part_ids:
             return set()
-        part_rows: list[fishbowl_rows.PartRow] = self._fetch_rows_by_ids(
+        part_rows = self._fetch_rows_by_ids(
             client,
             "part",
             "id",
@@ -266,12 +326,133 @@ class FishbowlImporterProducts(models.Model):
             {},
             template_model,
             product_maps["part"],
+            fishbowl_system,
+            sync_started_at,
         )
         self._update_product_code_map_from_part_rows(part_rows, product_maps["part"], product_code_map)
         mapped_part_ids = {row.id for row in part_rows if row.id in product_maps["part"]}
         if mapped_part_ids:
             _logger.info("Fishbowl import: hydrated %s missing parts", len(mapped_part_ids))
         return mapped_part_ids
+
+    def _apply_custom_fields(
+        self,
+        client: FishbowlClient,
+        part_ids: list[int],
+        product_ids: list[int],
+        product_maps: dict[str, dict[int, int]],
+    ) -> None:
+        if not CUSTOM_FIELD_ALLOWLIST:
+            return
+        table_id_map = self._load_custom_field_table_ids(client, {"part", "product"})
+        if not table_id_map:
+            return
+        product_model = self.env["product.product"].sudo().with_context(IMPORT_CONTEXT)
+        allowlist_names = list(CUSTOM_FIELD_ALLOWLIST.keys())
+        table_configs = [
+            ("part", part_ids, product_maps.get("part", {})),
+            ("product", product_ids, product_maps.get("product", {})),
+        ]
+        for table_name, record_ids, record_map in table_configs:
+            table_id = table_id_map.get(table_name)
+            if not table_id or not record_ids:
+                continue
+            value_map = self._fetch_custom_field_values(client, table_id, record_ids, allowlist_names)
+            if not value_map:
+                continue
+            for record_id, field_values in value_map.items():
+                variant_id = record_map.get(record_id)
+                if not variant_id:
+                    continue
+                template = product_model.browse(variant_id).product_tmpl_id
+                update_values: dict[str, object] = {}
+                for field_name, raw_value in field_values.items():
+                    odoo_field = CUSTOM_FIELD_ALLOWLIST.get(field_name)
+                    if not odoo_field:
+                        continue
+                    if field_name in CUSTOM_FIELD_BOOLEAN_NAMES:
+                        update_values[odoo_field] = self._to_bool(raw_value)
+                        continue
+                    normalized_value = self._normalize_custom_field_value(raw_value)
+                    if normalized_value is None:
+                        continue
+                    update_values[odoo_field] = normalized_value
+                if update_values:
+                    self._write_if_changed(template, update_values)
+
+    @staticmethod
+    def _normalize_custom_field_value(raw_value: object) -> str | None:
+        if raw_value is None:
+            return None
+        text = str(raw_value).strip()
+        return text or None
+
+    @staticmethod
+    def _load_custom_field_table_ids(
+        client: FishbowlClient,
+        table_names: set[str],
+    ) -> dict[str, int]:
+        if not table_names:
+            return {}
+        normalized_names = [name.strip().lower() for name in table_names if name]
+        placeholders = ", ".join(["%s"] * len(normalized_names))
+        query = (
+            "SELECT tableId, tableRefName "
+            "FROM tablereference "
+            f"WHERE LOWER(tableRefName) IN ({placeholders})"
+        )
+        rows = client.fetch_all(query, normalized_names)
+        table_id_map: dict[str, int] = {}
+        for row in rows:
+            raw_name = row.get("tableRefName")
+            table_id = row.get("tableId")
+            if not raw_name or table_id is None:
+                continue
+            if not isinstance(table_id, (int, str, bytes)):
+                continue
+            try:
+                table_id_value = int(table_id)
+            except (TypeError, ValueError):
+                continue
+            table_id_map[str(raw_name).strip().lower()] = table_id_value
+        return table_id_map
+
+    @staticmethod
+    def _fetch_custom_field_values(
+        client: FishbowlClient,
+        table_id: int,
+        record_ids: list[int],
+        allowlist_names: list[str],
+    ) -> dict[int, dict[str, object]]:
+        if not record_ids or not allowlist_names:
+            return {}
+        name_placeholders = ", ".join(["%s"] * len(allowlist_names))
+        values_by_record: dict[int, dict[str, object]] = {}
+        for batch in chunked(record_ids, 500):
+            if not batch:
+                continue
+            record_placeholders = ", ".join(["%s"] * len(batch))
+            query = (
+                "SELECT cfName, recordID, info "
+                "FROM customfieldview "
+                f"WHERE cfTableID = %s AND cfName IN ({name_placeholders}) "
+                f"AND recordID IN ({record_placeholders})"
+            )
+            parameters = [table_id, *allowlist_names, *batch]
+            rows = client.fetch_all(query, parameters)
+            for row in rows:
+                field_name = str(row.get("cfName") or "").strip()
+                if not field_name:
+                    continue
+                record_id_value = row.get("recordID")
+                try:
+                    record_id = int(record_id_value or 0)
+                except (TypeError, ValueError):
+                    continue
+                if record_id <= 0:
+                    continue
+                values_by_record.setdefault(record_id, {})[field_name] = row.get("info")
+        return values_by_record
 
     @staticmethod
     def _update_product_code_map_from_part_rows(

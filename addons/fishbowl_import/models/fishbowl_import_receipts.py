@@ -22,6 +22,8 @@ class FishbowlImporterReceipts(models.Model):
         order_maps: dict[str, dict[int, int]],
         product_maps: dict[str, dict[int, int]],
         start_datetime: datetime | None,
+        fishbowl_system: "odoo.model.external_system",
+        sync_started_at: datetime,
     ) -> None:
         receipt_status_map = self._load_status_map(client, "receiptstatus")
         done_statuses = {"received", "fulfilled"}
@@ -65,12 +67,23 @@ class FishbowlImporterReceipts(models.Model):
         receipt_line_log_every = 5000
         receipt_line_log_threshold = receipt_line_log_every
         receipt_line_started_at = time.monotonic()
-        receipt_line_batch_size = 2000
-        fishbowl_system = self._get_fishbowl_system()
+        receipt_line_batch_size = 500
         receipt_ids = {row.receiptId for row in receipt_item_rows if row.receiptId is not None}
         receipt_existing_map: dict[str, int] = {}
         _receipt_stale_map: dict[str, "odoo.model.external_id"] = {}
         receipt_blocked: set[str] = set()
+        receipt_latest_dates: dict[int, datetime] = {}
+        receipt_line_totals: dict[int, int] = {}
+        receipt_line_success: dict[int, int] = {}
+        receipt_line_blocked: set[int] = set()
+        for row in receipt_item_rows:
+            if row.receiptId is None or row.dateReceived is None:
+                continue
+            receipt_line_totals[row.receiptId] = receipt_line_totals.get(row.receiptId, 0) + 1
+            latest = receipt_latest_dates.get(row.receiptId)
+            if not latest or row.dateReceived > latest:
+                receipt_latest_dates[row.receiptId] = row.dateReceived
+        receipts_to_process: set[int] = set()
         if receipt_ids:
             receipt_external_ids = [str(value) for value in receipt_ids]
             receipt_existing_map, _receipt_stale_map, receipt_blocked = self._prefetch_external_id_records(
@@ -79,21 +92,35 @@ class FishbowlImporterReceipts(models.Model):
                 receipt_external_ids,
                 "stock.picking",
             )
+            for receipt_id in receipt_ids:
+                updated_at = receipt_latest_dates.get(receipt_id)
+                if not updated_at:
+                    continue
+                if self._should_process_external_row(
+                    fishbowl_system,
+                    str(receipt_id),
+                    RESOURCE_RECEIPT,
+                    updated_at,
+                ):
+                    receipts_to_process.add(receipt_id)
 
         for start_index in range(0, len(receipt_item_rows), receipt_line_batch_size):
-            # noinspection DuplicatedCode
             batch_rows = receipt_item_rows[start_index : start_index + receipt_line_batch_size]
-            external_ids = [str(row.id) for row in batch_rows]
-            existing_map, stale_map, blocked = self._prefetch_external_id_records(
+            (
+                existing_map,
+                stale_map,
+                blocked,
+                create_values,
+                create_external_ids,
+                move_line_payloads,
+                batch_move_ids,
+                processed_external_ids,
+            ) = self._prepare_stock_move_batch(
                 fishbowl_system.id,
                 RESOURCE_RECEIPT_LINE,
-                external_ids,
-                "stock.move",
+                batch_rows,
             )
-            create_values: list["odoo.values.stock_move"] = []
-            create_external_ids: list[str] = []
-            move_line_payloads: dict[str, "odoo.values.stock_move_line"] = {}
-            batch_move_ids: dict[str, int] = {}
+            receipt_line_map: dict[str, int] = {}
 
             for row in batch_rows:
                 receipt_id = row.receiptId
@@ -102,6 +129,10 @@ class FishbowlImporterReceipts(models.Model):
                 fishbowl_receipt_id = receipt_id
                 receipt_external_id_value = str(fishbowl_receipt_id)
                 if receipt_external_id_value in receipt_blocked:
+                    receipt_line_blocked.add(fishbowl_receipt_id)
+                    continue
+                updated_at = receipt_latest_dates.get(fishbowl_receipt_id)
+                if updated_at and fishbowl_receipt_id not in receipts_to_process:
                     continue
                 picking_id = done_picking_ids.get(fishbowl_receipt_id)
                 if not picking_id:
@@ -109,7 +140,7 @@ class FishbowlImporterReceipts(models.Model):
                     partner_id = False
                     if purchase_order_id:
                         partner_id = self.env["purchase.order"].sudo().browse(purchase_order_id).partner_id.id
-                    values: "odoo.values.stock_picking" = {
+                    values = {
                         "picking_type_id": picking_type.id,
                         "location_id": source_location.id,
                         "location_dest_id": destination_location.id,
@@ -129,7 +160,7 @@ class FishbowlImporterReceipts(models.Model):
                                 picking.picking_type_id.display_name,
                                 picking_type.display_name,
                             )
-                        update_values: "odoo.values.stock_picking" = dict(values)
+                        update_values = dict(values)
                         update_values.pop("picking_type_id", None)
                         update_values.pop("location_id", None)
                         update_values.pop("location_dest_id", None)
@@ -145,21 +176,25 @@ class FishbowlImporterReceipts(models.Model):
                         )
                         picking_id = picking.id
                         done_picking_ids[fishbowl_receipt_id] = picking_id
-
                 fishbowl_line_id = row.id
                 external_id_value = str(fishbowl_line_id)
                 if external_id_value in blocked:
+                    receipt_line_blocked.add(fishbowl_receipt_id)
                     continue
                 product_id = self._resolve_product_from_receipt_row(row, order_maps, product_maps)
+                # noinspection DuplicatedCode
+                # Receipt/shipment line handling stays explicit to keep line-field differences readable.
                 if not product_id:
+                    receipt_line_blocked.add(fishbowl_receipt_id)
                     continue
                 product = self.env["product.product"].sudo().browse(product_id)
                 if not self._is_stockable_product(product):
+                    receipt_line_success[fishbowl_receipt_id] = receipt_line_success.get(fishbowl_receipt_id, 0) + 1
                     continue
                 unit_id = unit_map.get(row.uomId or 0)
                 quantity_received = row.qty or 0
                 picking = picking_model.browse(picking_id)
-                move_values: "odoo.values.stock_move" = {
+                move_values = {
                     "product_id": product_id,
                     "product_uom_qty": float(quantity_received),
                     "product_uom": unit_id or product.uom_id.id,
@@ -169,6 +204,7 @@ class FishbowlImporterReceipts(models.Model):
                     "purchase_line_id": order_maps["purchase_line"].get(row.poItemId or 0) or False,
                 }
                 # noinspection DuplicatedCode
+                # Receipt/shipment move handling stays explicit to keep order-line differences readable.
                 move_line_payloads[external_id_value] = {
                     "product_id": product_id,
                     "product_uom_id": unit_id or product.uom_id.id,
@@ -181,45 +217,46 @@ class FishbowlImporterReceipts(models.Model):
                     existing_move = move_model.browse(existing_move_id)
                     if existing_move.state == "done":
                         batch_move_ids[external_id_value] = existing_move_id
+                        processed_external_ids.append(external_id_value)
+                        receipt_line_success[fishbowl_receipt_id] = receipt_line_success.get(fishbowl_receipt_id, 0) + 1
                         continue
                     existing_move.write(move_values)
                     batch_move_ids[external_id_value] = existing_move_id
+                    processed_external_ids.append(external_id_value)
+                    receipt_line_success[fishbowl_receipt_id] = receipt_line_success.get(fishbowl_receipt_id, 0) + 1
                     continue
                 create_values.append(move_values)
                 create_external_ids.append(external_id_value)
+                receipt_line_map[external_id_value] = fishbowl_receipt_id
 
-            # noinspection DuplicatedCode
-            if create_values:
-                created_moves = move_model.create(create_values)
-                external_id_payloads: list["odoo.values.external_id"] = []
-                for external_id_value, move in zip(create_external_ids, created_moves, strict=True):
-                    batch_move_ids[external_id_value] = move.id
-                    stale_record = stale_map.pop(external_id_value, None)
-                    if stale_record:
-                        stale_record.write({"res_model": "stock.move", "res_id": move.id, "active": True})
-                        continue
-                    external_id_payloads.append(
-                        {
-                            "res_model": "stock.move",
-                            "res_id": move.id,
-                            "system_id": fishbowl_system.id,
-                            "resource": RESOURCE_RECEIPT_LINE,
-                            "external_id": external_id_value,
-                            "active": True,
-                        }
-                    )
-                if external_id_payloads:
-                    self.env["external.id"].sudo().create(external_id_payloads)
+            created_move_ids = self._create_stock_moves_with_external_ids(
+                move_model,
+                create_values=create_values,
+                create_external_ids=create_external_ids,
+                stale_map=stale_map,
+                system_id=fishbowl_system.id,
+                resource=RESOURCE_RECEIPT_LINE,
+            )
+            for external_id_value, move_id in created_move_ids.items():
+                batch_move_ids[external_id_value] = move_id
+                processed_external_ids.append(external_id_value)
+                receipt_id = receipt_line_map.get(external_id_value)
+                if receipt_id:
+                    receipt_line_success[receipt_id] = receipt_line_success.get(receipt_id, 0) + 1
+            if processed_external_ids:
+                self._mark_external_ids_synced(
+                    fishbowl_system.id,
+                    RESOURCE_RECEIPT_LINE,
+                    processed_external_ids,
+                    sync_started_at,
+                )
 
-            for external_id_value, move_id in batch_move_ids.items():
-                move = move_model.browse(move_id)
-                if move.move_line_ids:
-                    continue
-                move_line_values = move_line_payloads.get(external_id_value)
-                if not move_line_values:
-                    continue
-                move_line_values["move_id"] = move.id
-                move_line_model.create(move_line_values)
+            self._ensure_stock_move_lines(
+                move_model,
+                move_line_model,
+                batch_move_ids,
+                move_line_payloads,
+            )
 
             receipt_line_processed += len(batch_rows)
             if receipt_line_processed >= receipt_line_log_threshold:
@@ -257,3 +294,26 @@ class FishbowlImporterReceipts(models.Model):
             self._commit_and_clear()
             finalize_elapsed = time.monotonic() - finalize_started_at
             _logger.info("Fishbowl import: finalized %s receipts in %.2fs", total_pickings, finalize_elapsed)
+
+        if receipts_to_process:
+            synced_receipts = 0
+            for receipt_id in receipts_to_process:
+                if receipt_id in receipt_line_blocked:
+                    continue
+                total_lines = receipt_line_totals.get(receipt_id, 0)
+                if total_lines <= 0:
+                    continue
+                if receipt_line_success.get(receipt_id, 0) != total_lines:
+                    continue
+                updated_at = receipt_latest_dates.get(receipt_id)
+                if not updated_at:
+                    continue
+                self._mark_external_id_synced(
+                    fishbowl_system,
+                    str(receipt_id),
+                    RESOURCE_RECEIPT,
+                    updated_at,
+                )
+                synced_receipts += 1
+            if synced_receipts:
+                _logger.info("Fishbowl import: synced %s receipts", synced_receipts)

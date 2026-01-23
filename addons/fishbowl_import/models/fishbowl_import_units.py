@@ -1,10 +1,11 @@
 import logging
+from datetime import datetime
 
 from odoo import models
 
 from ..services.fishbowl_client import FishbowlClient
 from . import fishbowl_rows
-from .fishbowl_import_constants import EXTERNAL_SYSTEM_CODE, IMPORT_CONTEXT, RESOURCE_UNIT
+from .fishbowl_import_constants import IMPORT_CONTEXT, RESOURCE_UNIT
 
 _logger = logging.getLogger(__name__)
 
@@ -14,7 +15,12 @@ _logger = logging.getLogger(__name__)
 class FishbowlImporterUnits(models.Model):
     _inherit = "fishbowl.importer"
 
-    def _import_units_of_measure(self, client: FishbowlClient) -> None:
+    def _import_units_of_measure(
+        self,
+        client: FishbowlClient,
+        fishbowl_system: "odoo.model.external_system",
+        sync_started_at: datetime,
+    ) -> None:
         unit_rows = self._fetch_rows(
             client,
             fishbowl_rows.UNIT_ROWS_ADAPTER,
@@ -37,17 +43,20 @@ class FishbowlImporterUnits(models.Model):
             if not reference_unit_id or reference_unit_id != fishbowl_unit_id:
                 continue
             name = str(row.name or "").strip() or f"Unit {fishbowl_unit_id}"
-            values: "odoo.values.uom_uom" = {
+            values = {
                 "name": name,
                 "relative_factor": 1.0,
                 "relative_uom_id": False,
                 "active": self._to_bool(row.activeFlag),
             }
-            unit = unit_model.get_or_create_by_external_id(
-                EXTERNAL_SYSTEM_CODE,
+            unit = self._get_or_create_by_external_id_with_sync(
+                unit_model,
+                fishbowl_system,
                 str(fishbowl_unit_id),
                 values,
-                RESOURCE_UNIT,
+                resource=RESOURCE_UNIT,
+                updated_at=None,
+                sync_started_at=sync_started_at,
             )
             reference_unit_map[fishbowl_unit_id] = unit.id
 
@@ -67,7 +76,7 @@ class FishbowlImporterUnits(models.Model):
             if ratio is None:
                 ratio = 1.0
                 _logger.warning("Missing conversion ratio for Fishbowl unit %s; defaulting to 1.0", fishbowl_unit_id)
-            values: "odoo.values.uom_uom" = {
+            values = {
                 "name": name,
                 "relative_factor": float(ratio),
                 "relative_uom_id": reference_odoo_id,
@@ -76,11 +85,14 @@ class FishbowlImporterUnits(models.Model):
             if fishbowl_unit_id == reference_unit_id:
                 values["relative_factor"] = 1.0
                 values["relative_uom_id"] = False
-            unit_model.get_or_create_by_external_id(
-                EXTERNAL_SYSTEM_CODE,
+            self._get_or_create_by_external_id_with_sync(
+                unit_model,
+                fishbowl_system,
                 str(fishbowl_unit_id),
                 values,
-                RESOURCE_UNIT,
+                resource=RESOURCE_UNIT,
+                updated_at=None,
+                sync_started_at=sync_started_at,
             )
 
     def _compute_unit_ratios(

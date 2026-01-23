@@ -1,10 +1,11 @@
 import logging
+from datetime import datetime
 
 from odoo import models
 
 from ..services.fishbowl_client import FishbowlClient
 from . import fishbowl_rows
-from .fishbowl_import_constants import EXTERNAL_SYSTEM_CODE, IMPORT_CONTEXT, RESOURCE_ADDRESS, RESOURCE_CUSTOMER, RESOURCE_VENDOR
+from .fishbowl_import_constants import IMPORT_CONTEXT, RESOURCE_ADDRESS, RESOURCE_CUSTOMER, RESOURCE_VENDOR
 
 _logger = logging.getLogger(__name__)
 
@@ -14,7 +15,12 @@ _logger = logging.getLogger(__name__)
 class FishbowlImporterPartners(models.Model):
     _inherit = "fishbowl.importer"
 
-    def _import_partners(self, client: FishbowlClient) -> dict[str, dict[int, int]]:
+    def _import_partners(
+        self,
+        client: FishbowlClient,
+        fishbowl_system: "odoo.model.external_system",
+        sync_started_at: datetime,
+    ) -> dict[str, dict[int, int]]:
         customer_rows = self._fetch_rows(
             client,
             fishbowl_rows.CUSTOMER_ROWS_ADAPTER,
@@ -57,18 +63,21 @@ class FishbowlImporterPartners(models.Model):
 
         for row in customer_rows:
             fishbowl_id = row.id
-            values: "odoo.values.res_partner" = {
+            values = {
                 "name": str(row.name or "").strip() or f"Customer {fishbowl_id}",
                 "ref": str(row.number or "").strip() or False,
                 "comment": row.note or False,
                 "active": self._to_bool(row.activeFlag),
                 "customer_rank": 1,
             }
-            partner = partner_model.get_or_create_by_external_id(
-                EXTERNAL_SYSTEM_CODE,
+            partner = self._get_or_create_by_external_id_with_sync(
+                partner_model,
+                fishbowl_system,
                 str(fishbowl_id),
                 values,
-                RESOURCE_CUSTOMER,
+                resource=RESOURCE_CUSTOMER,
+                updated_at=None,
+                sync_started_at=sync_started_at,
             )
             account_id = row.accountId
             if account_id is not None:
@@ -77,18 +86,21 @@ class FishbowlImporterPartners(models.Model):
 
         for row in vendor_rows:
             fishbowl_id = row.id
-            values: "odoo.values.res_partner" = {
+            values = {
                 "name": str(row.name or "").strip() or f"Vendor {fishbowl_id}",
                 "ref": str(row.accountNum or "").strip() or False,
                 "comment": row.note or False,
                 "active": self._to_bool(row.activeFlag),
                 "supplier_rank": 1,
             }
-            partner = partner_model.get_or_create_by_external_id(
-                EXTERNAL_SYSTEM_CODE,
+            partner = self._get_or_create_by_external_id_with_sync(
+                partner_model,
+                fishbowl_system,
                 str(fishbowl_id),
                 values,
-                RESOURCE_VENDOR,
+                resource=RESOURCE_VENDOR,
+                updated_at=None,
+                sync_started_at=sync_started_at,
             )
             account_id = row.accountId
             if account_id is not None:
@@ -115,7 +127,7 @@ class FishbowlImporterPartners(models.Model):
             partner_type = address_type_mapping.get(address_type_name.lower(), "other")
             country_id = self._resolve_country_id(row.countryId, country_map)
             state_id = self._resolve_state_id(row.stateId, state_map, country_map, country_id)
-            values: "odoo.values.res_partner" = {
+            values = {
                 "parent_id": parent_id,
                 "type": partner_type,
                 "name": str(row.addressName or row.name or "").strip() or False,
@@ -125,11 +137,14 @@ class FishbowlImporterPartners(models.Model):
                 "country_id": country_id or False,
                 "state_id": state_id or False,
             }
-            partner_model.get_or_create_by_external_id(
-                EXTERNAL_SYSTEM_CODE,
+            self._get_or_create_by_external_id_with_sync(
+                partner_model,
+                fishbowl_system,
                 str(fishbowl_id),
                 values,
-                RESOURCE_ADDRESS,
+                resource=RESOURCE_ADDRESS,
+                updated_at=None,
+                sync_started_at=sync_started_at,
             )
 
         return {

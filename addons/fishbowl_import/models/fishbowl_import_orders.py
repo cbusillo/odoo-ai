@@ -32,15 +32,16 @@ class FishbowlImporterOrders(models.Model):
         partner_maps: dict[str, dict[int, int]],
         product_maps: dict[str, dict[int, int]],
         start_datetime: datetime | None,
+        fishbowl_system: "odoo.model.external_system",
+        sync_started_at: datetime,
     ) -> dict[str, dict[int, int]]:
         sales_status_map = self._load_status_map(client, "sostatus")
         purchase_status_map = self._load_status_map(client, "postatus")
 
-        fishbowl_system = self._get_fishbowl_system()
         product_code_map = self._load_product_code_map()
         part_type_map = self._load_part_type_map(client)
 
-        sales_order_rows: list[fishbowl_rows.OrderRow] = fishbowl_rows.ORDER_ROWS_ADAPTER.validate_python(
+        sales_order_rows = fishbowl_rows.ORDER_ROWS_ADAPTER.validate_python(
             self._fetch_orders(
                 client,
                 "so",
@@ -59,7 +60,7 @@ class FishbowlImporterOrders(models.Model):
             select_columns="l.id, l.soId, l.productId, l.productNum, l.description, l.qtyOrdered, l.unitPrice, l.uomId",
         )
         sales_line_total = self._count_order_lines(client, "soitem", "so", "soId", "dateIssued", start_datetime)
-        purchase_order_rows: list[fishbowl_rows.OrderRow] = fishbowl_rows.ORDER_ROWS_ADAPTER.validate_python(
+        purchase_order_rows = fishbowl_rows.ORDER_ROWS_ADAPTER.validate_python(
             self._fetch_orders(
                 client,
                 "po",
@@ -92,13 +93,44 @@ class FishbowlImporterOrders(models.Model):
         unresolved_sales_product_ids: set[int] = set()
         unresolved_purchase_part_ids: set[int] = set()
 
+        def map_existing_order(
+            record_model: "odoo.model.external_id_mixin",
+            record_map: dict[int, int],
+            order_external_id: str,
+            resource: str,
+            order_updated_at: datetime | None,
+            order_fishbowl_id: int,
+        ) -> bool:
+            if self._should_process_external_row(fishbowl_system, order_external_id, resource, order_updated_at):
+                return False
+            existing_order = record_model.search_by_external_id(
+                EXTERNAL_SYSTEM_CODE,
+                order_external_id,
+                resource,
+            )
+            if not existing_order:
+                return False
+            record_map[order_fishbowl_id] = existing_order.id
+            return True
+
         for row in sales_order_rows:
             fishbowl_id = row.id
+            external_id_value = str(fishbowl_id)
             partner_id = partner_maps["customer"].get(row.customerId or 0)
             if not partner_id:
                 continue
+            updated_at = row.dateIssued or row.dateCreated
+            if map_existing_order(
+                sale_order_model,
+                sales_order_map,
+                external_id_value,
+                RESOURCE_SALES_ORDER,
+                updated_at,
+                fishbowl_id,
+            ):
+                continue
             order_state = self._map_sales_state(sales_status_map.get(row.statusId or 0, ""))
-            values: "odoo.values.sale_order" = {
+            values = {
                 "name": str(row.num or f"SO-{fishbowl_id}"),
                 "partner_id": partner_id,
                 "partner_invoice_id": partner_id,
@@ -110,9 +142,15 @@ class FishbowlImporterOrders(models.Model):
             }
             order = sale_order_model.get_or_create_by_external_id(
                 EXTERNAL_SYSTEM_CODE,
-                str(fishbowl_id),
+                external_id_value,
                 values,
                 RESOURCE_SALES_ORDER,
+            )
+            self._mark_external_id_synced(
+                fishbowl_system,
+                external_id_value,
+                RESOURCE_SALES_ORDER,
+                updated_at or sync_started_at,
             )
             sales_order_map[fishbowl_id] = order.id
 
@@ -158,10 +196,13 @@ class FishbowlImporterOrders(models.Model):
                     unit_map,
                     product_maps,
                     product_code_map,
+                    fishbowl_system,
+                    sync_started_at,
                 )
                 unresolved_sales_product_ids.update(missing_product_ids - mapped_product_ids)
             create_values: list["odoo.values.sale_order_line"] = []
             create_external_ids: list[str] = []
+            processed_external_ids: list[str] = []
 
             for row in sales_line_rows:
                 fishbowl_id = row.id
@@ -195,7 +236,7 @@ class FishbowlImporterOrders(models.Model):
                         reference=str(row.productNum or ""),
                         fallback_product_id=product_id,
                     )
-                values: "odoo.values.sale_order_line" = {
+                values = {
                     "order_id": order_id,
                     "product_id": product_id or False,
                     "name": line_name or False,
@@ -209,6 +250,7 @@ class FishbowlImporterOrders(models.Model):
                 if existing_line_id:
                     sale_line_model.browse(existing_line_id).write(values)
                     sales_line_map[fishbowl_id] = existing_line_id
+                    processed_external_ids.append(external_id_value)
                     continue
                 create_values.append(values)
                 create_external_ids.append(external_id_value)
@@ -219,6 +261,7 @@ class FishbowlImporterOrders(models.Model):
                 for external_id_value, line in zip(create_external_ids, created_lines, strict=True):
                     sales_line_map[int(external_id_value)] = line.id
                     sales_existing_map[external_id_value] = line.id
+                    processed_external_ids.append(external_id_value)
                     stale_record = sales_stale_map.pop(external_id_value, None)
                     if stale_record:
                         stale_record.write({"res_model": "sale.order.line", "res_id": line.id, "active": True})
@@ -235,6 +278,13 @@ class FishbowlImporterOrders(models.Model):
                     )
                 if external_id_payloads:
                     self.env["external.id"].sudo().create(external_id_payloads)
+            if processed_external_ids:
+                self._mark_external_ids_synced(
+                    fishbowl_system.id,
+                    RESOURCE_SALES_ORDER_LINE,
+                    processed_external_ids,
+                    sync_started_at,
+                )
             self._commit_and_clear()
             sales_line_processed += len(sales_line_rows)
             if sales_line_processed >= sales_line_log_threshold:
@@ -262,11 +312,22 @@ class FishbowlImporterOrders(models.Model):
 
         for row in purchase_order_rows:
             fishbowl_id = row.id
+            external_id_value = str(fishbowl_id)
             partner_id = partner_maps["vendor"].get(row.vendorId or 0)
             if not partner_id:
                 continue
+            updated_at = row.dateIssued or row.dateCreated
+            if map_existing_order(
+                purchase_order_model,
+                purchase_order_map,
+                external_id_value,
+                RESOURCE_PURCHASE_ORDER,
+                updated_at,
+                fishbowl_id,
+            ):
+                continue
             order_state = self._map_purchase_state(purchase_status_map.get(row.statusId or 0, ""))
-            values: "odoo.values.purchase_order" = {
+            values = {
                 "name": str(row.num or f"PO-{fishbowl_id}"),
                 "partner_id": partner_id,
                 "date_order": row.dateIssued or row.dateCreated,
@@ -275,9 +336,15 @@ class FishbowlImporterOrders(models.Model):
             }
             order = purchase_order_model.get_or_create_by_external_id(
                 EXTERNAL_SYSTEM_CODE,
-                str(fishbowl_id),
+                external_id_value,
                 values,
                 RESOURCE_PURCHASE_ORDER,
+            )
+            self._mark_external_id_synced(
+                fishbowl_system,
+                external_id_value,
+                RESOURCE_PURCHASE_ORDER,
+                updated_at or sync_started_at,
             )
             purchase_order_map[fishbowl_id] = order.id
 
@@ -322,10 +389,13 @@ class FishbowlImporterOrders(models.Model):
                     unit_map,
                     product_maps,
                     product_code_map,
+                    fishbowl_system,
+                    sync_started_at,
                 )
                 unresolved_purchase_part_ids.update(missing_part_ids - mapped_part_ids)
             create_values: list["odoo.values.purchase_order_line"] = []
             create_external_ids: list[str] = []
+            processed_external_ids: list[str] = []
 
             # noinspection DuplicatedCode
             for row in purchase_line_rows:
@@ -361,7 +431,7 @@ class FishbowlImporterOrders(models.Model):
                         reference=str(row.partNum or ""),
                         fallback_product_id=product_id,
                     )
-                values: "odoo.values.purchase_order_line" = {
+                values = {
                     "order_id": order_id,
                     "product_id": product_id or False,
                     "name": line_name or False,
@@ -375,6 +445,7 @@ class FishbowlImporterOrders(models.Model):
                 if existing_line_id:
                     purchase_line_model.browse(existing_line_id).write(values)
                     purchase_line_map[fishbowl_id] = existing_line_id
+                    processed_external_ids.append(external_id_value)
                     continue
                 create_values.append(values)
                 create_external_ids.append(external_id_value)
@@ -385,6 +456,7 @@ class FishbowlImporterOrders(models.Model):
                 for external_id_value, line in zip(create_external_ids, created_lines, strict=True):
                     purchase_line_map[int(external_id_value)] = line.id
                     purchase_existing_map[external_id_value] = line.id
+                    processed_external_ids.append(external_id_value)
                     stale_record = purchase_stale_map.pop(external_id_value, None)
                     if stale_record:
                         stale_record.write({"res_model": "purchase.order.line", "res_id": line.id, "active": True})
@@ -401,6 +473,13 @@ class FishbowlImporterOrders(models.Model):
                     )
                 if external_id_payloads:
                     self.env["external.id"].sudo().create(external_id_payloads)
+            if processed_external_ids:
+                self._mark_external_ids_synced(
+                    fishbowl_system.id,
+                    RESOURCE_PURCHASE_ORDER_LINE,
+                    processed_external_ids,
+                    sync_started_at,
+                )
             self._commit_and_clear()
             purchase_line_processed += len(purchase_line_rows)
             if purchase_line_processed >= purchase_line_log_threshold:
@@ -548,7 +627,7 @@ class FishbowlImporterOrders(models.Model):
         if product:
             return product.id
         template_model = self.env["product.template"].sudo().with_context(IMPORT_CONTEXT)
-        values: "odoo.values.product_template" = {
+        values = {
             "name": name,
             "default_code": code,
             "categ_id": self._get_legacy_category().id,

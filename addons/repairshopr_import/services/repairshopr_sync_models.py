@@ -38,6 +38,7 @@ class Customer:
     notes: str | None = None
     disabled: bool | None = None
     no_email: bool | None = None
+    updated_at: datetime | None = None
     contacts: list[Contact] = field(default_factory=list)
 
 
@@ -55,6 +56,7 @@ class Product:
     category_path: str | None = None
     upc_code: str | None = None
     long_description: str | None = None
+    updated_at: datetime | None = None
 
 
 @dataclass
@@ -102,6 +104,7 @@ class Ticket:
     problem_type: str | None = None
     status: str | None = None
     priority: str | None = None
+    updated_at: datetime | None = None
     properties: TicketProperties = field(default_factory=TicketProperties)
     comments: list[TicketComment] = field(default_factory=list)
 
@@ -114,6 +117,7 @@ class SalesDocument:
     number: str | None = None
     created_at: datetime | None = None
     date: datetime | None = None
+    updated_at: datetime | None = None
 
 
 @dataclass

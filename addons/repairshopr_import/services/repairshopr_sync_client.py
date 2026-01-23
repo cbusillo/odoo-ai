@@ -128,6 +128,26 @@ class RepairshoprSyncClient:
             return self._fetch_invoice_line_items(invoice_id)
         return []
 
+    def prefetch_estimate_line_items(
+        self,
+        estimate_id_values: Sequence[int],
+    ) -> dict[int, list[dict[str, object]]]:
+        return self._fetch_line_items_for_parents(
+            table=ESTIMATE_LINE_ITEM_TABLE,
+            parent_column="parent_estimate_id",
+            parent_id_values=estimate_id_values,
+        )
+
+    def prefetch_invoice_line_items(
+        self,
+        invoice_id_values: Sequence[int],
+    ) -> dict[int, list[dict[str, object]]]:
+        return self._fetch_line_items_for_parents(
+            table=INVOICE_LINE_ITEM_TABLE,
+            parent_column="parent_invoice_id",
+            parent_id_values=invoice_id_values,
+        )
+
     def _iter_customers(self, updated_at: datetime | None) -> Iterator[repairshopr_models.Customer]:
         for rows in self._iter_batches(
             CUSTOMER_TABLE,
@@ -148,6 +168,7 @@ class RepairshoprSyncClient:
                 "notes",
                 "disabled",
                 "no_email",
+                "updated_at",
             ],
             updated_at=updated_at,
             updated_column="updated_at",
@@ -243,6 +264,7 @@ class RepairshoprSyncClient:
                 "customer_business_then_name",
                 "number",
                 "created_at",
+                "updated_at",
                 "date",
                 "employee",
             ],
@@ -262,6 +284,7 @@ class RepairshoprSyncClient:
                 "customer_business_then_name",
                 "number",
                 "created_at",
+                "updated_at",
                 "date",
                 "due_date",
                 "note",
@@ -285,7 +308,7 @@ class RepairshoprSyncClient:
         last_seen_id = 0
         while True:
             where_fragments = ["id > %s"]
-            parameters: list[object] = [last_seen_id]
+            parameters = [last_seen_id]
             if updated_at is not None and updated_column:
                 if created_column:
                     where_fragments.append(f"({updated_column} >= %s OR {created_column} >= %s)")
@@ -370,6 +393,31 @@ class RepairshoprSyncClient:
             parent_id=invoice_id,
         )
 
+    def _fetch_line_items_for_parents(
+        self,
+        *,
+        table: str,
+        parent_column: str,
+        parent_id_values: Sequence[int],
+    ) -> dict[int, list[dict[str, object]]]:
+        if not parent_id_values:
+            return {}
+        line_items_by_parent: dict[int, list[dict[str, object]]] = defaultdict(list)
+        for batch in chunk_values(parent_id_values, self._settings.batch_size):
+            placeholders = ", ".join(["%s"] * len(batch))
+            query = (
+                "SELECT id, product_id, item, name, price, quantity, discount_percent, "
+                f"{parent_column} AS parent_id "
+                f"FROM {table} WHERE {parent_column} IN ({placeholders}) ORDER BY {parent_column}, id"
+            )
+            rows = self._fetch_rows(query, batch)
+            for row in rows:
+                parent_id = row.get("parent_id")
+                if not isinstance(parent_id, int):
+                    continue
+                line_items_by_parent[parent_id].append(self._build_line_item(row))
+        return line_items_by_parent
+
     def _fetch_line_items_for_parent(self, *, table: str, parent_column: str, parent_id: int) -> list[dict[str, object]]:
         query = (
             "SELECT id, product_id, item, name, price, quantity, discount_percent "
@@ -450,6 +498,7 @@ class RepairshoprSyncClient:
             notes=_to_text(row.get("notes")),
             disabled=row.get("disabled"),
             no_email=row.get("no_email"),
+            updated_at=_to_datetime(row.get("updated_at")),
             contacts=contacts,
         )
 
@@ -487,6 +536,7 @@ class RepairshoprSyncClient:
             category_path=_to_text(row.get("category_path")),
             upc_code=_to_text(row.get("upc_code")),
             long_description=_to_text(row.get("long_description")),
+            updated_at=_to_datetime(row.get("updated_at")),
         )
 
     @staticmethod
@@ -543,6 +593,7 @@ class RepairshoprSyncClient:
             problem_type=_to_text(row.get("problem_type")),
             status=_to_text(row.get("status")),
             priority=_to_text(row.get("priority")),
+            updated_at=_to_datetime(row.get("updated_at")),
             properties=properties,
             comments=comments,
         )
@@ -556,6 +607,7 @@ class RepairshoprSyncClient:
             customer_business_then_name=_to_text(row.get("customer_business_then_name")),
             number=_to_text(row.get("number")),
             created_at=_to_datetime(row.get("created_at")),
+            updated_at=_to_datetime(row.get("updated_at")),
             date=_to_datetime(row.get("date")),
             employee=_to_text(row.get("employee")),
         )
@@ -569,6 +621,7 @@ class RepairshoprSyncClient:
             customer_business_then_name=_to_text(row.get("customer_business_then_name")),
             number=_to_text(row.get("number")),
             created_at=_to_datetime(row.get("created_at")),
+            updated_at=_to_datetime(row.get("updated_at")),
             date=_to_datetime(row.get("date")),
             due_date=_to_datetime(row.get("due_date")),
             note=_to_text(row.get("note")),

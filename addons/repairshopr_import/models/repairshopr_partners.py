@@ -10,13 +10,29 @@ from .repairshopr_importer import EXTERNAL_SYSTEM_CODE, IMPORT_CONTEXT, RESOURCE
 class RepairshoprImporter(models.Model):
     _inherit = "repairshopr.importer"
 
-    def _import_customers(self, repairshopr_client: RepairshoprSyncClient, start_datetime: datetime | None) -> None:
+    def _import_customers(
+        self,
+        repairshopr_client: RepairshoprSyncClient,
+        start_datetime: datetime | None,
+        system: "odoo.model.external_system",
+        sync_started_at: datetime,
+    ) -> None:
         partner_model = self.env["res.partner"].sudo().with_context(IMPORT_CONTEXT)
+        commit_interval = self._get_commit_interval()
+        processed_count = 0
         customers = repairshopr_client.get_model(repairshopr_models.Customer, updated_at=start_datetime)
         for customer in customers:
+            external_id_value = str(customer.id)
+            if not self._should_process_external_row(
+                system,
+                external_id_value,
+                RESOURCE_CUSTOMER,
+                customer.updated_at,
+            ):
+                continue
             partner = partner_model.search_by_external_id(
                 EXTERNAL_SYSTEM_CODE,
-                str(customer.id),
+                external_id_value,
                 RESOURCE_CUSTOMER,
             )
             values = self._build_partner_values_from_customer(customer)
@@ -24,22 +40,34 @@ class RepairshoprImporter(models.Model):
                 partner.write(values)
             else:
                 partner = partner_model.create(values)
-                partner.set_external_id(EXTERNAL_SYSTEM_CODE, str(customer.id), RESOURCE_CUSTOMER)
+                partner.set_external_id(EXTERNAL_SYSTEM_CODE, external_id_value, RESOURCE_CUSTOMER)
+            self._mark_external_id_synced(
+                system,
+                external_id_value,
+                RESOURCE_CUSTOMER,
+                customer.updated_at or sync_started_at,
+            )
             self._ensure_customer_phone_contacts(partner_model, partner, customer)
-            self._import_contacts(partner_model, partner, customer)
+            self._import_contacts(partner_model, partner, customer, system, sync_started_at)
+            processed_count += 1
+            if self._maybe_commit(processed_count, commit_interval, label="customer"):
+                partner_model = self.env["res.partner"].sudo().with_context(IMPORT_CONTEXT)
 
     def _import_contacts(
         self,
         partner_model: "odoo.model.res_partner",
         parent_partner: "odoo.model.res_partner",
         customer: repairshopr_models.Customer,
+        system: "odoo.model.external_system",
+        sync_started_at: datetime,
     ) -> None:
         if not customer.contacts:
             return
         for contact in customer.contacts:
+            external_id_value = str(contact.id)
             contact_partner = partner_model.search_by_external_id(
                 EXTERNAL_SYSTEM_CODE,
-                str(contact.id),
+                external_id_value,
                 RESOURCE_CONTACT,
             )
             values = self._build_partner_values_from_contact(contact, parent_partner)
@@ -47,7 +75,13 @@ class RepairshoprImporter(models.Model):
                 contact_partner.write(values)
             else:
                 contact_partner = partner_model.create(values)
-                contact_partner.set_external_id(EXTERNAL_SYSTEM_CODE, str(contact.id), RESOURCE_CONTACT)
+                contact_partner.set_external_id(EXTERNAL_SYSTEM_CODE, external_id_value, RESOURCE_CONTACT)
+            self._mark_external_id_synced(
+                system,
+                external_id_value,
+                RESOURCE_CONTACT,
+                customer.updated_at or sync_started_at,
+            )
             self._ensure_contact_phone_contacts(partner_model, parent_partner, contact_partner, contact)
 
     def _build_partner_values_from_customer(self, customer: repairshopr_models.Customer) -> "odoo.values.res_partner":
@@ -55,7 +89,7 @@ class RepairshoprImporter(models.Model):
         state_id, country_id = self._resolve_state_and_country(customer.state)
         email_value = customer.email if not customer.no_email else None
         phone_value = self._select_primary_phone(customer.phone, customer.mobile)
-        values: "odoo.values.res_partner" = {
+        values = {
             "name": name,
             "company_type": "company" if customer.business_name else "person",
             "is_company": bool(customer.business_name),
@@ -84,7 +118,7 @@ class RepairshoprImporter(models.Model):
         state_id, country_id = self._resolve_state_and_country(contact.state)
         contact_phone, contact_mobile = self._select_contact_phone_values(contact)
         phone_value = self._select_primary_phone(contact_phone, contact_mobile)
-        values: "odoo.values.res_partner" = {
+        values = {
             "name": name,
             "company_type": "person",
             "is_company": False,
@@ -191,7 +225,7 @@ class RepairshoprImporter(models.Model):
                 ],
                 limit=1,
             )
-            values: "odoo.values.res_partner" = {
+            values = {
                 "name": contact_name,
                 "company_type": "person",
                 "is_company": False,
@@ -266,7 +300,7 @@ class RepairshoprImporter(models.Model):
         )
         if partner:
             return partner
-        values: "odoo.values.res_partner" = {
+        values = {
             "name": fallback_name or f"RepairShopr Customer {customer_id}",
             "customer_rank": 1,
             "company_type": "company",

@@ -15,6 +15,7 @@
         "account",
         "helpdesk",
         "external_ids",
+        "cm_custom",
     ],
     "data": [
         "security/ir.model.access.csv",

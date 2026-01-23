@@ -19,13 +19,42 @@ _logger = logging.getLogger(__name__)
 class RepairshoprImporter(models.Model):
     _inherit = "repairshopr.importer"
 
-    def _import_products(self, repairshopr_client: RepairshoprSyncClient, start_datetime: datetime | None) -> None:
+    def _import_products(
+        self,
+        repairshopr_client: RepairshoprSyncClient,
+        start_datetime: datetime | None,
+        system: "odoo.model.external_system",
+        sync_started_at: datetime,
+    ) -> None:
         product_model = self.env["product.template"].sudo().with_context(IMPORT_CONTEXT)
+        commit_interval = self._get_commit_interval()
+        processed_count = 0
         products = repairshopr_client.get_model(repairshopr_models.Product, updated_at=start_datetime)
+
+        def finalize_product_sync(product_external_id: str, sync_timestamp: datetime) -> None:
+            nonlocal processed_count, product_model
+            self._mark_external_id_synced(
+                system,
+                product_external_id,
+                RESOURCE_PRODUCT,
+                sync_timestamp,
+            )
+            processed_count += 1
+            if self._maybe_commit(processed_count, commit_interval, label="product"):
+                product_model = self.env["product.template"].sudo().with_context(IMPORT_CONTEXT)
+
         for product in products:
+            external_id_value = str(product.id)
+            if not self._should_process_external_row(
+                system,
+                external_id_value,
+                RESOURCE_PRODUCT,
+                product.updated_at,
+            ):
+                continue
             product_record = product_model.search_by_external_id(
                 EXTERNAL_SYSTEM_CODE,
-                str(product.id),
+                external_id_value,
                 RESOURCE_PRODUCT,
             )
             values = self._build_product_values(product)
@@ -33,6 +62,7 @@ class RepairshoprImporter(models.Model):
                 safe_values = self._sanitize_update_values(product_record, values)
                 safe_values, standard_price = self._extract_standard_price(safe_values)
                 self._write_product_values(product_record, safe_values, standard_price)
+                finalize_product_sync(external_id_value, product.updated_at or sync_started_at)
                 continue
             matched_record = self._match_existing_product(product_model, product)
             if matched_record:
@@ -40,18 +70,20 @@ class RepairshoprImporter(models.Model):
                 safe_values = self._sanitize_update_values(matched_record, merged_values)
                 safe_values, standard_price = self._extract_standard_price(safe_values)
                 self._write_product_values(matched_record, safe_values, standard_price)
-                matched_record.set_external_id(EXTERNAL_SYSTEM_CODE, str(product.id), RESOURCE_PRODUCT)
+                matched_record.set_external_id(EXTERNAL_SYSTEM_CODE, external_id_value, RESOURCE_PRODUCT)
+                finalize_product_sync(external_id_value, product.updated_at or sync_started_at)
                 continue
             safe_values = self._sanitize_create_values(values)
             safe_values, standard_price = self._extract_standard_price(safe_values)
             product_record = product_model.create(safe_values)
             if standard_price is not None:
                 product_record.with_context(disable_auto_revaluation=True).write({"standard_price": standard_price})
-            product_record.set_external_id(EXTERNAL_SYSTEM_CODE, str(product.id), RESOURCE_PRODUCT)
+            product_record.set_external_id(EXTERNAL_SYSTEM_CODE, external_id_value, RESOURCE_PRODUCT)
+            finalize_product_sync(external_id_value, product.updated_at or sync_started_at)
 
     def _build_product_values(self, product: repairshopr_models.Product) -> "odoo.values.product_template":
         name = self._select_product_name(product)
-        values: "odoo.values.product_template" = {
+        values = {
             "name": name,
             "list_price": float(product.price_retail or 0.0),
             "standard_price": float(product.price_cost or 0.0),
@@ -241,7 +273,7 @@ class RepairshoprImporter(models.Model):
     ) -> "odoo.values.product_template":
         if not values:
             return values
-        sanitized_values: "odoo.values.product_template" = dict(values)
+        sanitized_values = dict(values)
         barcode_value = sanitized_values.get("barcode")
         if not barcode_value:
             return sanitized_values
@@ -276,7 +308,7 @@ class RepairshoprImporter(models.Model):
     ) -> "odoo.values.product_template":
         if not values:
             return values
-        sanitized_values: "odoo.values.product_template" = dict(values)
+        sanitized_values = dict(values)
         barcode_value = sanitized_values.get("barcode")
         if not barcode_value:
             return sanitized_values
@@ -307,7 +339,7 @@ class RepairshoprImporter(models.Model):
     ) -> tuple["odoo.values.product_template", float | None]:
         if not values:
             return values, None
-        sanitized_values: "odoo.values.product_template" = dict(values)
+        sanitized_values = dict(values)
         standard_price = sanitized_values.pop("standard_price", None)
         return sanitized_values, standard_price
 
@@ -371,7 +403,7 @@ class RepairshoprImporter(models.Model):
         template_model = self.env["product.template"].sudo().with_context(IMPORT_CONTEXT)
         product_template = template_model.search([("default_code", "=", DEFAULT_SERVICE_PRODUCT_CODE)], limit=1)
         if not product_template:
-            values: "odoo.values.product_template" = {
+            values = {
                 "name": fallback_name or "RepairShopr Service",
                 "default_code": DEFAULT_SERVICE_PRODUCT_CODE,
                 "list_price": 0.0,

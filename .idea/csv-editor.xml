@@ -94,7 +94,28 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="/addons/product_connect/security/ir.model.access.csv">
+        <entry key="/addons/marine_motors/security/ir.model.access.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="/addons/notification_center/security/ir.model.access.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="/addons/opw_custom/security/ir.model.access.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="/addons/product_metadata/security/ir.model.access.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
@@ -102,6 +123,34 @@
           </value>
         </entry>
         <entry key="/addons/repairshopr_import/security/ir.model.access.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="/addons/shopify_sync/security/ir.model.access.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="/docs/internal/data/ESBOCES Acer Chromebook Pricing.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="/docs/internal/data/ESBOCES Asus Chromebook Pricing.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="/docs/internal/data/ESBOCES Dell Chromebook Pricing.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

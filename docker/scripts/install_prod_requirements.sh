@@ -65,6 +65,7 @@ paths = [
     "/volumes/addons",
     "/opt/project/addons",
     "/opt/extra_addons",
+    "/opt/extra_addons/odoo-enterprise-mirror",
     "/opt/extra_addons/OpenUpgrade",
 ]
 

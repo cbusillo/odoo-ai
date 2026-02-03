@@ -4,12 +4,11 @@ import re
 from pathlib import Path
 
 import requests
-from graphql import get_introspection_query, build_client_schema, print_schema, IntrospectionQuery
-
 from ariadne_codegen.main import client as codegen_client
+from graphql import IntrospectionQuery, build_client_schema, get_introspection_query, print_schema
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-ADDONS_PATH = REPOSITORY_ROOT / "addons" / "product_connect"
+ADDONS_PATH = REPOSITORY_ROOT / "addons" / "shopify_sync"
 
 
 def fetch_shopify_introspection(endpoint: str, token: str) -> dict[str, dict[str, str]]:

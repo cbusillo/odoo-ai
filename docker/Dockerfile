@@ -105,6 +105,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 RUN printf '/odoo\n' > "${SITE_PACKAGES_PATH}/odoo_local.pth" \
     && printf '/odoo/addons\n' > "${SITE_PACKAGES_PATH}/odoo_addons.pth" \
     && printf '/opt/extra_addons\n' > "${SITE_PACKAGES_PATH}/odoo_enterprise.pth" \
+    && printf '/opt/extra_addons/odoo-enterprise-mirror\n' > "${SITE_PACKAGES_PATH}/odoo_enterprise_mirror.pth" \
     && printf '/opt/extra_addons/OpenUpgrade\n' > "${SITE_PACKAGES_PATH}/upgrade_utils.pth"
 
 # Apply development patches for --dev mode issues

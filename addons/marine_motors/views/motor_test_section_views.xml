@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Motor Test Section List View -->
+        <record id="motor_test_section_list_view" model="ir.ui.view">
+            <field name="name">motor.test.section.list</field>
+            <field name="model">motor.test.section</field>
+            <field name="arch" type="xml">
+                <list string="Motor Test Sections">
+                    <field name="sequence" widget="handle"/>
+                    <field name="name"/>
+                    <field name="templates" widget="many2many_tags"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Motor Test Section Form View -->
+        <record id="motor_test_section_form_view" model="ir.ui.view">
+            <field name="name">motor.test.section.form</field>
+            <field name="model">motor.test.section</field>
+            <field name="arch" type="xml">
+                <form string="Motor Test Section">
+                    <sheet>
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name" placeholder="Section Name"/>
+                            </h1>
+                        </div>
+                        <group>
+                            <field name="sequence"/>
+                        </group>
+                        <notebook>
+                            <page string="Tests">
+                                <field name="templates"/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Motor Test Section Action -->
+        <record id="motor_test_section_action" model="ir.actions.act_window">
+            <field name="name">Motor Test Sections</field>
+            <field name="res_model">motor.test.section</field>
+            <field name="view_mode">list,form</field>
+            <field name="group_ids" eval="[(6,0,[ref('base.group_user')])]"/>
+        </record>
+
+        <!-- Menu Item -->
+        <menuitem id="menu_motor_test_section"
+                  name="Motor Test Sections"
+                  parent="menu_subheader_config_motor"
+                  action="motor_test_section_action"
+                  sequence="35"
+                  groups="base.group_user"/>
+    </data>
+</odoo>

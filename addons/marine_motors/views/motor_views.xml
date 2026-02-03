@@ -1,0 +1,517 @@
+<odoo>
+    <!-- List View -->
+    <record id="view_motor_list" model="ir.ui.view">
+        <field name="name">motor.list</field>
+        <field name="model">motor</field>
+        <field name="arch" type="xml">
+            <list string="Motors List">
+                <field name="has_notes" widget="boolean_toggle" string="Notes"/>
+                <field name="motor_number" string="Motor"/>
+                <field name="location" optional="show"/>
+                <field name="create_date" optional="show" widget="date_only" readonly="1"/>
+                <field name="year"/>
+                <field name="manufacturer" string="Manu"/>
+                <field name="horsepower"/>
+                <field name="model"/>
+                <field name="serial_number" string="Serial" optional="hide"/>
+                <field name="stroke" optional="hide"/>
+                <field name="configuration" optional="hide"/>
+                <field name="color" optional="hide"/>
+                <field name="hours" optional="hide" widget="integer"/>
+                <field name="shaft_length" optional="hide"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="cost" widget="monetary" sum="Total Cost"/>
+                <field name="price" widget="monetary" optional="hide" sum="Total Cost"/>
+                <field name="product_repair_states_with_icons" widget="repair_states_widget" optional="show"
+                       string="Repairs"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_motor_form" model="ir.ui.view">
+        <field name="name">motor.form</field>
+        <field name="model">motor</field>
+        <field name="arch" type="xml">
+            <form string="Motor Check-In" js_class="motor_form">
+                <header>
+                    <field name="stage" widget="statusbar_duration" options="{'clickable': '1'}"
+                           domain="[('name', '!=', 'Hold')]"/>
+                </header>
+
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button" type="object" name="action_view_products" icon="fa-cubes"
+                                groups="stock.group_stock_manager">
+                            <field string="Products" name="product_count" widget="statinfo"/>
+                        </button>
+
+                        <button class="oe_stat_button" type="object" name="action_view_tests" icon="fa-check-square"
+                                groups="stock.group_stock_manager">
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">Completed tests</span>
+                                <span class="o_stat_value">
+                                    <field name="completed_test_count"/>&#160;/&#160;<field
+                                        name="applicable_test_count"/>
+                                </span>
+                            </div>
+                        </button>
+
+                        <button class="oe_stat_button btn" type="object" name="download_zip_of_images" icon="fa-camera"
+                                groups="stock.group_stock_manager">
+                            <field string="Download Images" name="image_count" widget="statinfo"/>
+                        </button>
+                        <a class="oe_stat_button btn btn-primary" role="button" onclick="
+                               const chatterBox = document.querySelector('.o-mail-ChatterContainer');
+                               const toggleButton = this;
+                               if (chatterBox) {
+                                   chatterBox.classList.toggle('collapse');
+                                   toggleButton.classList.toggle('btn-primary');
+                                   toggleButton.classList.toggle('btn-outline-secondary');
+                               }">
+                            <i class="fa fa-2x fa-comments me-2"></i>Comments </a>
+                    </div>
+
+                    <field name="active" invisible="1"/>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+
+                    <div class="row">
+                        <div class="col-md-9">
+                            <div class="oe_title pe-0">
+                                <h2 class="d-flex justify-content-between align-items-center">
+                                    <div class="d-flex w-100">
+                                        <field name="priority" widget="priority" class="me-3"/>
+
+                                        <field name="display_name" options="{'line_breaks': False}" widget="text"
+                                               class="o_task_name text-truncate w-md-75 w-100 pe-2"
+                                               placeholder="Motor Title..."/>
+                                    </div>
+                                </h2>
+                            </div>
+
+                            <group>
+                                <group>
+                                    <field name="date_deadline"/>
+                                    <field name="tags" widget="many2many_tags" options="{'color_field': 'color'}"
+                                           optional="hide"/>
+                                    <field name="price" widget="monetary"/>
+                                </group>
+                                <group>
+                                    <field name="create_date" readonly="1"/>
+                                    <field name="write_date" readonly="1"/>
+                                </group>
+                            </group>
+                            <div invisible="not notes" class="alert alert-warning" role="alert">
+                                <i class="fa fa-warning me-2"></i>
+                                <span class="h3">See Notes</span>
+                            </div>
+                        </div>
+                        <div invisible="not image_icon" class="col-md-3">
+                            <field name="image_icon" widget="image" class="oe_avatar"
+                                   options="{'preview_image': 'image_icon', 'size': [None, 350]}"/>
+                        </div>
+                    </div>
+
+                    <notebook class="motor_main_notebook">
+                        <page id="basic_info" string="Basic Info">
+                            <button name="print_motor_labels" type="object" class="btn btn-primary mb-2">
+                                <i class="fa fa-print"/>&#160;Print Motor Label </button>
+                            <group>
+                                <field name="motor_number" readonly="1"/>
+                                <field name="location"/>
+                                <field name="manufacturer" widget="resettable_selection_badge" required="1"/>
+                                <field name="horsepower" required="1"/>
+                                <field name="stroke" required="1" widget="resettable_selection_badge"/>
+                                <field name="configuration" required="1" widget="resettable_selection_badge"/>
+                                <field name="model"/>
+                                <field name="sub_model"/>
+                                <field name="serial_number"/>
+                                <field name="year" widget="resettable_selection_badge"/>
+                                <field name="color" widget="resettable_selection_badge" required="1"/>
+                                <field name="cost"/>
+                                <field name="vendor"/>
+                                <field name="lot_id"/>
+                                <field name="is_tag_readable" widget="resettable_selection_badge"/>
+                                <field name="notes"/>
+                            </group>
+                        </page>
+                        <page string="Images">
+                            <header>
+                                <button name="download_zip_of_images" type="object" class="btn btn-primary">
+                                    <i class="fa fa-download"/>&#160;Download Images </button>
+                            </header>
+                            <field name="images" class="motor_image_adder">
+                                <list editable="bottom" delete="False">
+                                    <field name="name"/>
+                                    <field name="image_256" widget="image" column_invisible="1"/>
+                                    <field name="image_1920" widget="image_upload"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <page string="Missing Parts">
+                            <field name="parts">
+                                <list editable="bottom" create="False" delete="False" open_form_view="0">
+                                    <field name="is_missing" widget="boolean_toggle"
+                                           class="large-toggle o_motor_part_missing_column"/>
+                                    <field name="name" class="sc_full_width"/>
+                                    <field name="template" column_invisible="1"/>
+                                    <field name="hidden_tests" column_invisible="1"/>
+                                </list>
+                            </field>
+                            <group>
+                                <field name="notes"/>
+                            </group>
+                        </page>
+                        <page id="basic_testing" string="Basic Testing">
+                            <field name="basic_tests" widget="motor_test_widget">
+                                <list>
+                                    <field name="id"/>
+                                    <field name="name"/>
+                                    <field name="result_type"/>
+                                    <field name="section"/>
+                                    <field name="sequence"/>
+                                    <field name="section_sequence"/>
+                                    <field name="template"/>
+                                    <field name="yes_no_result"/>
+                                    <field name="selection_options" widget="many2many_tags"/>
+                                    <field name="selection_result"/>
+                                    <field name="selection_result_value"/>
+                                    <field name="numeric_result"/>
+                                    <field name="text_result"/>
+                                    <field name="file_result"/>
+                                    <field name="default_value"/>
+                                    <field name="strokes"/>
+                                    <field name="manufacturers"/>
+                                    <field name="configurations"/>
+                                    <field name="conditions"/>
+                                    <field name="conditional_tests"/>
+                                </list>
+                            </field>
+                            <group>
+                                <field name="notes"/>
+                            </group>
+                        </page>
+                        <page string="Compression" invisible="hide_compression_page">
+                            <header>
+                                <button name="set_all_cylinders_untestable" type="object" class="btn btn-secondary"
+                                        string="Mark All Untestable"/>
+                            </header>
+                            <field name="cylinders">
+                                <list editable="bottom" delete="False" create="False">
+                                    <field name="is_untestable" class="large-toggle" widget="boolean_toggle"/>
+                                    <field name="cylinder_number" readonly="1"/>
+                                    <field name="compression_psi" string="PSI"/>
+                                </list>
+                            </field>
+                            <field name="hide_compression_page" invisible="1"/>
+                        </page>
+                        <page string="Summary">
+                            <group string="Notes">
+                                <field name="notes" readonly="1" string=""/>
+                            </group>
+                            <group string="Basic Info">
+                                <group>
+                                    <field name="motor_number" readonly="1"/>
+                                    <field name="location" readonly="1"/>
+                                    <field name="manufacturer" readonly="1" options="{'no_open': True}"/>
+                                    <field name="horsepower" readonly="1"/>
+                                    <field name="stroke" readonly="1" options="{'no_open': True}"/>
+                                    <field name="configuration" readonly="1" options="{'no_open': True}"/>
+                                    <field name="model" readonly="1"/>
+                                </group>
+                                <group>
+                                    <field name="sub_model" readonly="1"/>
+                                    <field name="serial_number" readonly="1"/>
+                                    <field name="year" readonly="1"/>
+                                    <field name="color" readonly="1" options="{'no_open': True}"/>
+                                    <field name="cost" readonly="1"/>
+                                    <field name="is_tag_readable" readonly="1"/>
+                                </group>
+                            </group>
+
+                            <group string="Missing Parts">
+                                <field name="missing_parts_names" readonly="1" string="Parts"/>
+                            </group>
+
+                            <group string="Basic Testing">
+                                <field name="basic_tests" readonly="1" string="">
+                                    <list decoration-danger="(not computed_result or computed_result == 0) and is_applicable"
+                                          decoration-muted="not is_applicable">
+                                        <field name="name"/>
+                                        <field name="result_type" string="Test Type"/>
+                                        <field name="computed_result" string="Test Result"/>
+                                        <field name="file_result" widget="pdf_viewer"/>
+                                        <field name="is_applicable" widget="boolean_toggle"/>
+                                    </list>
+                                </field>
+                            </group>
+
+                            <group string="Compression Testing">
+                                <group>
+                                    <field name="cylinders" readonly="1">
+                                        <list decoration-danger="not compression_psi and not is_untestable">
+                                            <field name="is_untestable"/>
+                                            <field name="cylinder_number"/>
+                                            <field name="compression_psi"/>
+                                        </list>
+                                    </field>
+                                </group>
+
+                            </group>
+
+                            <group string="Extended Testing">
+                                <field name="extended_tests" readonly="1" string="">
+                                    <list decoration-danger="(not computed_result or computed_result == 0) and is_applicable"
+                                          decoration-muted="not is_applicable">
+                                        <field name="name"/>
+                                        <field name="result_type" string="Test Type"/>
+                                        <field name="computed_result" string="Test Result"/>
+                                        <field name="file_result" widget="pdf_viewer"/>
+                                        <field name="is_applicable" column_invisible="1"/>
+                                    </list>
+                                </field>
+                            </group>
+                        </page>
+                        <page string="Listing">
+                            <notebook class="motor_nested_notebook">
+                                <page string="Admin" groups="stock.group_stock_manager" limit="200">
+                                    <div class="mb-3">
+                                        <button name="create_motor_products" type="object"
+                                                class="btn btn-primary btn-sm">
+                                            <i class="fa fa-ship"/>&#160;Create Motor Products </button>
+                                        <button name="apply_cost" type="object" class="btn btn-primary btn-sm ms-2">
+                                            <i class="fa fa-dollar"/>&#160;Apply Cost </button>
+                                        <button name="print_motor_pull_list" type="object"
+                                                class="btn btn-primary btn-sm ms-2">
+                                            <i class="fa fa-print"/>&#160;Print Pull List </button>
+                                        <button name="print_motor_product_labels" type="object"
+                                                class="btn btn-primary btn-sm ms-2">
+                                            <i class="fa fa-print"/>&#160;Print Product Labels </button>
+                                        <button name="enable_ready_for_sale" type="object"
+                                                class="btn btn-primary btn-sm ms-2">
+                                            <i class="fa fa-upload"/>&#160;Enable All </button>
+                                    </div>
+                                    <field name="products_not_enabled" mode="list" context="{'list_view_ref': 'marine_motors.view_motor_product_list',
+                                           'form_view_ref': 'marine_motors.view_motor_product_form'}"/>
+                                </page>
+                                <page string="Reference" limit="200">
+                                    <field name="products_with_reference_product"
+                                           context="{'list_view_ref': 'marine_motors.view_motor_product_kanban'}"/>
+                                </page>
+                                <page string="Dismantle" limit="200">
+                                    <field name="products_to_dismantle" mode="list"
+                                           context="{'list_view_ref': 'marine_motors.view_motor_product_list_dismantle'}"/>
+                                </page>
+                                <page string="Clean" limit="200">
+                                    <field name="products_to_clean" mode="list"
+                                           context="{'list_view_ref': 'marine_motors.view_motor_product_list_clean'}"/>
+                                </page>
+                                <page id="extended_testing" string="Extended Testing">
+                                    <field name="extended_tests" widget="motor_test_widget">
+                                        <list>
+                                            <field name="id"/>
+                                            <field name="name"/>
+                                            <field name="result_type"/>
+                                            <field name="section"/>
+                                            <field name="sequence"/>
+                                            <field name="section_sequence"/>
+                                            <field name="template"/>
+                                            <field name="yes_no_result"/>
+                                            <field name="selection_options" widget="many2many_tags"/>
+                                            <field name="selection_result"/>
+                                            <field name="numeric_result"/>
+                                            <field name="text_result"/>
+                                            <field name="file_result"/>
+                                            <field name="default_value"/>
+                                            <field name="strokes"/>
+                                            <field name="manufacturers"/>
+                                            <field name="configurations"/>
+                                            <field name="conditions"/>
+                                            <field name="conditional_tests"/>
+                                        </list>
+                                    </field>
+                                    <group>
+                                        <field name="notes"/>
+                                    </group>
+                                </page>
+                                <page string="Picture" limit="200">
+                                    <field name="products_to_picture" mode="list"
+                                           context="{'list_view_ref': 'marine_motors.view_motor_product_list_picture'}"/>
+                                </page>
+                                <page string="Stock" limit="200">
+                                    <field name="products_to_stock" mode="list"
+                                           context="{'list_view_ref': 'marine_motors.view_motor_product_list_stock'}"/>
+                                </page>
+                            </notebook>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_motor_kanban" model="ir.ui.view">
+        <field name="name">motor.kanban</field>
+        <field name="model">motor</field>
+        <field name="arch" type="xml">
+            <kanban default_order="priority desc, date_deadline desc, motor_number desc"
+                    class="o_project_kanban o_kanban_small_column o_kanban_project_tasks">
+                <progressbar field="stage" colors='{"0": "bg-secondary", "50": "bg-warning", "100": "bg-success"}'/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_global_click" style="overflow: hidden;">
+                            <!-- Image display -->
+                            <t t-if="record.image_icon.raw_value">
+                                <field name="image_icon" invisible="1"/>
+                                <div class="o_kanban_image" style="float: left; margin-right: 10px;">
+                                    <field name="priority" widget="priority" style="margin-right: 5px;"/>
+                                    <img t-att-src="'/web/image/motor/' + record.id.raw_value + '/image_icon'"
+                                         style="border-radius: 5px; max-width: none;" alt="Motor Image"/>
+                                </div>
+
+                            </t>
+                            <!-- Motor details -->
+                            <div style="float: left; width: 45%; vertical-align: top;">
+                                <div style="margin-bottom: 5px;">
+                                    <field name="motor_number" style="white-space: nowrap;"/>
+                                </div>
+                                <div style="margin-bottom: 5px;">
+                                    <field name="location"/>
+                                </div>
+                                <div style="margin-bottom: 5px;">
+                                    <field name="manufacturer" style="white-space: nowrap;"/>
+                                </div>
+                                <div style="margin-bottom: 5px;">
+                                    <strong>Model: </strong>
+                                    <field name="model"/>
+                                </div>
+                                <div style="margin-bottom: 5px; white-space: nowrap">
+                                    <strong>HP: </strong>
+                                    <field name="horsepower_formatted"/>
+                                </div>
+                                <div>
+                                    <strong>Serial: </strong>
+                                    <field name="serial_number" style="white-space: nowrap;"/>
+                                </div>
+                            </div>
+                            <div style="clear: both;"></div>
+                            <div>
+                                <div class="d-flex justify-content-start">
+                                    <field name="stage_name" invisible="1"/>
+                                    <div invisible="stage_name != 'Done'">
+                                        <span style="margin-right: 5px;">Active:</span>
+                                        <field name="active" widget="boolean_toggle" style="display: inline-block;"/>
+                                    </div>
+
+                                    <field name="tags" widget="many2many_tags"/>
+                                    <div invisible="not date_deadline">
+                                        <span style="display: inline-block; margin-right: 5px;">Deadline:</span>
+                                        <field name="date_deadline" widget="datetime" style="display: inline-block"/>
+                                    </div>
+                                    <field name="tags" widget="many2many_tags" options="{'color_field': 'color'}"
+                                           style="margin-right: 5px;"/>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+    <record id="view_motor_search" model="ir.ui.view">
+        <field name="name">motor.search</field>
+        <field name="model">motor</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="motor_number" string="Search Motors"
+                       filter_domain="['|', '|', '|', '|', '|', ('motor_number', 'ilike', self), ('location', '=ilike', self), ('manufacturer', 'ilike', self), ('model', 'ilike', self), ('serial_number', 'ilike', self), ('year', '=', self)]"/>
+                <field name="motor_number" filter_domain="[('motor_number', 'ilike', self)]"/>
+                <field name="location" filter_domain="[('location', '=ilike', self)]"/>
+                <field name="manufacturer"/>
+                <field name="model"/>
+                <field name="serial_number"/>
+                <field name="year"/>
+                <filter name="filter_has_repairs" string="Has Repairs or May Need Repairs"
+                        domain="[('products.repair_state', 'not in', [False, 'none']), ('products.is_ready_for_sale', '=', False)]"/>
+                <filter name="filter_has_repaired" string="Has Repaired Products"
+                        domain="[('products.repair_state', '=', 'repaired'), ('products.is_ready_for_sale', '=', False)]"/>
+                <filter name="filter_has_in_repair" string="Has Products In Repair"
+                        domain="[('products.repair_state', '=', 'in_repair'), ('products.is_ready_for_sale', '=', False)]"/>
+                <filter name="filter_has_may_need_repair" string="Has Products That May Need Repair"
+                        domain="[('products.repair_state', '=', 'may_need_repair'), ('products.is_ready_for_sale', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record model="ir.actions.act_window" id="action_motor_form">
+        <field name="name">Motor List</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">motor</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="search_view_id" ref="view_motor_search"/>
+    </record>
+
+    <record model="ir.actions.act_window" id="action_motor_stages">
+        <field name="name">Motor Stages</field>
+        <field name="res_model">motor</field>
+        <field name="view_mode">kanban,list,pivot,graph,form</field>
+        <field name="view_id" ref="view_motor_kanban"/>
+        <field name="context">{'group_by': 'stage'}</field>
+        <field name="search_view_id" ref="view_motor_search"/>
+    </record>
+
+    <record id="view_motor_cohort" model="ir.ui.view">
+        <field name="name">motor.cohort</field>
+        <field name="model">motor</field>
+        <field name="arch" type="xml">
+            <cohort string="Motor Stage Progress" date_start="create_date" date_stop="date_last_stage_update"
+                    interval="week" mode="churn" timeline="backward">
+                <field name="stage"/>
+                <field name="manufacturer"/>
+            </cohort>
+        </field>
+    </record>
+
+    <!-- Update the main motor action to include all views -->
+    <record id="action_motor_analysis" model="ir.actions.act_window">
+        <field name="name">Motors Analysis</field>
+        <field name="res_model">motor</field>
+        <field name="view_mode">pivot,graph,activity,cohort,kanban,list,form</field>
+        <field name="context">{'group_by': ['stage']}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No motors found.
+            </p>
+            <p>
+                Add a new motor to start tracking.
+            </p>
+        </field>
+    </record>
+
+    <record id="server_action_motor_print_labels" model="ir.actions.server">
+        <field name="name">Print Motor Label(s)</field>
+        <field name="model_id" ref="model_motor"/>
+        <field name="binding_model_id" ref="model_motor"/>
+        <field name="binding_type">action</field>
+        <field name="state">code</field>
+        <field name="code">
+            action = records.print_motor_labels()
+        </field>
+    </record>
+
+    <!-- Menu -->
+    <menuitem id="menu_subheader_motor" name="Motors" parent="stock.menu_stock_inventory_control"
+              groups="base.group_user"/>
+    <menuitem id="menu_subheader_config_motor" name="Motors" parent="stock.menu_stock_config_settings"
+              groups="base.group_user"/>
+    <menuitem id="menu_motor_stages" name="Motor Stages" parent="menu_subheader_motor" action="action_motor_stages"
+              sequence="10" groups="base.group_user"/>
+    <menuitem id="menu_motor" name="Motor List" parent="menu_subheader_motor" action="action_motor_form" sequence="20"
+              groups="base.group_user"/>
+    <menuitem id="menu_motor_analysis" name="Motors Analysis" parent="menu_subheader_motor"
+              action="action_motor_analysis" sequence="30" groups="base.group_user"/>
+
+</odoo>

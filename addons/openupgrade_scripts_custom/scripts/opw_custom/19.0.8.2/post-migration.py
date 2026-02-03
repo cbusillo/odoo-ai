@@ -32,7 +32,7 @@ def _ensure_env(cursor_or_env: Cursor | Environment) -> Environment:
 
 @openupgrade.migrate()
 def migrate(cr: Cursor, version: str) -> None:
-    """Post-migration hook for product_connect (19.0.8.2)."""
+    """Post-migration hook for opw_custom (19.0.8.2)."""
     _ = version
     env = _ensure_env(cr)
     _mark_missing_manifest_modules_uninstalled(env)

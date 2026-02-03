@@ -15,8 +15,8 @@ title: TODO / Optimization Ideas
 ## Stack Migration (OPW)
 
 - Draft OPW prod cutover checklist and validate the prod gate.
-- Create `opw_custom` addon as OPW prime layer; migrate OPW-only logic from
-  `product_connect` over time.
+- Keep `opw_custom` as the OPW prime layer; migrate OPW-only logic out of
+  shared addons over time.
 - OPW testing-prod readiness:
   - Run JetBrains inspections on changed scope + git scope.
   - Human click-through and integration testing on `opw-testing`.
@@ -41,6 +41,9 @@ title: TODO / Optimization Ideas
     Coolify so production cron jobs resume.
   - After `opw-prod` promotion: uninstall `environment_overrides` and remove it
     from `ODOO_INSTALL_MODULES` in `opw-prod`.
+  - After `opw-prod` promotion: remove OpenUpgrade scripts/legacy module rename
+    scaffolding (including the legacy `product_connect` rename helpers in the
+    base pre-migration script) once the post-cutover cleanup plan is complete.
 
 ## Stack Migration (CM)
 
@@ -64,3 +67,12 @@ title: TODO / Optimization Ideas
 
 - Build a dedicated `odoo_healthcheck` addon with a DB/registry-aware endpoint
   (avoid `/web/health` false positives) and use it across all environments.
+
+## Static Analysis Noise Cleanup
+
+- Audit and remove all `# type: ignore` and `# pragma: no cover` markers across
+  the repo.
+- Align validator behavior with PyCharm Odoo-aware inspections (ideally via
+  repo config).
+- If Codex/Every Code does not support project-level ignore config, open a PR
+  to `just-every/code` to add configurable ignore rules.

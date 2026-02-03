@@ -3,15 +3,17 @@ title: OPW Rename + Shared Addons Migration Plan
 ---
 
 
-Status: draft — awaiting sequencing decisions.
+Status: in progress — rename/extractions done; pre-migration rename handled in
+base hook; external_ids migration implemented; Shopify + motors split
+confirmed; local restore completes; tests migration done; validation pending.
 
-Goal: rename `product_connect` to `opw_custom`, extract shared logic into
+Goal: rename the legacy OPW addon to `opw_custom`, extract shared logic into
 standalone addons, and migrate legacy Shopify/eBay IDs into `external_ids`.
 No shim module.
 
 ## Requirements
 
-- Rename `product_connect` to `opw_custom`.
+- Legacy OPW addon renamed to `opw_custom`.
 - Shared addons live in `addons/` with neutral names (e.g.,
   `environment_banner`, `external_ids`).
 - OPW-specific addons follow `opw_*` naming pattern.
@@ -27,13 +29,15 @@ No shim module.
 - `external_ids` needs a URL-template base override (implemented as
   `external.system.url.base_url`).
 - No shim module.
-- DM is also marine → motors become a strong shared-addon candidate.
+- Shopify sync is an independent shared addon (`shopify_sync`), no OPW-only
+  wrapper planned.
+- Motors system is an independent shared addon (`marine_motors`).
 
 ## Candidates for extraction
 
-- Shopify sync: shared first-class addon (`shopify_sync`).
-- OPW-only extensions (if needed): `opw_shopify_<suffix>` as thin wrappers.
-- Motors system: shared addon candidate now that OPW + DM are marine.
+- Shopify sync: shared first-class addon (`shopify_sync`) (done).
+- Motors system: shared addon (`marine_motors`) (done).
+- OPW-only Shopify extensions: none planned.
 
 ## Migration plan
 
@@ -41,16 +45,16 @@ No shim module.
    - OPW-specific -> `opw_custom` or `opw_*`
    - Shared -> standalone addons with neutral names
 
-2) Rename module
+2) Rename module (done)
    - `git mv addons/product_connect addons/opw_custom`
    - Update manifests, assets, and imports
    - Update references in other addons/tests/docs
 
-3) Extract shared addons
+3) Extract shared addons (done)
    - `git mv` shared code into new addon(s)
    - Update asset bundles and dependencies
 
-4) External IDs migration (per docs/todo/external_ids_migration.md)
+4) External IDs migration (implemented; validation pending; docs/todo/external_ids_migration.md)
    - res.partner: `shopify_customer_id`, `shopify_address_id`, `ebay_username`
    - product.product: `shopify_product_id`, `shopify_variant_id`,
      `shopify_condition_id`, `shopify_ebay_category_id`
@@ -64,42 +68,65 @@ No shim module.
      - Shopify store: `product_store`
      - eBay: `profile`
    - Replace computed URL fields with `external.system.url` templates (codes above)
+   - `shopify_sync` post-init hook migrates legacy columns into `external.id`
+     and drops the legacy columns after seeding when safe
 
 5) Data migration scripts
-   - Pre-upgrade (required when no shim module; run as SQL/OpenUpgrade pre-migration):
-     - rename `ir_module_module.name` from `product_connect` -> `opw_custom`
-     - update `ir_model_data.module` for renamed/moved XML IDs
+   - Pre-upgrade (required when no shim module; OpenUpgrade pre-migration):
+     - `addons/openupgrade_scripts_custom/scripts/base/19.0.1.0/pre-migration.py`
+       renames `ir_module_module.name` to `opw_custom` and reassigns moved XML IDs
+       to extracted addons to prevent inconsistent module states when
+       `product_connect` no longer has a manifest.
      - note: `addons/opw_custom/migrations/*` will not run until after the DB rename
-   - Post-upgrade (in `addons/opw_custom/migrations/*`):
-     - migrate legacy ID fields into `external.id`
-     - optionally clear legacy fields after verification
+   - Post-upgrade:
+     - `addons/openupgrade_scripts_custom/scripts/opw_custom/19.0.8.2/post-migration.py`
+       handles missing-manifest cleanup in the OpenUpgrade pass.
+     - legacy ID fields already migrate in `shopify_sync` post-init hook
+     - no separate legacy-field cleanup (columns dropped after seeding)
 
-6) Tests migration
+6) Tests migration (done)
    - Move unit/integration/tours into the owning addon
    - Update any test fixtures and asset includes
+   - Transaction mixin unit coverage moved to `transaction_utilities`
 
-7) Full audit
-   - Repo: `rg product_connect` (code/docs/tests/data)
-   - Local env files: `docker/config/*-local.env`
-   - Coolify env keys for the relevant apps (values redacted unless `--show-values`;
-     do not paste output into PRs/tickets/logs):
-     `uv run ops coolify env-get --apps <comma-separated-apps>`
-   - Replace any `product_connect` keys or references
+7) Full audit (done)
+   - Repo: `rg product_connect` only in this doc, the base OpenUpgrade pre-migration
+     script, and generated Shopify gql headers (do not edit)
+   - Local env files: `docker/config/*-local.env`, `.env`, `.env.example` clean
+   - Coolify env keys: `uv run ops coolify env-get --apps opw-dev,opw-testing,opw-prod`
+     returned no `product_connect` matches
 
-8) Validation
-   - `uv run ops local upgrade-restart opw`
-   - Verify assets via `?debug=assets`
-   - Smoke test key flows and migrated tests
+8) Validation (in progress)
+   - `uv run ops local upgrade-restart opw` (done 2026-01-28)
+   - Verify assets via `?debug=assets` (HTTP 200 on `/web/login?debug=assets`, 2026-01-28)
+   - Smoke test key flows and migrated tests (pending)
+   - Full `uv run test run --json --stack opw --detached` completed 2026-01-28
+     (session `test-20260128_003110`): unit/js pass; integration/tour reported
+     0 tests and returned rc=1 (investigate missing tests)
+   - Full `uv run test run --json --stack opw --detached` completed 2026-01-28
+     (session `test-20260128_010712`): integration pass; unit error + tour
+     failures traced to discuss_record_links domain bug (fixed)
+   - Targeted reruns: `uv run test unit --modules discuss_record_links --stack opw`
+     (session `test-20260128_095857`) and `uv run test tour --modules
+     discuss_record_links,test_web_tours --stack opw` (session
+     `test-20260128_095921`) both green
+   - Full `uv run test run --json --stack opw --detached` completed 2026-01-28
+     (session `test-20260128_101451`): unit/js/integration pass; tour failure
+     in `test_web_tours` readiness check (fixed)
+   - Targeted rerun: `uv run test tour --modules test_web_tours --stack opw`
+     (session `test-20260128_103553`) green
 
 ## Risks / edge cases
 
 - XML IDs break if `ir_model_data.module` is not migrated correctly.
 - Shopify GIDs may need relaxed `id_format` if stored as-is.
 - References may exist in env keys or server actions even if code refs are gone.
+- Local resets now archive + remove Shopify external IDs when `test_store=True`
+  to avoid unique constraint conflicts if the store changes.
+- Remove `shopify_sync` post-init migration hook after opw-prod upgrade once
+  legacy columns are fully retired.
 
-## Open questions
+## Open questions (resolved)
 
-- For `shopify_sync`, what functionality should be in the shared addon, and what
-  (if anything) should remain OPW-only in `opw_shopify_*` addons?
-- Motors: should it be extracted as a shared addon now, or kept OPW-only (inside
-  `opw_custom` or split into `opw_motors`)?
+- Shopify stays independent in `shopify_sync` (no `opw_shopify_*` wrappers).
+- Motors stays independent in `marine_motors`.

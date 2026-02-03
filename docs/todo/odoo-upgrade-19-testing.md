@@ -9,8 +9,8 @@ Scope and guardrails:
   do not use it for docs of fixtures in the root of this repo outside the addons folder. The addons folder is mapped
   into docker so odoo-intelligence will work on it.
 - Fix only clear bugs/tests/fixtures. If behavior is ambiguous, DO NOT guess — document it and move on.
-- Never edit generated GraphQL artifacts: addons/product_connect/services/shopify/gql/* and
-  addons/product_connect/graphql/
+- Never edit generated GraphQL artifacts: addons/shopify_sync/services/shopify/gql/* and
+  addons/shopify_sync/graphql/
   schema/*.
 - Follow Odoo 19 view rules (<list>, no attrs/states), and repo standards in AGENTS.md.
 - Auto-review tool is failing due to provider stream errors — rely on manual inspection (see

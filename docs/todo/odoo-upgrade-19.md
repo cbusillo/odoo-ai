@@ -13,13 +13,14 @@ title: Odoo 19 Upgrade (OPW)
 
 - Follow @docs/todo/odoo-19-post-upgrade-cleanup.md after prod cutover.
 
-## product_connect dependencies
+## opw_custom dependencies
 
-From `addons/product_connect/__manifest__.py` (version 19.0.8.2):
+From `addons/opw_custom/__manifest__.py` (version 19.0.8.2):
 
 - base
 - product
 - web
+- environment_banner
 - web_tour
 - website_sale
 - base_automation
@@ -36,48 +37,70 @@ From `addons/product_connect/__manifest__.py` (version 19.0.8.2):
 - delivery_ups_rest
 - delivery_usps_rest
 - base_geolocalize
+- transaction_utilities
+- image_enhancements
+- notification_center
+- product_metadata
+- marine_motors
+- shopify_sync
 - external_ids
 - hr_employee_name_extended
 - discuss_record_links
 - disable_odoo_online
+- authentik_sso
 
-## Dependency classification (product_connect)
+## Dependency classification (opw_custom)
 
-| Dependency                | Repo location   | Opw DB state (2026-01-05) | License (DB) |
-|---------------------------|-----------------|---------------------------|--------------|
-| account                   | core (Odoo)     | installed                 | LGPL-3       |
-| base                      | core (Odoo)     | installed                 | LGPL-3       |
-| base_automation           | core (Odoo)     | installed                 | LGPL-3       |
-| base_geolocalize          | core (Odoo)     | installed                 | LGPL-3       |
-| contacts                  | core (Odoo)     | installed                 | LGPL-3       |
-| delivery                  | core (Odoo)     | installed                 | LGPL-3       |
-| delivery_ups_rest         | enterprise      | installed                 | OEEL-1       |
-| delivery_usps_rest        | enterprise      | installed                 | OEEL-1       |
-| disable_odoo_online       | core (Odoo)     | installed                 | LGPL-3       |
-| discuss_record_links      | custom (addons) | missing from DB           |              |
-| external_ids              | custom (addons) | missing from DB           |              |
-| hr_employee_name_extended | custom (addons) | missing from DB           |              |
-| mail                      | core (Odoo)     | installed                 | LGPL-3       |
-| phone_validation          | core (Odoo)     | installed                 | LGPL-3       |
-| product                   | core (Odoo)     | installed                 | LGPL-3       |
-| project                   | core (Odoo)     | installed                 | LGPL-3       |
-| purchase                  | core (Odoo)     | installed                 | LGPL-3       |
-| repair                    | core (Odoo)     | installed                 | LGPL-3       |
-| sale_management           | core (Odoo)     | installed                 | LGPL-3       |
-| stock                     | core (Odoo)     | installed                 | LGPL-3       |
-| web                       | core (Odoo)     | installed                 | LGPL-3       |
-| web_tour                  | core (Odoo)     | installed                 | LGPL-3       |
-| website_sale              | core (Odoo)     | installed                 | LGPL-3       |
+| Dependency                | Repo       | DB state  | License |
+|---------------------------|------------|-----------|---------|
+| account                   | core       | installed | LGPL-3  |
+| base                      | core       | installed | LGPL-3  |
+| base_automation           | core       | installed | LGPL-3  |
+| base_geolocalize          | core       | installed | LGPL-3  |
+| contacts                  | core       | installed | LGPL-3  |
+| delivery                  | core       | installed | LGPL-3  |
+| delivery_ups_rest         | enterprise | installed | OEEL-1  |
+| delivery_usps_rest        | enterprise | installed | OEEL-1  |
+| disable_odoo_online       | core       | installed | LGPL-3  |
+| environment_banner        | custom     | missing   |         |
+| discuss_record_links      | custom     | missing   |         |
+| external_ids              | custom     | missing   |         |
+| marine_motors             | custom     | missing   |         |
+| product_metadata          | custom     | missing   |         |
+| transaction_utilities     | custom     | missing   |         |
+| image_enhancements        | custom     | missing   |         |
+| notification_center       | custom     | missing   |         |
+| shopify_sync              | custom     | missing   |         |
+| hr_employee_name_extended | custom     | missing   |         |
+| mail                      | core       | installed | LGPL-3  |
+| phone_validation          | core       | installed | LGPL-3  |
+| product                   | core       | installed | LGPL-3  |
+| project                   | core       | installed | LGPL-3  |
+| purchase                  | core       | installed | LGPL-3  |
+| repair                    | core       | installed | LGPL-3  |
+| sale_management           | core       | installed | LGPL-3  |
+| stock                     | core       | installed | LGPL-3  |
+| web                       | core       | installed | LGPL-3  |
+| web_tour                  | core       | installed | LGPL-3  |
+| website_sale              | core       | installed | LGPL-3  |
+| authentik_sso             | custom     | missing   |         |
 
 Notes:
 
-- discuss_record_links, external_ids, and hr_employee_name_extended are
-  present in the repo but do not exist in the current opw database module table.
-  This likely
-  reflects the Odoo 19 manifest vs the Odoo 18 database state and will need
-  review during migration.
+- Repo: core = Odoo core, enterprise = Odoo Enterprise, custom = addons/.
+- DB state snapshot date: 2026-01-05.
+
+- Custom addons (environment_banner, external_ids, discuss_record_links,
+  hr_employee_name_extended, marine_motors, notification_center,
+  product_metadata, transaction_utilities, image_enhancements, shopify_sync,
+  authentik_sso) are present in the repo but do not exist in the
+  current opw database module table. This likely reflects the Odoo 19 manifest
+  vs the Odoo 18 database state and will need review during migration.
 - Custom dependency paths: addons/discuss_record_links, addons/external_ids,
-  addons/hr_employee_name_extended.
+  addons/environment_banner, addons/hr_employee_name_extended,
+  addons/marine_motors, addons/product_metadata, addons/notification_center,
+  addons/transaction_utilities, addons/image_enhancements, addons/shopify_sync,
+  addons/authentik_sso.
 - The Odoo 19 container cannot open the Odoo 18 schema in opw-local (missing
   res_partner.suggest_based_on). Use SQL queries for inventory until migration.
 
@@ -95,7 +118,7 @@ Notes:
 - im_livechat (LGPL-3)
 - knowledge (OEEL-1, enterprise)
 - mail (LGPL-3)
-- product_connect (LGPL-3, custom)
+- opw_custom (LGPL-3, custom)
 - project (LGPL-3)
 - project_todo (LGPL-3)
 - purchase (LGPL-3)
@@ -125,10 +148,12 @@ Notes:
 - knowledge: digest, html_editor, mail, portal, web, web_editor, web_hierarchy,
   web_unsplash
 - mail: base, base_setup, bus, html_editor, web_tour
-- product_connect: account, base, base_automation, base_geolocalize, contacts,
-  delivery, delivery_ups_rest, delivery_usps_rest, mail, phone_validation,
-  product, project, purchase, repair, sale_management, stock, web,
-  website_sale, web_tour
+- opw_custom: account, base, base_automation, base_geolocalize, contacts,
+  delivery, delivery_ups_rest, delivery_usps_rest, environment_banner,
+  external_ids, mail, marine_motors, phone_validation, product,
+  product_metadata, project, purchase, repair, sale_management,
+  notification_center, transaction_utilities, image_enhancements, shopify_sync,
+  stock, web, website_sale, web_tour
 - project: analytic, base_setup, digest, mail, portal, rating, resource, web,
   web_tour
 - project_todo: project
@@ -150,7 +175,7 @@ Notes:
 
 Snapshot: 2026-01-05.
 
-- product_connect: delivery_ups_rest (OEEL-1), delivery_usps_rest (OEEL-1)
+- opw_custom: delivery_ups_rest (OEEL-1), delivery_usps_rest (OEEL-1)
 - web_studio: web_cohort, web_enterprise, web_gantt, web_map (OEEL-1)
 
 ## OpenUpgrade provisioning (repeatable)
@@ -193,7 +218,7 @@ Snapshot: 2026-01-05.
 - `uv run ops local openupgrade opw` now resets `ir_module_module.latest_version`
   to `0.0.0` for modules that have OpenUpgrade scripts so re-runs execute
   migration hooks after partial failures.
-- product_connect 18.x pre-migrations now fall back to OpenUpgrade helpers when
+- opw_custom 18.x pre-migrations now fall back to OpenUpgrade helpers when
   `odoo.upgrade.util` is unavailable (Odoo 19).
 - OpenUpgrade completed successfully via `uv run ops local openupgrade opw`.
   Warnings captured:
@@ -211,8 +236,8 @@ Snapshot: 2026-01-05.
   unit/js/integration/tour phases.
 - Root causes identified:
     - `res.users` field renamed from `groups_id` to `group_ids` in Odoo 19;
-      update product_connect fixtures/tests accordingly.
-    - `Registry.in_test_mode()` removed in Odoo 19; update product_connect
+      update opw_custom fixtures/tests accordingly.
+    - `Registry.in_test_mode()` removed in Odoo 19; update opw_custom
       transaction mixin/tests to use `odoo.modules.module.current_test` and
       `config["test_enable"]`.
     - `res.partner.mobile` and `mobile_blacklisted` are no longer available in
@@ -251,15 +276,15 @@ Snapshot: 2026-01-05.
       the required test cursor cookie (raw `requests.get` returned 400).
     - Phone blacklist checks now prefer `phone_sanitized_blacklisted` in Odoo 19
       to reflect the underlying blacklist state reliably.
-    - `_sync_phone_blacklist` now uses `phone.blacklist` with sanitized numbers
-      and skips invalid phone values to avoid UserErrors on overly long inputs.
-    - Tour setup now stores attachments in DB (`ir_attachment.location=db`) to
-      avoid missing filestore asset files during headless tours.
-    - Filestore snapshot now skips removal when the production filestore is
-      absent to prevent deleting tour DB assets.
-    - Tour setup clears cached `/web/assets/` attachments after switching to DB
-      storage so fresh bundles regenerate for the test DB.
-- `uv run test integration --modules product_connect` (session
+        - `_sync_phone_blacklist` now uses `phone.blacklist` with sanitized numbers
+          and skips invalid phone values to avoid UserErrors on overly long inputs.
+        - Tour setup now stores attachments in DB (`ir_attachment.location=db`) to
+          avoid missing filestore asset files during headless tours.
+        - Filestore snapshot now skips removal when the production filestore is
+          absent to prevent deleting tour DB assets.
+        - Tour setup clears cached `/web/assets/` attachments after switching to DB
+          storage so fresh bundles regenerate for the test DB.
+- `uv run test integration --modules opw_custom` (session
   test-20260106_031050) passed after applying the order importer tax field
   update and phone blacklist sync changes.
 - No ambiguous failures; tracked in `docs/todo/confusing-test-failures.md`.
@@ -271,12 +296,12 @@ Snapshot: 2026-01-05.
 - `uv run test run --json` (session test-20260107_113601) also reported success
   (return codes 0) but unit counters still showed 1 error. The unit log shows
   a PostgreSQL not-null error during
-  `TestProductTemplate.test_name_field_validation` in product_connect; confirm
+  `TestProductTemplate.test_name_field_validation` in opw_custom; confirm
   whether the test should avoid DB-level errors or the harness should ignore
   expected SQL errors.
 - Test harness updated to only count unittest-style `FAIL:`/`ERROR:` headers,
   which avoids false positives from expected SQL errors; unit run
-  `test-20260107_122740` now reports errors=0 for product_connect.
+  `test-20260107_122740` now reports errors=0 for opw_custom.
 - Added custom OpenUpgrade hooks that mark missing-manifest modules (including
   `web_editor`) uninstalled and remove `web_editor.*` model metadata to prevent
   registry warnings.
@@ -414,7 +439,7 @@ All installed modules (alphabetical):
 - privacy_lookup
 - product
 - product_barcodelookup
-- product_connect
+- opw_custom
 - project
 - project_account
 - project_enterprise
@@ -530,7 +555,7 @@ All installed modules (alphabetical):
 
 ## Progress log
 
-- 2026-01-05: Created this tracker and captured `product_connect` dependencies.
+- 2026-01-05: Created this tracker and captured `opw_custom` dependencies.
 - 2026-01-05: Added dependency classification and opw-local module inventory
   (SQL snapshot).
 - 2026-01-05: Added application modules and dependency map (SQL snapshot).

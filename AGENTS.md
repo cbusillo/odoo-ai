@@ -19,8 +19,8 @@ the linked docs, then keep prompts lean.
 
 - Custom addons live under `./addons/`; host `./` maps to container `/volumes/`.
 - We target Odoo 19 Enterprise. Never edit generated GraphQL artifacts
-  (`addons/product_connect/services/shopify/gql/*`,
-  `addons/product_connect/graphql/schema/*`).
+  (`addons/shopify_sync/services/shopify/gql/*`,
+  `addons/shopify_sync/graphql/schema/*`).
 - Always go through `uv run ...`; the Odoo environment must bootstrap every
   command (tests, scripts, shell helpers).
 - Never call the system Python directly; use `uv run python ...` (or the
@@ -99,7 +99,7 @@ the linked docs, then keep prompts lean.
   module updates before falling back to ad-hoc shell commands
   (`docs/tooling/odoo-intelligence.md`).
 - Mirror the design style and patterns already established in
-  `addons/product_connect/`; align new modules and views with that reference
+  `addons/opw_custom/`; align new modules and views with that reference
   before inventing new approaches.
 - Run JetBrains inspections on changed scope and then git scope before the gate
   (`docs/tooling/inspection.md`).

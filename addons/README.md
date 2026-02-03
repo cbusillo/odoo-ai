@@ -1,12 +1,23 @@
 # Addon Management Guide
 
-This directory contains Odoo addons managed directly in this repo (no submodules). This keeps shared code and
-deployment tooling in one place while still letting you isolate client-specific addons by directory.
+This directory contains Odoo addons managed directly in this repo (no submodules).
+This keeps shared code and deployment tooling in one place while still letting
+you isolate client-specific addons by directory.
 
 ## Current Addons
 
-- **`product_connect`** - Example addon demonstrating advanced patterns (e-commerce, Shopify integration)
-- **`repairshopr_import`** - RepairShopr migration importer (customers, tickets, estimates, invoices)
+- **`opw_custom`** - OPW product workflows, multigraph analytics, inventory tools
+- **`shopify_sync`** - Shopify sync services and shipping analytics
+- **`marine_motors`** - Marine motor teardown workflows and reporting
+- **`product_metadata`** - Shared product reference models (types, conditions,
+  manufacturers)
+- **`transaction_utilities`** - Transaction safety helpers (commit/rollback,
+  advisory locks)
+- **`image_enhancements`** - Extended image metadata (dimensions, file size)
+- **`notification_center`** - Channel notifications and alert history
+- **`external_ids`** - External ID registry + URL templates
+- **`repairshopr_import`** - RepairShopr migration importer (customers,
+  tickets, estimates, invoices)
 
 Private addons (not stored in this repo) are pulled during build using
 `ODOO_ADDON_REPOSITORIES`.
@@ -34,8 +45,9 @@ git commit -m "Remove my_custom_addon"
 
 ## Sharing Addons Externally
 
-If an addon needs to be shared outside this repo, mirror or export it from this repo instead of embedding a submodule.
-Keep the monorepo as the source of truth.
+If an addon needs to be shared outside this repo, mirror or export it from this
+repo instead of embedding a submodule. Keep the monorepo as the source of
+truth.
 
 ## Cloning the Project
 
@@ -63,8 +75,9 @@ my_addon/
 
 ## Addon Notes (Agent‑Focused)
 
-Each addon should include a short `AGENTS.md` with focused guidance for LLM agents (implementation hints, test entry
-points, and links). Keep it small and link to project docs by handle instead of copying content.
+Each addon should include a short `AGENTS.md` with focused guidance for LLM
+agents (implementation hints, test entry points, and links). Keep it small and
+link to project docs by handle instead of copying content.
 
 Example `addons/my_addon/AGENTS.md`:
 

@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+from odoo import fields
+
 from ...models.repairshopr_importer import EXTERNAL_SYSTEM_CODE, RESOURCE_ESTIMATE, RESOURCE_PRODUCT
 from ..common_imports import UNIT_TAGS, tagged
 from ..fixtures.base import UnitTestCase
@@ -212,6 +214,7 @@ class TestRepairshoprMapping(UnitTestCase):
             description="Widget",
             price_retail=10.0,
             price_cost=5.0,
+            updated_at=None,
             long_description=None,
             disabled=False,
             upc_code=None,
@@ -220,13 +223,15 @@ class TestRepairshoprMapping(UnitTestCase):
         )
         client = ClientStub([product_record])
 
-        self.importer._import_products(client, None)
+        system = self.importer._get_repairshopr_system()
+        sync_started_at = fields.Datetime.now()
+        self.importer._import_products(client, None, system, sync_started_at)
         first_product = self.ProductTemplate.search_by_external_id(
             EXTERNAL_SYSTEM_CODE,
             "505",
             RESOURCE_PRODUCT,
         )
-        self.importer._import_products(client, None)
+        self.importer._import_products(client, None, system, sync_started_at)
         second_product = self.ProductTemplate.search_by_external_id(
             EXTERNAL_SYSTEM_CODE,
             "505",
@@ -247,6 +252,10 @@ class TestRepairshoprMapping(UnitTestCase):
                 return self._estimates
 
             @staticmethod
+            def prefetch_estimate_line_items(_estimate_id_values: list[int]) -> dict[int, list[dict[str, object]]]:
+                return {}
+
+            @staticmethod
             def fetch_line_items(*, estimate_id: int | None = None, invoice_id: int | None = None) -> list[dict[str, object]]:
                 _ = estimate_id
                 _ = invoice_id
@@ -259,17 +268,20 @@ class TestRepairshoprMapping(UnitTestCase):
             number="EST-606",
             date=None,
             created_at=None,
+            updated_at=None,
             employee=None,
         )
         client = ClientStub([estimate_record])
 
-        self.importer._import_estimates(client, None)
+        system = self.importer._get_repairshopr_system()
+        sync_started_at = fields.Datetime.now()
+        self.importer._import_estimates(client, None, system, sync_started_at)
         first_order = self.env["sale.order"].search_by_external_id(
             EXTERNAL_SYSTEM_CODE,
             "606",
             RESOURCE_ESTIMATE,
         )
-        self.importer._import_estimates(client, None)
+        self.importer._import_estimates(client, None, system, sync_started_at)
         second_order = self.env["sale.order"].search_by_external_id(
             EXTERNAL_SYSTEM_CODE,
             "606",

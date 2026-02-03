@@ -1,5 +1,4 @@
 import logging
-import ssl
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
@@ -8,6 +7,7 @@ from decimal import Decimal
 from typing import Any, overload
 
 import pymysql
+from odoo.addons.external_ids.utils.ssl_context import build_ssl_context
 
 from . import repairshopr_sync_models as repairshopr_models
 
@@ -442,15 +442,8 @@ class RepairshoprSyncClient:
                 self.close()
         return []
 
-    # noinspection DuplicatedCode
-    # Mirrors Fishbowl SSL handling to keep connection logic self-contained.
     def _open_connection(self) -> pymysql.connections.Connection:
-        secure_context: ssl.SSLContext | None = None
-        if self._settings.use_ssl:
-            secure_context = ssl.create_default_context()
-            if not self._settings.ssl_verify:
-                secure_context.check_hostname = False
-                secure_context.verify_mode = ssl.CERT_NONE
+        secure_context = build_ssl_context(self._settings.use_ssl, self._settings.ssl_verify)
         return pymysql.connect(
             host=self._settings.host,
             user=self._settings.user,

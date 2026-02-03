@@ -1,0 +1,10 @@
+<odoo>
+    <data noupdate="0">
+        <record id="sequence_product_template_default_code" model="ir.sequence">
+            <field name="name">Product SKU</field>
+            <field name="code">product.template.default_code</field>
+            <field name="padding">6</field>
+            <field name="number_next">8000</field>
+        </record>
+    </data>
+</odoo>

@@ -1,6 +1,0 @@
-schema:
-  - https://${ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY}.myshopify.com/admin/api/${ENV_OVERRIDE_SHOPIFY__API_VERSION}/graphql.json:
-      headers:
-        X-Shopify-Access-Token: ${ENV_OVERRIDE_SHOPIFY__API_TOKEN}
-include:
-  - "**/*.graphql"

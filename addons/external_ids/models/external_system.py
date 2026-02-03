@@ -37,6 +37,51 @@ class ExternalSystem(models.Model):
         for system in self:
             system.external_id_count = len(system.external_ids)
 
+    @api.model_create_multi
+    def create(self, vals_list: "list[odoo.values.external_system]") -> "odoo.model.external_system":
+        seen_codes: set[str] = set()
+        seen_names: set[str] = set()
+        for vals in vals_list:
+            code_raw = vals.get("code")
+            code_value = str(code_raw or "").strip()
+            if code_raw is not None:
+                vals["code"] = code_value
+            if code_value:
+                if code_value in seen_codes or self.sudo().search_count([("code", "=", code_value)]):
+                    raise ValidationError("System code must be unique!")
+                seen_codes.add(code_value)
+            name_raw = vals.get("name")
+            name_value = str(name_raw or "").strip()
+            if name_raw is not None:
+                vals["name"] = name_value
+            if name_value:
+                if name_value in seen_names or self.sudo().search_count([("name", "=", name_value)]):
+                    raise ValidationError("System name must be unique!")
+                seen_names.add(name_value)
+        return super().create(vals_list)
+
+    @api.constrains("code")
+    def _check_unique_code(self) -> None:
+        for system in self:
+            if not system.code:
+                continue
+            domain = [("code", "=", system.code)]
+            if system.id:
+                domain.append(("id", "!=", system.id))
+            if self.sudo().search_count(domain):
+                raise ValidationError("System code must be unique!")
+
+    @api.constrains("name")
+    def _check_unique_name(self) -> None:
+        for system in self:
+            if not system.name:
+                continue
+            domain = [("name", "=", system.name)]
+            if system.id:
+                domain.append(("id", "!=", system.id))
+            if self.sudo().search_count(domain):
+                raise ValidationError("System name must be unique!")
+
     @api.model
     def ensure_system(
         self,
@@ -49,6 +94,8 @@ class ExternalSystem(models.Model):
         url: str | None = None,
         applicable_model_xml_ids: tuple[str, ...] = (),
     ) -> "odoo.model.external_system":
+        code = (code or "").strip()
+        name = (name or "").strip()
         external_system_model = self.sudo().with_context(active_test=False)
         system = external_system_model.search([("code", "=", code)], limit=1)
         applicable_model_ids = self._resolve_applicable_model_ids(applicable_model_xml_ids)

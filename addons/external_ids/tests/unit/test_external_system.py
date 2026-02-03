@@ -14,6 +14,7 @@ class TestExternalSystem(UnitTestCase):
             url="https://discord.com",
             id_format=r"^\d{18}$",
             id_prefix="",
+            reuse_existing=True,
         )
 
         self.assertEqual(system.name, "Discord")
@@ -34,7 +35,7 @@ class TestExternalSystem(UnitTestCase):
             ExternalSystemFactory.create(self.env, name="Unique System", code="different_code")
 
     def test_external_id_count(self) -> None:
-        system = ExternalSystemFactory.create(self.env, name="Shopify", code="shopify")
+        system = ExternalSystemFactory.create(self.env, name="Shopify", code="shopify", reuse_existing=True)
         self.assertEqual(system.external_id_count, 0)
 
         partner = self.Partner.create({"name": "Test Customer"})
@@ -60,7 +61,7 @@ class TestExternalSystem(UnitTestCase):
         self.assertNotIn(system, active_systems)
 
     def test_system_with_external_ids_restriction(self) -> None:
-        system = ExternalSystemFactory.create(self.env, name="RepairShopr", code="repairshopr")
+        system = ExternalSystemFactory.create(self.env, name="RepairShopr", code="repairshopr", reuse_existing=True)
         partner = self.Partner.create({"name": "Test Partner"})
 
         ExternalIdFactory.create(
@@ -90,7 +91,7 @@ class TestExternalSystem(UnitTestCase):
         self.assertIn(self.env.ref("base.model_res_partner"), system.applicable_model_ids)
 
         system.active = False
-        system.invalidate_cache()
+        system.invalidate_model()
 
         updated = self.ExternalSystem.ensure_system(
             code="fishbowl",

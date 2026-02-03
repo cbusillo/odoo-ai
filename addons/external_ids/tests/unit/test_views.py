@@ -8,10 +8,15 @@ from ..fixtures.base import UnitTestCase
 class TestViewsLoad(UnitTestCase):
     def _fields_in_form(self, model_name: str, view_xmlid: str) -> list[str]:
         view = self.env.ref(view_xmlid)
-        info = self.env[model_name].fields_view_get(view_id=view.id, view_type="form")
-        arch = etree.fromstring(info["arch"].encode())
+        model = self.env[model_name]
+        if hasattr(model, "fields_view_get"):
+            info = model.fields_view_get(view_id=view.id, view_type="form")
+        else:
+            info = model.get_view(view_id=view.id, view_type="form")
+        arch_source = info.get("arch") or info.get("arch_base") or ""
+        arch = etree.fromstring(arch_source.encode())
         fields = {node.get("name") for node in arch.xpath(".//field[@name]")}
-        return [f for f in fields if f in self.env[model_name]._fields]
+        return [field_name for field_name in fields if field_name in model._fields]
 
     def _assert_form_read_ok(self, model_name: str, create_vals: dict, view_xmlid: str) -> None:
         fields = self._fields_in_form(model_name, view_xmlid)
@@ -34,9 +39,15 @@ class TestViewsLoad(UnitTestCase):
         )
 
     def test_employee_form_reads(self) -> None:
+        employee_model = self.env["hr.employee"]
+        employee_values = {"name": "View Test Employee"}
+        if "first_name" in employee_model._fields:
+            employee_values["first_name"] = "View"
+        if "last_name" in employee_model._fields:
+            employee_values["last_name"] = "Employee"
         self._assert_form_read_ok(
             "hr.employee",
-            {"name": "View Test Employee"},
+            employee_values,
             "external_ids.view_employee_form_external_ids",
         )
 

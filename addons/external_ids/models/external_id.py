@@ -80,6 +80,8 @@ class ExternalId(models.Model):
     def create(self, vals_list: "list[odoo.values.external_id]") -> "odoo.model.external_id":
         # Ensure required res_model is populated even if view context omitted it
         ctx_res_model = (self.env.context or {}).get("default_res_model") or (self.env.context or {}).get("active_model")
+        unique_record_keys: set[tuple[str, int, int, str]] = set()
+        unique_external_id_keys: set[tuple[int, str, str]] = set()
         for vals in vals_list:
             if not vals.get("res_model") and ctx_res_model:
                 vals["res_model"] = ctx_res_model
@@ -89,6 +91,56 @@ class ExternalId(models.Model):
                 vals["resource"] = "default"
             if "external_id" in vals and isinstance(vals["external_id"], str):
                 vals["external_id"] = vals["external_id"].strip()
+            reference_value = vals.get("reference")
+            if reference_value and (not vals.get("res_model") or not vals.get("res_id")):
+                if isinstance(reference_value, str):
+                    model_name, _, record_id = reference_value.partition(",")
+                    if model_name:
+                        vals["res_model"] = model_name
+                    if record_id:
+                        try:
+                            vals["res_id"] = int(record_id)
+                        except ValueError:
+                            vals["res_id"] = vals.get("res_id")
+                else:
+                    model_name = getattr(reference_value, "_name", None)
+                    record_id = getattr(reference_value, "id", None)
+                    if model_name:
+                        vals["res_model"] = model_name
+                    if record_id:
+                        vals["res_id"] = record_id
+            res_model = vals.get("res_model")
+            res_id = vals.get("res_id")
+            system_id_value = vals.get("system_id")
+            if hasattr(system_id_value, "id"):
+                system_id_value = system_id_value.id
+            resource_value = vals.get("resource") or "default"
+            external_id_value = vals.get("external_id")
+            if res_model and res_id and system_id_value:
+                record_key = (str(res_model), int(res_id), int(system_id_value), str(resource_value))
+                if record_key in unique_record_keys:
+                    raise ValidationError("Each record can have only one ID per external system and resource!")
+                unique_record_keys.add(record_key)
+                record_domain = [
+                    ("res_model", "=", res_model),
+                    ("res_id", "=", res_id),
+                    ("system_id", "=", system_id_value),
+                    ("resource", "=", resource_value),
+                ]
+                if self.sudo().with_context(active_test=False).search_count(record_domain):
+                    raise ValidationError("Each record can have only one ID per external system and resource!")
+            if system_id_value and external_id_value:
+                external_key = (int(system_id_value), str(resource_value), str(external_id_value))
+                if external_key in unique_external_id_keys:
+                    raise ValidationError("This external ID already exists for this system and resource!")
+                unique_external_id_keys.add(external_key)
+                external_domain = [
+                    ("system_id", "=", system_id_value),
+                    ("resource", "=", resource_value),
+                    ("external_id", "=", external_id_value),
+                ]
+                if self.sudo().with_context(active_test=False).search_count(external_domain):
+                    raise ValidationError("This external ID already exists for this system and resource!")
         return super().create(vals_list)
 
     def write(self, vals: "odoo.values.external_id") -> bool:
@@ -162,6 +214,37 @@ class ExternalId(models.Model):
         if operator == "=" and value:
             return [("res_model", "=", value._name), ("res_id", "=", value.id)]
         return []
+
+    @api.constrains("res_model", "res_id", "system_id", "resource")
+    def _check_unique_record_per_system_resource(self) -> None:
+        for record in self:
+            if not record.res_model or not record.res_id or not record.system_id:
+                continue
+            domain = [
+                ("res_model", "=", record.res_model),
+                ("res_id", "=", record.res_id),
+                ("system_id", "=", record.system_id.id),
+                ("resource", "=", record.resource or "default"),
+            ]
+            if record.id:
+                domain.append(("id", "!=", record.id))
+            if self.sudo().with_context(active_test=False).search_count(domain):
+                raise ValidationError("Each record can have only one ID per external system and resource!")
+
+    @api.constrains("system_id", "resource", "external_id")
+    def _check_unique_external_id_per_system_resource(self) -> None:
+        for record in self:
+            if not record.system_id or not record.external_id:
+                continue
+            domain = [
+                ("system_id", "=", record.system_id.id),
+                ("resource", "=", record.resource or "default"),
+                ("external_id", "=", record.external_id),
+            ]
+            if record.id:
+                domain.append(("id", "!=", record.id))
+            if self.sudo().with_context(active_test=False).search_count(domain):
+                raise ValidationError("This external ID already exists for this system and resource!")
 
     @api.depends("res_model", "res_id")
     def _compute_record_name(self) -> None:

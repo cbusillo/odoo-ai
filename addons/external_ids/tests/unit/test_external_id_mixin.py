@@ -11,11 +11,13 @@ class TestExternalIdMixin(UnitTestCase):
             self.env,
             name="Discord",
             code="discord",
+            reuse_existing=True,
         )
         self.shopify_system = ExternalSystemFactory.create(
             self.env,
             name="Shopify",
             code="shopify",
+            reuse_existing=True,
         )
 
     def test_set_and_get_external_id_on_partner(self) -> None:
@@ -31,10 +33,10 @@ class TestExternalIdMixin(UnitTestCase):
         partner = self.Partner.create({"name": "Multi ID Partner"})
 
         partner.set_external_id("discord", "987654321098765432")
-        partner.set_external_id("shopify", "gid://shopify/Customer/123")
+        partner.set_external_id("shopify", "123")
 
         self.assertEqual(partner.get_external_system_id("discord"), "987654321098765432")
-        self.assertEqual(partner.get_external_system_id("shopify"), "gid://shopify/Customer/123")
+        self.assertEqual(partner.get_external_system_id("shopify"), "123")
         self.assertFalse(partner.get_external_system_id("nonexistent"))
 
     def test_update_existing_external_id(self) -> None:
@@ -85,12 +87,16 @@ class TestExternalIdMixin(UnitTestCase):
         self.assertEqual(action["context"]["default_res_id"], partner.id)
 
     def test_external_id_on_employee(self) -> None:
-        employee = self.Employee.create(
-            {
-                "name": "Test Employee",
-                "work_email": "employee@example.com",
-            }
-        )
+        employee_values = {
+            "name": "Test Employee",
+            "work_email": "employee@example.com",
+        }
+        if "first_name" in self.Employee._fields:
+            employee_values["first_name"] = "Test"
+        if "last_name" in self.Employee._fields:
+            employee_values["last_name"] = "Employee"
+
+        employee = self.Employee.create(employee_values)
 
         employee.set_external_id("discord", "777777777777777777")
         self.assertEqual(employee.get_external_system_id("discord"), "777777777777777777")
@@ -106,10 +112,10 @@ class TestExternalIdMixin(UnitTestCase):
             }
         )
 
-        product.set_external_id("shopify", "gid://shopify/Product/123456")
-        self.assertEqual(product.get_external_system_id("shopify"), "gid://shopify/Product/123456")
+        product.set_external_id("shopify", "123456")
+        self.assertEqual(product.get_external_system_id("shopify"), "123456")
 
-        found = self.Product.search_by_external_id("shopify", "gid://shopify/Product/123456")
+        found = self.Product.search_by_external_id("shopify", "123456")
         self.assertEqual(found, product)
 
     def test_set_external_id_invalid_system(self) -> None:

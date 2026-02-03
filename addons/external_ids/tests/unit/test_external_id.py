@@ -12,12 +12,14 @@ class TestExternalId(UnitTestCase):
             name="Discord",
             code="discord",
             id_format=r"^\d{18}$",
+            reuse_existing=True,
         )
         self.shopify_system = ExternalSystemFactory.create(
             self.env,
             name="Shopify",
             code="shopify",
             id_prefix="gid://shopify/Customer/",
+            reuse_existing=True,
         )
 
     def test_create_external_id(self) -> None:

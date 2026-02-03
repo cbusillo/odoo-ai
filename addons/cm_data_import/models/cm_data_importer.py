@@ -530,6 +530,8 @@ class CmDataImporter(models.Model):
             else:
                 password_model.create(values)
             processed_count += 1
+            # noinspection PyUnresolvedReferences
+            # False positive: helper is defined later in this class.
             if self._maybe_commit(processed_count, commit_interval, label="password"):
                 password_model = self.env["integration.cm_data.password"].sudo().with_context(IMPORT_CONTEXT)
 
@@ -569,7 +571,8 @@ class CmDataImporter(models.Model):
         system: "odoo.model.external_system",
         sync_started_at: datetime,
     ) -> tuple[dict[int, CmDataPricingCatalog], dict[int, int]]:
-        catalog_model = self.env["school.pricing.catalog"].sudo().with_context(IMPORT_CONTEXT)
+        catalog_model_name = "school.pricing.catalog"
+        catalog_model = self.env[catalog_model_name].sudo().with_context(IMPORT_CONTEXT)
         audit_model = self.env["integration.cm_data.pricing.audit"].sudo().with_context(IMPORT_CONTEXT)
         commit_interval = self._get_commit_interval()
         processed_count = 0
@@ -587,9 +590,11 @@ class CmDataImporter(models.Model):
                     catalog_name=row.name,
                     partner=partner,
                     source_catalog_id=row.record_id,
-                    message=(f"Pricing catalog '{row.name}' partner label '{row.partner_label}' could not be linked to a partner."),
+                    message=f"Pricing catalog '{row.name}' partner label '{row.partner_label}' could not be linked to a partner.",
                 )
                 continue
+            # noinspection PyUnresolvedReferences
+            # False positive: fields are provided by the cm_school dependency.
             values: "odoo.values.school_pricing_catalog" = {
                 "name": row.name,
                 "code": row.code,
@@ -597,6 +602,8 @@ class CmDataImporter(models.Model):
                 "notes": row.notes,
                 "active": row.active,
             }
+            # noinspection PyTypeChecker
+            # False positive: cm_school catalog inherits external.id.mixin at runtime.
             catalog_record = self._get_or_create_by_external_id_with_sync(
                 catalog_model,
                 system,
@@ -609,7 +616,7 @@ class CmDataImporter(models.Model):
             catalog_id_map[row.record_id] = catalog_record.id
             processed_count += 1
             if self._maybe_commit(processed_count, commit_interval, label="pricing catalog"):
-                catalog_model = self.env["school.pricing.catalog"].sudo().with_context(IMPORT_CONTEXT)
+                catalog_model = self.env[catalog_model_name].sudo().with_context(IMPORT_CONTEXT)
                 audit_model = self.env["integration.cm_data.pricing.audit"].sudo().with_context(IMPORT_CONTEXT)
         return catalog_row_map, catalog_id_map
 
@@ -667,6 +674,8 @@ class CmDataImporter(models.Model):
                     message="Pricing catalog is missing for this line.",
                 )
                 continue
+            # noinspection PyUnresolvedReferences
+            # False positive: fields are provided by the cm_school dependency.
             values: "odoo.values.school_pricing_matrix" = {
                 "name": f"{row.model_label} - {row.repair_label}",
                 "catalog_id": catalog_record_id,
@@ -675,6 +684,8 @@ class CmDataImporter(models.Model):
                 "price": row.price,
                 "active": row.active,
             }
+            # noinspection PyTypeChecker
+            # False positive: cm_school matrix inherits external.id.mixin at runtime.
             self._get_or_create_by_external_id_with_sync(
                 matrix_model,
                 system,
@@ -823,7 +834,7 @@ class CmDataImporter(models.Model):
         audit_model: "odoo.model.integration_cm_data_pricing_audit",
         *,
         issue_type: str,
-        catalog: "odoo.model.school_pricing_catalog | None" = None,
+        catalog: models.Model | None = None,
         catalog_code: str | None = None,
         catalog_name: str | None = None,
         partner: "odoo.model.res_partner | None" = None,

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import ssl
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -9,6 +8,7 @@ from decimal import Decimal
 from types import TracebackType
 
 import pymysql
+from odoo.addons.external_ids.utils.ssl_context import build_ssl_context
 
 _logger = logging.getLogger(__name__)
 
@@ -971,15 +971,8 @@ class CmDataClient:
                 self.close()
         return []
 
-    # noinspection DuplicatedCode
-    # Mirrors RepairShopr SSL handling to keep connection logic self-contained.
     def _open_connection(self) -> pymysql.connections.Connection:
-        secure_context: ssl.SSLContext | None = None
-        if self._settings.use_ssl:
-            secure_context = ssl.create_default_context()
-            if not self._settings.ssl_verify:
-                secure_context.check_hostname = False
-                secure_context.verify_mode = ssl.CERT_NONE
+        secure_context = build_ssl_context(self._settings.use_ssl, self._settings.ssl_verify)
         connection = pymysql.connect(
             host=self._settings.host,
             user=self._settings.user,

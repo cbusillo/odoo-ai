@@ -1,0 +1,53 @@
+{
+    "name": "Shopify Sync",
+    "version": "19.0.1.1",
+    "category": "Sales",
+    "author": "Shiny Computers",
+    "maintainers": ["cbusillo"],
+    "depends": [
+        "base",
+        "delivery",
+        "sale_management",
+        "stock",
+        "account",
+        "contacts",
+        "mail",
+        "web",
+        "website_sale",
+        "phone_validation",
+        "external_ids",
+        "product_metadata",
+        "marine_motors",
+        "notification_center",
+        "transaction_utilities",
+        "web_tour",
+    ],
+    "summary": "Shopify integration and sync services",
+    "description": """
+Sync Shopify products, customers, and orders with Odoo.
+Includes shipping mappings and analytics for marketplace orders.
+    """,
+    "data": [
+        "security/ir.model.access.csv",
+        "data/shopify_cron.xml",
+        "data/delivery_products.xml",
+        "data/delivery_carriers.xml",
+        "data/delivery_carrier_mappings.xml",
+        "views/delivery_carrier_views.xml",
+        "views/sale_order_views.xml",
+        "views/shipping_analytics_views.xml",
+        "views/shopify_sync_views.xml",
+        "views/product_template_views.xml",
+        "views/res_partner_views.xml",
+    ],
+    "assets": {
+        "web.assets_tests": [
+            "shopify_sync/static/tests/tours/**/*.js",
+        ],
+    },
+    "pre_init_hook": "pre_init_hook",
+    "post_init_hook": "post_init_hook",
+    "installable": True,
+    "application": False,
+    "license": "LGPL-3",
+}

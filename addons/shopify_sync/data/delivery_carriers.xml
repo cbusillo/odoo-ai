@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- UPS Carriers -->
+        <record id="delivery_carrier_ups_ground" model="delivery.carrier">
+            <field name="name">UPS Ground</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_ups_ground"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <record id="delivery_carrier_ups_2day" model="delivery.carrier">
+            <field name="name">UPS 2nd Day Air</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_ups_2day"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <record id="delivery_carrier_ups_3day" model="delivery.carrier">
+            <field name="name">UPS 3 Day Select</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_ups_3day"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <record id="delivery_carrier_ups_nextday" model="delivery.carrier">
+            <field name="name">UPS Next Day Air</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_ups_nextday"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <record id="delivery_carrier_ups_nextday_saver" model="delivery.carrier">
+            <field name="name">UPS Next Day Air Saver</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_ups_nextday_saver"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <record id="delivery_carrier_ups_standard" model="delivery.carrier">
+            <field name="name">UPS Standard</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_ups_standard"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <record id="delivery_carrier_ups_worldwide_expedited" model="delivery.carrier">
+            <field name="name">UPS Worldwide Expedited</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_ups_worldwide_expedited"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <record id="delivery_carrier_ups_worldwide_express" model="delivery.carrier">
+            <field name="name">UPS Worldwide Express</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_ups_worldwide_express"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <record id="delivery_carrier_ups_worldwide_saver" model="delivery.carrier">
+            <field name="name">UPS Worldwide Saver</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_ups_worldwide_saver"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <!-- USPS Carriers -->
+        <record id="delivery_carrier_usps_ground" model="delivery.carrier">
+            <field name="name">USPS Ground Advantage</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_usps_ground"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <record id="delivery_carrier_usps_parcel" model="delivery.carrier">
+            <field name="name">USPS Parcel Select Ground</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_usps_parcel"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <record id="delivery_carrier_usps_priority" model="delivery.carrier">
+            <field name="name">USPS Priority Mail</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_usps_priority"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <record id="delivery_carrier_usps_priority_intl" model="delivery.carrier">
+            <field name="name">USPS Priority Mail International</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_usps_priority_intl"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <record id="delivery_carrier_usps_first_class" model="delivery.carrier">
+            <field name="name">USPS First Class Package</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_usps_first_class"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <record id="delivery_carrier_usps_first_class_intl" model="delivery.carrier">
+            <field name="name">USPS First-Class Package International</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_usps_first_class_intl"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <!-- Freight Carriers -->
+        <record id="delivery_carrier_freight_flat" model="delivery.carrier">
+            <field name="name">Flat Rate Freight</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_freight_flat"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <record id="delivery_carrier_freight_standard" model="delivery.carrier">
+            <field name="name">Freight Shipping</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_freight_standard"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <record id="delivery_carrier_freight_commercial" model="delivery.carrier">
+            <field name="name">Freight - Commercial Address</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_freight_commercial"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <record id="delivery_carrier_freight_southeastern" model="delivery.carrier">
+            <field name="name">Freight Via Southeastern</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_freight_southeastern"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <!-- Other Carriers -->
+        <record id="delivery_carrier_standard" model="delivery.carrier">
+            <field name="name">Standard Shipping</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_standard"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <record id="delivery_carrier_free" model="delivery.carrier">
+            <field name="name">Free Shipping</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_free"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <record id="delivery_carrier_pickup_store" model="delivery.carrier">
+            <field name="name">In Store Pickup</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_pickup_store"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <record id="delivery_carrier_pickup_local" model="delivery.carrier">
+            <field name="name">Local Pickup</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_pickup_local"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <record id="delivery_carrier_customer_arrange" model="delivery.carrier">
+            <field name="name">Customer Arranged Shipping</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_customer_arrange"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <!-- eBay GSP Carrier -->
+        <record id="delivery_carrier_ebay_gsp" model="delivery.carrier">
+            <field name="name">Standard Shipping (eBay GSP)</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_ebay_gsp"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+        
+        <!-- Warehouse Pickup Carrier -->
+        <record id="delivery_carrier_warehouse" model="delivery.carrier">
+            <field name="name">Warehouse</field>
+            <field name="delivery_type">fixed</field>
+            <field name="product_id" ref="shopify_sync.product_delivery_warehouse"/>
+            <field name="fixed_price">0</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

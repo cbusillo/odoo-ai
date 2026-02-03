@@ -1,0 +1,38 @@
+<odoo>
+    <record id="view_partner_form_inherit_connect" model="ir.ui.view">
+        <field name="name">res.partner.form.inherit.connect</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="priority">21</field>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet/notebook" position="inside">
+                <page string="External Integrations" invisible="not shopify_customer_admin_url and not ebay_profile_url">
+                    <group col="2">
+                        <group invisible="not shopify_customer_admin_url">
+                            <separator string="Shopify"/>
+                            <field name="shopify_customer_admin_url" widget="CopyClipboardURL"/>
+                        </group>
+                        <group invisible="not ebay_profile_url">
+                            <separator string="eBay"/>
+                            <field name="ebay_profile_url" widget="CopyClipboardURL"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_partner_search_inherit_connect" model="ir.ui.view">
+        <field name="name">res.partner.search.inherit.connect</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_res_partner_filter"/>
+        <field name="priority">22</field>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <filter name="filter_contacts_only" string="Contacts" domain="[('type','in',('contact', False))]"/>
+                <filter name="filter_shopify_only" string="Shopify" domain="[('category_id.name','=', 'Shopify')]"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

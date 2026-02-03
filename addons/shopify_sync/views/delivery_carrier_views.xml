@@ -1,0 +1,50 @@
+<odoo>
+    <record id="view_delivery_carrier_service_map_list" model="ir.ui.view">
+        <field name="name">delivery.carrier.service.map.list</field>
+        <field name="model">delivery.carrier.service.map</field>
+        <field name="arch" type="xml">
+            <list editable="bottom" string="Service Mappings">
+                <field name="platform"/>
+                <field name="platform_service_normalized_name"/>
+                <field name="external_id"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form view -->
+    <record id="view_delivery_carrier_service_map_form" model="ir.ui.view">
+        <field name="name">delivery.carrier.service.map.form</field>If the
+        <field name="model">delivery.carrier.service.map</field>
+        <field name="arch" type="xml">
+            <form string="Service Mapping">
+                <group>
+                    <field name="carrier"/>
+                    <field name="platform"/>
+                    <field name="platform_service_normalized_name"/>
+                    <field name="external_id"/>
+                </group>
+            </form>
+        </field>
+    </record>
+
+    <!-- Extend carrier form -->
+    <record id="view_delivery_carrier_form_inherit_service_map" model="ir.ui.view">
+        <field name="name">delivery.carrier.form.inherit.service.map</field>
+        <field name="model">delivery.carrier</field>
+        <field name="inherit_id" ref="delivery.view_delivery_carrier_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form/sheet/notebook" position="inside">
+                <page string="Service Mappings">
+                    <field name="service_maps" mode="list,form" context="{'default_platform': 'shopify'}"
+                           nolabel="1">
+                        <list editable="bottom">
+                            <field name="platform"/>
+                            <field name="platform_service_normalized_name"/>
+                            <field name="external_id"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

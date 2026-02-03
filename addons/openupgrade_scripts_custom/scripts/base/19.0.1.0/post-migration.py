@@ -1,4 +1,5 @@
 import logging
+from datetime import date
 
 from odoo import SUPERUSER_ID, api
 from odoo.api import Environment
@@ -192,6 +193,90 @@ def _make_product_image_attachments_public(env: Environment) -> None:
     logger.info("Marked %s product image attachments as public for Shopify exports.", pending_count)
 
 
+def _table_exists(env: Environment, table_name: str) -> bool:
+    env.cr.execute(
+        "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = %s",
+        (table_name,),
+    )
+    return env.cr.fetchone() is not None
+
+
+def _backfill_ready_for_sale_enabled_date(env: Environment) -> None:
+    if not openupgrade.column_exists(env.cr, "product_template", "is_ready_for_sale_last_enabled_date"):
+        return
+    if not _table_exists(env, "product_template"):
+        return
+
+    noisy_dates = {date(2024, 2, 1), date(2024, 2, 2)}
+    logger.info("Backfilling ready-for-sale enabled dates using SQL.")
+
+    has_tracking_tables = all(
+        _table_exists(env, table_name)
+        for table_name in ("mail_message", "mail_tracking_value", "ir_model_fields")
+    )
+    if has_tracking_tables:
+        env.cr.execute(
+            """
+            WITH tracking AS (
+                SELECT mm.res_id AS product_id,
+                       MAX(mm.create_date) AS enabled_at
+                  FROM mail_message mm
+                  JOIN mail_tracking_value mtv ON mtv.mail_message_id = mm.id
+                  JOIN ir_model_fields field ON field.id = mtv.field_id
+                 WHERE mm.model = 'product.template'
+                   AND field.name = 'is_ready_for_sale'
+                   AND mtv.new_value_integer = 1
+                 GROUP BY mm.res_id
+            )
+            UPDATE product_template pt
+               SET is_ready_for_sale_last_enabled_date = tracking.enabled_at
+              FROM tracking
+             WHERE pt.id = tracking.product_id
+               AND pt.is_ready_for_sale = TRUE
+               AND pt.is_ready_for_sale_last_enabled_date IS NULL
+            """,
+        )
+
+    env.cr.execute(
+        """
+        UPDATE product_template
+           SET is_ready_for_sale_last_enabled_date = create_date
+         WHERE is_ready_for_sale = TRUE
+           AND is_ready_for_sale_last_enabled_date IS NULL
+           AND (create_date IS NULL OR create_date::date NOT IN (%s, %s))
+        """,
+        tuple(noisy_dates),
+    )
+
+
+def _fix_partner_data_issues(env: Environment) -> None:
+    if not openupgrade.column_exists(env.cr, "res_partner", "autopost_bills"):
+        return
+
+    env.cr.execute("SELECT COUNT(*) FROM res_partner WHERE autopost_bills IS NULL")
+    null_count_before = env.cr.fetchone()[0]
+    if null_count_before:
+        logger.info("Found %s partners with NULL autopost_bills", null_count_before)
+        env.cr.execute("UPDATE res_partner SET autopost_bills = 'ask' WHERE autopost_bills IS NULL")
+
+    env.cr.execute(
+        "UPDATE res_partner SET name = phone WHERE name = '' AND type = 'contact' AND phone IS NOT NULL"
+    )
+    contact_fixed = env.cr.rowcount
+    if contact_fixed:
+        logger.info("Fixed %s contacts by using phone as name", contact_fixed)
+
+    env.cr.execute("UPDATE res_partner SET name = 'Customer ' || id::text WHERE name = '' AND type = 'contact'")
+    contact_placeholder = env.cr.rowcount
+    if contact_placeholder:
+        logger.info("Fixed %s contacts with placeholder names", contact_placeholder)
+
+    env.cr.execute("UPDATE res_partner SET name = NULL WHERE name = '' AND type IN ('delivery', 'invoice')")
+    address_fixed = env.cr.rowcount
+    if address_fixed:
+        logger.info("Fixed %s delivery/invoice partners by setting name NULL", address_fixed)
+
+
 @openupgrade.migrate()
 def migrate(cr: Cursor, version: str) -> None:
     """Post-migration hook for base (19.0.1.0)."""
@@ -202,3 +287,5 @@ def migrate(cr: Cursor, version: str) -> None:
     _cleanup_web_editor_metadata(env)
     _enforce_required_picking_policy_constraints(env)
     _make_product_image_attachments_public(env)
+    _backfill_ready_for_sale_enabled_date(env)
+    _fix_partner_data_issues(env)

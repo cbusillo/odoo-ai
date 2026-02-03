@@ -94,7 +94,7 @@ class EnvironmentOverrides(models.AbstractModel):
         webhook_key = os.environ.get(f"{SHOPIFY_PREFIX}WEBHOOK_KEY", "").strip()
         api_version = os.environ.get(f"{SHOPIFY_PREFIX}API_VERSION", "").strip()
         test_store_raw = os.environ.get(f"{SHOPIFY_PREFIX}TEST_STORE")
-        test_store = _parse_boolean(test_store_raw, default=True)
+        test_store = _parse_boolean(test_store_raw, default=False)
 
         indicators_raw = os.environ.get(f"{SHOPIFY_PREFIX}PRODUCTION_INDICATORS")
         if indicators_raw is None:
@@ -106,7 +106,6 @@ class EnvironmentOverrides(models.AbstractModel):
         required_values = [shop_url_key, api_token, webhook_key, api_version]
         if not all(required_values):
             self._clear_shopify_config()
-            self._clear_shopify_ids()
             if any(required_values):
                 _logger.warning("Shopify overrides incomplete; cleared Shopify configuration.")
             else:
@@ -116,9 +115,7 @@ class EnvironmentOverrides(models.AbstractModel):
         shop_url_lower = shop_url_key.lower()
         for indicator in production_indicators:
             if indicator and indicator in shop_url_lower:
-                raise ValidationError(
-                    f"Shopify shop_url_key '{shop_url_key}' appears to be production (indicator: '{indicator}')."
-                )
+                raise ValidationError(f"Shopify shop_url_key '{shop_url_key}' appears to be production (indicator: '{indicator}').")
 
         parameter_model = self.env["ir.config_parameter"].sudo()
         parameter_model.set_param("shopify.shop_url_key", shop_url_key)
@@ -127,9 +124,7 @@ class EnvironmentOverrides(models.AbstractModel):
         parameter_model.set_param("shopify.api_version", api_version)
         parameter_model.set_param("shopify.test_store", "True" if test_store else "False")
         self._remove_shopify_legacy_keys()
-
-        if test_store:
-            self._clear_shopify_ids()
+        self._update_shopify_external_urls(shop_url_key)
 
     def _clear_shopify_config(self) -> None:
         parameter_model = self.env["ir.config_parameter"].sudo()
@@ -153,19 +148,88 @@ class EnvironmentOverrides(models.AbstractModel):
         if records:
             records.unlink()
 
-    def _clear_shopify_ids(self) -> None:
-        product_model = self.env["product.product"].sudo().with_context(skip_shopify_sync=True)
-        fields_to_clear = [
-            "shopify_created_at",
-            "shopify_last_exported",
-            "shopify_last_exported_at",
-            "shopify_condition_id",
-            "shopify_variant_id",
-            "shopify_product_id",
-            "shopify_ebay_category_id",
-        ]
-        existing_fields = [field for field in fields_to_clear if field in product_model._fields]
-        if not existing_fields:
+    @staticmethod
+    def _normalize_shopify_storefront_base(shop_url_key: str) -> str:
+        from urllib.parse import urlsplit
+
+        raw_value = (shop_url_key or "").strip().strip("/")
+        if not raw_value:
+            return ""
+
+        lower_value = raw_value.lower()
+        http_prefix = "http" + "://"
+        https_prefix = "https" + "://"
+        if lower_value.startswith(http_prefix) or lower_value.startswith(https_prefix):
+            parts = urlsplit(raw_value)
+            netloc = parts.netloc
+            if not netloc:
+                return ""
+            return f"{parts.scheme}://{netloc}"
+
+        raw_value = raw_value.split("/", 1)[0]
+        raw_value = raw_value.split("?", 1)[0].split("#", 1)[0]
+        if raw_value.endswith(".myshopify.com"):
+            return f"https://{raw_value}"
+        if "." in raw_value:
+            return f"https://{raw_value}"
+        return f"https://{raw_value}.myshopify.com"
+
+    @staticmethod
+    def _derive_shopify_admin_store_key(shop_url_key: str) -> str:
+        from urllib.parse import urlsplit
+
+        raw_value = (shop_url_key or "").strip().strip("/")
+        if not raw_value:
+            return ""
+
+        lower_value = raw_value.lower()
+        http_prefix = "http" + "://"
+        https_prefix = "https" + "://"
+        if lower_value.startswith(http_prefix) or lower_value.startswith(https_prefix):
+            parts = urlsplit(raw_value)
+            host = parts.netloc
+        else:
+            host = raw_value.split("/", 1)[0]
+        host = host.split("?", 1)[0].split("#", 1)[0]
+
+        if host.endswith(".myshopify.com"):
+            return host.split(".", 1)[0]
+        if "." in host:
+            return ""
+        return host
+
+    def _update_shopify_external_urls(self, shop_url_key: str) -> None:
+        external_system_model = self.env.get("external.system")
+        external_system_url_model = self.env.get("external.system.url")
+        if external_system_model is None or external_system_url_model is None:
             return
-        for field_name in existing_fields:
-            self.env.cr.execute(f"UPDATE product_product SET {field_name} = NULL")
+
+        system = external_system_model.sudo().search([("code", "=", "shopify")], limit=1)
+        if not system:
+            return
+
+        storefront_base = self._normalize_shopify_storefront_base(shop_url_key)
+        admin_store_key = self._derive_shopify_admin_store_key(shop_url_key)
+        admin_base = f"https://admin.shopify.com/store/{admin_store_key}" if admin_store_key else ""
+
+        system_url = system["url"] if "url" in system._fields else ""
+        if storefront_base and system_url != storefront_base:
+            system.write({"url": storefront_base})
+
+        url_templates = external_system_url_model.sudo().search(
+            [
+                ("system_id", "=", system.id),
+                ("code", "in", ["customer_admin", "product_admin", "product_store"]),
+            ]
+        )
+        for url_template in url_templates:
+            url_code = url_template["code"] if "code" in url_template._fields else ""
+            if url_code in {"customer_admin", "product_admin"}:
+                base_url = admin_base
+            else:
+                base_url = storefront_base
+            if not base_url:
+                continue
+            template_base_url = url_template["base_url"] if "base_url" in url_template._fields else ""
+            if template_base_url != base_url:
+                url_template.write({"base_url": base_url})

@@ -74,7 +74,14 @@ class TestEnvironmentOverrides(UnitTestCase):
         self.ConfigParameter.set_param("shopify.webhook_key", "hook")
         self.ConfigParameter.set_param("shopify.api_version", "2025-01")
 
-        env_values = {"ENV_OVERRIDE_SHOPIFY__API_TOKEN": "token"}
+        env_values = {
+            "ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY": None,
+            "ENV_OVERRIDE_SHOPIFY__API_TOKEN": "token",
+            "ENV_OVERRIDE_SHOPIFY__WEBHOOK_KEY": None,
+            "ENV_OVERRIDE_SHOPIFY__API_VERSION": None,
+            "ENV_OVERRIDE_SHOPIFY__TEST_STORE": None,
+            "ENV_OVERRIDE_SHOPIFY__PRODUCTION_INDICATORS": None,
+        }
         with _set_env(env_values):
             self.Overrides._apply_shopify_overrides()
 

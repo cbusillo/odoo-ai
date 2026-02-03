@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_product_type,model_product_type,model_product_type,base.group_user,1,1,1,0
+access_product_manufacturer,model_product_manufacturer,model_product_manufacturer,base.group_user,1,1,1,1
+access_product_color,product.color,model_product_color,base.group_user,1,1,1,0
+access_product_color_tag,product.color.tag,model_product_color_tag,base.group_user,1,1,1,0
+access_product_condition,product.condition,model_product_condition,base.group_user,1,1,1,0

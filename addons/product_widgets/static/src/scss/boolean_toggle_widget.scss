@@ -1,0 +1,19 @@
+.large-toggle {
+    display: inline-block;
+    text-align: left;
+
+    .o_boolean_toggle.form-switch {
+        transform: scale(1.5);
+        transform-origin: left center;
+        margin: 0;
+    }
+}
+
+.o_list_view td.o_field_cell {
+    &.o_boolean_toggle_cell,
+    &.o_boolean_toggle_tooltip_cell {
+        padding-left: 0.3rem;
+        padding-right: 0.3rem;
+        text-align: left;
+    }
+}

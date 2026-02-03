@@ -1,0 +1,26 @@
+{
+    "name": "Product Metadata",
+    "version": "19.0.1.0",
+    "category": "Product",
+    "author": "Shiny Computers",
+    "maintainers": ["cbusillo"],
+    "depends": [
+        "base",
+        "product",
+        "purchase",
+        "stock",
+    ],
+    "summary": "Shared product reference models (types, conditions, manufacturers, colors)",
+    "data": [
+        "security/ir.model.access.csv",
+        "data/product_condition_data.xml",
+        "views/product_color_views.xml",
+        "views/product_condition_views.xml",
+        "views/product_type_views.xml",
+        "views/product_manufacturer_views.xml",
+    ],
+    "pre_init_hook": "pre_init_hook",
+    "installable": True,
+    "application": False,
+    "license": "LGPL-3",
+}

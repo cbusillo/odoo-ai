@@ -1,9 +1,11 @@
-from odoo.tests import TransactionCase, tagged
+from odoo.tests import TransactionCase
+
+from ..common_imports import tagged, UNIT_TAGS
 
 from ...models.config_util import extract_template_fields, render_template, parse_prefix, ModelCfg
 
 
-@tagged("post_install", "-at_install")
+@tagged(*UNIT_TAGS)
 class TestConfigUtil(TransactionCase):
     def test_extract_template_fields(self) -> None:
         template = "[{{ default_code }}] {{ name }} ({{year}})"

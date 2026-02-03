@@ -4,12 +4,14 @@
 
 from unittest.mock import patch
 
-from odoo.tests import TransactionCase, tagged
+from odoo.tests import TransactionCase
+
+from ..common_imports import tagged, UNIT_TAGS
 
 from ...controllers.main import DiscussRecordLinks
 
 
-@tagged("post_install", "-at_install")
+@tagged(*UNIT_TAGS)
 class TestLabelsRoute(TransactionCase):
     def setUp(self) -> None:
         super().setUp()
@@ -43,7 +45,7 @@ class TestLabelsRoute(TransactionCase):
 
         _req = type("_Req", (), {})()
         _req.env = self.env
-        with patch("odoo.http.request", _req):
+        with patch("odoo.addons.discuss_record_links.controllers.main.request", _req):
             rows = ctl.labels(targets=[{"model": "product.product", "id": self.product.id}])
 
         self.assertEqual(len(rows), 1)
@@ -57,14 +59,14 @@ class TestLabelsRoute(TransactionCase):
 
         _req = type("_Req", (), {})()
         _req.env = self.env
-        with patch("odoo.http.request", _req):
+        with patch("odoo.addons.discuss_record_links.controllers.main.request", _req):
             rows = ctl.labels(targets=[{"model": "res.partner", "id": partner.id}])
 
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["label"], partner.display_name)
 
 
-@tagged("post_install", "-at_install")
+@tagged(*UNIT_TAGS)
 class TestSearchRoute(TransactionCase):
     def setUp(self) -> None:
         super().setUp()
@@ -92,7 +94,7 @@ class TestSearchRoute(TransactionCase):
         term = "tpro2 widget"
         _req = type("_Req", (), {})()
         _req.env = self.env
-        with patch("odoo.http.request", _req):
+        with patch("odoo.addons.discuss_record_links.controllers.main.request", _req):
             res = ctl.search(term=term)
 
         labels = {s["label"] for s in res["suggestions"]}

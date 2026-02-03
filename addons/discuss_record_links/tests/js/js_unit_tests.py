@@ -1,12 +1,12 @@
 import time
 
-from odoo.addons.product_connect.tests.common_imports import JS_TAGS, tagged  # reuse shared tags
+from odoo.addons.opw_custom.tests.common_imports import JS_TAGS, tagged  # reuse shared tags
 
 try:
     import requests  # type: ignore
 except ImportError:  # pragma: no cover - optional dependency in some CI images
     requests = None  # type: ignore
-from odoo.addons.product_connect.tests.fixtures.base import TourTestCase  # stable base with test user
+from odoo.addons.opw_custom.tests.fixtures.base import TourTestCase  # stable base with test user
 
 
 def _unit_test_error_checker(message: str) -> bool:

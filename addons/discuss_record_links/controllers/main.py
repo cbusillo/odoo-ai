@@ -1,4 +1,4 @@
-from odoo import http
+from odoo import fields, http
 from odoo.http import request
 
 from ..models.config_util import ModelCfg, extract_template_fields, load_config, parse_prefix, render_template
@@ -13,20 +13,15 @@ class DiscussRecordLinks(http.Controller):
         model_filter, query = parse_prefix(term or "", cfg)
         tokens = [t for t in (query or "").strip().split() if t]
 
-        def build_domain(model_config: ModelCfg) -> list:
+        def build_domain(model_config: ModelCfg) -> fields.Domain | list:
             if not tokens:
                 return []
-            search_domain: list = []
             search_fields = model_config.search or ["name"]
-            for t in tokens:
-                # OR across all fields for this single token
-                leaves: list = [[f, "ilike", t] for f in search_fields]
-                if len(leaves) > 1:
-                    sub = ["|"] * (len(leaves) - 1) + leaves
-                else:
-                    sub = leaves[0]
-                search_domain = ["&", search_domain, sub] if search_domain else sub
-            return search_domain
+            search_domain: fields.Domain | None = None
+            for token in tokens:
+                or_domain = fields.Domain.OR([[(field, "ilike", token)] for field in search_fields])
+                search_domain = fields.Domain.AND([search_domain, or_domain]) if search_domain is not None else or_domain
+            return search_domain or fields.Domain([])
 
         suggestions = []
         for key, model_cfg in cfg.items():

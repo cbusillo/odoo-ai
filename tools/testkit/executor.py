@@ -221,7 +221,20 @@ class OdooExecutor:
             _TESTKIT_PYTHONPATH,
         )
 
-        run_container_name = _sanitize_container_name(f"testkit-{self.category}-{shard_base}-{int(time.time() * 1000)}")
+        project_name = ""
+        try:
+            project_name = (compose_env().get("ODOO_PROJECT_NAME") or "").strip()
+        except RuntimeError:
+            project_name = (
+                os.environ.get("ODOO_PROJECT_NAME")
+                or os.environ.get("ODOO_STACK_NAME")
+                or ""
+            ).strip()
+        project_prefix = f"{project_name}-" if project_name else ""
+
+        run_container_name = _sanitize_container_name(
+            f"{project_prefix}testkit-{self.category}-{shard_base}-{int(time.time() * 1000)}"
+        )
         command = ["docker", "compose", "run", "--rm", "--name", run_container_name]
         if coverage_run:
             host_session_dir = coverage_run.data_directory.parent.resolve()

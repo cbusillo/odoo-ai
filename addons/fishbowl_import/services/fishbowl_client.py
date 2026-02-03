@@ -1,8 +1,8 @@
-import ssl
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 
 import pymysql
+from odoo.addons.external_ids.utils.ssl_context import build_ssl_context
 
 
 @dataclass(frozen=True)
@@ -57,12 +57,7 @@ class FishbowlClient:
             cursor.close()
 
     def _open_connection(self) -> pymysql.connections.Connection:
-        ssl_options: ssl.SSLContext | None = None
-        if self._settings.use_ssl:
-            ssl_options = ssl.create_default_context()
-            if not self._settings.ssl_verify:
-                ssl_options.check_hostname = False
-                ssl_options.verify_mode = ssl.CERT_NONE
+        ssl_context = build_ssl_context(self._settings.use_ssl, self._settings.ssl_verify)
         return pymysql.connect(
             host=self._settings.host,
             user=self._settings.user,
@@ -71,7 +66,7 @@ class FishbowlClient:
             port=self._settings.port,
             charset="utf8mb4",
             autocommit=True,
-            ssl=ssl_options,
+            ssl=ssl_context,
         )
 
     def _require_connection(self) -> pymysql.connections.Connection:

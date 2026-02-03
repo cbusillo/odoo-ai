@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import ClassVar
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, TypeAdapter
 
@@ -6,7 +7,7 @@ FlagValue = bool | int | str | bytes | bytearray | memoryview | None
 
 
 class FishbowlRow(BaseModel):
-    model_config = ConfigDict(extra="forbid", populate_by_name=True, arbitrary_types_allowed=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", populate_by_name=True, arbitrary_types_allowed=True)
 
 
 class UnitRow(FishbowlRow):
@@ -132,18 +133,21 @@ class StatusRow(FishbowlRow):
     name: str | None = None
 
 
-class OrderRow(FishbowlRow):
+class OrderRowBase(FishbowlRow):
     id: int
     num: str | None = None
     statusId: int | None = None
+    dateIssued: datetime | None = None
+    dateCreated: datetime | None = None
+    note: str | None = None
+
+
+class OrderRow(OrderRowBase):
     customerId: int | None = None
     vendorId: int | None = None
     soId: int | None = None
-    dateIssued: datetime | None = None
-    dateCreated: datetime | None = None
     dateShipped: datetime | None = None
     customerPO: str | None = None
-    note: str | None = None
 
 
 # noinspection DuplicatedCode

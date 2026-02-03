@@ -59,12 +59,32 @@ class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
     def _format_phone_number(self, phone: str) -> str:
         if not phone or not phone.strip():
             return ""
+        stripped = phone.strip()
         country = self.env.company.country_id or self.env["res.country"].search([("code", "=", "US")], limit=1)
         if not country:
-            return phone.strip()
+            return stripped
         phone_code = int(country.phone_code or 0)
         formatted = phone_format(phone, country.code, phone_code, force_format="E164", raise_exception=False)
-        return formatted or phone.strip()
+        if formatted:
+            return formatted
+
+        normalized = normalize_phone(stripped)
+        if not normalized:
+            return stripped
+
+        if phone_code:
+            code_value = str(phone_code)
+            if len(normalized) == 10:
+                return f"+{code_value}{normalized}"
+            if normalized.startswith(code_value):
+                return f"+{normalized}"
+            if len(normalized) == len(code_value) + 10:
+                return f"+{normalized}"
+
+        if normalized.startswith("1") and len(normalized) == 11:
+            return f"+{normalized}"
+
+        return stripped
 
     @staticmethod
     def _geolocalize_partner(partner: "odoo.model.res_partner") -> None:

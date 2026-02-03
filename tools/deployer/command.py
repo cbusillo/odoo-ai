@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 class CommandError(RuntimeError):
-    def __init__(self, command: Sequence[str], returncode: int, stdout: str | None, stderr: str | None):
+    def __init__(self, command: Sequence[str], returncode: int, stdout: str | None, stderr: str | None) -> None:
         joined_command = " ".join(shlex.quote(part) for part in command)
         message = f"command failed ({returncode}): {joined_command}"
         super().__init__(message)

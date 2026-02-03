@@ -6,7 +6,7 @@ from shutil import disk_usage
 
 import click
 
-from tools.deployer.settings import discover_repo_root, load_stack_settings
+from tools.deployer.settings import discover_repo_root, load_stack_settings, security_environment_issues
 
 from .db import db_capacity
 from .docker_api import compose_env
@@ -14,10 +14,9 @@ from .phases import PhaseOutcome
 from .reporter import load_json
 from .session import PhaseName, TestSession
 from .settings import TestSettings
-from .sharding import plan_shards_for_phase
 
 
-def _emit_bottomline(latest: Path, as_json: bool) -> int:
+def _emit_bottom_line(latest: Path, as_json: bool) -> int:
     summary_path = latest / "summary.json"
     if not summary_path.exists():
         if as_json:
@@ -84,6 +83,13 @@ def _normalize_stack_name(stack: str | None, env_file: Path | None) -> str | Non
     return None
 
 
+def _stack_is_ci(stack_name: str | None) -> bool:
+    if not stack_name:
+        return False
+    stack_segments = [segment for segment in stack_name.split("-") if segment]
+    return "ci" in stack_segments
+
+
 def _prefer_continuous_integration_stack(stack: str | None, env_file: Path | None) -> str | None:
     if not stack or env_file:
         return stack
@@ -111,10 +117,16 @@ def _apply_stack_env(stack: str | None, env_file: str | None) -> None:
     if stack_name is None:
         raise click.ClickException("Unable to resolve stack name; provide --stack or --env-file.")
     settings = load_stack_settings(stack_name, env_path)
+    issues = security_environment_issues(settings.environment)
+    if issues:
+        formatted = "\n".join(f"- {issue}" for issue in issues)
+        raise click.ClickException(f"Security guardrails failed for stack '{stack_name}':\n{formatted}")
     os.environ.update(settings.environment)
     os.environ["TESTKIT_ENV_FILE"] = str(settings.env_file)
     os.environ["ODOO_STACK_NAME"] = stack_name
     os.environ["TESTKIT_DISABLE_DEV_MODE"] = "1"
+    if _stack_is_ci(stack_name):
+        os.environ.setdefault("TESTKIT_VOLUME_CLEANUP", "1")
 
 
 def _apply_shard_overrides(
@@ -178,7 +190,7 @@ def _run_phase_and_exit(test_session: TestSession, phase: PhaseName, timeout: in
     outcomes = _phase_outcomes(phase, outcome)
     return_code = test_session.finish(outcomes)
     if json_out:
-        _emit_bottomline(Path("tmp/test-logs/latest"), True)
+        _emit_bottom_line(Path("tmp/test-logs/latest"), True)
     sys.exit(return_code)
 
 
@@ -257,7 +269,6 @@ def run_all(
             "nohup",
             "env",
             "DETACHED_SPAWNED=1",
-            "TEST_DETACHED=1",
             "uv",
             "run",
             "test",
@@ -343,7 +354,7 @@ def run_all(
     ).run()
     if json_out:
         latest = Path("tmp/test-logs/latest")
-        _emit_bottomline(latest, True)
+        _emit_bottom_line(latest, True)
     sys.exit(return_code)
 
 
@@ -412,7 +423,6 @@ def run_js(
             "nohup",
             "env",
             "DETACHED_SPAWNED=1",
-            "TEST_DETACHED=1",
             "uv",
             "run",
             "test",
@@ -522,7 +532,6 @@ def run_tour(
             "nohup",
             "env",
             "DETACHED_SPAWNED=1",
-            "TEST_DETACHED=1",
             "uv",
             "run",
             "test",
@@ -621,42 +630,10 @@ def plan_cmd(
         tour_exclude=tour_exclude,
     )
 
-    def _phase_plan(name: PhaseName, shards: int | None) -> dict:
-        module_names = test_session.discover_modules(name)
-        if name == "unit":
-            shard_count = shards if shards is not None else test_session.settings.unit_shards
-        elif name == "js":
-            shard_count = shards if shards is not None else test_session.settings.js_shards
-        elif name == "integration":
-            shard_count = shards if shards is not None else test_session.settings.integration_shards
-        else:
-            shard_count = shards if shards is not None else test_session.settings.tour_shards
-        # Resolve auto value if <=0 using session heuristics
-        if not module_names:
-            effective_shards = 1
-        else:
-            if (shard_count or 0) <= 0:
-                try:
-                    cpu_count = len(os.sched_getaffinity(0))  # type: ignore[attr-defined]
-                except (AttributeError, OSError):
-                    cpu_count = os.cpu_count() or 4
-                default_auto = 4 if name == "unit" else 2
-                effective_shards = max(1, min(cpu_count, default_auto, len(module_names)))
-            else:
-                effective_shards = max(1, min(shard_count, len(module_names)))  # type: ignore[arg-type]
-        plan = plan_shards_for_phase(module_names, name, effective_shards)
-        return {
-            "phase": name,
-            "shards": plan.shards,
-            "total_weight": plan.total_weight,
-            "shards_count": plan.shards_count,
-            "strategy": plan.strategy,
-        }
-
     if phase == "all":
-        phases = list(_PHASES)
+        phases: list[PhaseName] = list(_PHASES)
     else:
-        phase_name = next(value for value in _PHASES if value == phase)
+        phase_name: PhaseName = next(value for value in _PHASES if value == phase)
         phases = [phase_name]
     payload = {"schema": "plan.v1", "phases": {}}
     for phase_name in phases:
@@ -668,7 +645,7 @@ def plan_cmd(
             phase_shards = integration_shards
         else:
             phase_shards = tour_shards
-        payload["phases"][phase_name] = _phase_plan(phase_name, phase_shards)
+        payload["phases"][phase_name] = test_session.plan_phase(phase_name, phase_shards)
 
     output = json.dumps(payload, indent=2)
     if json_out:
@@ -902,6 +879,99 @@ def doctor_cmd(stack: str | None, env_file: str | None, json_out: bool) -> None:
         click.echo(f"Disk free: {free_pct}%")
         click.echo(f"CPUs: {cpu_count}")
     sys.exit(0)
+
+
+@test.command("doctor-session")
+@click.option("--session", default=None, help="Specific session dir name")
+@click.option("--json", "json_out", is_flag=True, help="Emit JSON output")
+def doctor_session_cmd(session: str | None, json_out: bool) -> None:
+    """Summarize the latest session (slow shards, timeouts, failures)."""
+    base_dir = Path("tmp/test-logs")
+    if session:
+        session_dir = base_dir / session
+    else:
+        current_pointer = base_dir / "current"
+        session_dir = current_pointer if current_pointer.exists() else base_dir / "latest"
+
+    llm_path = session_dir / "llm.json"
+    summary_path = session_dir / "summary.json"
+    if not llm_path.exists() and not summary_path.exists():
+        payload = {"status": "missing", "session": str(session_dir)}
+        if json_out:
+            print(json.dumps(payload))
+        else:
+            click.echo("No session data found")
+        raise SystemExit(2)
+    if not llm_path.exists():
+        payload = {"status": "llm_missing", "session": str(session_dir)}
+        if summary_path.exists():
+            payload["summary"] = str(summary_path.resolve())
+        if json_out:
+            print(json.dumps(payload))
+        else:
+            click.echo("llm.json missing for session")
+        raise SystemExit(2)
+
+    llm_data = load_json(llm_path)
+    if not isinstance(llm_data, dict):
+        payload = {"status": "invalid", "session": str(session_dir), "llm": str(llm_path.resolve())}
+        if json_out:
+            print(json.dumps(payload))
+        else:
+            click.echo("Invalid llm.json for session")
+        raise SystemExit(3)
+    phases_data = llm_data.get("phases")
+    phases: dict[str, object] = phases_data if isinstance(phases_data, dict) else {}
+    shard_rows: list[dict[str, object]] = []
+    for phase_name, phase_payload in phases.items():
+        if not isinstance(phase_payload, dict):
+            continue
+        summaries = phase_payload.get("shard_summaries")
+        if not isinstance(summaries, list):
+            continue
+        for summary_entry in summaries:
+            if not isinstance(summary_entry, dict):
+                continue
+            row = dict(summary_entry)
+            row["phase"] = phase_name
+            shard_rows.append(row)
+
+    def _elapsed_seconds(shard_entry: dict[str, object]) -> float:
+        value = shard_entry.get("elapsed_seconds")
+        if value is None:
+            return 0.0
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value)
+            except ValueError:
+                return 0.0
+        return 0.0
+
+    slowest = sorted(shard_rows, key=_elapsed_seconds, reverse=True)[:5]
+    timeouts = [shard_entry for shard_entry in shard_rows if shard_entry.get("timed_out")]
+    failures = llm_data.get("failures") or []
+    payload = {
+        "session": str(session_dir),
+        "slowest_shards": slowest,
+        "timeouts": timeouts,
+        "failure_count": len(failures),
+    }
+    if json_out:
+        print(json.dumps(payload))
+        raise SystemExit(0)
+
+    click.echo(f"Session: {session_dir}")
+    if timeouts:
+        click.echo(f"Timeouts: {len(timeouts)}")
+    else:
+        click.echo("Timeouts: none")
+    click.echo(f"Failures: {len(failures)}")
+    click.echo("Slowest shards:")
+    for shard_entry in slowest:
+        click.echo(f"- {shard_entry.get('phase')} {shard_entry.get('shard')} {shard_entry.get('elapsed_seconds')}s")
+    raise SystemExit(0)
 
 
 @test.command("validate")

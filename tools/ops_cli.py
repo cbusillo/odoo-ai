@@ -41,6 +41,7 @@ from tools.deployer.settings import (
     discover_repo_root,
     load_stack_settings,
     parse_env_file,
+    security_environment_issues,
     resolve_addon_dirs,
 )
 from tools.stack_restore import restore_stack
@@ -357,6 +358,26 @@ def _render_cli_command(
         return shlex.join(command_parts)
 
     return shlex.join(command_parts)
+
+
+def _ensure_security_environment(settings: StackSettings) -> None:
+    issues = security_environment_issues(settings.environment)
+    if not issues:
+        return
+    formatted = "\n".join(f"- {issue}" for issue in issues)
+    raise click.ClickException(f"Security guardrails failed for stack '{settings.name}':\n{formatted}")
+
+
+def _load_stack_settings_with_security_checks(
+    stack: str,
+    env_file: Path | None,
+    *,
+    require_security: bool,
+) -> StackSettings:
+    settings = load_stack_settings(stack, env_file)
+    if require_security:
+        _ensure_security_environment(settings)
+    return settings
 
 
 def _run(cmd: Sequence[str], *, dry_run: bool = False, display: bool = True) -> None:
@@ -1328,12 +1349,17 @@ def _run_local_action(
     env_file: Path | None,
     skip_env: bool,
 ) -> None:
+    require_security = True
     if action == "info":
         payloads: list[dict[str, object]] = []
         for entry in _targets_for(target):
             stack = _resolve_local_stack(entry)
             env_file_path = env_file if env_file is not None else _resolve_local_env_file(entry)
-            settings = load_stack_settings(stack, env_file_path)
+            settings = _load_stack_settings_with_security_checks(
+                stack,
+                env_file_path,
+                require_security=require_security,
+            )
             payloads.append(_local_info_payload(settings))
         _emit_local_info(payloads, json_output=json_output)
         return
@@ -1344,7 +1370,11 @@ def _run_local_action(
         stack = _resolve_local_stack(entry)
         env_file_path = env_file if env_file is not None else _resolve_local_env_file(entry)
         if action == "down":
-            settings = load_stack_settings(stack, env_file_path)
+            settings = _load_stack_settings_with_security_checks(
+                stack,
+                env_file_path,
+                require_security=require_security,
+            )
             if dry_run:
                 _run_local_compose(settings, ["down", "--remove-orphans"], dry_run=True)
                 console.print(f"[dry-run] {entry} local down cleanup (anonymous volumes)")
@@ -1356,39 +1386,71 @@ def _run_local_action(
             console.print(f"{entry} local down complete")
             continue
         if action == "doctor":
-            settings = load_stack_settings(stack, env_file_path)
+            settings = _load_stack_settings_with_security_checks(
+                stack,
+                env_file_path,
+                require_security=require_security,
+            )
             _print_local_doctor(entry, settings)
             continue
         if action == "restart":
-            settings = load_stack_settings(stack, env_file_path)
+            settings = _load_stack_settings_with_security_checks(
+                stack,
+                env_file_path,
+                require_security=require_security,
+            )
             _run_local_restart(settings, dry_run=dry_run)
             console.print(f"{entry} local restart complete")
             continue
         if action == "upgrade":
-            settings = load_stack_settings(stack, env_file_path)
+            settings = _load_stack_settings_with_security_checks(
+                stack,
+                env_file_path,
+                require_security=require_security,
+            )
             _run_local_upgrade(settings, dry_run=dry_run)
             console.print(f"{entry} local upgrade complete")
             continue
         if action == "upgrade-restart":
-            settings = load_stack_settings(stack, env_file_path)
+            settings = _load_stack_settings_with_security_checks(
+                stack,
+                env_file_path,
+                require_security=require_security,
+            )
             _run_local_upgrade(settings, dry_run=dry_run)
             _run_local_restart(settings, dry_run=dry_run)
             console.print(f"{entry} local upgrade + restart complete")
             continue
         if action == "openupgrade":
-            settings = load_stack_settings(stack, env_file_path)
+            settings = _load_stack_settings_with_security_checks(
+                stack,
+                env_file_path,
+                require_security=require_security,
+            )
             _run_local_openupgrade(settings, dry_run=dry_run)
             console.print(f"{entry} local openupgrade complete")
             continue
         if action == "exec":
-            settings = load_stack_settings(stack, env_file_path)
+            settings = _load_stack_settings_with_security_checks(
+                stack,
+                env_file_path,
+                require_security=require_security,
+            )
             _run_local_exec(settings, command, service=service, skip_env=skip_env, dry_run=dry_run)
             continue
         if action == "shell":
-            settings = load_stack_settings(stack, env_file_path)
+            settings = _load_stack_settings_with_security_checks(
+                stack,
+                env_file_path,
+                require_security=require_security,
+            )
             _run_local_shell(settings, command, service=service, skip_env=skip_env, dry_run=dry_run)
             continue
-        settings = load_stack_settings(stack, env_file_path)
+        settings = _load_stack_settings_with_security_checks(
+            stack,
+            env_file_path,
+            require_security=require_security,
+        )
         if dry_run:
             extras: list[str] = []
             if build:

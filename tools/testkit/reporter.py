@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import time
 import xml.etree.ElementTree as ElementTree
 from datetime import datetime
@@ -98,7 +99,182 @@ def write_digest(session_dir: Path, aggregate: dict) -> None:
         "return_codes": aggregate.get("return_codes") or {},
         "summary": str((session_dir / "summary.json").resolve()),
     }
+    llm_path = session_dir / "llm.json"
+    if llm_path.exists():
+        digest["llm"] = str(llm_path.resolve())
     (session_dir / "digest.json").write_text(json.dumps(digest, indent=2))
+
+
+def _group_failures(entries: list[dict]) -> list[dict[str, object]]:
+    grouped: dict[str, dict[str, object]] = {}
+    for entry in entries:
+        fingerprint = str(entry.get("fingerprint") or entry.get("test") or entry.get("message") or "unknown")
+        group = grouped.setdefault(
+            fingerprint,
+            {
+                "fingerprint": fingerprint,
+                "count": 0,
+                "sample": entry,
+            },
+        )
+        current_count = group.get("count")
+        group_count = current_count if isinstance(current_count, int) else 0
+        group["count"] = group_count + 1
+
+    def _count(item: dict[str, object]) -> int:
+        value = item.get("count")
+        return value if isinstance(value, int) else 0
+
+    return sorted(grouped.values(), key=_count, reverse=True)
+
+
+def _build_repro_command(
+    phase: str,
+    modules: list[str],
+    *,
+    stack_name: str | None,
+    env_file: str | None,
+) -> str:
+    command = ["uv", "run", "test", phase]
+    if env_file:
+        command.extend(["--env-file", env_file])
+    elif stack_name:
+        command.extend(["--stack", stack_name])
+    for module_name in modules:
+        command.extend(["--modules", module_name])
+    return " ".join(command)
+
+
+_TEST_ID_RE = re.compile(r"^(?P<test>[^()]+?)\s*\((?P<path>[^)]+)\)$")
+
+
+def _extract_module_from_path(path: str) -> str | None:
+    if ".addons." in path:
+        tail = path.split(".addons.", 1)[1]
+        parts = [part for part in tail.split(".") if part]
+        if parts:
+            return parts[0]
+    return None
+
+
+def _normalize_failure(entry: dict) -> dict:
+    normalized = dict(entry)
+    test_id = entry.get("test")
+    if not test_id:
+        return normalized
+    match = _TEST_ID_RE.match(str(test_id))
+    if not match:
+        return normalized
+    test_name = match.group("test").strip()
+    path = match.group("path").strip()
+    module_name = _extract_module_from_path(path)
+    class_name = path.split(".")[-1] if path else None
+    normalized["test_name"] = test_name
+    normalized["test_path"] = path
+    if module_name:
+        normalized["module"] = module_name
+    if class_name:
+        normalized["class"] = class_name
+    return normalized
+
+
+def write_llm_report(session_dir: Path, aggregate: dict) -> Path:
+    env_context = aggregate.get("environment") or {}
+    stack_name = env_context.get("stack_name") if isinstance(env_context, dict) else None
+    env_file = env_context.get("env_file") if isinstance(env_context, dict) else None
+    phases: dict[str, object] = {}
+    all_failures: list[dict] = []
+    for phase in ("unit", "js", "integration", "tour"):
+        phase_dir = session_dir / phase
+        summary = load_json(phase_dir / "all.summary.json") or {}
+        failures_payload = load_json(phase_dir / "all.failures.json") or {}
+        entries: list[dict] = failures_payload.get("entries") or []
+        for entry in entries:
+            entry.setdefault("phase", phase)
+        all_failures.extend(entries)
+        normalized_entries = [_normalize_failure(entry) for entry in entries]
+        shard_summaries: list[dict[str, object]] = []
+        for summary_path in sorted(phase_dir.glob("*.summary.json")):
+            if summary_path.name == "all.summary.json":
+                continue
+            shard_payload = load_json(summary_path) or {}
+            modules = shard_payload.get("modules") or []
+            modules_list = [module for module in modules if isinstance(module, str)]
+            log_path = shard_payload.get("log_file")
+            shard_summaries.append(
+                {
+                    "shard": summary_path.stem.replace(".summary", ""),
+                    "returncode": shard_payload.get("returncode"),
+                    "elapsed_seconds": shard_payload.get("elapsed_seconds"),
+                    "timeout": shard_payload.get("timeout"),
+                    "timed_out": bool(shard_payload.get("timed_out", False)),
+                    "container_name": shard_payload.get("container_name"),
+                    "log_file": log_path,
+                    "summary_file": str(summary_path.resolve()),
+                    "database": shard_payload.get("database"),
+                    "modules": modules_list,
+                    "test_tags": shard_payload.get("test_tags"),
+                    "repro": _build_repro_command(phase, modules_list, stack_name=stack_name, env_file=env_file)
+                    if modules_list
+                    else None,
+                }
+            )
+        phases[phase] = {
+            "success": bool(summary.get("success", False)),
+            "counters": summary.get("counters") or {},
+            "shards": summary.get("shards"),
+            "failure_count": len(entries),
+            "sample_failures": normalized_entries[:10],
+            "shard_summaries": shard_summaries,
+            "log_dir": str(phase_dir),
+        }
+
+    normalized_failures = [_normalize_failure(entry) for entry in all_failures]
+    repro_by_phase: dict[str, str] = {}
+    modules_by_phase: dict[str, set[str]] = {"unit": set(), "js": set(), "integration": set(), "tour": set()}
+    for failure in normalized_failures:
+        phase_name = failure.get("phase")
+        module_name = failure.get("module")
+        if (
+            isinstance(phase_name, str)
+            and phase_name in modules_by_phase
+            and isinstance(module_name, str)
+            and module_name
+        ):
+            modules_by_phase[phase_name].add(module_name)
+    for phase_name, module_names in modules_by_phase.items():
+        if module_names:
+            repro_by_phase[phase_name] = _build_repro_command(
+                phase_name,
+                sorted(module_names),
+                stack_name=stack_name,
+                env_file=env_file,
+            )
+
+    report = {
+        "schema_version": SUMMARY_SCHEMA_VERSION,
+        "session": aggregate.get("session"),
+        "session_dir": str(session_dir.resolve()),
+        "success": bool(aggregate.get("success")),
+        "elapsed_seconds": aggregate.get("elapsed_seconds"),
+        "counters_total": aggregate.get("counters_total") or {},
+        "return_codes": aggregate.get("return_codes") or {},
+        "environment": aggregate.get("environment") or {},
+        "preflight": aggregate.get("preflight") or {},
+        "sharding": aggregate.get("sharding") or {},
+        "phases": phases,
+        "repro": repro_by_phase,
+        "failures": normalized_failures,
+        "failure_groups": _group_failures(normalized_failures)[:20],
+        "paths": {
+            "summary": str((session_dir / "summary.json").resolve()),
+            "events": str((session_dir / "events.ndjson").resolve()),
+            "manifest": str((session_dir / "manifest.json").resolve()),
+        },
+    }
+    output_path = session_dir / "llm.json"
+    output_path.write_text(json.dumps(report, indent=2))
+    return output_path
 
 
 def begin_session_dir() -> tuple[Path, str, float]:
@@ -130,10 +306,17 @@ def aggregate_phase(session_dir: Path, phase: str) -> dict | None:
                 counter_totals[counter_name] += int(counter_values.get(counter_name, 0))
             except (ValueError, TypeError):
                 continue
-        all_successful = all_successful and bool(summary_data.get("success", False))
+        summary_success = bool(summary_data.get("success", False))
+        all_successful = all_successful and summary_success
         # parse failures from corresponding log
         log_file = summary_data.get("log_file")
-        if log_file:
+        failure_count = 0
+        try:
+            failure_count += int(counter_values.get("failures", 0))
+            failure_count += int(counter_values.get("errors", 0))
+        except (TypeError, ValueError):
+            failure_count = 0
+        if log_file and (not summary_success or failure_count > 0):
             merged_failure_entries.extend(parse_failures(Path(log_file)))
     aggregate_data = {
         "schema_version": SUMMARY_SCHEMA_VERSION,

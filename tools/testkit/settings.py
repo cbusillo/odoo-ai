@@ -7,6 +7,43 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 SUMMARY_SCHEMA_VERSION = "1.0"
 
 
+def _load_pyproject_template_defaults() -> dict[str, object]:
+    try:
+        import tomllib
+
+        with open("pyproject.toml", "rb") as file_handle:
+            data = tomllib.load(file_handle)
+        return data.get("tool", {}).get("odoo-test", {}).get("template", {}) or {}
+    except (OSError, ValueError):
+        return {}
+
+
+_PYPROJECT_TEMPLATE_DEFAULTS = _load_pyproject_template_defaults()
+
+
+def _template_bool(key: str, default: bool) -> bool:
+    value = _PYPROJECT_TEMPLATE_DEFAULTS.get(key, default)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return default
+
+
+def _template_int(key: str, default: int) -> int:
+    value = _PYPROJECT_TEMPLATE_DEFAULTS.get(key, default)
+    if isinstance(value, bool):
+        return 1 if value else 0
+    if isinstance(value, (int, float, str)):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+    return default
+
+
 class TestSettings(BaseSettings):
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         case_sensitive=False,
@@ -21,15 +58,11 @@ class TestSettings(BaseSettings):
     db_name: str = Field("odoo", alias="ODOO_DB_NAME")
 
     # Runner toggles and parameters
-    test_unit_split: bool = Field(True, alias="TEST_UNIT_SPLIT")
     test_keep_going: bool = Field(True, alias="TEST_KEEP_GOING")
     test_log_keep: int = Field(12, alias="TEST_LOG_KEEP")
-    test_scoped_cleanup: bool = Field(True, alias="TEST_SCOPED_CLEANUP")
 
-    tour_warmup: int = Field(1, alias="TOUR_WARMUP")
     js_workers: int = Field(0, alias="JS_WORKERS")
     tour_workers: int = Field(0, alias="TOUR_WORKERS")
-    test_detached: bool = Field(False, alias="TEST_DETACHED")
 
     test_tags_override: str | None = Field(None, alias="TEST_TAGS")
     test_log_session: str | None = Field(None, alias="TEST_LOG_SESSION")
@@ -40,6 +73,7 @@ class TestSettings(BaseSettings):
     integration_shards: int = Field(0, alias="INTEGRATION_SHARDS")
     tour_shards: int = Field(0, alias="TOUR_SHARDS")
     max_procs: int = Field(0, alias="TEST_MAX_PROCS")  # 0 -> auto
+    shard_timeout: int = Field(0, alias="TESTKIT_SHARD_TIMEOUT")
     # Within-module sharding (split heavy modules by class/file)
     unit_within_shards: int = Field(0, alias="UNIT_WITHIN_SHARDS")
     integration_within_shards: int = Field(0, alias="INTEGRATION_WITHIN_SHARDS")
@@ -52,7 +86,6 @@ class TestSettings(BaseSettings):
     skip_filestore_tour: bool = Field(False, alias="SKIP_FILESTORE_TOUR")
 
     # Connection guardrails (soft caps)
-    db_max_connections: int = Field(100, alias="DB_MAX_CONNECTIONS")
     conn_per_shard: int = Field(4, alias="DB_CONN_PER_SHARD")
     conn_reserve: int = Field(10, alias="DB_CONN_RESERVE")
 
@@ -60,8 +93,8 @@ class TestSettings(BaseSettings):
     events_stdout: bool = Field(False, alias="EVENTS_STDOUT")
 
     # Template reuse (between sessions)
-    reuse_template: bool = Field(False, alias="REUSE_TEMPLATE")
-    template_ttl_sec: int = Field(0, alias="TEMPLATE_TTL_SEC")
+    reuse_template: bool = Field(_template_bool("reuse", False), alias="REUSE_TEMPLATE")
+    template_ttl_sec: int = Field(_template_int("ttl_sec", 0), alias="TEMPLATE_TTL_SEC")
 
     # Coverage toggles (pass-through / future use)
     coverage_py: bool = Field(False, alias="COVERAGE_PY")

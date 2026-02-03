@@ -46,6 +46,8 @@ docker-compose.yml
 ## Notes
 
 - Keep secrets in `.env` (untracked); tracked env files should stay non-secret.
+- `ODOO_MASTER_PASSWORD` is required for all stacks; set it in `.env`.
+- `ODOO_LIST_DB` must be `False` to disable the database manager UI.
 - Create a local `docker-compose.override.yml` to expose ports and mount the
   repo for live-editing (see `docs/workflows/multi-project.md`).
 - Local-only overrides live in the env files (for example `ODOO_WEB_COMMAND`

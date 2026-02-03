@@ -57,6 +57,53 @@ def _executed_modules(session_dir: Path, phase: str) -> list[str]:
     return sorted(modules)
 
 
+def _tag_requirements() -> dict[str, tuple[str, ...]]:
+    return {
+        "unit": ("UNIT_TAGS", "unit_test"),
+        "integration": ("INTEGRATION_TAGS", "integration_test"),
+        "tour": ("TOUR_TAGS", "tour_test"),
+        "js": ("JS_TAGS", "js_test"),
+    }
+
+
+def _missing_tagged_tests(addons_root: Path) -> dict[str, list[str]]:
+    missing: dict[str, list[str]] = {phase: [] for phase in _tag_requirements()}
+    for phase, needles in _tag_requirements().items():
+        for test_file in addons_root.glob(f"**/tests/{phase}/*.py"):
+            if test_file.name == "__init__.py":
+                continue
+            text = test_file.read_text(errors="ignore")
+            if not any(needle in text for needle in needles):
+                missing[phase].append(str(test_file))
+    return missing
+
+
+def _missing_test_package_inits(addons_root: Path) -> dict[str, list[str]]:
+    missing: dict[str, list[str]] = {phase: [] for phase in _tag_requirements()}
+    for phase in _tag_requirements():
+        for test_dir in addons_root.glob(f"*/tests/{phase}"):
+            if not test_dir.is_dir():
+                continue
+            py_files = [path for path in test_dir.glob("*.py") if path.name != "__init__.py"]
+            if py_files and not (test_dir / "__init__.py").exists():
+                missing[phase].append(str(test_dir))
+    return missing
+
+
+def check_test_structure(addons_root: Path) -> dict[str, object]:
+    missing_tags = _missing_tagged_tests(addons_root)
+    missing_inits = _missing_test_package_inits(addons_root)
+    tags_ok = all(len(items) == 0 for items in missing_tags.values())
+    init_ok = all(len(items) == 0 for items in missing_inits.values())
+    return {
+        "missing_tags": missing_tags,
+        "missing_init": missing_inits,
+        "tags_ok": tags_ok,
+        "init_ok": init_ok,
+        "ok": tags_ok and init_ok,
+    }
+
+
 def _failures_summary(session_dir: Path) -> dict[str, dict[str, int]]:
     phase_failures: dict[str, dict[str, int]] = {}
     for phase in ("unit", "js", "integration", "tour"):
@@ -93,6 +140,10 @@ def validate(session: str | None = None, json_out: bool = False) -> int:
     ok_modules = all(len(missing_modules) == 0 for missing_modules in missing.values())
 
     failures = _failures_summary(session_dir)
+    missing_tags = _missing_tagged_tests(addons_root)
+    missing_inits = _missing_test_package_inits(addons_root)
+    tags_ok = all(len(items) == 0 for items in missing_tags.values())
+    init_ok = all(len(items) == 0 for items in missing_inits.values())
 
     payload = {
         "session": session_dir.name,
@@ -101,6 +152,10 @@ def validate(session: str | None = None, json_out: bool = False) -> int:
         "counts_ok": ok_counts,
         "missing_modules": missing,
         "modules_ok": ok_modules,
+        "missing_tags": missing_tags,
+        "tags_ok": tags_ok,
+        "missing_init": missing_inits,
+        "init_ok": init_ok,
         "failures": failures,
         "summary": str((session_dir / "summary.json").resolve()),
     }
@@ -126,10 +181,20 @@ def validate(session: str | None = None, json_out: bool = False) -> int:
                 f"  {phase:<12}: {failure_counts.get('fail', 0)}/"
                 f"{failure_counts.get('error', 0)}/{failure_counts.get('js_fail', 0)}"
             )
+        if not tags_ok:
+            print("Files missing expected phase tags:")
+            for phase, files in missing_tags.items():
+                if files:
+                    print(f"  {phase:<12}: {', '.join(files)}")
+        if not init_ok:
+            print("Test directories missing __init__.py:")
+            for phase, dirs in missing_inits.items():
+                if dirs:
+                    print(f"  {phase:<12}: {', '.join(dirs)}")
         print(f"Summary: {payload['summary']}")
 
-    # Final code: counts and modules must be OK; failures/errors allowed per your policy
-    return 0 if (ok_counts and ok_modules) else 1
+    # Final code: counts/modules/tags/package markers must be OK; failures/errors allowed per your policy
+    return 0 if (ok_counts and ok_modules and tags_ok and init_ok) else 1
 
 
 def main(argv: list[str] | None = None) -> int:

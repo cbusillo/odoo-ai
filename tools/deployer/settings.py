@@ -50,6 +50,33 @@ def parse_env_file(path: Path) -> dict[str, str]:
     return values
 
 
+_FALSY_SETTING_VALUES = {"false", "0", "no", "off"}
+
+
+def _is_false_setting(raw_value: str | None) -> bool:
+    if raw_value is None:
+        return False
+    normalized = raw_value.strip().lower()
+    if not normalized:
+        return False
+    return normalized in _FALSY_SETTING_VALUES
+
+
+def security_environment_issues(environment: dict[str, str]) -> tuple[str, ...]:
+    issues: list[str] = []
+    master_password = (environment.get("ODOO_MASTER_PASSWORD") or "").strip()
+    if not master_password:
+        issues.append(
+            "Missing ODOO_MASTER_PASSWORD (set a non-empty value in .env or the deployment environment)."
+        )
+    list_db_value = environment.get("ODOO_LIST_DB")
+    if not _is_false_setting(list_db_value):
+        issues.append(
+            "ODOO_LIST_DB must be false to disable the database manager (set ODOO_LIST_DB=False)."
+        )
+    return tuple(issues)
+
+
 def split_values(raw_value: str | None) -> tuple[str, ...]:
     if not raw_value:
         return ()
@@ -470,6 +497,9 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
     final_environment["ODOO_DATA_HOST_DIR"] = str(data_dir_host)
     final_environment["ODOO_LOG_HOST_DIR"] = str(log_dir_host)
     final_environment["ODOO_DB_HOST_DIR"] = str(db_dir_host)
+    final_environment["ODOO_DATA_MOUNT"] = str(data_dir_host)
+    final_environment["ODOO_LOG_MOUNT"] = str(log_dir_host)
+    final_environment["ODOO_DB_MOUNT"] = str(db_dir_host)
     final_environment["ODOO_DATA_DIR"] = "/volumes/data"
     final_environment["ODOO_LOG_DIR"] = "/volumes/logs"
     final_environment["ODOO_DB_DIR"] = "/var/lib/postgresql/data"

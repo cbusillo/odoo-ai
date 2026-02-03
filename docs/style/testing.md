@@ -18,6 +18,19 @@ Sources of Truth
 - `addons/*/static/tests/` — JS/Hoot/tour tests.
 - `addons/*/static/tests/helpers/` — shared JS helpers (when present).
 
+Recorded Tours
+
+- DB-recorded tours live in `web_tour.tour`/`web_tour.tour.step`
+  (recorded via the UI recorder).
+- Export recorded tours to stdout (transient):
+
+  ```bash
+  uv run ops local shell opw < tools/tour_recorder/export_recorded_tours.py
+  ```
+
+- Seed at test time by passing `RECORDED_TOURS_JSON` or
+  `RECORDED_TOURS_PATH` (e.g., a temp file).
+
 Basics
 
 - Place Python tests under `addons/<module>/tests/` and JS/tours under

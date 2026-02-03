@@ -23,6 +23,8 @@ x-odoo-env: &odoo-env
   ODOO_DB_HOST: database
   ODOO_DB_PORT: "5432"
   ODOO_ADDONS_PATH: /opt/project/addons,/opt/extra_addons,/odoo/addons
+  ODOO_LIST_DB: "False"
+  ODOO_MASTER_PASSWORD: ${ODOO_MASTER_PASSWORD:?Set ODOO_MASTER_PASSWORD}
   IMAGE_ODOO_ENTERPRISE_LOCATION: /volumes/enterprise_disabled
   IMAGE_EXTRA_ADDONS_LOCATION: /opt/extra_addons
 

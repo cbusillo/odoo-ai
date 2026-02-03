@@ -96,6 +96,8 @@ Behavior notes
 
 - Local actions run deployer helpers directly and use the stack env files
   (`docker/config/{target}-local.env`).
+- Local actions enforce security guardrails: `ODOO_MASTER_PASSWORD` must be set
+  and `ODOO_LIST_DB` must be `False` to keep the database manager disabled.
 - `uv run ops local info` prints machine-readable stack metadata (paths + identifiers
   only; no secrets) derived from `load_stack_settings()`.
 - Restore/init runs `docker/scripts/restore_from_upstream.py` (restore/boot,

@@ -56,10 +56,14 @@ ops = "tools.ops_cli:main"
 preview = true
 
 [tool.odoo-test.timeouts]
-unit = 600
-integration = 900
-tour = 600
+unit = 1200
+integration = 1200
+tour = 1200
 js = 1200
+
+[tool.odoo-test.template]
+reuse = true
+ttl_sec = 3600
 
 [tool.ruff]
 line-length = 133

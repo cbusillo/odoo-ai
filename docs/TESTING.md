@@ -40,6 +40,15 @@ Notes
 
 - Parse `tmp/test-logs/latest/summary.json` (or phase-specific summaries); wait
   for `success: true` before declaring a run green.
+- `tmp/test-logs/latest/llm.json` provides an LLM-friendly rollup of the same
+  session (grouped failures, per-phase counters, artifact paths).
+- Phase timeouts are defined under `[tool.odoo-test.timeouts]` in
+  `pyproject.toml` and are enforced as hard shard kill limits.
+- The runner preflight validates test structure (missing tags/`__init__.py`) and
+  removes exited `testkit-*` containers before starting shards.
+- Unit/JS phases build a per-session template DB (union of phase modules) and
+  clone shards from it to avoid repeated module installs; template logs land
+  under `tmp/test-logs/<session>/<phase>/template-*.log`.
 - Use detached mode (`uv run test run --detached`, then `uv run test wait
   --json`) when long tours or integrations risk timeouts.
 - The prod gate runs `uv run test run --json --stack <target>` so the correct

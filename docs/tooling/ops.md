@@ -54,6 +54,7 @@ Quick start
 
   uv run ops status testing opw
   uv run ops status testing all --no-wait
+  uv run ops coolify app-logs --apps opw-testing --lines 200
   ```
 
 Remembered choices
@@ -159,6 +160,8 @@ Behavior notes
 - `uv run ops coolify logs` can fetch the latest deployment logs from Coolify.
   Defaults to override/post-deploy markers; use `--all` or `--pattern` for
   broader output.
+- `uv run ops coolify app-logs` can fetch runtime application logs via the
+  Coolify API (optionally filtered by service).
 - Use `--serial` to deploy one target at a time when shipping `all`.
 - `uv run ops status` uses the Coolify API and requires `COOLIFY_TOKEN` (waits by
   default; use `--no-wait`).

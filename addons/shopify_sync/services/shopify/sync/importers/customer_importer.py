@@ -60,28 +60,52 @@ class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
         if not phone or not phone.strip():
             return ""
         stripped = phone.strip()
+        
+        def _is_plausible_e164_digits(digits: str) -> bool:
+            if not digits or digits.startswith("0"):
+                return False
+            if len(digits) > 15:
+                return False
+            if digits.startswith("1") and len(digits) != 11:
+                return False
+            return True
+
         country = self.env.company.country_id or self.env["res.country"].search([("code", "=", "US")], limit=1)
         if not country:
             return stripped
         phone_code = int(country.phone_code or 0)
         formatted = phone_format(phone, country.code, phone_code, force_format="E164", raise_exception=False)
-        if formatted and formatted.startswith("+") and formatted[1:].isdigit():
-            return formatted
+        formatted_digits = normalize_phone(formatted) if formatted else ""
+        if formatted and formatted.startswith("+") and _is_plausible_e164_digits(formatted_digits):
+            return f"+{formatted_digits}"
+
+        if stripped.startswith("+"):
+            stripped_digits = normalize_phone(stripped)
+            if _is_plausible_e164_digits(stripped_digits):
+                return f"+{stripped_digits}"
 
         normalized = normalize_phone(stripped)
         if not normalized:
             return stripped
 
+        if normalized.startswith("00") and len(normalized) > 2:
+            candidate_digits = normalized[2:]
+            if _is_plausible_e164_digits(candidate_digits):
+                return f"+{candidate_digits}"
+
+        if normalized.startswith("011") and len(normalized) > 3:
+            candidate_digits = normalized[3:]
+            if _is_plausible_e164_digits(candidate_digits):
+                return f"+{candidate_digits}"
+
         if phone_code:
             code_value = str(phone_code)
-            if len(normalized) == 10:
+            if phone_code == 1 and len(normalized) == 10 and normalized[0] not in {"0", "1"}:
                 return f"+{code_value}{normalized}"
-            if normalized.startswith(code_value):
-                return f"+{normalized}"
-            if len(normalized) == len(code_value) + 10:
+            if normalized.startswith(code_value) and _is_plausible_e164_digits(normalized):
                 return f"+{normalized}"
 
-        if normalized.startswith("1") and len(normalized) == 11:
+        if normalized.startswith("1") and _is_plausible_e164_digits(normalized):
             return f"+{normalized}"
 
         return stripped

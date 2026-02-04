@@ -161,7 +161,7 @@ Behavior notes
   Defaults to override/post-deploy markers; use `--all` or `--pattern` for
   broader output.
 - `uv run ops coolify app-logs` can fetch runtime application logs via the
-  Coolify API (optionally filtered by service).
+  Coolify API.
 - Use `--serial` to deploy one target at a time when shipping `all`.
 - `uv run ops status` uses the Coolify API and requires `COOLIFY_TOKEN` (waits by
   default; use `--no-wait`).

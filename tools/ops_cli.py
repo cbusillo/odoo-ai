@@ -7,7 +7,6 @@ import sys
 import time
 import tomllib
 import urllib.error
-import urllib.parse
 import urllib.request
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -702,13 +701,12 @@ def _coolify_deployment_logs(app_ref: str) -> list[str]:
     return []
 
 
-def _coolify_application_logs(app_ref: str, *, lines: int, service: str | None) -> str:
+def _coolify_application_logs(app_ref: str, *, lines: int) -> str:
     app_uuid = _coolify_find_app_uuid(app_ref)
-    query = {"lines": str(lines)}
-    if service:
-        query["service"] = service
-    query_string = urllib.parse.urlencode(query)
-    payload = _coolify_request(f"/api/v1/applications/{app_uuid}/logs?{query_string}")
+    try:
+        payload = _coolify_request(f"/api/v1/applications/{app_uuid}/logs?lines={lines}")
+    except (urllib.error.HTTPError, urllib.error.URLError) as error:
+        raise click.ClickException(f"Failed to fetch logs for {app_ref}: {error}") from error
     if isinstance(payload, dict):
         logs = payload.get("logs")
         if isinstance(logs, str):
@@ -2487,19 +2485,14 @@ def coolify_logs(
 @coolify_group.command("app-logs")
 @click.option("--apps", required=True, help="Comma-separated list of Coolify app names")
 @click.option("--lines", type=int, default=200, show_default=True, help="Number of log lines to request")
-@click.option("--service", default=None, help="Optional service/container name to filter logs")
 @click.option("--json", "json_output", is_flag=True)
-def coolify_app_logs(apps: str, lines: int, service: str | None, json_output: bool) -> None:
+def coolify_app_logs(apps: str, lines: int, json_output: bool) -> None:
     if lines <= 0:
         raise click.ClickException("--lines must be > 0.")
     app_references = _parse_coolify_app_refs(apps)
     output: dict[str, str] = {}
-    missing_service_logs: set[str] = set()
     for app_reference in app_references:
-        logs = _coolify_application_logs(app_reference, lines=lines, service=service)
-        output[app_reference] = logs
-        if service and not logs.strip():
-            missing_service_logs.add(app_reference)
+        output[app_reference] = _coolify_application_logs(app_reference, lines=lines)
 
     if json_output:
         console.print_json(json.dumps(output, indent=2))
@@ -2509,10 +2502,7 @@ def coolify_app_logs(apps: str, lines: int, service: str | None, json_output: bo
         console.print(f"[{app_reference}]", markup=False)
         logs = output.get(app_reference, "")
         if not logs.strip():
-            if app_reference in missing_service_logs:
-                console.print(f"no log lines for service '{service}'", markup=False)
-            else:
-                console.print("no log lines available", markup=False)
+            console.print("no log lines available", markup=False)
             continue
         console.print(logs, markup=False)
 

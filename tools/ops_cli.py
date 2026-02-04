@@ -702,10 +702,10 @@ def _coolify_deployment_logs(app_ref: str) -> list[str]:
 
 
 def _coolify_application_logs(app_ref: str, *, lines: int) -> str:
-    app_uuid = _coolify_find_app_uuid(app_ref)
     try:
+        app_uuid = _coolify_find_app_uuid(app_ref)
         payload = _coolify_request(f"/api/v1/applications/{app_uuid}/logs?lines={lines}")
-    except (urllib.error.HTTPError, urllib.error.URLError) as error:
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as error:
         raise click.ClickException(f"Failed to fetch logs for {app_ref}: {error}") from error
     if isinstance(payload, dict):
         logs = payload.get("logs")

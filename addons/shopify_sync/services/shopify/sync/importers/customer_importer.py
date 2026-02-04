@@ -59,7 +59,16 @@ class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
     def _format_phone_number(self, phone: str) -> str:
         if not phone or not phone.strip():
             return ""
-        stripped = phone.strip()
+        raw_stripped = phone.strip()
+
+        def _strip_extension(value: str) -> str:
+            match = re.search(r"(?:ext\.?|extension|x|#)\s*\d+", value, flags=re.IGNORECASE)
+            if not match:
+                return value.strip()
+            trimmed = value[: match.start()].rstrip(" ,;/")
+            return trimmed.strip() or value.strip()
+
+        stripped = _strip_extension(raw_stripped)
         
         def _is_plausible_e164_digits(digits: str) -> bool:
             if not digits or digits.startswith("0"):
@@ -86,7 +95,7 @@ class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
 
         normalized = normalize_phone(stripped)
         if not normalized:
-            return stripped
+            return raw_stripped
 
         if normalized.startswith("00") and len(normalized) > 2:
             candidate_digits = normalized[2:]
@@ -108,7 +117,7 @@ class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
         if normalized.startswith("1") and _is_plausible_e164_digits(normalized):
             return f"+{normalized}"
 
-        return stripped
+        return raw_stripped
 
     @staticmethod
     def _geolocalize_partner(partner: "odoo.model.res_partner") -> None:

@@ -18,6 +18,9 @@ class DummySync:
         self.total_count = 0
         self.updated_count = 0
 
+    def ensure_not_canceled(self) -> None:
+        return
+
 
 class DummyPublication(ProductSetProductSetProductResourcePublicationsV2NodesPublication):
     def __init__(self, gid: str) -> None:

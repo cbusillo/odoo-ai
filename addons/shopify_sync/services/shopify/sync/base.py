@@ -47,6 +47,7 @@ class ShopifyBase(ABC, Generic[T]):
         self.default_datetime = DEFAULT_DATETIME
 
     def _maybe_commit(self, processed_count: int) -> None:
+        self.sync_record.ensure_not_canceled()
         if processed_count % self.commit_size == 0:
             try:
                 self.sync_record._safe_commit()
@@ -74,6 +75,7 @@ class ShopifyBase(ABC, Generic[T]):
         has_next = True
         total_processed = 0
         while has_next:
+            self.sync_record.ensure_not_canceled()
             page = fetch_page(query, cursor)
             nodes = page.nodes
             if not nodes:
@@ -82,6 +84,7 @@ class ShopifyBase(ABC, Generic[T]):
             self.sync_record.total_count += len(nodes)
 
             for node in nodes:
+                self.sync_record.ensure_not_canceled()
                 total_processed += 1
 
                 try:
@@ -131,6 +134,7 @@ class ShopifyBaseExporter(ShopifyBase[T]):
             return
         self.sync_record.total_count = self.sync_record.total_count or len(records)
         for index, record in enumerate(records, 1):
+            self.sync_record.ensure_not_canceled()
             self._export_one(record)
             self.sync_record.updated_count += 1
             self._maybe_commit(index)
@@ -163,6 +167,7 @@ class ShopifyBaseDeleter(ShopifyBase[T]):
         self.sync_record.total_count = self.sync_record.total_count or len(records)
 
         for index, record in enumerate(records, 1):
+            self.sync_record.ensure_not_canceled()
             try:
                 with self.env.cr.savepoint():
                     self._delete_one(record)

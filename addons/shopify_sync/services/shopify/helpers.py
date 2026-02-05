@@ -182,6 +182,10 @@ class ShopifySyncRunFailed(Exception):
     pass
 
 
+class ShopifySyncCanceled(Exception):
+    pass
+
+
 class ShopifyApiError(OdooDataError):
     def __init__(
         self,

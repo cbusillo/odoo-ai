@@ -14,6 +14,9 @@ class DummySync:
         self.total_count = 0
         self.updated_count = 0
 
+    def ensure_not_canceled(self) -> None:
+        return
+
 
 @tagged(*UNIT_TAGS)
 class TestProductDeleter(UnitTestCase):

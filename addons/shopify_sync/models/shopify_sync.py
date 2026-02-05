@@ -17,6 +17,7 @@ from ..services.shopify.helpers import (
     DEFAULT_DATETIME,
     OdooDataError,
     ShopifyApiError,
+    ShopifySyncCanceled,
     ShopifyStaleRunTimeout,
     ShopifySyncRunFailed,
     SyncMode,
@@ -66,6 +67,8 @@ class ShopifySync(models.TransientModel):
     progress_percent = fields.Float(string="Progress %", compute="_compute_progress_percent", store=True)
     hard_throttle_count = fields.Integer(default=0)
     retry_attempts = fields.Integer(default=0)
+    cancel_requested = fields.Boolean(default=False)
+    cancel_reason = fields.Text()
 
     state = fields.Selection(
         selection=[
@@ -74,6 +77,7 @@ class ShopifySync(models.TransientModel):
             ("running", "Running"),
             ("success", "Success"),
             ("failed", "Failed"),
+            ("canceled", "Canceled"),
         ],
         default="draft",
         required=True,
@@ -188,6 +192,47 @@ class ShopifySync(models.TransientModel):
                 record.run_time = 0.0
                 record.run_time_human = "-"
 
+    def ensure_not_canceled(self) -> None:
+        self.ensure_one()
+        if self.state == "canceled" or self.cancel_requested:
+            reason = self.cancel_reason or "Canceled by user."
+            raise ShopifySyncCanceled(reason)
+
+    def request_cancel(self) -> None:
+        current_time = fields.Datetime.now()
+        for record in self:
+            if record.state in {"success", "failed", "canceled"}:
+                continue
+            cancel_reason = record.cancel_reason or "Canceled by user."
+            if record.state in {"draft", "queued"}:
+                record.write(
+                    {
+                        "state": "canceled",
+                        "cancel_requested": False,
+                        "cancel_reason": cancel_reason,
+                        "end_time": current_time,
+                    }
+                )
+            else:
+                record.write(
+                    {
+                        "cancel_requested": True,
+                        "cancel_reason": cancel_reason,
+                    }
+                )
+            record._safe_commit()
+
+    def _mark_canceled(self, reason: str | None = None) -> None:
+        self.ensure_one()
+        cancel_reason = reason or self.cancel_reason or "Canceled by user."
+        self.write(
+            {
+                "state": "canceled",
+                "cancel_requested": False,
+                "cancel_reason": cancel_reason,
+            }
+        )
+
     def _fail_stale_runs(self, threshold_seconds: int = 0) -> None:
         if not threshold_seconds:
             threshold_seconds = self.CRON_IDLE_TIMEOUT_THRESHOLD_SECONDS
@@ -202,6 +247,18 @@ class ShopifySync(models.TransientModel):
         stale_runs = self.browse(stale_ids)
 
         for run in stale_runs:
+            if run.cancel_requested:
+                cancel_reason = run.cancel_reason or "Canceled by user."
+                run.write(
+                    {
+                        "state": "canceled",
+                        "cancel_requested": False,
+                        "cancel_reason": cancel_reason,
+                        "end_time": run.write_date,
+                    }
+                )
+                _logger.info(f"Canceled stale sync {run.id} ({cancel_reason})")
+                continue
             if run.retry_attempts < run.MAX_RETRY_ATTEMPTS:
                 stale_message = f"Stale sync {run.id} (run {run.retry_attempts + 1}/{run.MAX_RETRY_ATTEMPTS})"
                 run.write(
@@ -341,6 +398,12 @@ class ShopifySync(models.TransientModel):
             self._mark_failed(ValueError(f"No handler for mode: {self.mode!r}"))
             return
 
+        try:
+            self.ensure_not_canceled()
+        except ShopifySyncCanceled as error:
+            self._mark_canceled(str(error))
+            self._safe_commit()
+            return
         with self._run_guard():
             runner()
 
@@ -408,15 +471,25 @@ class ShopifySync(models.TransientModel):
         self.write({"state": "running"})
         self._safe_commit()
         try:
+            self.ensure_not_canceled()
             yield
+            self.ensure_not_canceled()
             self.state = "success"
             resource_type = SyncMode(self.mode).resource_type
             if resource_type and self.last_import_start_time:
                 config_key = last_import_config_key(resource_type)
                 self.env["ir.config_parameter"].set_param(config_key, format_datetime_for_shopify(self.last_import_start_time))
             self._safe_commit()
+        except ShopifySyncCanceled as error:
+            self._safe_rollback()
+            self._mark_canceled(str(error))
+            self._safe_commit()
         except Exception as error:
             self._safe_rollback()
+            if self.cancel_requested:
+                self._mark_canceled()
+                self._safe_commit()
+                return
             self._mark_failed(error)
             self._safe_commit()
             raise ShopifySyncRunFailed()

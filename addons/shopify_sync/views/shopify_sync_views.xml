@@ -30,7 +30,7 @@
                   decoration-danger="state == 'failed'"
                   decoration-warning="state == 'running'"
                   decoration-success="state == 'success'"
-                  decoration-muted="state == 'draft' or state == 'queued'">
+                  decoration-muted="state == 'draft' or state == 'queued' or state == 'canceled'">
                 <field name="create_time_human" optional="show"/>
                 <field name="start_time_human"/>
                 <field name="end_time_human"/>
@@ -39,10 +39,12 @@
                 <field name="error_exception" optional="show"/>
                 <field name="hard_throttle_count" string="Throttles"/>
                 <field name="retry_attempts" string="Retries"/>
+                <field name="cancel_requested" optional="show"/>
                 <field name="state" widget="badge"
                        decoration-danger="state == 'failed'"
                        decoration-warning="state == 'running'"
-                       decoration-success="state == 'success'"/>
+                       decoration-success="state == 'success'"
+                       decoration-muted="state == 'canceled'"/>
                 <field name="updated_count" string="Updated" sum="updated_count"/>
                 <field name="total_count" string="Total" sum="total_count"/>
                 <field name="progress_percent" widget="progressbar" avg="progress_percent"
@@ -66,7 +68,8 @@
                                 <field name="state" widget="badge"
                                        decoration-danger="state == 'failed'"
                                        decoration-warning="state == 'running'"
-                                       decoration-success="state == 'success'"/>
+                                       decoration-success="state == 'success'"
+                                       decoration-muted="state == 'canceled'"/>
                                 <field name="mode" widget="badge"/>
                                 <field name="updated_count"/> /
                                 <field name="total_count"/>
@@ -88,6 +91,7 @@
                 <filter name="filter_running" string="Running" domain="[('state','=','running')]"
                         help="Currently running"/>
                 <filter name="filter_failed" string="Failed" domain="[('state','=','failed')]" help="Runs with errors"/>
+                <filter name="filter_canceled" string="Canceled" domain="[('state','=','canceled')]" help="Canceled runs"/>
                 <filter name="filter_import" string="Import" domain="[('mode','ilike','import')]"/>
                 <filter name="filter_export" string="Export" domain="[('mode','ilike','export')]"/>
                 <separator/>
@@ -123,6 +127,11 @@
                             type="object"
                             class="btn-primary"
                             invisible="state not in ['draft','queued'] or not mode"/>
+                    <button name="request_cancel"
+                            string="Cancel"
+                            type="object"
+                            class="btn-secondary"
+                            invisible="state not in ['running','queued'] or cancel_requested"/>
                     <button name="duplicate_and_run_async"
                             string="Duplicate"
                             type="object"
@@ -149,10 +158,15 @@
                                invisible="state not in ['queued','draft']"/>
                         <field name="hard_throttle_count" invisible="not hard_throttle_count"/>
                         <field name="retry_attempts" invisible="not retry_attempts"/>
+                        <field name="cancel_requested" invisible="not cancel_requested"/>
                         <field name="state" widget="badge" readonly="1"
                                decoration-danger="state == 'failed'"
                                decoration-warning="state == 'running'"
-                               decoration-success="state == 'success'" invisible="not start_time"/>
+                               decoration-success="state == 'success'"
+                               decoration-muted="state == 'canceled'" invisible="not start_time"/>
+                    </group>
+                    <group string="Cancel Info" invisible="state != 'canceled'">
+                        <field name="cancel_reason" readonly="1"/>
                     </group>
                     <group string="Error Item"
                            invisible="not error_odoo_record and not error_shopify_record and not error_shopify_input">

@@ -37,6 +37,8 @@ When
   metadata.
 - `addons/shopify_sync/services/shopify/sync/` — importers, exporters, and
   deleters.
+- Sync runs can be canceled from the UI and will stop at the next safe
+  checkpoint; canceled runs move to the `canceled` state.
 
 ## eBay Orders via Shopify
 

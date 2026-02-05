@@ -47,7 +47,7 @@ class ShopifySync(models.TransientModel):
 
     LOCK_ID = 87945012
     IMPORT_EXPORT_CRON_TIME = 60 * 60
-    CRON_IDLE_TIMEOUT_THRESHOLD_SECONDS = 60
+    CRON_IDLE_TIMEOUT_THRESHOLD_SECONDS = 10 * 60
 
     create_time_human = fields.Char(compute="_compute_create_time_human", string="Created")
     start_time = fields.Datetime()

@@ -148,6 +148,8 @@ class IntegrationTestCase(_ShopifyMockMixin, _BaseDataMixin, TransactionCase):
             )
 
         cls._setup_class_base_data()
+        if cls.test_company.country_id != cls.usa_country:
+            cls.test_company.write({"country_id": cls.usa_country.id})
         cls._reset_sku_sequence()
 
     @classmethod

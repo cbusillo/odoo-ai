@@ -83,7 +83,7 @@ class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
         if not country:
             return stripped
         phone_code = int(country.phone_code or 0)
-        formatted = phone_format(phone, country.code, phone_code, force_format="E164", raise_exception=False)
+        formatted = phone_format(stripped, country.code, phone_code, force_format="E164", raise_exception=False)
         formatted_digits = normalize_phone(formatted) if formatted else ""
         if formatted and formatted.startswith("+") and _is_plausible_e164_digits(formatted_digits):
             return f"+{formatted_digits}"

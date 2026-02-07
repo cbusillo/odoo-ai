@@ -2,7 +2,13 @@ from types import SimpleNamespace
 
 from odoo import fields
 
-from ...models.repairshopr_importer import EXTERNAL_SYSTEM_CODE, RESOURCE_ESTIMATE, RESOURCE_PRODUCT
+from ...models.repairshopr_importer import (
+    EXTERNAL_SYSTEM_CODE,
+    RESOURCE_CUSTOMER,
+    RESOURCE_ESTIMATE,
+    RESOURCE_PRODUCT,
+    RESOURCE_TICKET,
+)
 from ..common_imports import UNIT_TAGS, tagged
 from ..fixtures.base import UnitTestCase
 
@@ -256,6 +262,10 @@ class TestRepairshoprMapping(UnitTestCase):
                 return {}
 
             @staticmethod
+            def prefetch_ticket_properties_by_ticket_ids(_ticket_id_values: list[int]) -> dict[int, object]:
+                return {}
+
+            @staticmethod
             def fetch_line_items(*, estimate_id: int | None = None, invoice_id: int | None = None) -> list[dict[str, object]]:
                 _ = estimate_id
                 _ = invoice_id
@@ -270,10 +280,40 @@ class TestRepairshoprMapping(UnitTestCase):
             created_at=None,
             updated_at=None,
             employee=None,
+            ticket_id=909,
         )
         client = ClientStub([estimate_record])
 
         system = self.importer._get_repairshopr_system()
+        partner = self.Partner.create({"name": "Test Customer"})
+        self.env["external.id"].sudo().create(
+            {
+                "res_model": "res.partner",
+                "res_id": partner.id,
+                "system_id": system.id,
+                "resource": RESOURCE_CUSTOMER,
+                "external_id": str(estimate_record.customer_id),
+                "active": True,
+            }
+        )
+        helpdesk_team = self.env["helpdesk.team"].create({"name": "Support"})
+        ticket_record = self.env["helpdesk.ticket"].create(
+            {
+                "name": "Ticket 909",
+                "team_id": helpdesk_team.id,
+                "partner_id": partner.id,
+            }
+        )
+        self.env["external.id"].sudo().create(
+            {
+                "res_model": "helpdesk.ticket",
+                "res_id": ticket_record.id,
+                "system_id": system.id,
+                "resource": RESOURCE_TICKET,
+                "external_id": str(estimate_record.ticket_id),
+                "active": True,
+            }
+        )
         sync_started_at = fields.Datetime.now()
         self.importer._import_estimates(client, None, system, sync_started_at)
         first_order = self.env["sale.order"].search_by_external_id(

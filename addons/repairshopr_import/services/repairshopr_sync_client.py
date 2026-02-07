@@ -58,6 +58,7 @@ class RepairshoprSyncClient:
         self._connection.close()
         self._connection = None
 
+
     @overload
     def get_model(
         self,
@@ -255,6 +256,7 @@ class RepairshoprSyncClient:
                 comments = comments_by_ticket.get(ticket_id, []) if ticket_id is not None else []
                 yield self._build_ticket(row, properties, comments)
 
+
     def _iter_estimates(self, updated_at: datetime | None) -> Iterator[repairshopr_models.Estimate]:
         for rows in self._iter_batches(
             ESTIMATE_TABLE,
@@ -266,6 +268,7 @@ class RepairshoprSyncClient:
                 "created_at",
                 "updated_at",
                 "date",
+                "ticket_id",
                 "employee",
             ],
             updated_at=updated_at,
@@ -288,6 +291,7 @@ class RepairshoprSyncClient:
                 "date",
                 "due_date",
                 "note",
+                "ticket_id",
             ],
             updated_at=updated_at,
             updated_column="updated_at",
@@ -362,6 +366,36 @@ class RepairshoprSyncClient:
                 if properties.id is not None:
                     properties_by_id[properties.id] = properties
         return properties_by_id
+
+    def prefetch_ticket_properties_by_ticket_ids(
+        self,
+        ticket_ids: Sequence[int],
+    ) -> dict[int, repairshopr_models.TicketProperties]:
+        if not ticket_ids:
+            return {}
+        properties_by_ticket: dict[int, repairshopr_models.TicketProperties] = {}
+        for batch in chunk_values(ticket_ids, self._settings.batch_size):
+            placeholders = ", ".join(["%s"] * len(batch))
+            query = (
+                "SELECT id, properties_id "
+                f"FROM {TICKET_TABLE} WHERE id IN ({placeholders})"
+            )
+            rows = self._fetch_rows(query, batch)
+            properties_ids: list[int] = []
+            for row in rows:
+                properties_id = _to_int(row.get("properties_id"))
+                if properties_id is not None:
+                    properties_ids.append(properties_id)
+            properties_by_id = self._fetch_ticket_properties(properties_ids)
+            for row in rows:
+                ticket_id = _to_int(row.get("id"))
+                properties_id = _to_int(row.get("properties_id"))
+                if ticket_id is None:
+                    continue
+                properties_by_ticket[ticket_id] = (
+                    properties_by_id.get(properties_id) if properties_id is not None else None
+                ) or repairshopr_models.TicketProperties()
+        return properties_by_ticket
 
     def _fetch_ticket_comments(self, ticket_ids: Sequence[int]) -> dict[int, list[repairshopr_models.TicketComment]]:
         comments_by_ticket: dict[int, list[repairshopr_models.TicketComment]] = defaultdict(list)
@@ -603,6 +637,7 @@ class RepairshoprSyncClient:
             updated_at=_to_datetime(row.get("updated_at")),
             date=_to_datetime(row.get("date")),
             employee=_to_text(row.get("employee")),
+            ticket_id=_to_int(row.get("ticket_id")),
         )
 
     @staticmethod
@@ -618,6 +653,7 @@ class RepairshoprSyncClient:
             date=_to_datetime(row.get("date")),
             due_date=_to_datetime(row.get("due_date")),
             note=_to_text(row.get("note")),
+            ticket_id=_to_int(row.get("ticket_id")),
         )
 
     @staticmethod

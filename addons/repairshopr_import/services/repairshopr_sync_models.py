@@ -123,9 +123,11 @@ class SalesDocument:
 @dataclass
 class Estimate(SalesDocument):
     employee: str | None = None
+    ticket_id: int | None = None
 
 
 @dataclass
 class Invoice(SalesDocument):
     due_date: datetime | None = None
     note: str | None = None
+    ticket_id: int | None = None

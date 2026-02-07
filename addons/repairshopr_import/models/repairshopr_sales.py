@@ -1,6 +1,7 @@
 import csv
 import logging
 import re
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -11,13 +12,416 @@ from odoo.exceptions import UserError
 from ..services import repairshopr_sync_models as repairshopr_models
 from ..services.repairshopr_sync_client import RepairshoprSyncClient
 
-from .repairshopr_importer import EXTERNAL_SYSTEM_CODE, IMPORT_CONTEXT, RESOURCE_ESTIMATE, RESOURCE_INVOICE
+from .repairshopr_importer import (
+    ASSET_TAG_PATTERN,
+    CLAIM_PATTERN,
+    EXTERNAL_SYSTEM_CODE,
+    IMPORT_CONTEXT,
+    PO_PATTERN,
+    RESOURCE_ESTIMATE,
+    RESOURCE_INVOICE,
+    RESOURCE_TICKET,
+    SERIAL_PATTERN,
+)
 
 _logger = logging.getLogger(__name__)
 
 
 class RepairshoprImporter(models.Model):
     _inherit = "repairshopr.importer"
+
+    _TICKET_LINK_IDENTIFIER_TYPES = (
+        "serial",
+        "asset_tag",
+        "asset_tag_secondary",
+        "claim",
+        "ticket",
+    )
+
+    @staticmethod
+    def _split_lines(value: object) -> list[str]:
+        if not value:
+            return []
+        text = str(value).replace("\r", "\n")
+        return [line.strip() for line in text.split("\n") if line.strip()]
+
+    @classmethod
+    def _is_needs_estimate_marker(cls, text: str) -> bool:
+        normalized = " ".join(text.strip().lower().split())
+        return "needs estimate" in normalized
+
+    @classmethod
+    def _is_device_line(cls, text: str) -> bool:
+        normalized = " ".join(text.strip().lower().split())
+        if not normalized:
+            return False
+        non_device_prefixes = (
+            "summary",
+            "level 1 tech support",
+            "diagnostic fee per unit",
+            "district reference",
+            "quote #",
+            "invoice #",
+            "district invoices",
+            "remote support provided",
+            "capped pricing discount",
+        )
+        if normalized.startswith(non_device_prefixes):
+            return False
+        if "needs estimate" in normalized:
+            return False
+        if "replacement" in normalized or "repair" in normalized:
+            return True
+        if re.search(r"\(\s*(?:n/c|\$)", normalized):
+            return True
+        if re.search(r"\$\s*\d", normalized):
+            return True
+        return False
+
+    @staticmethod
+    def _is_summary_line(text: str) -> bool:
+        normalized = " ".join(text.strip().lower().split())
+        return normalized.startswith("summary")
+
+    @staticmethod
+    def _clean_summary_line(text: str) -> str:
+        cleaned = text.strip()
+        if not cleaned:
+            return ""
+        match = re.match(r"(?i)^summary\s*[:\-]\s*(?P<summary>.+)$", cleaned)
+        if match:
+            return match.group("summary").strip()
+        if cleaned.lower().startswith("summary"):
+            return cleaned[len("summary") :].lstrip(" :\t-")
+        return cleaned
+
+    @classmethod
+    def _extract_device_identifiers_from_line(cls, text: str) -> dict[str, str]:
+        identifiers: dict[str, str] = {}
+        for match in SERIAL_PATTERN.finditer(text):
+            identifiers.setdefault("serial", match.group("serial").strip())
+        for match in ASSET_TAG_PATTERN.finditer(text):
+            identifiers.setdefault("asset_tag", match.group("tag").strip())
+        for match in CLAIM_PATTERN.finditer(text):
+            identifiers.setdefault("claim", match.group("claim").strip())
+        for match in PO_PATTERN.finditer(text):
+            identifiers.setdefault("po", match.group("po").strip())
+        return identifiers
+
+    @classmethod
+    def _extract_model_from_line(cls, text: str) -> str | None:
+        if not cls._is_device_line(text):
+            return None
+        if " - " in text:
+            return text.split(" - ", 1)[0].strip() or None
+        if "-" in text:
+            return text.split("-", 1)[0].strip() or None
+        return None
+
+    @staticmethod
+    def _resolve_case_indicator(value: str | None) -> str | None:
+        if not value:
+            return None
+        normalized = value.strip().lower()
+        if normalized in {"yes", "y", "true"}:
+            return "yes"
+        if normalized in {"no", "n", "false"}:
+            return "no"
+        return None
+
+    def _find_or_create_device(
+        self,
+        *,
+        partner: "odoo.model.res_partner",
+        model_label: str | None,
+        serial_number: str | None,
+        asset_tag: str | None,
+        asset_tag_secondary: str | None,
+    ) -> "odoo.model.service_device":
+        device_model = self.env["service.device"].sudo().with_context(IMPORT_CONTEXT)
+        model_model = self.env["service.device.model"].sudo().with_context(IMPORT_CONTEXT)
+        device_record = None
+        if serial_number:
+            device_record = device_model.search([("serial_number", "=", serial_number)], limit=1)
+        if not device_record and asset_tag:
+            device_record = device_model.search([("asset_tag", "=", asset_tag)], limit=1)
+        if not device_record and asset_tag_secondary:
+            device_record = device_model.search([("asset_tag_secondary", "=", asset_tag_secondary)], limit=1)
+
+        device_model_record = None
+        if model_label:
+            device_model_record = model_model.search([("number", "=", model_label)], limit=1)
+        if not device_model_record:
+            device_model_record = model_model.search([], limit=1)
+        if not device_model_record:
+            device_model_record = model_model.create({"number": model_label or "Unknown"})
+
+        if device_record:
+            update_values: dict[str, object] = {}
+            if not device_record.model:
+                update_values["model"] = device_model_record.id
+            if not device_record.owner:
+                update_values["owner"] = partner.id
+            if asset_tag and not device_record.asset_tag:
+                update_values["asset_tag"] = asset_tag
+            if asset_tag_secondary and not device_record.asset_tag_secondary:
+                update_values["asset_tag_secondary"] = asset_tag_secondary
+            if update_values:
+                device_record.write(update_values)
+            return device_record
+
+        return device_model.create(
+            {
+                "serial_number": serial_number,
+                "asset_tag": asset_tag,
+                "asset_tag_secondary": asset_tag_secondary,
+                "model": device_model_record.id,
+                "owner": partner.id,
+            }
+        )
+
+    def _build_intake_from_line_items(
+        self,
+        ticket: repairshopr_models.Ticket,
+        partner: "odoo.model.res_partner",
+        *,
+        line_items: list[dict[str, Any]],
+    ) -> tuple["odoo.model.service_intake_order | None", list["odoo.model.service_intake_order_device"]]:
+        if not line_items:
+            return None, []
+        device_lines: list[dict[str, object]] = []
+        pending_device: dict[str, object] | None = None
+        needs_estimate_next = False
+        needs_estimate_all = False
+
+        def flush_pending() -> None:
+            nonlocal pending_device
+            if not pending_device:
+                return
+            device_lines.append(pending_device)
+            pending_device = None
+
+        for line_item in line_items:
+            line_text = line_item.get("name") or line_item.get("item") or ""
+            lines = self._split_lines(line_text)
+            if not lines:
+                continue
+            for line in lines:
+                if self._is_needs_estimate_marker(line):
+                    if pending_device is None and not device_lines:
+                        needs_estimate_all = True
+                    else:
+                        needs_estimate_next = True
+                    continue
+                if self._is_summary_line(line):
+                    if pending_device is not None:
+                        summary_notes = pending_device.setdefault("summary_notes", [])
+                        if isinstance(summary_notes, list):
+                            cleaned_summary = self._clean_summary_line(line)
+                            if cleaned_summary:
+                                summary_notes.append(cleaned_summary)
+                    continue
+                model_label = self._extract_model_from_line(line)
+                identifiers = self._extract_device_identifiers_from_line(line)
+                if model_label or identifiers:
+                    flush_pending()
+                    pending_device = {
+                        "model_label": model_label,
+                        "serial": identifiers.get("serial"),
+                        "asset_tag": identifiers.get("asset_tag"),
+                        "claim_number": identifiers.get("claim"),
+                        "po_number": identifiers.get("po"),
+                        "customer_notes": [],
+                        "summary_notes": [],
+                        "needs_estimate": needs_estimate_all or needs_estimate_next,
+                    }
+                    needs_estimate_next = False
+                    continue
+                if pending_device is not None:
+                    customer_notes = pending_device.setdefault("customer_notes", [])
+                    if isinstance(customer_notes, list):
+                        customer_notes.append(line)
+        flush_pending()
+
+        if not device_lines:
+            return None, []
+
+        intake_model = self.env["service.intake.order"].sudo().with_context(IMPORT_CONTEXT)
+        intake_device_model = self.env["service.intake.order.device"].sudo().with_context(IMPORT_CONTEXT)
+
+        intake_order = intake_model.create(
+            {
+                "client": partner.id,
+                "state": "finished",
+                "finish_date": ticket.created_at,
+            }
+        )
+
+        created_lines: list["odoo.model.service_intake_order_device"] = []
+        quality_control_candidates: list[tuple["odoo.model.service_device", str]] = []
+        for device_line in device_lines:
+            model_label = device_line.get("model_label")
+            if model_label is not None:
+                model_label = str(model_label)
+            serial_number = device_line.get("serial") or (
+                (ticket.properties.s_n_num or ticket.properties.s_n) if ticket.properties else None
+            )
+            if serial_number is not None:
+                serial_number = str(serial_number)
+            asset_tag = device_line.get("asset_tag") or (ticket.properties.tag_num if ticket.properties else None)
+            if asset_tag is not None:
+                asset_tag = str(asset_tag)
+            asset_tag_secondary = ticket.properties.tag_num_2 if ticket.properties else None
+            if asset_tag_secondary is not None:
+                asset_tag_secondary = str(asset_tag_secondary)
+            device_record = self._find_or_create_device(
+                partner=partner,
+                model_label=model_label,
+                serial_number=serial_number,
+                asset_tag=asset_tag,
+                asset_tag_secondary=asset_tag_secondary,
+            )
+            customer_notes = device_line.get("customer_notes")
+            notes = "\n".join(customer_notes) if isinstance(customer_notes, list) else ""
+            claim_number = device_line.get("claim_number") or (ticket.properties.claim_num if ticket.properties else None)
+            po_number = device_line.get("po_number") or (ticket.properties.po_num_2 if ticket.properties else None)
+            student_name = ticket.properties.student if ticket.properties else None
+            guardian_name = ticket.properties.p_g_name if ticket.properties else None
+            guardian_phone = ticket.properties.phone_num if ticket.properties else None
+            case_indicator = self._resolve_case_indicator(ticket.properties.case) if ticket.properties else None
+            intake_device = intake_device_model.create(
+                {
+                    "intake_order": intake_order.id,
+                    "device": device_record.id,
+                    "claim_number": claim_number,
+                    "po_number": po_number,
+                    "customer_stated_notes": notes,
+                    "student_name": student_name,
+                    "guardian_name": guardian_name,
+                    "guardian_phone": guardian_phone,
+                    "needs_estimate": device_line.get("needs_estimate", False),
+                    "case_indicator": case_indicator or "unknown",
+                    "has_case": case_indicator == "yes" if case_indicator else False,
+                }
+            )
+            created_lines.append(intake_device)
+            summary_notes = device_line.get("summary_notes")
+            if isinstance(summary_notes, list):
+                summary_text = "\n".join(line for line in summary_notes if isinstance(line, str) and line.strip())
+                if summary_text:
+                    quality_control_candidates.append((device_record, summary_text))
+
+        if quality_control_candidates:
+            quality_control_order_model = self.env["service.quality.control.order"].sudo().with_context(IMPORT_CONTEXT)
+            quality_control_device_model = self.env["service.quality.control.order.device"].sudo().with_context(
+                IMPORT_CONTEXT
+            )
+            finish_date = ticket.created_at
+            quality_control_order = quality_control_order_model.create(
+                {
+                    "name": f"RepairShopr QC {ticket.id}",
+                    "state": "finished",
+                    "start_date": finish_date,
+                    "finish_date": finish_date,
+                    "client": partner.id,
+                }
+            )
+            for device_record, summary_text in quality_control_candidates:
+                existing = quality_control_device_model.search(
+                    [
+                        ("device", "=", device_record.id),
+                        ("summary_note", "=", summary_text),
+                    ],
+                    limit=1,
+                )
+                if existing:
+                    continue
+                quality_control_device_model.create(
+                    {
+                        "quality_control_order": quality_control_order.id,
+                        "device": device_record.id,
+                        "state": "finished",
+                        "start_date": finish_date,
+                        "finish_date": finish_date,
+                        "summary_note": summary_text,
+                    }
+                )
+
+        return intake_order, created_lines
+
+    def _identifier_pairs_for_ticket_link(
+        self,
+        identifiers: dict[str, set[str]],
+    ) -> set[tuple[str, str]]:
+        pairs: set[tuple[str, str]] = set()
+        if not identifiers:
+            return pairs
+        for identifier_type in self._TICKET_LINK_IDENTIFIER_TYPES:
+            for identifier_value in identifiers.get(identifier_type, set()):
+                normalized = self._normalize_identifier_value(identifier_value)
+                if normalized:
+                    pairs.add((identifier_type, normalized))
+        return pairs
+
+    def _build_ticket_identifier_cache(
+        self,
+        identifier_pairs: set[tuple[str, str]],
+    ) -> tuple[dict[tuple[str, str], set[int]], dict[int, int]]:
+        if not identifier_pairs:
+            return {}, {}
+        identifier_types = sorted({identifier_type for identifier_type, _ in identifier_pairs})
+        normalized_values = sorted({identifier_value for _, identifier_value in identifier_pairs})
+        identifier_model = self.env["identifier.index"].sudo().with_context(IMPORT_CONTEXT)
+        records = identifier_model.search(
+            [
+                ("res_model", "=", "helpdesk.ticket"),
+                ("identifier_type", "in", identifier_types),
+                ("identifier_normalized", "in", normalized_values),
+                ("active", "=", True),
+            ]
+        )
+        pair_to_ticket_ids: dict[tuple[str, str], set[int]] = defaultdict(set)
+        candidate_ticket_ids: set[int] = set()
+        for record in records:
+            if not record.identifier_normalized:
+                continue
+            pair = (record.identifier_type, record.identifier_normalized)
+            if pair not in identifier_pairs:
+                continue
+            pair_to_ticket_ids[pair].add(record.res_id)
+            candidate_ticket_ids.add(record.res_id)
+        ticket_partner_map: dict[int, int] = {}
+        if candidate_ticket_ids:
+            ticket_model = self.env["helpdesk.ticket"].sudo().with_context(IMPORT_CONTEXT)
+            for ticket in ticket_model.browse(list(candidate_ticket_ids)):
+                if not ticket.exists():
+                    continue
+                ticket_partner_map[ticket.id] = ticket.partner_id.id if ticket.partner_id else 0
+        return pair_to_ticket_ids, ticket_partner_map
+
+    @staticmethod
+    def _resolve_ticket_id_from_pairs(
+        identifier_pairs: set[tuple[str, str]],
+        *,
+        pair_to_ticket_ids: dict[tuple[str, str], set[int]],
+        ticket_partner_map: dict[int, int],
+        partner_id: int,
+    ) -> int | None:
+        if not identifier_pairs or not partner_id:
+            return None
+        candidate_ticket_ids: set[int] = set()
+        for pair in identifier_pairs:
+            candidate_ticket_ids.update(pair_to_ticket_ids.get(pair, set()))
+        if not candidate_ticket_ids:
+            return None
+        candidate_ticket_ids = {
+            ticket_id
+            for ticket_id in candidate_ticket_ids
+            if ticket_partner_map.get(ticket_id) == partner_id
+        }
+        if len(candidate_ticket_ids) != 1:
+            return None
+        return next(iter(candidate_ticket_ids))
 
     _NO_CHARGE_NOTE = "repairs done at no charge"
     _pricing_catalog: "RepairshoprPricingCatalog | None" = None
@@ -147,10 +551,26 @@ class RepairshoprImporter(models.Model):
             external_ids,
             "sale.order",
         )
+        ticket_ids = [str(estimate.ticket_id) for estimate in estimates if estimate.ticket_id]
+        (
+            ticket_map,
+            _,
+            _,
+            _,
+            _,
+        ) = self._prefetch_external_id_records(
+            system.id,
+            RESOURCE_TICKET,
+            ticket_ids,
+            "helpdesk.ticket",
+        )
         estimate_id_values: list[int] = []
         for estimate in estimates:
             external_id_value = str(estimate.id)
             if external_id_value in blocked:
+                continue
+            cutoff_timestamp = estimate.date or estimate.created_at
+            if self._is_before_transaction_cutoff(cutoff_timestamp):
                 continue
             updated_at = estimate.updated_at
             last_sync = last_sync_map.get(external_id_value)
@@ -163,7 +583,7 @@ class RepairshoprImporter(models.Model):
         sync_timestamps: dict[str, datetime] = {}
         identifiers_by_external_id: dict[str, dict[str, set[str]]] = {}
         pending_commit = False
-
+        identifier_pairs_by_external_id: dict[str, set[tuple[str, str]]] = {}
         def should_commit() -> bool:
             return commit_interval > 0 and processed_count % commit_interval == 0
 
@@ -210,9 +630,44 @@ class RepairshoprImporter(models.Model):
             create_values = []
             create_external_ids = []
 
+        ticket_properties_by_ticket_id = repairshopr_client.prefetch_ticket_properties_by_ticket_ids(
+            [estimate.ticket_id for estimate in estimates if estimate.ticket_id]
+        )
         for estimate in estimates:
             external_id_value = str(estimate.id)
             if external_id_value in blocked:
+                continue
+            cutoff_timestamp = estimate.date or estimate.created_at
+            if self._is_before_transaction_cutoff(cutoff_timestamp):
+                continue
+            updated_at = estimate.updated_at
+            last_sync = last_sync_map.get(external_id_value)
+            if updated_at and last_sync and last_sync >= updated_at:
+                continue
+            identifiers = self._collect_identifiers_from_line_items(
+                line_items_by_estimate_id.get(estimate.id, [])
+            )
+            ticket_id = estimate.ticket_id
+            if ticket_id:
+                ticket_properties = ticket_properties_by_ticket_id.get(ticket_id)
+                if ticket_properties:
+                    identifiers = self._merge_identifier_maps(
+                        identifiers,
+                        self._collect_identifiers_from_ticket_properties(ticket_properties),
+                    )
+            identifier_pairs_by_external_id[external_id_value] = self._identifier_pairs_for_ticket_link(
+                identifiers
+            )
+        pair_to_ticket_ids, ticket_partner_map = self._build_ticket_identifier_cache(
+            {pair for pairs in identifier_pairs_by_external_id.values() for pair in pairs}
+        )
+
+        for estimate in estimates:
+            external_id_value = str(estimate.id)
+            if external_id_value in blocked:
+                continue
+            cutoff_timestamp = estimate.date or estimate.created_at
+            if self._is_before_transaction_cutoff(cutoff_timestamp):
                 continue
             updated_at = estimate.updated_at
             last_sync = last_sync_map.get(external_id_value)
@@ -238,6 +693,48 @@ class RepairshoprImporter(models.Model):
                 billing_contract=billing_contract,
                 pricing_catalog=pricing_catalog,
             )
+            ticket_id = estimate.ticket_id
+            ticket_record_id = ticket_map.get(str(ticket_id)) if ticket_id else None
+            if ticket_record_id:
+                ticket_record = self.env["helpdesk.ticket"].browse(ticket_record_id)
+                if ticket_record and not ticket_record.intake_order_id:
+                    ticket_properties = (
+                        ticket_properties_by_ticket_id.get(ticket_id)
+                        if ticket_id
+                        else repairshopr_models.TicketProperties()
+                    )
+                    intake_order, _ = self._build_intake_from_line_items(
+                        ticket=repairshopr_models.Ticket(
+                            id=ticket_id or 0,
+                            created_at=estimate.created_at,
+                            properties=ticket_properties,
+                        ),
+                        partner=partner,
+                        line_items=line_items,
+                    )
+                    if intake_order:
+                        ticket_record.write({"intake_order_id": intake_order.id})
+            if ticket_id:
+                ticket_properties = ticket_properties_by_ticket_id.get(ticket_id)
+                if ticket_properties:
+                    identifiers = self._merge_identifier_maps(
+                        identifiers,
+                        self._collect_identifiers_from_ticket_properties(ticket_properties),
+                    )
+            if not ticket_record_id:
+                identifier_pairs = identifier_pairs_by_external_id.get(external_id_value, set())
+                ticket_record_id = self._resolve_ticket_id_from_pairs(
+                    identifier_pairs,
+                    pair_to_ticket_ids=pair_to_ticket_ids,
+                    ticket_partner_map=ticket_partner_map,
+                    partner_id=partner.id,
+                )
+            if "source_ticket_id" in self.env["sale.order"]._fields and not ticket_record_id:
+                _logger.info(
+                    "Skipping estimate %s because no ticket link was found.",
+                    estimate.id,
+                )
+                continue
             is_no_charge = self._has_no_charge_note(estimate.employee, line_items)
             line_commands = self._apply_rework_labor_adjustment(line_commands, is_no_charge, billing_contract)
             line_commands = self._prioritize_labor_lines(line_commands, billing_contract)
@@ -249,6 +746,8 @@ class RepairshoprImporter(models.Model):
                 billing_contract,
                 include_line_clear=bool(order_record_id),
             )
+            if ticket_record_id and "source_ticket_id" in self.env["sale.order"]._fields:
+                values["source_ticket_id"] = ticket_record_id
             if estimate.number:
                 identifiers.setdefault("ticket", set()).add(str(estimate.number))
             identifiers_by_external_id[external_id_value] = identifiers
@@ -330,10 +829,29 @@ class RepairshoprImporter(models.Model):
             external_ids,
             "account.move",
         )
+        ticket_ids = [str(invoice.ticket_id) for invoice in invoices if invoice.ticket_id]
+        (
+            ticket_map,
+            _,
+            _,
+            _,
+            _,
+        ) = self._prefetch_external_id_records(
+            system.id,
+            RESOURCE_TICKET,
+            ticket_ids,
+            "helpdesk.ticket",
+        )
+        ticket_properties_by_ticket_id = repairshopr_client.prefetch_ticket_properties_by_ticket_ids(
+            [invoice.ticket_id for invoice in invoices if invoice.ticket_id]
+        )
         invoice_id_values: list[int] = []
         for invoice in invoices:
             external_id_value = str(invoice.id)
             if external_id_value in blocked:
+                continue
+            cutoff_timestamp = invoice.date or invoice.created_at
+            if self._is_before_transaction_cutoff(cutoff_timestamp):
                 continue
             updated_at = invoice.updated_at
             last_sync = last_sync_map.get(external_id_value)
@@ -341,11 +859,42 @@ class RepairshoprImporter(models.Model):
                 continue
             invoice_id_values.append(invoice.id)
         line_items_by_invoice_id = repairshopr_client.prefetch_invoice_line_items(invoice_id_values)
+        for invoice in invoices:
+            external_id_value = str(invoice.id)
+            if external_id_value in blocked:
+                continue
+            cutoff_timestamp = invoice.date or invoice.created_at
+            if self._is_before_transaction_cutoff(cutoff_timestamp):
+                continue
+            updated_at = invoice.updated_at
+            last_sync = last_sync_map.get(external_id_value)
+            if updated_at and last_sync and last_sync >= updated_at:
+                continue
+            identifiers = self._collect_identifiers_from_line_items(
+                line_items_by_invoice_id.get(invoice.id, [])
+            )
+            ticket_properties = (
+                ticket_properties_by_ticket_id.get(invoice.ticket_id)
+                if invoice.ticket_id
+                else None
+            )
+            if ticket_properties:
+                identifiers = self._merge_identifier_maps(
+                    identifiers,
+                    self._collect_identifiers_from_ticket_properties(ticket_properties),
+                )
+            identifier_pairs_by_external_id[external_id_value] = self._identifier_pairs_for_ticket_link(
+                identifiers
+            )
+        pair_to_ticket_ids, ticket_partner_map = self._build_ticket_identifier_cache(
+            {pair for pairs in identifier_pairs_by_external_id.values() for pair in pairs}
+        )
         create_values: list["odoo.values.account_move"] = []
         create_external_ids: list[str] = []
         sync_timestamps: dict[str, datetime] = {}
         identifiers_by_external_id: dict[str, dict[str, set[str]]] = {}
         pending_commit = False
+        identifier_pairs_by_external_id: dict[str, set[tuple[str, str]]] = {}
 
         def should_commit() -> bool:
             return commit_interval > 0 and processed_count % commit_interval == 0
@@ -398,6 +947,9 @@ class RepairshoprImporter(models.Model):
             external_id_value = str(invoice.id)
             if external_id_value in blocked:
                 continue
+            cutoff_timestamp = invoice.date or invoice.created_at
+            if self._is_before_transaction_cutoff(cutoff_timestamp):
+                continue
             updated_at = invoice.updated_at
             last_sync = last_sync_map.get(external_id_value)
             if updated_at and last_sync and last_sync >= updated_at:
@@ -422,6 +974,16 @@ class RepairshoprImporter(models.Model):
                 billing_contract=billing_contract,
                 pricing_catalog=pricing_catalog,
             )
+            ticket_properties = (
+                ticket_properties_by_ticket_id.get(invoice.ticket_id)
+                if invoice.ticket_id
+                else None
+            )
+            if ticket_properties:
+                identifiers = self._merge_identifier_maps(
+                    identifiers,
+                    self._collect_identifiers_from_ticket_properties(ticket_properties),
+                )
             is_no_charge = self._has_no_charge_note(invoice.note, line_items)
             line_commands = self._apply_rework_labor_adjustment(line_commands, is_no_charge, billing_contract)
             line_commands = self._prioritize_labor_lines(line_commands, billing_contract)
@@ -434,6 +996,25 @@ class RepairshoprImporter(models.Model):
                 billing_contract,
                 include_line_clear=bool(move_record_id),
             )
+            ticket_record_id = ticket_map.get(str(invoice.ticket_id)) if invoice.ticket_id else None
+            if ticket_record_id:
+                values["source_ticket_id"] = ticket_record_id
+            if not values.get("source_ticket_id"):
+                identifier_pairs = identifier_pairs_by_external_id.get(external_id_value, set())
+                ticket_record_id = self._resolve_ticket_id_from_pairs(
+                    identifier_pairs,
+                    pair_to_ticket_ids=pair_to_ticket_ids,
+                    ticket_partner_map=ticket_partner_map,
+                    partner_id=partner.id,
+                )
+                if ticket_record_id:
+                    values["source_ticket_id"] = ticket_record_id
+            if "source_ticket_id" in self.env["account.move"]._fields and not values.get("source_ticket_id"):
+                _logger.info(
+                    "Skipping invoice %s because no ticket link was found.",
+                    invoice.id,
+                )
+                continue
             if invoice.number:
                 identifiers.setdefault("invoice", set()).add(str(invoice.number))
             identifiers_by_external_id[external_id_value] = identifiers

@@ -28,6 +28,7 @@ RESOURCE_INVOICE = "invoice"
 
 DEFAULT_HELPDESK_TEAM_NAME = "RepairShopr"
 DEFAULT_SERVICE_PRODUCT_CODE = "REPAIRSHOPR-SERVICE"
+REPAIRSHOPR_TRANSACTION_CUTOFF = datetime(2022, 1, 1)
 
 SERIAL_PATTERN = re.compile(
     r"\b(?:S\s*/?\s*N|SN|SERIAL(?:\s*(?:NO|NUMBER))?)\s*[:#\-]\s*(?P<serial>[A-Z0-9][A-Z0-9\- ]{4,25})\b",
@@ -43,6 +44,10 @@ CLAIM_PATTERN = re.compile(
 )
 PO_PATTERN = re.compile(
     r"\b(?:PO|P/O|PURCHASE\s+ORDER)\s*(?:NO|NUMBER|#)?\s*[:#\-]\s*(?P<po>[A-Z0-9][A-Z0-9\- ]{2,30})\b",
+    re.IGNORECASE,
+)
+BID_PATTERN = re.compile(
+    r"\bBID\s*(?:NO|NUMBER|#)?\s*[:#\-]?\s*(?P<bid>[A-Z0-9][A-Z0-9\- ]{1,30})\b",
     re.IGNORECASE,
 )
 IMEI_PATTERN = re.compile(
@@ -61,6 +66,7 @@ IMPORT_CONTEXT = {
     "mail_create_nosubscribe": True,
     "sale_no_log_for_new_lines": True,
     "skip_shopify_sync": True,
+    "cm_skip_required_fields": True,
 }
 
 
@@ -81,14 +87,15 @@ class RepairshoprImporter(models.Model):
         sync_started_at = fields.Datetime.now()
         use_last_sync_at = self._use_last_sync_at()
         start_datetime = self._get_last_sync_at() if update_last_sync and use_last_sync_at else None
+        transaction_start_datetime = self._apply_transaction_cutoff(start_datetime)
         repairshopr_client = self._build_client()
         try:
             system = self._get_repairshopr_system()
             self._import_customers(repairshopr_client, start_datetime, system, sync_started_at)
             self._import_products(repairshopr_client, start_datetime, system, sync_started_at)
-            self._import_tickets(repairshopr_client, start_datetime, system, sync_started_at)
-            self._import_estimates(repairshopr_client, start_datetime, system, sync_started_at)
-            self._import_invoices(repairshopr_client, start_datetime, system, sync_started_at)
+            self._import_tickets(repairshopr_client, transaction_start_datetime, system, sync_started_at)
+            self._import_estimates(repairshopr_client, transaction_start_datetime, system, sync_started_at)
+            self._import_invoices(repairshopr_client, transaction_start_datetime, system, sync_started_at)
         except Exception as exc:
             _logger.exception("RepairShopr import failed")
             self._record_last_run("failed", str(exc))
@@ -99,6 +106,18 @@ class RepairshoprImporter(models.Model):
         self._record_last_run("success", "")
         if update_last_sync and use_last_sync_at:
             self._set_last_sync_at(sync_started_at)
+
+    @staticmethod
+    def _apply_transaction_cutoff(start_datetime: datetime | None) -> datetime:
+        if start_datetime and start_datetime > REPAIRSHOPR_TRANSACTION_CUTOFF:
+            return start_datetime
+        return REPAIRSHOPR_TRANSACTION_CUTOFF
+
+    @staticmethod
+    def _is_before_transaction_cutoff(timestamp: datetime | None) -> bool:
+        if not timestamp:
+            return False
+        return timestamp < REPAIRSHOPR_TRANSACTION_CUTOFF
 
     def _build_client(self) -> RepairshoprSyncClient:
         settings = self._get_sync_settings()
@@ -402,6 +421,10 @@ class RepairshoprImporter(models.Model):
             po_value = match.group("po").strip()
             if po_value:
                 identifiers["po"].add(po_value)
+        for match in BID_PATTERN.finditer(text):
+            bid_value = match.group("bid").strip()
+            if bid_value:
+                identifiers["bid"].add(bid_value)
         for match in IMEI_PATTERN.finditer(text):
             imei_value = match.group("imei").strip()
             if imei_value:
@@ -437,6 +460,12 @@ class RepairshoprImporter(models.Model):
         po_value = getattr(properties, "po_num_2", None)
         if po_value:
             identifiers["po"].add(str(po_value).strip())
+        other_value = getattr(properties, "other", None)
+        if other_value:
+            for match in BID_PATTERN.finditer(str(other_value)):
+                bid_value = match.group("bid").strip()
+                if bid_value:
+                    identifiers["bid"].add(bid_value)
         return identifiers
 
     def _collect_identifiers_from_line_items(self, line_items: list[dict[str, object]]) -> dict[str, set[str]]:

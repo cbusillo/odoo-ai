@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_helpdesk_ticket_form_cm_details" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.form.cm.details</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="inherit_id" ref="helpdesk.helpdesk_ticket_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="CM Details">
+                    <group>
+                        <group>
+                            <field name="device_id"/>
+                            <field name="transport_order_id"/>
+                            <field name="intake_order_id"/>
+                            <field name="repair_batch_id"/>
+                            <field name="invoice_order_id"/>
+                            <field name="invoice_batch_id"/>
+                        </group>
+                        <group>
+                            <field name="billing_contract_id"/>
+                            <field name="billing_context_id"/>
+                            <field name="billing_policy_id"/>
+                            <field name="billing_pricelist_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="claim_id"/>
+                            <field name="call_authorization_id"/>
+                            <field name="delivery_number"/>
+                            <field name="delivery_day_id"/>
+                            <field name="return_method_id"/>
+                        </group>
+                        <group>
+                            <field name="po_number"/>
+                            <field name="bid_number"/>
+                            <field name="other_override_id"/>
+                        </group>
+                    </group>
+                    <group string="Locations">
+                        <group>
+                            <field name="location_option_id"/>
+                            <field name="transport_location_option_id"/>
+                            <field name="transport_location_2_option_id"/>
+                        </group>
+                        <group>
+                            <field name="dropoff_location_option_id"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

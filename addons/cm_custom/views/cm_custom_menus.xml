@@ -9,8 +9,17 @@
               parent="menu_cm_custom_root" action="cm_diagnostic.action_diagnostic_orders" sequence="30"/>
     <menuitem id="menu_repair_batches" name="Repair Batches"
               parent="menu_cm_custom_root" action="cm_repair.action_repair_batches" sequence="40"/>
+    <menuitem id="menu_quality_control_orders" name="Quality Control Orders"
+              parent="menu_cm_custom_root" action="cm_quality_control.action_quality_control_orders"
+              sequence="45"/>
     <menuitem id="menu_repair_claims" name="Repair Claims"
               parent="menu_cm_custom_root" action="cm_repair.action_repair_claims" sequence="50"/>
+    <menuitem id="menu_invoice_orders" name="Invoice Orders"
+              parent="menu_cm_custom_root" action="cm_invoice_batch.action_invoice_orders"
+              sequence="55"/>
+    <menuitem id="menu_invoice_batches" name="Invoice Batches"
+              parent="menu_cm_custom_root" action="cm_invoice_batch.action_invoice_batches"
+              sequence="60"/>
     <menuitem id="menu_devices" name="Devices"
               parent="menu_cm_custom_root" action="cm_device.action_devices" sequence="70"/>
     <menuitem id="menu_cm_custom_config" name="CM Configuration"
@@ -33,6 +42,27 @@
               parent="menu_cm_custom_config" action="cm_school.action_pricing_catalogs" sequence="80"/>
     <menuitem id="menu_pricing_matrix" name="Pricing Matrix"
               parent="menu_cm_custom_config" action="cm_school.action_pricing_matrix" sequence="85"/>
+    <menuitem id="menu_location_options" name="Location Options"
+              parent="menu_cm_custom_config" action="cm_school.action_location_options" sequence="87"/>
+    <menuitem id="menu_location_option_aliases" name="Location Option Aliases"
+              parent="menu_cm_custom_config" action="cm_school.action_location_option_aliases" sequence="87"/>
+    <menuitem id="menu_delivery_days" name="Delivery Days"
+              parent="menu_cm_custom_config" action="cm_school.action_delivery_days" sequence="88"/>
+    <menuitem id="menu_delivery_day_aliases" name="Delivery Day Aliases"
+              parent="menu_cm_custom_config" action="cm_school.action_delivery_day_aliases" sequence="88"/>
+    <menuitem id="menu_override_options" name="Override Options"
+              parent="menu_cm_custom_config" action="cm_school.action_override_options" sequence="89"/>
+    <menuitem id="menu_return_methods" name="Return Methods"
+              parent="menu_cm_custom_config" action="cm_school.action_return_methods" sequence="89"/>
+    <menuitem id="menu_invoice_note_templates" name="Invoice Note Templates"
+              parent="menu_cm_custom_config" action="cm_invoice_batch.action_invoice_note_templates"
+              sequence="90"/>
+    <menuitem id="menu_call_authorizations" name="Call Authorizations"
+              parent="menu_cm_custom_config" action="cm_invoice_batch.action_call_authorizations"
+              sequence="91"/>
+    <menuitem id="menu_quality_control_checklist" name="Quality Control Checklist"
+              parent="menu_cm_custom_config"
+              action="cm_quality_control.action_quality_control_checklist_items" sequence="95"/>
     <menuitem id="menu_identifier_index" name="Identifier Index"
               parent="menu_cm_custom_config" action="cm_custom.action_identifier_index" sequence="90"/>
 </odoo>

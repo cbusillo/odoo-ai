@@ -33,7 +33,7 @@ class ResPartner(models.Model):
         compute="_compute_diagnostic_orders",
     )
     qc_orders = fields.Many2many(
-        "service.repair.batch.device",
+        "service.quality.control.order.device",
         compute="_compute_qc_orders",
     )
     repair_batch_devices = fields.Many2many(
@@ -81,10 +81,12 @@ class ResPartner(models.Model):
         for partner in self:
             partner.diagnostic_orders = partner.devices.mapped("diagnostic_orders.diagnostic_order")
 
-    @api.depends("devices.repair_batch_lines.state")
+    @api.depends("devices.quality_control_order_devices.state")
     def _compute_qc_orders(self) -> None:
         for partner in self:
-            partner.qc_orders = partner.devices.mapped("repair_batch_lines").filtered(lambda line: line.state != "finished")
+            partner.qc_orders = partner.devices.mapped("quality_control_order_devices").filtered(
+                lambda line: line.state in {"pending", "started"}
+            )
 
     @api.depends("devices.repair_batch_lines")
     def _compute_repair_batch_devices(self) -> None:

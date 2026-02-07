@@ -13,7 +13,9 @@
         "contacts",
         "cm_device",
         "cm_diagnostic",
+        "cm_invoice_batch",
         "cm_intake",
+        "cm_quality_control",
         "cm_repair",
         "cm_school",
         "cm_transport",
@@ -33,6 +35,7 @@
     "data": [
         "security/ir.model.access.csv",
         "views/res_partner_views.xml",
+        "views/helpdesk_ticket_views.xml",
         "views/identifier_index_views.xml",
         "views/cm_custom_actions.xml",
         "views/cm_custom_menus.xml",

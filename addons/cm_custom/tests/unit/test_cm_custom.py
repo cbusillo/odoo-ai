@@ -126,15 +126,39 @@ class TestCmCustom(UnitTestCase):
         client_partner = self._create_partner("Repair Client")
         device_started = self._create_device(client_partner, "QC-START")
         device_finished = self._create_device(client_partner, "QC-FINISH")
+        quality_control_order = self.env["service.quality.control.order"].create(
+            {
+                "name": "Quality Control",
+                "state": "started",
+            }
+        )
+        quality_control_order_device_started = self.env[
+            "service.quality.control.order.device"
+        ].create(
+            {
+                "quality_control_order": quality_control_order.id,
+                "device": device_started.id,
+                "state": "started",
+            }
+        )
+        quality_control_order_device_finished = self.env[
+            "service.quality.control.order.device"
+        ].create(
+            {
+                "quality_control_order": quality_control_order.id,
+                "device": device_finished.id,
+                "state": "passed",
+            }
+        )
         repair_batch = self.RepairBatch.create({"name": "Batch"})
-        started_line = self.RepairBatchDevice.create(
+        repair_batch_device_started = self.RepairBatchDevice.create(
             {
                 "batch_id": repair_batch.id,
                 "device_id": device_started.id,
                 "state": "started",
             }
         )
-        finished_line = self.RepairBatchDevice.create(
+        repair_batch_device_finished = self.RepairBatchDevice.create(
             {
                 "batch_id": repair_batch.id,
                 "device_id": device_finished.id,
@@ -142,10 +166,10 @@ class TestCmCustom(UnitTestCase):
             }
         )
 
-        self.assertIn(started_line, client_partner.qc_orders)
-        self.assertNotIn(finished_line, client_partner.qc_orders)
-        self.assertIn(started_line, client_partner.repair_batch_devices)
-        self.assertIn(finished_line, client_partner.repair_batch_devices)
+        self.assertIn(quality_control_order_device_started, client_partner.qc_orders)
+        self.assertNotIn(quality_control_order_device_finished, client_partner.qc_orders)
+        self.assertIn(repair_batch_device_started, client_partner.repair_batch_devices)
+        self.assertIn(repair_batch_device_finished, client_partner.repair_batch_devices)
 
     def test_transport_order_device_onchange_sets_scan_date(self) -> None:
         client_partner = self._create_partner("Scan Client")

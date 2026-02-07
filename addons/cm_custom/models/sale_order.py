@@ -28,3 +28,8 @@ class SaleOrder(models.Model):
         readonly=True,
         string="Billing Pricelist",
     )
+    source_ticket_id = fields.Many2one(
+        "helpdesk.ticket",
+        ondelete="set null",
+        string="Source Ticket",
+    )

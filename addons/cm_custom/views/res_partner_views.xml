@@ -88,8 +88,8 @@
                             </field>
                             <field name="qc_orders" readonly="1">
                                 <list>
-                                    <field name="batch_id"/>
-                                    <field name="device_id"/>
+                                    <field name="quality_control_order"/>
+                                    <field name="device"/>
                                     <field name="state"/>
                                     <field name="start_date"/>
                                 </list>

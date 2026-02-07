@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_invoice_note_template_list" model="ir.ui.view">
+        <field name="name">service.invoice.note.template.list</field>
+        <field name="model">service.invoice.note.template</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="note_type"/>
+                <field name="partner_id"/>
+                <field name="billing_context_id"/>
+                <field name="sequence"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_invoice_note_template_form" model="ir.ui.view">
+        <field name="name">service.invoice.note.template.form</field>
+        <field name="model">service.invoice.note.template</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="note_type"/>
+                        </group>
+                        <group>
+                            <field name="partner_id"/>
+                            <field name="billing_context_id"/>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="template_text" colspan="2"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+</odoo>

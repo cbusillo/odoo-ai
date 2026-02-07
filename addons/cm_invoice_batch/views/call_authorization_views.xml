@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_call_authorization_list" model="ir.ui.view">
+        <field name="name">service.call.authorization.list</field>
+        <field name="model">service.call.authorization</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="state"/>
+                <field name="partner_id"/>
+                <field name="ticket_id"/>
+                <field name="invoice_order_id"/>
+                <field name="requested_at"/>
+                <field name="approved_at"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_call_authorization_form" model="ir.ui.view">
+        <field name="name">service.call.authorization.form</field>
+        <field name="model">service.call.authorization</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="state"/>
+                            <field name="partner_id"/>
+                        </group>
+                        <group>
+                            <field name="ticket_id"/>
+                            <field name="invoice_order_id"/>
+                            <field name="reference_number"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="requested_at"/>
+                            <field name="approved_at"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="notes" colspan="2"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_device_form_invoice" model="ir.ui.view">
+        <field name="name">service.device.form.invoice</field>
+        <field name="model">service.device</field>
+        <field name="inherit_id" ref="cm_device.view_device_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Invoice Orders">
+                    <field name="invoice_order_devices">
+                        <list>
+                            <field name="invoice_order"/>
+                            <field name="state"/>
+                            <field name="update_status"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

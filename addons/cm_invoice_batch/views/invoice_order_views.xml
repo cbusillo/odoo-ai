@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_invoice_order_tree" model="ir.ui.view">
+        <field name="name">service.invoice.order.tree</field>
+        <field name="model">service.invoice.order</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="state"/>
+                <field name="client"/>
+                <field name="ticket_id"/>
+                <field name="invoice_date"/>
+                <field name="invoice_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_invoice_order_form" model="ir.ui.view">
+        <field name="name">service.invoice.order.form</field>
+        <field name="model">service.invoice.order</field>
+        <field name="arch" type="xml">
+            <form string="Invoice Order">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="state"/>
+                            <field name="employee"/>
+                        </group>
+                        <group>
+                            <field name="client"/>
+                            <field name="billing_contract_id"/>
+                            <field name="billing_context_id"/>
+                            <field name="billing_policy_id"/>
+                            <field name="billing_pricelist_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="ticket_id"/>
+                            <field name="repair_batch_id"/>
+                            <field name="quality_control_order_id"/>
+                        </group>
+                        <group>
+                            <field name="invoice_batch_id"/>
+                            <field name="invoice_id"/>
+                            <field name="invoice_date"/>
+                            <field name="call_authorization_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="claim_id"/>
+                            <field name="call_authorization_id"/>
+                            <field name="delivery_number"/>
+                            <field name="delivery_day_id"/>
+                            <field name="return_method_id"/>
+                        </group>
+                        <group>
+                            <field name="po_number"/>
+                            <field name="bid_number"/>
+                            <field name="other_override_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="notes" colspan="2"/>
+                        <field name="allow_manual_notes"/>
+                    </group>
+                    <notebook>
+                        <page string="Devices">
+                            <field name="device_lines">
+                                <list editable="bottom">
+                                    <field name="device"/>
+                                    <field name="state"/>
+                                    <field name="update_status"/>
+                                    <field name="needs_estimate"/>
+                                    <field name="is_capped_pricing"/>
+                                    <field name="capped_amount"/>
+                                </list>
+                                <form string="Invoice Device">
+                                    <group>
+                                        <field name="device"/>
+                                        <field name="state"/>
+                                        <field name="quality_control_order_device"/>
+                                    </group>
+                                    <group>
+                                        <field name="diagnosis_template_id"/>
+                                        <field name="repair_template_id"/>
+                                        <field name="summary_template_id"/>
+                                    </group>
+                                    <group>
+                                        <field name="update_status"/>
+                                        <field name="needs_estimate"/>
+                                        <field name="is_capped_pricing"/>
+                                        <field name="capped_amount"/>
+                                    </group>
+                                    <group>
+                                        <field name="diagnosis_note" colspan="2" readonly="not parent.allow_manual_notes"/>
+                                        <field name="repair_note" colspan="2" readonly="not parent.allow_manual_notes"/>
+                                        <field name="summary_note" colspan="2" readonly="not parent.allow_manual_notes"/>
+                                    </group>
+                                </form>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+</odoo>

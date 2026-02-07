@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_invoice_batch_user,service.invoice.batch.user,model_service_invoice_batch,base.group_user,1,1,1,1
+access_invoice_batch_line_user,service.invoice.batch.line.user,model_service_invoice_batch_line,base.group_user,1,1,1,1
+access_invoice_order_user,service.invoice.order.user,model_service_invoice_order,base.group_user,1,1,1,1
+access_invoice_order_device_user,service.invoice.order.device.user,model_service_invoice_order_device,base.group_user,1,1,1,1
+access_call_authorization_user,service.call.authorization.user,model_service_call_authorization,base.group_user,1,1,1,1
+access_invoice_note_template_user,service.invoice.note.template.user,model_service_invoice_note_template,base.group_user,1,1,1,1

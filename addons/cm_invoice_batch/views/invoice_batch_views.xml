@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_invoice_batch_tree" model="ir.ui.view">
+        <field name="name">service.invoice.batch.tree</field>
+        <field name="model">service.invoice.batch</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="batch_type"/>
+                <field name="state"/>
+                <field name="partner_id"/>
+                <field name="period_start"/>
+                <field name="period_end"/>
+                <field name="invoice_date"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_invoice_batch_form" model="ir.ui.view">
+        <field name="name">service.invoice.batch.form</field>
+        <field name="model">service.invoice.batch</field>
+        <field name="arch" type="xml">
+            <form string="Invoice Batch">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="batch_type"/>
+                            <field name="state"/>
+                        </group>
+                        <group>
+                            <field name="partner_id"/>
+                            <field name="billing_contract_id"/>
+                            <field name="billing_context_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="period_start"/>
+                            <field name="period_end"/>
+                            <field name="invoice_date"/>
+                        </group>
+                        <group>
+                            <field name="ticket_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="notes" colspan="2"/>
+                    </group>
+                    <notebook>
+                        <page string="Line Items">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="partner_id"/>
+                                    <field name="description"/>
+                                    <field name="reference_numbers"/>
+                                    <field name="hours"/>
+                                    <field name="amount"/>
+                                </list>
+                                <form string="Invoice Batch Line">
+                                    <group>
+                                        <field name="partner_id"/>
+                                        <field name="sequence"/>
+                                    </group>
+                                    <group>
+                                        <field name="hours"/>
+                                        <field name="amount"/>
+                                        <field name="currency_id"/>
+                                    </group>
+                                    <group>
+                                        <field name="description" colspan="2"/>
+                                        <field name="reference_numbers" colspan="2"/>
+                                    </group>
+                                </form>
+                            </field>
+                        </page>
+                        <page string="Invoice Orders">
+                            <field name="invoice_orders">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="client"/>
+                                    <field name="state"/>
+                                    <field name="invoice_id"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Invoices">
+                            <field name="invoice_ids" widget="many2many_tags"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+</odoo>

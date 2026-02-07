@@ -203,15 +203,19 @@ class FishbowlImporterOrders(models.Model):
             create_values: list["odoo.values.sale_order_line"] = []
             create_external_ids: list[str] = []
             processed_external_ids: list[str] = []
+            seen_external_ids: set[str] = set()
 
             for row in sales_line_rows:
                 fishbowl_id = row.id
                 external_id_value = str(fishbowl_id)
                 if external_id_value in sales_blocked:
                     continue
+                if external_id_value in seen_external_ids:
+                    continue
                 order_id = sales_order_map.get(row.soId or 0)
                 if not order_id:
                     continue
+                seen_external_ids.add(external_id_value)
                 product_id = self._resolve_product_from_sales_row(row, product_maps, product_code_map)
                 # noinspection DuplicatedCode
                 missing_product = False

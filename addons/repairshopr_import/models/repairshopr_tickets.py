@@ -1,6 +1,8 @@
 from datetime import datetime
 import re
 
+from psycopg2 import IntegrityError
+
 from odoo import models
 
 from ..services import repairshopr_sync_models as repairshopr_models
@@ -442,7 +444,21 @@ class RepairshoprImporter(models.Model):
         )
         if option:
             return option
-        return option_model.create({"name": value, "partner_id": partner.id, "override_type": "other"})
+        try:
+            with self.env.cr.savepoint():
+                return option_model.create({"name": value, "partner_id": partner.id, "override_type": "other"})
+        except IntegrityError:
+            return (
+                option_model.search(
+                    [
+                        ("partner_id", "=", partner.id),
+                        ("override_type", "=", "other"),
+                        ("name", "=", value),
+                    ],
+                    limit=1,
+                )
+                or self.env["school.override.option"].browse()
+            )
 
     def _build_ticket_property_values(
         self,

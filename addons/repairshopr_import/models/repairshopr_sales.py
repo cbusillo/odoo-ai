@@ -258,7 +258,7 @@ class RepairshoprImporter(models.Model):
         )
 
         created_lines: list["odoo.model.service_intake_order_device"] = []
-        quality_control_candidates: list[tuple["odoo.model.service_device", str]] = []
+        quality_control_candidates: dict[int, dict[str, object]] = {}
         for device_line in device_lines:
             model_label = device_line.get("model_label")
             if model_label is not None:
@@ -307,9 +307,20 @@ class RepairshoprImporter(models.Model):
             created_lines.append(intake_device)
             summary_notes = device_line.get("summary_notes")
             if isinstance(summary_notes, list):
-                summary_text = "\n".join(line for line in summary_notes if isinstance(line, str) and line.strip())
-                if summary_text:
-                    quality_control_candidates.append((device_record, summary_text))
+                summary_lines = [line.strip() for line in summary_notes if isinstance(line, str) and line.strip()]
+                if summary_lines:
+                    candidate = quality_control_candidates.get(device_record.id)
+                    if not candidate:
+                        candidate = {
+                            "device": device_record,
+                            "summaries": [],
+                        }
+                        quality_control_candidates[device_record.id] = candidate
+                    summaries = candidate.get("summaries")
+                    if isinstance(summaries, list):
+                        for summary_line in summary_lines:
+                            if summary_line not in summaries:
+                                summaries.append(summary_line)
 
         if quality_control_candidates:
             quality_control_order_model = self.env["service.quality.control.order"].sudo().with_context(IMPORT_CONTEXT)
@@ -317,30 +328,66 @@ class RepairshoprImporter(models.Model):
                 IMPORT_CONTEXT
             )
             finish_date = ticket.created_at
-            quality_control_order = quality_control_order_model.create(
-                {
-                    "name": f"RepairShopr QC {ticket.id}",
-                    "state": "finished",
-                    "start_date": finish_date,
-                    "finish_date": finish_date,
-                    "client": partner.id,
-                }
+            quality_control_name = f"RepairShopr QC {ticket.id}"
+            quality_control_order = quality_control_order_model.search(
+                [
+                    ("name", "=", quality_control_name),
+                    ("client", "=", partner.id),
+                ],
+                limit=1,
             )
-            for device_record, summary_text in quality_control_candidates:
+            if not quality_control_order:
+                quality_control_order = quality_control_order_model.create(
+                    {
+                        "name": quality_control_name,
+                        "state": "finished",
+                        "start_date": finish_date,
+                        "finish_date": finish_date,
+                        "client": partner.id,
+                    }
+                )
+            for candidate in quality_control_candidates.values():
+                device_record = candidate.get("device")
+                summaries = candidate.get("summaries")
+                if not isinstance(device_record, models.BaseModel):
+                    continue
+                if not isinstance(summaries, list):
+                    continue
+                summary_text = "\n".join(summary for summary in summaries if isinstance(summary, str) and summary.strip())
+                if not summary_text:
+                    continue
                 existing = quality_control_device_model.search(
                     [
+                        ("quality_control_order", "=", quality_control_order.id),
                         ("device", "=", device_record.id),
-                        ("summary_note", "=", summary_text),
                     ],
                     limit=1,
                 )
                 if existing:
+                    existing_lines = [
+                        line.strip()
+                        for line in (existing.summary_note or "").splitlines()
+                        if line.strip()
+                    ]
+                    merged_lines: list[str] = []
+                    for line in [*existing_lines, *summaries]:
+                        cleaned = line.strip()
+                        if cleaned and cleaned not in merged_lines:
+                            merged_lines.append(cleaned)
+                    update_values: dict[str, object] = {}
+                    merged_text = "\n".join(merged_lines)
+                    if merged_text and merged_text != (existing.summary_note or ""):
+                        update_values["summary_note"] = merged_text
+                    if existing.state in {"pending", "started"}:
+                        update_values["state"] = "passed"
+                    if update_values:
+                        existing.write(update_values)
                     continue
                 quality_control_device_model.create(
                     {
                         "quality_control_order": quality_control_order.id,
                         "device": device_record.id,
-                        "state": "finished",
+                        "state": "passed",
                         "start_date": finish_date,
                         "finish_date": finish_date,
                         "summary_note": summary_text,

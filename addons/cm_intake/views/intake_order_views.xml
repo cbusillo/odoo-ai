@@ -39,6 +39,7 @@
                                     <field name="has_case"/>
                                     <field name="claim_number"/>
                                     <field name="po_number"/>
+                                    <field name="needs_estimate"/>
                                     <field name="customer_stated_notes"/>
                                     <field name="products" widget="many2many_tags"/>
                                 </list>
@@ -48,6 +49,7 @@
                                         <field name="has_case"/>
                                         <field name="claim_number"/>
                                         <field name="po_number"/>
+                                        <field name="needs_estimate"/>
                                         <field name="customer_stated_notes"/>
                                         <field name="products" widget="many2many_tags"/>
                                     </group>

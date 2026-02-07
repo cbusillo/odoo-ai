@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class IntakeOrderDevice(models.Model):
@@ -17,6 +17,15 @@ class IntakeOrderDevice(models.Model):
         required=True,
         ondelete="restrict",
     )
+    case_indicator = fields.Selection(
+        [
+            ("unknown", "Unknown"),
+            ("yes", "Yes"),
+            ("no", "No"),
+        ],
+        default="unknown",
+        required=True,
+    )
     has_case = fields.Boolean()
     customer_stated_notes = fields.Char()
     claim_number = fields.Char()
@@ -24,6 +33,7 @@ class IntakeOrderDevice(models.Model):
     student_name = fields.Char()
     guardian_name = fields.Char()
     guardian_phone = fields.Char()
+    needs_estimate = fields.Boolean()
 
     products = fields.Many2many(
         "product.template",
@@ -31,3 +41,19 @@ class IntakeOrderDevice(models.Model):
         "intake_order_device_id",
         "product_id",
     )
+
+    @api.onchange("case_indicator")
+    def _onchange_case_indicator(self) -> None:
+        if self.case_indicator == "yes":
+            self.has_case = True
+        elif self.case_indicator == "no":
+            self.has_case = False
+
+    @api.onchange("has_case")
+    def _onchange_has_case(self) -> None:
+        if self.has_case:
+            self.case_indicator = "yes"
+        elif self.case_indicator == "unknown":
+            return
+        else:
+            self.case_indicator = "no"

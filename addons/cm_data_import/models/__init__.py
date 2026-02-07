@@ -7,4 +7,7 @@ from . import cm_data_pricing_audit
 from . import cm_data_shipping_instruction
 from . import cm_data_pto_usage
 from . import cm_data_vacation_usage
+from . import cm_seed_loader
+from . import hr_employee
 from . import hr_attendance
+from . import res_partner

@@ -24,6 +24,7 @@
         "security/ir.model.access.csv",
         "data/ir_cron.xml",
         "views/pricing_audit_views.xml",
+        "views/res_partner_views.xml",
         "views/cm_data_import_actions.xml",
     ],
     "installable": True,

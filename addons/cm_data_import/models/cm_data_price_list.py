@@ -7,6 +7,7 @@ class CmDataPriceList(models.Model):
     _inherit = ["external.id.mixin"]
     _order = "id"
 
+    name = fields.Char()
     link = fields.Text()
     source_created_at = fields.Datetime()
     source_updated_at = fields.Datetime()

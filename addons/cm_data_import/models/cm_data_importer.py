@@ -1,10 +1,11 @@
 import logging
 import os
 import re
-from datetime import date, datetime
+from datetime import date, datetime, time
+from zoneinfo import ZoneInfo
 
 from odoo import api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 
 from ..services.cm_data_client import (
     CmDataAccountName,
@@ -32,6 +33,7 @@ EXTERNAL_SYSTEM_APPLICABLE_MODEL_XMLIDS = (
     "hr.model_hr_employee",
     "hr_attendance.model_hr_attendance",
     "cm_transport.model_service_transport_order",
+    "cm_quality_control.model_service_quality_control_checklist_item",
     "cm_data_import.model_integration_cm_data_direction",
     "cm_data_import.model_integration_cm_data_shipping_instruction",
     "cm_data_import.model_integration_cm_data_note",
@@ -54,6 +56,7 @@ MODEL_NUMBER_RESOURCE = "model_number"
 PRICE_LIST_RESOURCE = "price_list"
 PRICING_CATALOG_RESOURCE = "pricing_catalog"
 PRICING_LINE_RESOURCE = "pricing_line"
+QUALITY_CONTROL_CHECKLIST_RESOURCE = "quality_control_checklist"
 EMPLOYEE_RESOURCE = "employee"
 PTO_USAGE_RESOURCE = "pto_usage"
 VACATION_USAGE_RESOURCE = "vacation_usage"
@@ -72,6 +75,7 @@ IMPORT_CONTEXT = {
     "mail_create_nolog": True,
     "mail_notrack": True,
     "mail_create_nosubscribe": True,
+    "cm_skip_required_fields": True,
 }
 
 STATUS_MAP = {
@@ -209,6 +213,8 @@ class CmDataImporter(models.Model):
         sync_started_at: datetime,
     ) -> dict[str, int]:
         partner_model = self.env["res.partner"].sudo().with_context(IMPORT_CONTEXT)
+        price_list_model = self.env["integration.cm_data.price.list"].sudo().with_context(IMPORT_CONTEXT)
+        partner_role_map = self._build_partner_role_map()
         commit_interval = self._get_commit_interval()
         processed_count = 0
         partner_map: dict[str, int] = {}
@@ -237,10 +243,13 @@ class CmDataImporter(models.Model):
             )
             if not partner:
                 continue
+            self._apply_partner_roles_from_labels(partner, row.label_names, partner_role_map)
+            self._apply_partner_price_lists(partner, row.price_list, row.price_list_2, price_list_model)
             partner_map[self._normalize_key(row.account_name)] = partner.id
             processed_count += 1
             if self._maybe_commit(processed_count, commit_interval, label="account"):
                 partner_model = self.env["res.partner"].sudo().with_context(IMPORT_CONTEXT)
+                price_list_model = self.env["integration.cm_data.price.list"].sudo().with_context(IMPORT_CONTEXT)
         return partner_map
 
     def _import_account_aliases(
@@ -461,6 +470,9 @@ class CmDataImporter(models.Model):
         sync_started_at: datetime,
     ) -> None:
         note_model = self.env["integration.cm_data.note"].sudo().with_context(IMPORT_CONTEXT)
+        checklist_item_model = self.env["service.quality.control.checklist.item"].sudo().with_context(
+            IMPORT_CONTEXT
+        )
         commit_interval = self._get_commit_interval()
         processed_count = 0
         resource = NOTE_TYPE_RESOURCES[note_type]
@@ -488,9 +500,53 @@ class CmDataImporter(models.Model):
                 updated_at=row.updated_at,
                 sync_started_at=sync_started_at,
             )
+            if note_type == "quality_control":
+                self._import_quality_control_checklist_item(
+                    checklist_item_model,
+                    row,
+                    partner_id,
+                    system,
+                    sync_started_at,
+                )
             processed_count += 1
             if self._maybe_commit(processed_count, commit_interval, label=f"{note_type} note"):
                 note_model = self.env["integration.cm_data.note"].sudo().with_context(IMPORT_CONTEXT)
+                checklist_item_model = self.env["service.quality.control.checklist.item"].sudo().with_context(
+                    IMPORT_CONTEXT
+                )
+
+    def _import_quality_control_checklist_item(
+        self,
+        checklist_item_model: models.Model,
+        note_row: CmDataNoteRow,
+        partner_id: int,
+        system: "odoo.model.external_system",
+        sync_started_at: datetime,
+    ) -> None:
+        name = note_row.sub_name or "Quality Control"
+        if not note_row.sub_name and note_row.note:
+            first_line = note_row.note.splitlines()[0].strip()
+            if first_line:
+                name = first_line
+
+        sequence = note_row.sort_order if note_row.sort_order is not None else 10
+        values: "odoo.values.service_quality_control_checklist_item" = {
+            "name": name,
+            "partner_id": partner_id,
+            "category": "other",
+            "description": note_row.note,
+            "sequence": sequence,
+            "active": True,
+        }
+        self._get_or_create_by_external_id_with_sync(
+            checklist_item_model,
+            system,
+            str(note_row.record_id),
+            values,
+            resource=QUALITY_CONTROL_CHECKLIST_RESOURCE,
+            updated_at=note_row.updated_at,
+            sync_started_at=sync_started_at,
+        )
 
     def _import_passwords(
         self,
@@ -546,6 +602,7 @@ class CmDataImporter(models.Model):
         processed_count = 0
         for row in price_list_rows:
             values: "odoo.values.integration_cm_data_price_list" = {
+                "name": row.link or f"Price List {row.record_id}",
                 "link": row.link,
                 "source_created_at": row.created_at,
                 "source_updated_at": row.updated_at,
@@ -979,6 +1036,22 @@ class CmDataImporter(models.Model):
                 work_email = self._extract_email(row.grafana_username)
                 if work_email:
                     values["work_email"] = work_email
+            if "cm_data_timeclock_id" in employee_model._fields:
+                values["cm_data_timeclock_id"] = row.timeclock_id
+            if "cm_data_repairshopr_id" in employee_model._fields:
+                values["cm_data_repairshopr_id"] = row.repairshopr_id
+            if "cm_data_discord_id" in employee_model._fields:
+                values["cm_data_discord_id"] = str(row.discord_id) if row.discord_id is not None else None
+            if "cm_data_grafana_username" in employee_model._fields:
+                values["cm_data_grafana_username"] = row.grafana_username
+            if "cm_data_dept" in employee_model._fields:
+                values["cm_data_dept"] = row.dept
+            if "cm_data_team" in employee_model._fields:
+                values["cm_data_team"] = row.team
+            if "cm_data_on_site" in employee_model._fields:
+                values["cm_data_on_site"] = row.on_site
+            if "cm_data_last_day" in employee_model._fields and row.last_day:
+                values["cm_data_last_day"] = self._as_date(row.last_day)
             if "birthday" in employee_model._fields and row.date_of_birth:
                 values["birthday"] = self._as_date(row.date_of_birth)
             if "first_contract_date" in employee_model._fields and row.date_of_hire:
@@ -1078,6 +1151,8 @@ class CmDataImporter(models.Model):
         attendance_model = self.env["hr.attendance"].sudo().with_context(IMPORT_CONTEXT)
         commit_interval = self._get_commit_interval()
         processed_count = 0
+        closing_time = self._get_timeclock_close_time()
+        today_local = fields.Date.context_today(self)
         employee_ids = {
             employee_id for employee_id in (timeclock_employee_map.get(row.user_id or 0) for row in punch_rows) if employee_id
         }
@@ -1157,17 +1232,42 @@ class CmDataImporter(models.Model):
                 if open_attendance_id:
                     open_attendance = attendance_model.browse(open_attendance_id).exists()
                     if open_attendance and not open_attendance.check_out:
-                        check_out_time = punch_time
-                        if open_attendance.check_in and check_out_time < open_attendance.check_in:
-                            check_out_time = open_attendance.check_in
-                        open_attendance.write({"check_out": check_out_time})
+                        check_in_local = self._to_local_datetime(open_attendance.check_in)
+                        punch_local = self._to_local_datetime(punch_time)
+                        if punch_local.date() > check_in_local.date() or punch_local.time() > closing_time:
+                            self._close_attendance_missing_checkout(
+                                open_attendance,
+                                closing_time=closing_time,
+                                reason=f"missing_checkout_before_new_check_in punch={row.record_id}",
+                            )
+                        else:
+                            check_out_time = punch_time
+                            if open_attendance.check_in and check_out_time < open_attendance.check_in:
+                                check_out_time = open_attendance.check_in
+                            try:
+                                open_attendance.write({"check_out": check_out_time})
+                            except ValidationError:
+                                self._close_attendance_with_check_out(
+                                    open_attendance,
+                                    check_out_time=check_out_time,
+                                    reason=f"missing_checkout_before_new_check_in punch={row.record_id}",
+                                )
                     open_attendance_by_employee.pop(employee_id, None)
                 values: "odoo.values.hr_attendance" = {
                     "employee_id": employee_id,
                     "check_in": punch_time,
                 }
-                attendance_record = attendance_model.create(values)
-                open_attendance_by_employee[employee_id] = attendance_record.id
+                attendance_record = self._create_attendance_with_fix(
+                    attendance_model,
+                    values,
+                    employee_id=employee_id,
+                    closing_time=closing_time,
+                    reason=f"missing_checkout_on_check_in punch={row.record_id}",
+                )
+                if attendance_record.check_out:
+                    open_attendance_by_employee.pop(employee_id, None)
+                else:
+                    open_attendance_by_employee[employee_id] = attendance_record.id
             else:
                 open_attendance_id = open_attendance_by_employee.get(employee_id)
                 open_attendance = (
@@ -1186,7 +1286,14 @@ class CmDataImporter(models.Model):
                     check_out_time = punch_time
                     if open_attendance.check_in and check_out_time < open_attendance.check_in:
                         check_out_time = open_attendance.check_in
-                    open_attendance.write({"check_out": check_out_time})
+                    try:
+                        open_attendance.write({"check_out": check_out_time})
+                    except ValidationError:
+                        self._close_attendance_with_check_out(
+                            open_attendance,
+                            check_out_time=check_out_time,
+                            reason=f"missing_checkout_on_check_out punch={row.record_id}",
+                        )
                     attendance_record = open_attendance
                 else:
                     values: "odoo.values.hr_attendance" = {
@@ -1194,7 +1301,13 @@ class CmDataImporter(models.Model):
                         "check_in": punch_time,
                         "check_out": punch_time,
                     }
-                    attendance_record = attendance_model.create(values)
+                    attendance_record = self._create_attendance_with_fix(
+                        attendance_model,
+                        values,
+                        employee_id=employee_id,
+                        closing_time=closing_time,
+                        reason=f"missing_checkout_on_check_out punch={row.record_id}",
+                    )
                 open_attendance_by_employee.pop(employee_id, None)
 
             attendance_record.set_external_id(EXTERNAL_SYSTEM_CODE, external_id_value, resource)
@@ -1202,6 +1315,19 @@ class CmDataImporter(models.Model):
             processed_count += 1
             if self._maybe_commit(processed_count, commit_interval, label="attendance"):
                 attendance_model = self.env["hr.attendance"].sudo().with_context(IMPORT_CONTEXT)
+
+        for employee_id, attendance_id in list(open_attendance_by_employee.items()):
+            attendance = attendance_model.browse(attendance_id).exists()
+            if not attendance or attendance.check_out:
+                continue
+            check_in_local = self._to_local_datetime(attendance.check_in)
+            if check_in_local.date() >= today_local:
+                continue
+            self._close_attendance_missing_checkout(
+                attendance,
+                closing_time=closing_time,
+                reason="missing_checkout_end_of_import",
+            )
 
     def _resolve_transport_partner(
         self,
@@ -1237,6 +1363,100 @@ class CmDataImporter(models.Model):
             return location_name
         return f"Delivery Log {row.record_id}"
 
+    def _build_partner_role_map(self) -> dict[str, int]:
+        role_model = self.env["school.partner.role"].sudo()
+        role_map: dict[str, int] = {}
+        for role in role_model.search([]):
+            for token in (role.code, role.name):
+                normalized = self._normalize_key(token)
+                if normalized and normalized not in role_map:
+                    role_map[normalized] = role.id
+        return role_map
+
+    def _apply_partner_roles_from_labels(
+        self,
+        partner: "odoo.model.res_partner",
+        label_names: str | None,
+        partner_role_map: dict[str, int],
+    ) -> None:
+        if "partner_role_ids" not in partner._fields:
+            return
+        role_ids = self._resolve_partner_role_ids(label_names, partner_role_map)
+        if not role_ids:
+            return
+        current_ids = partner.partner_role_ids.ids
+        merged_ids = sorted(set(current_ids).union(role_ids))
+        if set(current_ids) != set(merged_ids):
+            partner.write({"partner_role_ids": [(6, 0, merged_ids)]})
+
+    def _resolve_partner_role_ids(self, label_names: str | None, partner_role_map: dict[str, int]) -> list[int]:
+        tokens = self._extract_aliases(label_names)
+        role_ids: list[int] = []
+        for token in tokens:
+            normalized = self._normalize_key(token)
+            role_id = partner_role_map.get(normalized)
+            if role_id:
+                role_ids.append(role_id)
+            else:
+                _logger.warning("CM data label '%s' did not match a partner role.", token)
+        return list(dict.fromkeys(role_ids))
+
+    def _apply_partner_price_lists(
+        self,
+        partner: "odoo.model.res_partner",
+        primary_value: str | None,
+        secondary_value: str | None,
+        price_list_model: "odoo.model.integration_cm_data_price_list",
+    ) -> None:
+        if "cm_data_price_list_record_ids" not in partner._fields:
+            return
+        primary_ids = self._parse_cm_id_list(primary_value)
+        secondary_ids = self._parse_cm_id_list(secondary_value)
+        external_ids = list(dict.fromkeys([*primary_ids, *secondary_ids]))
+        if not external_ids and not secondary_ids:
+            return
+        record_ids = self._resolve_price_list_record_ids(price_list_model, external_ids)
+        if record_ids:
+            current_ids = partner.cm_data_price_list_record_ids.ids
+            merged_ids = sorted(set(current_ids).union(record_ids))
+            if set(current_ids) != set(merged_ids):
+                partner.write({"cm_data_price_list_record_ids": [(6, 0, merged_ids)]})
+        if secondary_ids and "cm_data_price_list_secondary_record_id" in partner._fields:
+            secondary_records = self._resolve_price_list_record_ids(price_list_model, secondary_ids)
+            if secondary_records:
+                secondary_id = secondary_records[0]
+                if partner.cm_data_price_list_secondary_record_id.id != secondary_id:
+                    partner.write({"cm_data_price_list_secondary_record_id": secondary_id})
+
+    def _parse_cm_id_list(self, value: str | None) -> list[str]:
+        tokens = self._extract_aliases(value)
+        id_values: list[str] = []
+        for token in tokens:
+            match = re.search(r"\d+", token)
+            if not match:
+                _logger.info("CM data value '%s' did not include an id; skipping.", token)
+                continue
+            id_values.append(match.group(0))
+        return list(dict.fromkeys(id_values))
+
+    def _resolve_price_list_record_ids(
+        self,
+        price_list_model: "odoo.model.integration_cm_data_price_list",
+        external_ids: list[str],
+    ) -> list[int]:
+        record_ids: list[int] = []
+        for external_id in external_ids:
+            record = price_list_model.search_by_external_id(
+                EXTERNAL_SYSTEM_CODE,
+                external_id,
+                PRICE_LIST_RESOURCE,
+            )
+            if not record:
+                _logger.warning("CM data price list '%s' not found; skipping.", external_id)
+                continue
+            record_ids.append(record.id)
+        return list(dict.fromkeys(record_ids))
+
     @staticmethod
     def _extract_aliases(raw_value: str | None) -> list[str]:
         if not raw_value:
@@ -1254,6 +1474,243 @@ class CmDataImporter(models.Model):
             seen.add(normalized)
             aliases.append(cleaned)
         return aliases
+
+    def _get_timeclock_close_time(self) -> time:
+        value = self._get_config_raw_value(
+            "cm_data.timeclock_close_time",
+            "ENV_OVERRIDE_CONFIG_PARAM__CM_DATA__TIMECLOCK_CLOSE_TIME",
+        )
+        if not value:
+            return time(17, 0)
+        cleaned = value.strip()
+        if not cleaned:
+            return time(17, 0)
+        try:
+            parts = cleaned.split(":")
+            hour = int(parts[0])
+            minute = int(parts[1]) if len(parts) > 1 else 0
+        except (TypeError, ValueError) as exc:
+            raise UserError("Invalid time for cm_data.timeclock_close_time; expected HH:MM.") from exc
+        return time(hour, minute)
+
+    def _get_user_tzinfo(self) -> ZoneInfo:
+        tz_name = self.env.user.tz or "UTC"
+        try:
+            return ZoneInfo(tz_name)
+        except Exception:
+            _logger.warning("Unknown timezone '%s'; falling back to UTC.", tz_name)
+            return ZoneInfo("UTC")
+
+    def _to_local_datetime(self, value: datetime) -> datetime:
+        tzinfo = self._get_user_tzinfo()
+        return value.replace(tzinfo=ZoneInfo("UTC")).astimezone(tzinfo)
+
+    def _combine_local_date_and_time(self, base_date: date, clock_time: time) -> datetime:
+        tzinfo = self._get_user_tzinfo()
+        local_dt = datetime.combine(base_date, clock_time, tzinfo=tzinfo)
+        return local_dt.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+
+    def _close_attendance_missing_checkout(
+        self,
+        attendance: "odoo.model.hr_attendance",
+        *,
+        closing_time: time,
+        reason: str,
+    ) -> None:
+        if not attendance.check_in:
+            return
+        check_in_local = self._to_local_datetime(attendance.check_in)
+        close_at = self._combine_local_date_and_time(check_in_local.date(), closing_time)
+        if close_at < attendance.check_in:
+            close_at = attendance.check_in
+        self._close_attendance_with_check_out(
+            attendance,
+            check_out_time=close_at,
+            reason=reason,
+        )
+
+    def _close_attendance_with_check_out(
+        self,
+        attendance: "odoo.model.hr_attendance",
+        *,
+        check_out_time: datetime,
+        reason: str,
+    ) -> None:
+        if not attendance.check_in:
+            return
+        attendance_model = self.env["hr.attendance"].sudo()
+        adjusted_check_in = attendance.check_in
+        previous_attendance = attendance_model.search(
+            [
+                ("employee_id", "=", attendance.employee_id.id),
+                ("check_in", "<=", adjusted_check_in),
+                ("id", "!=", attendance.id),
+            ],
+            order="check_in desc",
+            limit=1,
+        )
+        if previous_attendance and previous_attendance.check_out and previous_attendance.check_out > adjusted_check_in:
+            adjusted_check_in = previous_attendance.check_out
+
+        adjusted_check_out = check_out_time
+        if adjusted_check_out < adjusted_check_in:
+            adjusted_check_out = adjusted_check_in
+
+        next_attendance = attendance_model.search(
+            [
+                ("employee_id", "=", attendance.employee_id.id),
+                ("check_in", ">", adjusted_check_in),
+                ("id", "!=", attendance.id),
+            ],
+            order="check_in asc",
+            limit=1,
+        )
+        if next_attendance and adjusted_check_out > next_attendance.check_in:
+            adjusted_check_out = next_attendance.check_in
+        if adjusted_check_out < adjusted_check_in:
+            adjusted_check_out = adjusted_check_in
+
+        values = {"check_out": adjusted_check_out}
+        if adjusted_check_in != attendance.check_in:
+            values["check_in"] = adjusted_check_in
+        if attendance.check_out == adjusted_check_out and adjusted_check_in == attendance.check_in:
+            return
+        try:
+            attendance.write(values)
+        except ValidationError as exc:
+            self._log_attendance_fix_failure(
+                attendance,
+                check_out_time=adjusted_check_out,
+                reason=reason,
+                error=exc,
+            )
+            return
+        self._log_attendance_fix(attendance, adjusted_check_out, reason)
+
+    def _log_attendance_fix(
+        self,
+        attendance: "odoo.model.hr_attendance",
+        close_at: datetime,
+        reason: str,
+    ) -> None:
+        employee_name = attendance.employee_id.display_name if attendance.employee_id else "Unknown Employee"
+        _logger.warning(
+            "CM data attendance fix: %s | check_in=%s | check_out=%s | reason=%s",
+            employee_name,
+            attendance.check_in,
+            close_at,
+            reason,
+        )
+
+    def _log_attendance_fix_failure(
+        self,
+        attendance: "odoo.model.hr_attendance",
+        *,
+        check_out_time: datetime,
+        reason: str,
+        error: Exception,
+    ) -> None:
+        employee_name = attendance.employee_id.display_name if attendance.employee_id else "Unknown Employee"
+        _logger.warning(
+            "CM data attendance fix skipped: %s | check_in=%s | check_out=%s | reason=%s | error=%s",
+            employee_name,
+            attendance.check_in,
+            check_out_time,
+            reason,
+            error,
+        )
+
+    def _find_overlapping_attendance(
+        self,
+        attendance_model: "odoo.model.hr_attendance",
+        *,
+        employee_id: int,
+        check_time: datetime | None,
+    ) -> "odoo.model.hr_attendance":
+        if not check_time:
+            return attendance_model.browse()
+        return attendance_model.search(
+            [
+                ("employee_id", "=", employee_id),
+                ("check_in", "<=", check_time),
+                "|",
+                ("check_out", "=", False),
+                ("check_out", ">", check_time),
+            ],
+            order="check_in desc, id desc",
+            limit=1,
+        )
+
+    def _log_attendance_overlap(
+        self,
+        attendance: "odoo.model.hr_attendance",
+        *,
+        check_time: datetime,
+        reason: str,
+        updated: bool,
+    ) -> None:
+        employee_name = attendance.employee_id.display_name if attendance.employee_id else "Unknown Employee"
+        _logger.warning(
+            "CM data attendance overlap: %s | check_time=%s | attendance_id=%s | updated=%s | reason=%s",
+            employee_name,
+            check_time,
+            attendance.id,
+            updated,
+            reason,
+        )
+
+    def _create_attendance_with_fix(
+        self,
+        attendance_model: "odoo.model.hr_attendance",
+        values: dict[str, object],
+        *,
+        employee_id: int,
+        closing_time: time,
+        reason: str,
+    ) -> "odoo.model.hr_attendance":
+        try:
+            return attendance_model.create(values)
+        except ValidationError:
+            open_attendance_records = attendance_model.search(
+                [
+                    ("employee_id", "=", employee_id),
+                    ("check_out", "=", False),
+                ],
+                order="check_in desc, id desc",
+            )
+            if not open_attendance_records:
+                raise
+            for attendance in open_attendance_records:
+                self._close_attendance_missing_checkout(
+                    attendance,
+                    closing_time=closing_time,
+                    reason=reason,
+                )
+            try:
+                return attendance_model.create(values)
+            except ValidationError:
+                check_time = values.get("check_in") if isinstance(values, dict) else None
+                overlapping_attendance = self._find_overlapping_attendance(
+                    attendance_model,
+                    employee_id=employee_id,
+                    check_time=check_time if isinstance(check_time, datetime) else None,
+                )
+                if overlapping_attendance:
+                    updated = False
+                    check_out_time = values.get("check_out") if isinstance(values, dict) else None
+                    if isinstance(check_out_time, datetime):
+                        if not overlapping_attendance.check_out or overlapping_attendance.check_out < check_out_time:
+                            overlapping_attendance.write({"check_out": check_out_time})
+                            updated = True
+                    if isinstance(check_time, datetime):
+                        self._log_attendance_overlap(
+                            overlapping_attendance,
+                            check_time=check_time,
+                            reason=reason,
+                            updated=updated,
+                        )
+                    return overlapping_attendance
+                raise
 
     @staticmethod
     def _resolve_punch_time(row: CmDataTimeclockPunch) -> datetime | None:

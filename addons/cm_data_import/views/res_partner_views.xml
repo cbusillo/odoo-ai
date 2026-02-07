@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_res_partner_form_cm_data_import" model="ir.ui.view">
+        <field name="name">res.partner.form.cm.data.import</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='cm_data_label_names']" position="after">
+                <field name="cm_data_price_list_record_ids" widget="many2many_tags"/>
+                <field name="cm_data_price_list_secondary_record_id"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

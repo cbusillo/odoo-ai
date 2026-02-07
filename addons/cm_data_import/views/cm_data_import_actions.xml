@@ -7,8 +7,19 @@
         <field name="context">{"group_by": ["issue_type", "catalog_code"]}</field>
     </record>
 
+    <record id="action_cm_seed_loader" model="ir.actions.server">
+        <field name="name">Run CM Seed Loader</field>
+        <field name="model_id" ref="cm_data_import.model_integration_cm_seed_loader"/>
+        <field name="state">code</field>
+        <field name="code">model.run_seed()</field>
+    </record>
+
     <menuitem id="menu_cm_data_pricing_audit" name="CM Data Pricing Audit"
               parent="cm_custom.menu_cm_custom_config"
               groups="base.group_system"
               action="action_cm_data_pricing_audit" sequence="88"/>
+    <menuitem id="menu_cm_seed_loader" name="Run CM Seed Loader"
+              parent="cm_custom.menu_cm_custom_config"
+              groups="base.group_system"
+              action="action_cm_seed_loader" sequence="89"/>
 </odoo>

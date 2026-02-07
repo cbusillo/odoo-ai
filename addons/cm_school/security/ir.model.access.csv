@@ -9,3 +9,9 @@ access_school_billing_policy_user,school.billing.policy.user,model_school_billin
 access_school_billing_contract_user,school.billing.contract.user,model_school_billing_contract,base.group_user,1,1,1,1
 access_school_pricing_catalog_user,school.pricing.catalog.user,model_school_pricing_catalog,base.group_user,1,1,1,1
 access_school_pricing_matrix_user,school.pricing.matrix.user,model_school_pricing_matrix,base.group_user,1,1,1,1
+access_school_location_option_user,school.location.option.user,model_school_location_option,base.group_user,1,1,1,1
+access_school_location_option_alias_user,school.location.option.alias.user,model_school_location_option_alias,base.group_user,1,1,1,1
+access_school_delivery_day_user,school.delivery.day.user,model_school_delivery_day,base.group_user,1,1,1,1
+access_school_delivery_day_alias_user,school.delivery.day.alias.user,model_school_delivery_day_alias,base.group_user,1,1,1,1
+access_school_override_option_user,school.override.option.user,model_school_override_option,base.group_user,1,1,1,1
+access_school_return_method_user,school.return.method.user,model_school_return_method,base.group_user,1,1,1,1

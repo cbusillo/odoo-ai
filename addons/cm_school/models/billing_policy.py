@@ -58,6 +58,8 @@ class BillingPolicy(models.Model):
         ],
         default="no_rounding",
     )
+    rounding_precision = fields.Float(default=0.01)
+    max_unit_rate = fields.Monetary(currency_field="currency_id")
     parts_markup_percent = fields.Float()
     cap_amount = fields.Monetary(currency_field="currency_id")
     cap_labor_amount = fields.Monetary(currency_field="currency_id")

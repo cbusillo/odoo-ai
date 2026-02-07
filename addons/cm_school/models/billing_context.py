@@ -15,6 +15,10 @@ class BillingContext(models.Model):
         "context_id",
         "requirement_id",
     )
+    requires_estimate = fields.Boolean(default=False)
+    requires_claim_approval = fields.Boolean(default=False)
+    requires_call_authorization = fields.Boolean(default=False)
+    requires_payment_on_pickup = fields.Boolean(default=False)
     sequence = fields.Integer(default=10)
     active = fields.Boolean(default=True)
 

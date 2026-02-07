@@ -53,4 +53,40 @@
         <field name="res_model">school.pricing.matrix</field>
         <field name="view_mode">list,form</field>
     </record>
+
+    <record id="action_location_options" model="ir.actions.act_window">
+        <field name="name">Location Options</field>
+        <field name="res_model">school.location.option</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_delivery_days" model="ir.actions.act_window">
+        <field name="name">Delivery Days</field>
+        <field name="res_model">school.delivery.day</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_override_options" model="ir.actions.act_window">
+        <field name="name">Override Options</field>
+        <field name="res_model">school.override.option</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_delivery_day_aliases" model="ir.actions.act_window">
+        <field name="name">Delivery Day Aliases</field>
+        <field name="res_model">school.delivery.day.alias</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_location_option_aliases" model="ir.actions.act_window">
+        <field name="name">Location Option Aliases</field>
+        <field name="res_model">school.location.option.alias</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_return_methods" model="ir.actions.act_window">
+        <field name="name">Return Methods</field>
+        <field name="res_model">school.return.method</field>
+        <field name="view_mode">list,form</field>
+    </record>
 </odoo>

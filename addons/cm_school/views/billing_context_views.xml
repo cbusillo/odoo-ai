@@ -7,6 +7,10 @@
             <list>
                 <field name="name"/>
                 <field name="code"/>
+                <field name="requires_estimate"/>
+                <field name="requires_claim_approval"/>
+                <field name="requires_call_authorization"/>
+                <field name="requires_payment_on_pickup"/>
                 <field name="sequence"/>
                 <field name="active"/>
             </list>
@@ -26,6 +30,10 @@
                             <field name="sequence"/>
                         </group>
                         <group>
+                            <field name="requires_estimate"/>
+                            <field name="requires_claim_approval"/>
+                            <field name="requires_call_authorization"/>
+                            <field name="requires_payment_on_pickup"/>
                             <field name="active"/>
                         </group>
                     </group>

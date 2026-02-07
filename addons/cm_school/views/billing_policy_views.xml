@@ -49,6 +49,10 @@
                             <field name="parts_markup_percent"/>
                             <field name="quantity_rounding"/>
                         </group>
+                        <group>
+                            <field name="rounding_precision"/>
+                            <field name="max_unit_rate"/>
+                        </group>
                     </group>
                     <group string="Caps">
                         <group>

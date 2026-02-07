@@ -7,6 +7,10 @@
             <list>
                 <field name="name"/>
                 <field name="code"/>
+                <field name="target_model"/>
+                <field name="field_name"/>
+                <field name="requirement_group"/>
+                <field name="is_required"/>
                 <field name="sequence"/>
                 <field name="active"/>
             </list>
@@ -26,8 +30,14 @@
                             <field name="sequence"/>
                         </group>
                         <group>
+                            <field name="requirement_group"/>
+                            <field name="is_required"/>
                             <field name="active"/>
                         </group>
+                    </group>
+                    <group>
+                        <field name="target_model"/>
+                        <field name="field_name"/>
                     </group>
                     <group>
                         <field name="description"/>

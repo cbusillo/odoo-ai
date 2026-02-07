@@ -6,6 +6,12 @@ from . import billing_requirement
 from . import billing_context
 from . import billing_policy
 from . import billing_contract
+from . import delivery_day
+from . import delivery_day_alias
+from . import location_option
+from . import location_option_alias
+from . import override_option
+from . import return_method
 from . import pricing_catalog
 from . import pricing_matrix
 from . import shipping_profile

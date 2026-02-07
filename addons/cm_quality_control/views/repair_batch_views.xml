@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_repair_batch_form_quality_control" model="ir.ui.view">
+        <field name="name">service.repair.batch.form.quality.control</field>
+        <field name="model">service.repair.batch</field>
+        <field name="inherit_id" ref="cm_repair.view_repair_batch_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[field[@name='ticket_ids']]" position="after">
+                <page string="Quality Control Orders">
+                    <field name="quality_control_orders">
+                        <list>
+                            <field name="name"/>
+                            <field name="state"/>
+                            <field name="start_date"/>
+                            <field name="finish_date"/>
+                            <field name="employee"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

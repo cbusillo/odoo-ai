@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_quality_control_order_user,service.quality.control.order.user,model_service_quality_control_order,base.group_user,1,1,1,1
+access_quality_control_order_device_user,service.quality.control.order.device.user,model_service_quality_control_order_device,base.group_user,1,1,1,1
+access_quality_control_checklist_item_user,service.quality.control.checklist.item.user,model_service_quality_control_checklist_item,base.group_user,1,1,1,1
+access_quality_control_result_user,service.quality.control.result.user,model_service_quality_control_result,base.group_user,1,1,1,1

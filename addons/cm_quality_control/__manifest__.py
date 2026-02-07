@@ -1,0 +1,28 @@
+{
+    "name": "CM Quality Control",
+    "version": "19.0.0.1",
+    "category": "Industries",
+    "summary": "Quality control workflow for Cell Mechanic",
+    "description": "Quality control orders and checklist tracking for repair workflows.",
+    "author": "Shiny Computers",
+    "maintainers": ["cbusillo"],
+    "license": "LGPL-3",
+    "depends": [
+        "base",
+        "contacts",
+        "external_ids",
+        "mail",
+        "cm_device",
+        "cm_repair",
+    ],
+    "data": [
+        "security/ir.model.access.csv",
+        "views/quality_control_order_views.xml",
+        "views/quality_control_checklist_views.xml",
+        "views/cm_quality_control_actions.xml",
+        "views/repair_batch_views.xml",
+        "views/device_views.xml",
+    ],
+    "installable": True,
+    "application": False,
+}

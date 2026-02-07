@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_quality_control_checklist_item_tree" model="ir.ui.view">
+        <field name="name">service.quality.control.checklist.item.tree</field>
+        <field name="model">service.quality.control.checklist.item</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="category"/>
+                <field name="partner_id"/>
+                <field name="sequence"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_quality_control_checklist_item_form" model="ir.ui.view">
+        <field name="name">service.quality.control.checklist.item.form</field>
+        <field name="model">service.quality.control.checklist.item</field>
+        <field name="arch" type="xml">
+            <form string="Quality Control Checklist Item">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="category"/>
+                        </group>
+                        <group>
+                            <field name="partner_id"/>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="description" colspan="2"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+</odoo>

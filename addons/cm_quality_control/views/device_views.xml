@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_device_form_quality_control" model="ir.ui.view">
+        <field name="name">service.device.form.quality.control</field>
+        <field name="model">service.device</field>
+        <field name="inherit_id" ref="cm_device.view_device_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Quality Control">
+                    <field name="quality_control_order_devices">
+                        <list>
+                            <field name="quality_control_order"/>
+                            <field name="state"/>
+                            <field name="start_date"/>
+                            <field name="finish_date"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

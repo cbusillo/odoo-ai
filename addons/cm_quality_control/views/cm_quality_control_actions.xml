@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="action_quality_control_orders" model="ir.actions.act_window">
+        <field name="name">Quality Control Orders</field>
+        <field name="res_model">service.quality.control.order</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_quality_control_checklist_items" model="ir.actions.act_window">
+        <field name="name">Quality Control Checklist</field>
+        <field name="res_model">service.quality.control.checklist.item</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

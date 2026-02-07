@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_quality_control_order_tree" model="ir.ui.view">
+        <field name="name">service.quality.control.order.tree</field>
+        <field name="model">service.quality.control.order</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="state"/>
+                <field name="client"/>
+                <field name="repair_batch"/>
+                <field name="start_date"/>
+                <field name="finish_date"/>
+                <field name="employee"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_quality_control_order_form" model="ir.ui.view">
+        <field name="name">service.quality.control.order.form</field>
+        <field name="model">service.quality.control.order</field>
+        <field name="arch" type="xml">
+            <form string="Quality Control Order">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="state"/>
+                            <field name="employee"/>
+                        </group>
+                        <group>
+                            <field name="client"/>
+                            <field name="repair_batch"/>
+                            <field name="start_date"/>
+                            <field name="finish_date"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="notes" colspan="2"/>
+                    </group>
+                    <notebook>
+                        <page string="Devices">
+                            <field name="devices">
+                                <list editable="bottom">
+                                    <field name="device"/>
+                                    <field name="state"/>
+                                    <field name="start_date"/>
+                                    <field name="finish_date"/>
+                                    <field name="repair_batch_device"/>
+                                </list>
+                                <form string="Quality Control Device">
+                                    <group>
+                                        <field name="device"/>
+                                        <field name="state"/>
+                                        <field name="repair_batch_device"/>
+                                        <field name="start_date"/>
+                                        <field name="finish_date"/>
+                                    </group>
+                                    <group>
+                                        <field name="summary_note" colspan="2"/>
+                                    </group>
+                                    <notebook>
+                                        <page string="Checklist Results">
+                                            <field name="results">
+                                                <list editable="bottom">
+                                                    <field name="checklist_item"/>
+                                                    <field name="result"/>
+                                                    <field name="notes"/>
+                                                </list>
+                                                <form string="Checklist Result">
+                                                    <group>
+                                                        <field name="checklist_item"/>
+                                                        <field name="result"/>
+                                                    </group>
+                                                    <group>
+                                                        <field name="notes" colspan="2"/>
+                                                    </group>
+                                                    <group>
+                                                        <field name="evidence_attachment_ids" widget="many2many_binary"/>
+                                                    </group>
+                                                </form>
+                                            </field>
+                                        </page>
+                                    </notebook>
+                                </form>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+</odoo>

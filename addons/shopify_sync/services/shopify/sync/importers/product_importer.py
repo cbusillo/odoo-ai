@@ -1,5 +1,6 @@
 import base64
 import logging
+from datetime import timedelta
 from tempfile import NamedTemporaryFile
 from typing import Optional
 
@@ -93,7 +94,8 @@ class ProductImporter(ShopifyBaseImporter[ProductFields]):
                     _logger.debug(f"Product {odoo_product.id} has media failed. Flagging for re‑import.")
                     odoo_product.shopify_next_export = True
 
-                if shopify_product.updated_at > latest_write_date:
+                # Avoid re-importing our own exports when timestamps differ by a few seconds.
+                if shopify_product.updated_at > (latest_write_date + timedelta(seconds=5)):
                     _logger.debug(f"Updating existing product {odoo_product.id} from Shopify")
                     odoo_product = self.save_odoo_product(odoo_product, shopify_product)
                     return True

@@ -192,7 +192,12 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
         upsert_external_id(odoo_product, system_code="shopify", resource="variant", external_id_value=shopify_variant_id)
         upsert_external_id(odoo_product, system_code="shopify", resource="condition", external_id_value=condition_id)
         upsert_external_id(odoo_product, system_code="shopify", resource="ebay_category", external_id_value=ebay_category_id)
-        odoo_product.shopify_last_exported_at = fields.Datetime.now()
+        # Align export marker to Shopify's clock, but never move it backwards.
+        exported_at = shopify_product.updated_at or fields.Datetime.now()
+        current_exported_at = odoo_product.shopify_last_exported_at
+        if current_exported_at and exported_at < current_exported_at:
+            exported_at = current_exported_at
+        odoo_product.shopify_last_exported_at = exported_at
 
     @staticmethod
     def _sync_images_after_export(odoo_product: "odoo.model.product_product", shopify_product: ProductSetProductSetProduct) -> None:

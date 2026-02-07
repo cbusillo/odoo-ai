@@ -36,3 +36,8 @@ class DiagnosticOrderDevice(models.Model):
         "diagnostic_order_device_id",
         "test_id",
     )
+    results = fields.One2many(
+        "service.diagnostic.result",
+        "diagnostic_order_device",
+        string="Test Results",
+    )

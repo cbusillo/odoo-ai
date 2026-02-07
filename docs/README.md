@@ -26,7 +26,8 @@ Routing
   @docs/integrations/shopify.md)
 - Data sources: @docs/data-sources/README.md
 - Tooling: @docs/tooling/codex-cli.md, @docs/tooling/odoo-intelligence.md,
-  @docs/tooling/ops.md, @docs/tooling/docker.md
+  @docs/tooling/ops.md, @docs/tooling/docker.md,
+  @docs/tooling/cm-seeds.md
 - Architecture: @docs/ARCHITECTURE.md, @docs/resources.md
 - Roles: @docs/roles.md
 

@@ -5,6 +5,9 @@
     <menuitem id="menu_cm_admin_root" name="CM Admin" sequence="60"
               web_icon="cm_custom,static/description/icon.png"/>
 
+    <menuitem id="menu_cm_custom_config" name="CM Configuration"
+              parent="menu_cm_admin_root" sequence="5"/>
+
     <menuitem id="menu_cm_ops_transport" name="Transport"
               parent="menu_cm_custom_root" sequence="10"/>
     <menuitem id="menu_transport_orders" name="Transport Orders"

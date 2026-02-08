@@ -145,8 +145,6 @@ class RepairshoprImporter(models.Model):
         if identifier_type in {"serial", "asset_tag"}:
             if len(cleaned) < 4:
                 return None
-            if not any(ch.isdigit() for ch in cleaned):
-                return None
         return cleaned
 
     @classmethod
@@ -365,8 +363,6 @@ class RepairshoprImporter(models.Model):
                         "summary_notes": [],
                         "needs_estimate": needs_estimate_all or needs_estimate_next,
                     }
-                    if comment_identifiers:
-                        self._merge_comment_identifiers(pending_device, comment_identifiers)
                     needs_estimate_next = False
                     continue
                 if pending_device is not None:
@@ -374,6 +370,9 @@ class RepairshoprImporter(models.Model):
                     if isinstance(customer_notes, list):
                         customer_notes.append(line)
         flush_pending()
+
+        if len(device_lines) == 1 and comment_identifiers:
+            self._merge_comment_identifiers(device_lines[0], comment_identifiers)
 
         if not device_lines:
             return None, []

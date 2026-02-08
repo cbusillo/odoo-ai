@@ -39,7 +39,13 @@ class Device(models.Model):
 
     @api.model
     def cleanup_identifiers(self, *, batch_size: int = 5000, commit_interval: int = 5000) -> dict[str, int]:
-        device_model = self.sudo()
+        cleanup_context = {
+            "tracking_disable": True,
+            "mail_create_nolog": True,
+            "mail_notrack": True,
+            "mail_create_nosubscribe": True,
+        }
+        device_model = self.sudo().with_context(cleanup_context)
         last_id = 0
         processed_count = 0
         updated_count = 0
@@ -57,7 +63,7 @@ class Device(models.Model):
                 if commit_interval and processed_count % commit_interval == 0:
                     self.env.cr.commit()
                     self.env.clear()
-                    device_model = self.sudo()
+                    device_model = self.sudo().with_context(cleanup_context)
             last_id = devices[-1].id
 
         return {
@@ -101,7 +107,8 @@ class Device(models.Model):
         if existing_imei != imei:
             update_values["imei"] = imei
 
-        has_identifier = any([serial_number, asset_tag, asset_tag_secondary, imei])
+        is_placeholder = bool(serial_number and serial_number.startswith("UNIDENTIFIED-"))
+        has_identifier = any([serial_number, asset_tag, asset_tag_secondary, imei]) and not is_placeholder
         if not has_identifier and not device.is_serial_unavailable:
             update_values["is_serial_unavailable"] = True
         if has_identifier and device.is_serial_unavailable:
@@ -124,7 +131,5 @@ class Device(models.Model):
             return digits if len(digits) >= 8 else None
         if identifier_type in {"serial", "asset_tag"}:
             if len(cleaned) < 4:
-                return None
-            if not any(ch.isdigit() for ch in cleaned):
                 return None
         return cleaned

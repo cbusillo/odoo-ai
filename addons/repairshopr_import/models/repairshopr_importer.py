@@ -341,7 +341,9 @@ class RepairshoprImporter(models.Model):
             return
 
         intake_orders = intake_orders.filtered(lambda order: order.id in set(intake_order_ids))
-        intake_orders = intake_orders.sorted(key=lambda record: (record.finish_date or record.id, record.id))
+        intake_orders = intake_orders.sorted(
+            key=lambda record: (record.finish_date or datetime.min, record.id)
+        )
 
         intake_info_by_id: dict[int, dict[str, object]] = {}
         for intake_order in intake_orders:

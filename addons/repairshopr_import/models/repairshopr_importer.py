@@ -96,8 +96,7 @@ class RepairshoprImporter(models.Model):
             self._import_tickets(repairshopr_client, transaction_start_datetime, system, sync_started_at)
             self._import_estimates(repairshopr_client, transaction_start_datetime, system, sync_started_at)
             self._import_invoices(repairshopr_client, transaction_start_datetime, system, sync_started_at)
-            if not update_last_sync:
-                self._backfill_transport_order_devices()
+            self._backfill_transport_order_devices()
         except Exception as exc:
             _logger.exception("RepairShopr import failed")
             self._record_last_run("failed", str(exc))

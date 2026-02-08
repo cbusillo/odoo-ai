@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import api, fields, models
 
 TRANSPORT_ORDER_STATES = [
     ("draft", "Draft"),
@@ -35,6 +35,15 @@ class TransportOrder(models.Model):
         default=lambda self: self.env.user.partner_id,
         ondelete="restrict",
     )
+    vehicle_id = fields.Many2one(
+        "fleet.vehicle",
+        ondelete="set null",
+    )
+    driver_id = fields.Many2one(
+        "res.partner",
+        ondelete="set null",
+        tracking=True,
+    )
     client = fields.Many2one(
         "res.partner",
         required=True,
@@ -64,3 +73,10 @@ class TransportOrder(models.Model):
         "service.transport.order.device",
         "transport_order",
     )
+
+    @api.onchange("vehicle_id")
+    def _onchange_vehicle_id(self) -> None:
+        if self.vehicle_id and not self.driver_id:
+            driver = self.vehicle_id.driver_id
+            if driver:
+                self.driver_id = driver

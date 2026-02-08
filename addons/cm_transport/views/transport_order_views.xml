@@ -28,6 +28,8 @@
                             <field name="name"/>
                             <field name="state"/>
                             <field name="employee"/>
+                            <field name="vehicle_id"/>
+                            <field name="driver_id"/>
                             <field name="client"/>
                             <field name="contact"/>
                         </group>

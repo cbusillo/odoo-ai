@@ -958,6 +958,7 @@ class RepairshoprImporter(models.Model):
         ticket_properties_by_ticket_id = repairshopr_client.prefetch_ticket_properties_by_ticket_ids(
             [invoice.ticket_id for invoice in invoices if invoice.ticket_id]
         )
+        identifier_pairs_by_external_id: dict[str, set[tuple[str, str]]] = {}
         invoice_id_values: list[int] = []
         for invoice in invoices:
             external_id_value = str(invoice.id)
@@ -1007,7 +1008,6 @@ class RepairshoprImporter(models.Model):
         sync_timestamps: dict[str, datetime] = {}
         identifiers_by_external_id: dict[str, dict[str, set[str]]] = {}
         pending_commit = False
-        identifier_pairs_by_external_id: dict[str, set[tuple[str, str]]] = {}
 
         def should_commit() -> bool:
             return commit_interval > 0 and processed_count % commit_interval == 0

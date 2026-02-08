@@ -21,8 +21,6 @@
         "purchase",
         "phone_validation",
         "base_geolocalize",
-        "delivery_ups_rest",
-        "delivery_usps_rest",
         "notification_center",
         "transaction_utilities",
         "product_metadata",

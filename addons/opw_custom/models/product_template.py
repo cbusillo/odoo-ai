@@ -261,13 +261,6 @@ class ProductTemplate(models.Model):
 
         return all(write_results)
 
-    def _post_create_actions(self) -> None:
-        super()._post_create_actions()
-
-    def _post_write_actions(self) -> None:
-        super()._post_write_actions()
-
-
     @api.depends("initial_quantity", "list_price")
     def _compute_initial_price_total(self) -> None:
         for product in self:

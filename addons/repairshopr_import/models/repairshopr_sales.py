@@ -6,6 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from psycopg2 import IntegrityError
+
 from odoo import fields, models
 from odoo.exceptions import UserError
 
@@ -70,7 +72,11 @@ class RepairshoprImporter(models.Model):
             return False
         if "needs estimate" in normalized:
             return False
+        if SERIAL_PATTERN.search(text) or ASSET_TAG_PATTERN.search(text) or CLAIM_PATTERN.search(text) or PO_PATTERN.search(text):
+            return True
         if "replacement" in normalized or "repair" in normalized:
+            return True
+        if " - " in normalized:
             return True
         if re.search(r"\(\s*(?:n/c|\$)", normalized):
             return True
@@ -383,16 +389,45 @@ class RepairshoprImporter(models.Model):
                     if update_values:
                         existing.write(update_values)
                     continue
-                quality_control_device_model.create(
-                    {
-                        "quality_control_order": quality_control_order.id,
-                        "device": device_record.id,
-                        "state": "passed",
-                        "start_date": finish_date,
-                        "finish_date": finish_date,
-                        "summary_note": summary_text,
-                    }
-                )
+                create_values = {
+                    "quality_control_order": quality_control_order.id,
+                    "device": device_record.id,
+                    "state": "passed",
+                    "start_date": finish_date,
+                    "finish_date": finish_date,
+                    "summary_note": summary_text,
+                }
+                try:
+                    with self.env.cr.savepoint():
+                        quality_control_device_model.create(create_values)
+                except IntegrityError:
+                    existing = quality_control_device_model.search(
+                        [
+                            ("quality_control_order", "=", quality_control_order.id),
+                            ("device", "=", device_record.id),
+                        ],
+                        limit=1,
+                    )
+                    if not existing:
+                        raise
+                    existing_lines = [
+                        line.strip()
+                        for line in (existing.summary_note or "").splitlines()
+                        if line.strip()
+                    ]
+                    merged_lines: list[str] = []
+                    for line in [*existing_lines, *summaries]:
+                        cleaned = line.strip()
+                        if cleaned and cleaned not in merged_lines:
+                            merged_lines.append(cleaned)
+                    update_values: dict[str, object] = {}
+                    merged_text = "\n".join(merged_lines)
+                    if merged_text and merged_text != (existing.summary_note or ""):
+                        update_values["summary_note"] = merged_text
+                    if existing.state in {"pending", "started"}:
+                        update_values["state"] = "passed"
+                    if update_values:
+                        existing.write(update_values)
 
         return intake_order, created_lines
 

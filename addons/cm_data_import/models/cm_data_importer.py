@@ -995,12 +995,14 @@ class CmDataImporter(models.Model):
         delivery_rows = client.fetch_delivery_logs(updated_at=start_datetime)
         commit_interval = self._get_commit_interval()
         processed_count = 0
+        unmatched_locations: dict[str, int] = {}
         for row in delivery_rows:
             client_partner = self._resolve_transport_partner(
                 row,
                 partner_map,
                 location_partner_map,
                 location_alias_partner_map,
+                unmatched_locations,
             )
             employee_partner = self.env.user.partner_id
             state = self._map_transport_state(row.status)
@@ -1037,6 +1039,7 @@ class CmDataImporter(models.Model):
             processed_count += 1
             if self._maybe_commit(processed_count, commit_interval, label="delivery"):
                 transport_model = self.env["service.transport.order"].sudo().with_context(IMPORT_CONTEXT)
+        self._log_unmatched_transport_locations(unmatched_locations)
 
     def _import_employees(
         self,
@@ -1368,6 +1371,7 @@ class CmDataImporter(models.Model):
         partner_map: dict[str, int],
         location_partner_map: dict[str, int],
         location_alias_partner_map: dict[str, int],
+        unmatched_locations: dict[str, int],
     ) -> "odoo.model.res_partner":
         normalized = self._normalize_key(row.location_name)
         partner_id = location_partner_map.get(normalized) or location_alias_partner_map.get(normalized)
@@ -1375,6 +1379,9 @@ class CmDataImporter(models.Model):
             partner_id = partner_map.get(normalized)
         if partner_id:
             return self.env["res.partner"].sudo().browse(partner_id)
+        raw_location = (row.location_name or "").strip()
+        if raw_location:
+            unmatched_locations[raw_location] = unmatched_locations.get(raw_location, 0) + 1
         partner_model = self.env["res.partner"].sudo().with_context(IMPORT_CONTEXT)
         existing_partner = partner_model.search([("name", "ilike", row.location_name)], limit=5)
         if existing_partner:
@@ -1388,6 +1395,23 @@ class CmDataImporter(models.Model):
         partner = partner_model.create(values)
         partner_map[normalized] = partner.id
         return partner
+
+    def _log_unmatched_transport_locations(self, unmatched_locations: dict[str, int]) -> None:
+        if not unmatched_locations:
+            return
+        sorted_locations = sorted(
+            unmatched_locations.items(),
+            key=lambda item: (-item[1], item[0].lower()),
+        )
+        top_locations = ", ".join(
+            f"{name} ({count})" for name, count in sorted_locations[:25]
+        )
+        _logger.warning(
+            "CM delivery locations missing account mapping (top %s of %s): %s",
+            min(25, len(sorted_locations)),
+            len(sorted_locations),
+            top_locations,
+        )
 
     def _build_location_partner_map(
         self,

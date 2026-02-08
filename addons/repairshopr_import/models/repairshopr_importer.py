@@ -96,7 +96,8 @@ class RepairshoprImporter(models.Model):
             self._import_tickets(repairshopr_client, transaction_start_datetime, system, sync_started_at)
             self._import_estimates(repairshopr_client, transaction_start_datetime, system, sync_started_at)
             self._import_invoices(repairshopr_client, transaction_start_datetime, system, sync_started_at)
-            self._backfill_transport_order_devices()
+            if not update_last_sync:
+                self._backfill_transport_order_devices()
         except Exception as exc:
             _logger.exception("RepairShopr import failed")
             self._record_last_run("failed", str(exc))
@@ -656,7 +657,6 @@ class RepairshoprImporter(models.Model):
         identifier_model = self.env["identifier.index"].sudo().with_context(active_test=False)
         device_model = self.env["service.device"].sudo().with_context(active_test=False)
         resolved_ids: set[int] = set()
-        fallback_ids: set[int] = set()
 
         for identifier_type, identifier_values in identifiers.items():
             for identifier_value in identifier_values:
@@ -664,7 +664,6 @@ class RepairshoprImporter(models.Model):
                 if not normalized_value:
                     continue
                 preferred_ids: set[int] = set()
-                non_preferred_ids: set[int] = set()
                 index_matches = identifier_model.search(
                     [
                         ("identifier_type", "=", identifier_type),
@@ -677,7 +676,6 @@ class RepairshoprImporter(models.Model):
                     if not device_record.exists():
                         continue
                     if partner_id and device_record.owner and device_record.owner.id != partner_id:
-                        non_preferred_ids.add(device_record.id)
                         continue
                     preferred_ids.add(device_record.id)
 
@@ -694,10 +692,8 @@ class RepairshoprImporter(models.Model):
 
                 if preferred_ids:
                     resolved_ids.update(preferred_ids)
-                else:
-                    fallback_ids.update(non_preferred_ids)
 
-        return resolved_ids or fallback_ids
+        return resolved_ids
 
     @staticmethod
     def _build_device_search_domain(identifier_value: str) -> list[object]:

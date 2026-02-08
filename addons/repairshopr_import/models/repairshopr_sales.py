@@ -125,6 +125,32 @@ class RepairshoprImporter(models.Model):
         return None
 
     @staticmethod
+    def _merge_identifiers_into_pending(
+        pending_device: dict[str, object],
+        identifiers: dict[str, str],
+    ) -> bool:
+        identifier_map = {
+            "serial": "serial",
+            "asset_tag": "asset_tag",
+            "claim": "claim_number",
+            "po": "po_number",
+        }
+        for identifier_key, pending_key in identifier_map.items():
+            incoming_value = identifiers.get(identifier_key)
+            if not incoming_value:
+                continue
+            existing_value = pending_device.get(pending_key)
+            if existing_value and str(existing_value).strip() != incoming_value:
+                return False
+        for identifier_key, pending_key in identifier_map.items():
+            incoming_value = identifiers.get(identifier_key)
+            if not incoming_value:
+                continue
+            if not pending_device.get(pending_key):
+                pending_device[pending_key] = incoming_value
+        return True
+
+    @staticmethod
     def _resolve_case_indicator(value: str | None) -> str | None:
         if not value:
             return None
@@ -229,6 +255,9 @@ class RepairshoprImporter(models.Model):
                     continue
                 model_label = self._extract_model_from_line(line)
                 identifiers = self._extract_device_identifiers_from_line(line)
+                if identifiers and pending_device is not None and not model_label:
+                    if self._merge_identifiers_into_pending(pending_device, identifiers):
+                        continue
                 if model_label or identifiers:
                     flush_pending()
                     pending_device = {

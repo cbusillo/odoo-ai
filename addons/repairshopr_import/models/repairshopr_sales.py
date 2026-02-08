@@ -19,6 +19,7 @@ from .repairshopr_importer import (
     CLAIM_PATTERN,
     EXTERNAL_SYSTEM_CODE,
     IMPORT_CONTEXT,
+    IMEI_PATTERN,
     PO_PATTERN,
     RESOURCE_ESTIMATE,
     RESOURCE_INVOICE,
@@ -107,14 +108,83 @@ class RepairshoprImporter(models.Model):
     def _extract_device_identifiers_from_line(cls, text: str) -> dict[str, str]:
         identifiers: dict[str, str] = {}
         for match in SERIAL_PATTERN.finditer(text):
-            identifiers.setdefault("serial", match.group("serial").strip())
+            cleaned = cls._clean_identifier_value(match.group("serial"), identifier_type="serial")
+            if cleaned:
+                identifiers.setdefault("serial", cleaned)
         for match in ASSET_TAG_PATTERN.finditer(text):
-            identifiers.setdefault("asset_tag", match.group("tag").strip())
+            cleaned = cls._clean_identifier_value(match.group("tag"), identifier_type="asset_tag")
+            if cleaned:
+                identifiers.setdefault("asset_tag", cleaned)
+        for match in IMEI_PATTERN.finditer(text):
+            cleaned = cls._clean_identifier_value(match.group("imei"), identifier_type="imei")
+            if cleaned:
+                identifiers.setdefault("imei", cleaned)
         for match in CLAIM_PATTERN.finditer(text):
-            identifiers.setdefault("claim", match.group("claim").strip())
+            cleaned = cls._clean_identifier_value(match.group("claim"), identifier_type="claim")
+            if cleaned:
+                identifiers.setdefault("claim", cleaned)
         for match in PO_PATTERN.finditer(text):
-            identifiers.setdefault("po", match.group("po").strip())
+            cleaned = cls._clean_identifier_value(match.group("po"), identifier_type="po")
+            if cleaned:
+                identifiers.setdefault("po", cleaned)
         return identifiers
+
+    @staticmethod
+    def _clean_identifier_value(value: str | None, *, identifier_type: str) -> str | None:
+        if not value:
+            return None
+        cleaned = " ".join(str(value).strip().split())
+        if not cleaned:
+            return None
+        normalized = cleaned.lower()
+        if normalized in {"n/a", "na", "none", "unknown", "unk", "tbd", "null", "-"}:
+            return None
+        if identifier_type == "imei":
+            digits = "".join(ch for ch in cleaned if ch.isdigit())
+            return digits if len(digits) >= 8 else None
+        if identifier_type in {"serial", "asset_tag"}:
+            if len(cleaned) < 4:
+                return None
+            if not any(ch.isdigit() for ch in cleaned):
+                return None
+        return cleaned
+
+    @classmethod
+    def _extract_identifiers_from_comments(
+        cls,
+        comments: list[repairshopr_models.TicketComment],
+    ) -> dict[str, set[str]]:
+        identifiers: dict[str, set[str]] = {}
+        for comment in comments or []:
+            for text in (comment.subject, comment.body):
+                for line in cls._split_lines(text or ""):
+                    extracted = cls._extract_device_identifiers_from_line(line)
+                    for key, value in extracted.items():
+                        identifiers.setdefault(key, set()).add(value)
+        return identifiers
+
+    @staticmethod
+    def _merge_comment_identifiers(
+        target: dict[str, object],
+        comment_identifiers: dict[str, set[str]],
+    ) -> None:
+        for key in ("serial", "asset_tag", "imei"):
+            if target.get(key):
+                continue
+            values = comment_identifiers.get(key) or set()
+            if len(values) == 1:
+                target[key] = next(iter(values))
+
+    @staticmethod
+    def _build_placeholder_serial(
+        ticket: repairshopr_models.Ticket,
+        partner: "odoo.model.res_partner",
+        model_label: str | None,
+    ) -> str:
+        ticket_ref = ticket.number or ticket.id
+        model_token = (model_label or "unknown").strip().replace(" ", "-")
+        serial = f"UNIDENTIFIED-{partner.id}-{ticket_ref}-{model_token}"
+        return serial[:64]
 
     @classmethod
     def _extract_model_from_line(cls, text: str) -> str | None:
@@ -134,6 +204,7 @@ class RepairshoprImporter(models.Model):
         identifier_map = {
             "serial": "serial",
             "asset_tag": "asset_tag",
+            "imei": "imei",
             "claim": "claim_number",
             "po": "po_number",
         }
@@ -171,6 +242,8 @@ class RepairshoprImporter(models.Model):
         serial_number: str | None,
         asset_tag: str | None,
         asset_tag_secondary: str | None,
+        imei: str | None,
+        is_placeholder: bool = False,
     ) -> "odoo.model.service_device":
         device_model = self.env["service.device"].sudo().with_context(IMPORT_CONTEXT)
         model_model = self.env["service.device.model"].sudo().with_context(IMPORT_CONTEXT)
@@ -181,6 +254,8 @@ class RepairshoprImporter(models.Model):
             device_record = device_model.search([("asset_tag", "=", asset_tag)], limit=1)
         if not device_record and asset_tag_secondary:
             device_record = device_model.search([("asset_tag_secondary", "=", asset_tag_secondary)], limit=1)
+        if not device_record and imei:
+            device_record = device_model.search([("imei", "=", imei)], limit=1)
 
         device_model_record = None
         if model_label:
@@ -200,6 +275,10 @@ class RepairshoprImporter(models.Model):
                 update_values["asset_tag"] = asset_tag
             if asset_tag_secondary and not device_record.asset_tag_secondary:
                 update_values["asset_tag_secondary"] = asset_tag_secondary
+            if imei and not device_record.imei:
+                update_values["imei"] = imei
+            if is_placeholder and not device_record.is_serial_unavailable:
+                update_values["is_serial_unavailable"] = True
             if update_values:
                 device_record.write(update_values)
             return device_record
@@ -209,8 +288,12 @@ class RepairshoprImporter(models.Model):
                 "serial_number": serial_number,
                 "asset_tag": asset_tag,
                 "asset_tag_secondary": asset_tag_secondary,
+                "imei": imei,
                 "model": device_model_record.id,
                 "owner": partner.id,
+                "is_serial_unavailable": is_placeholder or not any(
+                    [serial_number, asset_tag, asset_tag_secondary, imei]
+                ),
             }
         )
 
@@ -227,6 +310,7 @@ class RepairshoprImporter(models.Model):
         pending_device: dict[str, object] | None = None
         needs_estimate_next = False
         needs_estimate_all = False
+        comment_identifiers = self._extract_identifiers_from_comments(ticket.comments)
 
         def flush_pending() -> None:
             nonlocal pending_device
@@ -266,12 +350,15 @@ class RepairshoprImporter(models.Model):
                         "model_label": model_label,
                         "serial": identifiers.get("serial"),
                         "asset_tag": identifiers.get("asset_tag"),
+                        "imei": identifiers.get("imei"),
                         "claim_number": identifiers.get("claim"),
                         "po_number": identifiers.get("po"),
                         "customer_notes": [],
                         "summary_notes": [],
                         "needs_estimate": needs_estimate_all or needs_estimate_next,
                     }
+                    if comment_identifiers:
+                        self._merge_comment_identifiers(pending_device, comment_identifiers)
                     needs_estimate_next = False
                     continue
                 if pending_device is not None:
@@ -311,12 +398,25 @@ class RepairshoprImporter(models.Model):
             asset_tag_secondary = ticket.properties.tag_num_2 if ticket.properties else None
             if asset_tag_secondary is not None:
                 asset_tag_secondary = str(asset_tag_secondary)
+            imei = device_line.get("imei")
+            if imei is not None:
+                imei = str(imei)
+            is_placeholder = False
+            if not any([serial_number, asset_tag, asset_tag_secondary, imei]):
+                serial_number = self._build_placeholder_serial(
+                    ticket,
+                    partner,
+                    model_label,
+                )
+                is_placeholder = True
             device_record = self._find_or_create_device(
                 partner=partner,
                 model_label=model_label,
                 serial_number=serial_number,
                 asset_tag=asset_tag,
                 asset_tag_secondary=asset_tag_secondary,
+                imei=imei,
+                is_placeholder=is_placeholder,
             )
             customer_notes = device_line.get("customer_notes")
             notes = "\n".join(customer_notes) if isinstance(customer_notes, list) else ""

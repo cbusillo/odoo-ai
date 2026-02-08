@@ -253,9 +253,15 @@ class RepairshoprImporter(models.Model):
         if serial_number:
             device_record = device_model.search([("serial_number", "=", serial_number)], limit=1)
         if not device_record and asset_tag:
-            device_record = device_model.search([("asset_tag", "=", asset_tag)], limit=1)
+            asset_domain = [("asset_tag", "=", asset_tag)]
+            if partner:
+                asset_domain.append(("owner", "=", partner.id))
+            device_record = device_model.search(asset_domain, limit=1)
         if not device_record and asset_tag_secondary:
-            device_record = device_model.search([("asset_tag_secondary", "=", asset_tag_secondary)], limit=1)
+            asset_secondary_domain = [("asset_tag_secondary", "=", asset_tag_secondary)]
+            if partner:
+                asset_secondary_domain.append(("owner", "=", partner.id))
+            device_record = device_model.search(asset_secondary_domain, limit=1)
         if not device_record and imei:
             device_record = device_model.search([("imei", "=", imei)], limit=1)
 

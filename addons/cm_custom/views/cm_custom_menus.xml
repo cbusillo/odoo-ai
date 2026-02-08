@@ -1,68 +1,105 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
-    <menuitem id="menu_cm_custom_root" name="CM Operations" sequence="50"/>
+    <menuitem id="menu_cm_custom_root" name="CM Operations" sequence="50"
+              web_icon="cm_custom,static/description/icon.png"/>
+    <menuitem id="menu_cm_admin_root" name="CM Admin" sequence="60"
+              web_icon="cm_custom,static/description/icon.png"/>
+
+    <menuitem id="menu_cm_ops_transport" name="Transport"
+              parent="menu_cm_custom_root" sequence="10"/>
     <menuitem id="menu_transport_orders" name="Transport Orders"
-              parent="menu_cm_custom_root" action="cm_transport.action_transport_orders" sequence="10"/>
+              parent="menu_cm_ops_transport" action="cm_transport.action_transport_orders" sequence="10"/>
+
+    <menuitem id="menu_cm_ops_intake" name="Intake"
+              parent="menu_cm_custom_root" sequence="20"/>
     <menuitem id="menu_intake_orders" name="Intake Orders"
-              parent="menu_cm_custom_root" action="cm_intake.action_intake_orders" sequence="20"/>
+              parent="menu_cm_ops_intake" action="cm_intake.action_intake_orders" sequence="10"/>
     <menuitem id="menu_diagnostic_orders" name="Diagnostic Orders"
-              parent="menu_cm_custom_root" action="cm_diagnostic.action_diagnostic_orders" sequence="30"/>
+              parent="menu_cm_ops_intake" action="cm_diagnostic.action_diagnostic_orders" sequence="20"/>
+
+    <menuitem id="menu_cm_ops_repairs" name="Repairs"
+              parent="menu_cm_custom_root" sequence="30"/>
     <menuitem id="menu_repair_batches" name="Repair Batches"
-              parent="menu_cm_custom_root" action="cm_repair.action_repair_batches" sequence="40"/>
+              parent="menu_cm_ops_repairs" action="cm_repair.action_repair_batches" sequence="10"/>
     <menuitem id="menu_quality_control_orders" name="Quality Control Orders"
-              parent="menu_cm_custom_root" action="cm_quality_control.action_quality_control_orders"
-              sequence="45"/>
+              parent="menu_cm_ops_repairs" action="cm_quality_control.action_quality_control_orders"
+              sequence="20"/>
     <menuitem id="menu_repair_claims" name="Repair Claims"
-              parent="menu_cm_custom_root" action="cm_repair.action_repair_claims" sequence="50"/>
+              parent="menu_cm_ops_repairs" action="cm_repair.action_repair_claims" sequence="30"/>
+
+    <menuitem id="menu_cm_ops_billing" name="Billing"
+              parent="menu_cm_custom_root" sequence="40"/>
     <menuitem id="menu_invoice_orders" name="Invoice Orders"
-              parent="menu_cm_custom_root" action="cm_invoice_batch.action_invoice_orders"
-              sequence="55"/>
+              parent="menu_cm_ops_billing" action="cm_invoice_batch.action_invoice_orders"
+              sequence="10"/>
     <menuitem id="menu_invoice_batches" name="Invoice Batches"
-              parent="menu_cm_custom_root" action="cm_invoice_batch.action_invoice_batches"
-              sequence="60"/>
+              parent="menu_cm_ops_billing" action="cm_invoice_batch.action_invoice_batches"
+              sequence="20"/>
+
+    <menuitem id="menu_cm_ops_assets" name="Assets"
+              parent="menu_cm_custom_root" sequence="50"/>
     <menuitem id="menu_devices" name="Devices"
-              parent="menu_cm_custom_root" action="cm_device.action_devices" sequence="70"/>
-    <menuitem id="menu_cm_custom_config" name="CM Configuration"
-              parent="menu_cm_custom_root" sequence="90"/>
+              parent="menu_cm_ops_assets" action="cm_device.action_devices" sequence="10"/>
+
+    <menuitem id="menu_cm_admin_accounts" name="Accounts"
+              parent="menu_cm_admin_root" sequence="10"/>
     <menuitem id="menu_account_routing_rules" name="Account Routing Rules"
-              parent="menu_cm_custom_config" action="cm_school.action_account_routing_rules" sequence="10"/>
+              parent="menu_cm_admin_accounts" action="cm_school.action_account_routing_rules" sequence="10"/>
     <menuitem id="menu_account_aliases" name="Account Aliases"
-              parent="menu_cm_custom_config" action="cm_school.action_account_aliases" sequence="20"/>
-    <menuitem id="menu_shipping_profiles" name="Shipping Profiles"
-              parent="menu_cm_custom_config" action="cm_school.action_shipping_profiles" sequence="30"/>
-    <menuitem id="menu_billing_policies" name="Billing Policies"
-              parent="menu_cm_custom_config" action="cm_school.action_billing_policies" sequence="40"/>
-    <menuitem id="menu_billing_contexts" name="Billing Contexts"
-              parent="menu_cm_custom_config" action="cm_school.action_billing_contexts" sequence="50"/>
-    <menuitem id="menu_billing_requirements" name="Billing Requirements"
-              parent="menu_cm_custom_config" action="cm_school.action_billing_requirements" sequence="60"/>
-    <menuitem id="menu_billing_contracts" name="Billing Contracts"
-              parent="menu_cm_custom_config" action="cm_school.action_billing_contracts" sequence="70"/>
-    <menuitem id="menu_pricing_catalogs" name="Pricing Catalogs"
-              parent="menu_cm_custom_config" action="cm_school.action_pricing_catalogs" sequence="80"/>
-    <menuitem id="menu_pricing_matrix" name="Pricing Matrix"
-              parent="menu_cm_custom_config" action="cm_school.action_pricing_matrix" sequence="85"/>
+              parent="menu_cm_admin_accounts" action="cm_school.action_account_aliases" sequence="20"/>
+
+    <menuitem id="menu_cm_admin_locations" name="Locations"
+              parent="menu_cm_admin_root" sequence="20"/>
     <menuitem id="menu_location_options" name="Location Options"
-              parent="menu_cm_custom_config" action="cm_school.action_location_options" sequence="87"/>
+              parent="menu_cm_admin_locations" action="cm_school.action_location_options" sequence="10"/>
     <menuitem id="menu_location_option_aliases" name="Location Option Aliases"
-              parent="menu_cm_custom_config" action="cm_school.action_location_option_aliases" sequence="87"/>
+              parent="menu_cm_admin_locations" action="cm_school.action_location_option_aliases" sequence="20"/>
     <menuitem id="menu_delivery_days" name="Delivery Days"
-              parent="menu_cm_custom_config" action="cm_school.action_delivery_days" sequence="88"/>
+              parent="menu_cm_admin_locations" action="cm_school.action_delivery_days" sequence="30"/>
     <menuitem id="menu_delivery_day_aliases" name="Delivery Day Aliases"
-              parent="menu_cm_custom_config" action="cm_school.action_delivery_day_aliases" sequence="88"/>
-    <menuitem id="menu_override_options" name="Override Options"
-              parent="menu_cm_custom_config" action="cm_school.action_override_options" sequence="89"/>
+              parent="menu_cm_admin_locations" action="cm_school.action_delivery_day_aliases" sequence="40"/>
     <menuitem id="menu_return_methods" name="Return Methods"
-              parent="menu_cm_custom_config" action="cm_school.action_return_methods" sequence="89"/>
+              parent="menu_cm_admin_locations" action="cm_school.action_return_methods" sequence="50"/>
+
+    <menuitem id="menu_cm_admin_shipping" name="Shipping"
+              parent="menu_cm_admin_root" sequence="30"/>
+    <menuitem id="menu_shipping_profiles" name="Shipping Profiles"
+              parent="menu_cm_admin_shipping" action="cm_school.action_shipping_profiles" sequence="10"/>
+
+    <menuitem id="menu_cm_admin_billing" name="Billing"
+              parent="menu_cm_admin_root" sequence="40"/>
+    <menuitem id="menu_billing_policies" name="Billing Policies"
+              parent="menu_cm_admin_billing" action="cm_school.action_billing_policies" sequence="10"/>
+    <menuitem id="menu_billing_contexts" name="Billing Contexts"
+              parent="menu_cm_admin_billing" action="cm_school.action_billing_contexts" sequence="20"/>
+    <menuitem id="menu_billing_requirements" name="Billing Requirements"
+              parent="menu_cm_admin_billing" action="cm_school.action_billing_requirements" sequence="30"/>
+    <menuitem id="menu_billing_contracts" name="Billing Contracts"
+              parent="menu_cm_admin_billing" action="cm_school.action_billing_contracts" sequence="40"/>
+    <menuitem id="menu_pricing_catalogs" name="Pricing Catalogs"
+              parent="menu_cm_admin_billing" action="cm_school.action_pricing_catalogs" sequence="50"/>
+    <menuitem id="menu_pricing_matrix" name="Pricing Matrix"
+              parent="menu_cm_admin_billing" action="cm_school.action_pricing_matrix" sequence="60"/>
     <menuitem id="menu_invoice_note_templates" name="Invoice Note Templates"
-              parent="menu_cm_custom_config" action="cm_invoice_batch.action_invoice_note_templates"
-              sequence="90"/>
+              parent="menu_cm_admin_billing" action="cm_invoice_batch.action_invoice_note_templates"
+              sequence="70"/>
     <menuitem id="menu_call_authorizations" name="Call Authorizations"
-              parent="menu_cm_custom_config" action="cm_invoice_batch.action_call_authorizations"
-              sequence="91"/>
+              parent="menu_cm_admin_billing" action="cm_invoice_batch.action_call_authorizations"
+              sequence="80"/>
+
+    <menuitem id="menu_cm_admin_quality" name="Quality"
+              parent="menu_cm_admin_root" sequence="50"/>
     <menuitem id="menu_quality_control_checklist" name="Quality Control Checklist"
-              parent="menu_cm_custom_config"
-              action="cm_quality_control.action_quality_control_checklist_items" sequence="95"/>
+              parent="menu_cm_admin_quality"
+              action="cm_quality_control.action_quality_control_checklist_items" sequence="10"/>
+
+    <menuitem id="menu_cm_admin_overrides" name="Overrides"
+              parent="menu_cm_admin_root" sequence="60"/>
+    <menuitem id="menu_override_options" name="Override Options"
+              parent="menu_cm_admin_overrides" action="cm_school.action_override_options" sequence="10"/>
+
+    <menuitem id="menu_cm_admin_identifiers" name="Identifiers"
+              parent="menu_cm_admin_root" sequence="70"/>
     <menuitem id="menu_identifier_index" name="Identifier Index"
-              parent="menu_cm_custom_config" action="cm_custom.action_identifier_index" sequence="90"/>
+              parent="menu_cm_admin_identifiers" action="cm_custom.action_identifier_index" sequence="10"/>
 </odoo>

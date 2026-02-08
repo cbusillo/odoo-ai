@@ -11,6 +11,7 @@ from ..services.cm_data_client import (
     CmDataAccountName,
     CmDataClient,
     CmDataConnectionSettings,
+    CmDataDirection,
     CmDataDeliveryLog,
     CmDataEmployee,
     CmDataNoteRow,
@@ -129,12 +130,34 @@ class CmDataImporter(models.Model):
                     sync_started_at,
                 )
                 self._import_contacts(client, start_datetime, account_partner_map, system, sync_started_at)
-                self._import_directions(client, start_datetime, account_partner_map, system, sync_started_at)
+                direction_rows = client.fetch_directions(updated_at=start_datetime)
+                self._import_directions(
+                    client,
+                    start_datetime,
+                    account_partner_map,
+                    system,
+                    sync_started_at,
+                    direction_rows=direction_rows,
+                )
+                location_partner_map = self._build_location_partner_map(
+                    account_rows,
+                    direction_rows,
+                    account_partner_map,
+                )
+                location_alias_partner_map = self._build_location_alias_partner_map(system)
                 self._import_shipping_instructions(client, start_datetime, account_partner_map, system, sync_started_at)
                 self._import_note_tables(client, None, account_partner_map, system, sync_started_at)
                 self._import_passwords(client, None, account_partner_map)
                 self._import_model_numbers(client, None, system, sync_started_at)
-                self._import_delivery_logs(client, start_datetime, account_partner_map, system, sync_started_at)
+                self._import_delivery_logs(
+                    client,
+                    start_datetime,
+                    account_partner_map,
+                    location_partner_map,
+                    location_alias_partner_map,
+                    system,
+                    sync_started_at,
+                )
                 employee_rows = client.fetch_employees(updated_at=None)
                 employee_map, timeclock_employee_map = self._import_employees(employee_rows, system, sync_started_at)
                 pto_rows = client.fetch_pto_usage(updated_at=None)
@@ -336,8 +359,11 @@ class CmDataImporter(models.Model):
         partner_map: dict[str, int],
         system: "odoo.model.external_system",
         sync_started_at: datetime,
+        *,
+        direction_rows: list[CmDataDirection] | None = None,
     ) -> None:
-        direction_rows = client.fetch_directions(updated_at=start_datetime)
+        if direction_rows is None:
+            direction_rows = client.fetch_directions(updated_at=start_datetime)
         direction_model = self.env["integration.cm_data.direction"].sudo().with_context(IMPORT_CONTEXT)
         commit_interval = self._get_commit_interval()
         processed_count = 0
@@ -960,6 +986,8 @@ class CmDataImporter(models.Model):
         client: CmDataClient,
         start_datetime: datetime | None,
         partner_map: dict[str, int],
+        location_partner_map: dict[str, int],
+        location_alias_partner_map: dict[str, int],
         system: "odoo.model.external_system",
         sync_started_at: datetime,
     ) -> None:
@@ -968,7 +996,12 @@ class CmDataImporter(models.Model):
         commit_interval = self._get_commit_interval()
         processed_count = 0
         for row in delivery_rows:
-            client_partner = self._resolve_transport_partner(row, partner_map)
+            client_partner = self._resolve_transport_partner(
+                row,
+                partner_map,
+                location_partner_map,
+                location_alias_partner_map,
+            )
             employee_partner = self.env.user.partner_id
             state = self._map_transport_state(row.status)
             order_name = self._build_transport_order_name(row)
@@ -1333,9 +1366,13 @@ class CmDataImporter(models.Model):
         self,
         row: CmDataDeliveryLog,
         partner_map: dict[str, int],
+        location_partner_map: dict[str, int],
+        location_alias_partner_map: dict[str, int],
     ) -> "odoo.model.res_partner":
         normalized = self._normalize_key(row.location_name)
-        partner_id = partner_map.get(normalized)
+        partner_id = location_partner_map.get(normalized) or location_alias_partner_map.get(normalized)
+        if not partner_id:
+            partner_id = partner_map.get(normalized)
         if partner_id:
             return self.env["res.partner"].sudo().browse(partner_id)
         partner_model = self.env["res.partner"].sudo().with_context(IMPORT_CONTEXT)
@@ -1351,6 +1388,49 @@ class CmDataImporter(models.Model):
         partner = partner_model.create(values)
         partner_map[normalized] = partner.id
         return partner
+
+    def _build_location_partner_map(
+        self,
+        account_rows: list[CmDataAccountName],
+        direction_rows: list[CmDataDirection],
+        partner_map: dict[str, int],
+    ) -> dict[str, int]:
+        location_partner_map: dict[str, int] = {}
+        for row in account_rows:
+            partner_id = partner_map.get(self._normalize_key(row.account_name))
+            if not partner_id:
+                continue
+            for token in (row.account_name, row.ticket_name, row.ticket_name_report):
+                normalized = self._normalize_key(token)
+                if normalized and normalized not in location_partner_map:
+                    location_partner_map[normalized] = partner_id
+        for row in direction_rows:
+            partner_id = partner_map.get(self._normalize_key(row.account_name))
+            if not partner_id:
+                continue
+            for token in (row.ticket_title_name, row.school_name, row.account_name):
+                normalized = self._normalize_key(token)
+                if normalized and normalized not in location_partner_map:
+                    location_partner_map[normalized] = partner_id
+        return location_partner_map
+
+    def _build_location_alias_partner_map(
+        self,
+        system: "odoo.model.external_system",
+    ) -> dict[str, int]:
+        if "school.location.option.alias" not in self.env:
+            return {}
+        alias_model = self.env["school.location.option.alias"].sudo().with_context(IMPORT_CONTEXT)
+        alias_map: dict[str, int] = {}
+        for alias in alias_model.search([("system_id", "=", system.id)]):
+            normalized = self._normalize_key(alias.external_key)
+            if not normalized:
+                continue
+            partner = alias.location_option_id.partner_id
+            if not partner:
+                continue
+            alias_map.setdefault(normalized, partner.id)
+        return alias_map
 
     @staticmethod
     def _map_transport_state(status: str) -> str:

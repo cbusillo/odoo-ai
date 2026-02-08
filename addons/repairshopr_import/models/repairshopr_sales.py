@@ -76,8 +76,10 @@ class RepairshoprImporter(models.Model):
             return True
         if "replacement" in normalized or "repair" in normalized:
             return True
-        if " - " in normalized:
-            return True
+        if " - " in text:
+            left_side = text.split(" - ", 1)[0].strip()
+            if re.search(r"[A-Za-z]", left_side) and re.search(r"\d", left_side):
+                return True
         if re.search(r"\(\s*(?:n/c|\$)", normalized):
             return True
         if re.search(r"\$\s*\d", normalized):

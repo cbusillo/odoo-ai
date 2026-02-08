@@ -448,17 +448,17 @@ class RepairshoprImporter(models.Model):
             with self.env.cr.savepoint():
                 return option_model.create({"name": value, "partner_id": partner.id, "override_type": "other"})
         except IntegrityError:
-            return (
-                option_model.search(
-                    [
-                        ("partner_id", "=", partner.id),
-                        ("override_type", "=", "other"),
-                        ("name", "=", value),
-                    ],
-                    limit=1,
-                )
-                or self.env["school.override.option"].browse()
+            existing = option_model.search(
+                [
+                    ("partner_id", "=", partner.id),
+                    ("override_type", "=", "other"),
+                    ("name", "=", value),
+                ],
+                limit=1,
             )
+            if existing:
+                return existing
+            raise
 
     def _build_ticket_property_values(
         self,

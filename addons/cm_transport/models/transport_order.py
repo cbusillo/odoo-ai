@@ -38,11 +38,13 @@ class TransportOrder(models.Model):
     vehicle_id = fields.Many2one(
         "fleet.vehicle",
         ondelete="set null",
+        groups="fleet.fleet_group_user",
     )
     driver_id = fields.Many2one(
         "res.partner",
         ondelete="set null",
         tracking=True,
+        groups="fleet.fleet_group_user",
     )
     client = fields.Many2one(
         "res.partner",

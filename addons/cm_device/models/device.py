@@ -87,13 +87,18 @@ class Device(models.Model):
             imei = None
 
         update_values: dict[str, object] = {}
-        if device.serial_number != serial_number:
+        existing_serial = device.serial_number or None
+        existing_asset = device.asset_tag or None
+        existing_asset_secondary = device.asset_tag_secondary or None
+        existing_imei = device.imei or None
+
+        if existing_serial != serial_number:
             update_values["serial_number"] = serial_number
-        if device.asset_tag != asset_tag:
+        if existing_asset != asset_tag:
             update_values["asset_tag"] = asset_tag
-        if device.asset_tag_secondary != asset_tag_secondary:
+        if existing_asset_secondary != asset_tag_secondary:
             update_values["asset_tag_secondary"] = asset_tag_secondary
-        if device.imei != imei:
+        if existing_imei != imei:
             update_values["imei"] = imei
 
         has_identifier = any([serial_number, asset_tag, asset_tag_secondary, imei])

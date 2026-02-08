@@ -180,10 +180,12 @@ class RepairshoprImporter(models.Model):
         ticket: repairshopr_models.Ticket,
         partner: "odoo.model.res_partner",
         model_label: str | None,
+        *,
+        ordinal: int,
     ) -> str:
         ticket_ref = ticket.number or ticket.id
         model_token = (model_label or "unknown").strip().replace(" ", "-")
-        serial = f"UNIDENTIFIED-{partner.id}-{ticket_ref}-{model_token}"
+        serial = f"UNIDENTIFIED-{partner.id}-{ticket_ref}-{ordinal}-{model_token}"
         return serial[:64]
 
     @classmethod
@@ -383,6 +385,7 @@ class RepairshoprImporter(models.Model):
 
         created_lines: list["odoo.model.service_intake_order_device"] = []
         quality_control_candidates: dict[int, dict[str, object]] = {}
+        placeholder_ordinal = 0
         for device_line in device_lines:
             model_label = device_line.get("model_label")
             if model_label is not None:
@@ -403,10 +406,12 @@ class RepairshoprImporter(models.Model):
                 imei = str(imei)
             is_placeholder = False
             if not any([serial_number, asset_tag, asset_tag_secondary, imei]):
+                placeholder_ordinal += 1
                 serial_number = self._build_placeholder_serial(
                     ticket,
                     partner,
                     model_label,
+                    ordinal=placeholder_ordinal,
                 )
                 is_placeholder = True
             device_record = self._find_or_create_device(

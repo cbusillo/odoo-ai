@@ -236,6 +236,12 @@ class RepairshoprImporter(models.Model):
         if "service.transport.order.device" not in self.env:
             _logger.info("Transport device backfill skipped; transport device model missing.")
             return
+        if "external.id" not in self.env or "external.system" not in self.env:
+            _logger.info("Transport device backfill skipped; external ID models not installed.")
+            return
+        if "identifier.index" not in self.env:
+            _logger.info("Transport device backfill skipped; identifier index not installed.")
+            return
 
         transport_order_model = self.env["service.transport.order"].sudo().with_context(IMPORT_CONTEXT)
         intake_order_model = self.env["service.intake.order"].sudo().with_context(IMPORT_CONTEXT)
@@ -243,12 +249,50 @@ class RepairshoprImporter(models.Model):
         transport_device_model = self.env["service.transport.order.device"].sudo().with_context(IMPORT_CONTEXT)
         ticket_model = self.env["helpdesk.ticket"].sudo().with_context(IMPORT_CONTEXT)
 
-        transport_orders = transport_order_model.search([], order="arrival_date asc, id asc")
+        cm_system = self._get_external_system_by_code("cm_data")
+        if not cm_system:
+            _logger.info("Transport device backfill skipped; CM data external system not found.")
+            return
+        transport_order_ids = self._get_external_ids_for_model(
+            cm_system.id,
+            "delivery_log",
+            "service.transport.order",
+        )
+        if not transport_order_ids:
+            _logger.info("Transport device backfill skipped; no imported transport orders found.")
+            return
+        transport_orders = transport_order_model.browse(transport_order_ids).exists().sorted(
+            key=lambda record: (record.arrival_date or record.scheduled_date or record.create_date, record.id)
+        )
         if not transport_orders:
             _logger.info("Transport device backfill skipped; no transport orders found.")
             return
 
-        transport_order_ids = transport_orders.ids
+        repairshopr_system = self._get_external_system_by_code(EXTERNAL_SYSTEM_CODE)
+        if not repairshopr_system:
+            _logger.info("Transport device backfill skipped; RepairShopr system not found.")
+            return
+        imported_ticket_ids = self._get_external_ids_for_model(
+            repairshopr_system.id,
+            RESOURCE_TICKET,
+            "helpdesk.ticket",
+        )
+        if not imported_ticket_ids:
+            _logger.info("Transport device backfill skipped; no imported tickets found.")
+            return
+        ticket_records = ticket_model.browse(imported_ticket_ids).exists()
+        ticket_records = ticket_records.filtered(lambda record: record.intake_order_id)
+        if not ticket_records:
+            _logger.info("Transport device backfill skipped; no intake orders linked to imported tickets.")
+            return
+
+        intake_orders = ticket_records.mapped("intake_order_id").filtered(
+            lambda order: not order.transport_order
+        )
+        if not intake_orders:
+            _logger.info("Transport device backfill skipped; no intake orders need transport links.")
+            return
+
         device_counts: dict[int, int] = {}
         grouped_counts = transport_device_model.read_group(
             [("transport_order", "in", transport_order_ids)],
@@ -260,7 +304,7 @@ class RepairshoprImporter(models.Model):
             if transport_id:
                 device_counts[transport_id] = int(group.get("transport_order_count", 0) or 0)
 
-        alias_map = self._build_cm_location_alias_map()
+        alias_map = self._build_cm_location_alias_map(cm_system)
 
         transport_order_info: list[dict[str, object]] = []
         orders_by_partner: dict[int, list[dict[str, object]]] = {}
@@ -273,6 +317,11 @@ class RepairshoprImporter(models.Model):
             location_option_id = alias_map.get(location_key)
             capacity = int(transport_order.cm_data_units or transport_order.quantity_in_counted or 0)
             used_count = device_counts.get(transport_order.id, 0)
+            note_identifiers = self._extract_transport_order_identifiers(transport_order)
+            note_device_ids = self._resolve_devices_from_identifiers(
+                note_identifiers,
+                partner_id=partner_id,
+            )
             info: dict[str, object] = {
                 "id": transport_order.id,
                 "partner_id": partner_id,
@@ -281,25 +330,18 @@ class RepairshoprImporter(models.Model):
                 "location_option_id": location_option_id,
                 "capacity": capacity,
                 "used": used_count,
+                "note_device_ids": note_device_ids,
             }
             transport_order_info.append(info)
             orders_by_partner.setdefault(partner_id, []).append(info)
 
-        intake_order_ids = self._get_intake_orders_with_devices(intake_device_model)
+        intake_order_ids = self._get_intake_orders_with_devices(intake_device_model, intake_orders.ids)
         if not intake_order_ids:
             _logger.info("Transport device backfill skipped; no intake devices found.")
             return
 
-        intake_orders = intake_order_model.search(
-            [
-                ("id", "in", intake_order_ids),
-                ("transport_order", "=", False),
-            ],
-            order="finish_date asc, id asc",
-        )
-        if not intake_orders:
-            _logger.info("Transport device backfill skipped; no intake orders need transport links.")
-            return
+        intake_orders = intake_orders.filtered(lambda order: order.id in set(intake_order_ids))
+        intake_orders = intake_orders.sorted(key=lambda record: (record.finish_date or record.id, record.id))
 
         intake_info_by_id: dict[int, dict[str, object]] = {}
         for intake_order in intake_orders:
@@ -312,8 +354,11 @@ class RepairshoprImporter(models.Model):
                 "finish_date": intake_order.finish_date,
             }
 
-        tickets_by_intake_id = self._build_ticket_location_map(ticket_model, list(intake_info_by_id))
+        tickets_by_intake_id = self._build_ticket_location_map(ticket_records)
         devices_by_intake_id = self._build_intake_device_map(intake_device_model, list(intake_info_by_id))
+        for intake_id, device_ids in devices_by_intake_id.items():
+            if intake_id in intake_info_by_id:
+                intake_info_by_id[intake_id]["device_ids"] = device_ids
 
         commit_interval = self._get_commit_interval()
         processed_count = 0
@@ -339,6 +384,7 @@ class RepairshoprImporter(models.Model):
                 intake_info,
                 ticket_info,
                 candidate_orders,
+                device_ids,
             )
             if not selected_order:
                 skipped_missing_match += 1
@@ -374,6 +420,13 @@ class RepairshoprImporter(models.Model):
             skipped_missing_match,
         )
 
+        note_device_created = self._create_transport_devices_from_notes(
+            transport_device_model,
+            transport_order_info,
+        )
+        if note_device_created:
+            _logger.info("Transport device backfill: created %s note-derived device lines", note_device_created)
+
     @staticmethod
     def _normalize_location_key(value: str | None) -> str:
         if not value:
@@ -384,12 +437,8 @@ class RepairshoprImporter(models.Model):
     def _resolve_transport_order_date(transport_order: "odoo.model.service_transport_order") -> datetime | None:
         return transport_order.arrival_date or transport_order.scheduled_date or transport_order.create_date
 
-    def _build_cm_location_alias_map(self) -> dict[str, int]:
-        if "school.location.option.alias" not in self.env or "external.system" not in self.env:
-            return {}
-        system_model = self.env["external.system"].sudo()
-        cm_system = system_model.search([("code", "=", "cm_data")], limit=1)
-        if not cm_system:
+    def _build_cm_location_alias_map(self, cm_system: "odoo.model.external_system") -> dict[str, int]:
+        if "school.location.option.alias" not in self.env:
             return {}
         alias_model = self.env["school.location.option.alias"].sudo()
         alias_map: dict[str, int] = {}
@@ -402,9 +451,12 @@ class RepairshoprImporter(models.Model):
     @staticmethod
     def _get_intake_orders_with_devices(
         intake_device_model: "odoo.model.service_intake_order_device",
+        intake_order_ids: list[int],
     ) -> list[int]:
+        if not intake_order_ids:
+            return []
         grouped = intake_device_model.read_group(
-            [("intake_order", "!=", False)],
+            [("intake_order", "in", intake_order_ids)],
             ["intake_order"],
             ["intake_order"],
         )
@@ -417,13 +469,11 @@ class RepairshoprImporter(models.Model):
 
     def _build_ticket_location_map(
         self,
-        ticket_model: "odoo.model.helpdesk_ticket",
-        intake_order_ids: list[int],
+        tickets: "odoo.model.helpdesk_ticket",
     ) -> dict[int, dict[str, object]]:
-        if not intake_order_ids:
+        if not tickets:
             return {}
         ticket_info_map: dict[int, dict[str, object]] = {}
-        tickets = ticket_model.search([("intake_order_id", "in", intake_order_ids)])
         for ticket in tickets:
             intake_order = ticket.intake_order_id
             if not intake_order:
@@ -483,6 +533,7 @@ class RepairshoprImporter(models.Model):
         intake_info: dict[str, object],
         ticket_info: dict[str, object] | None,
         candidate_orders: list[dict[str, object]],
+        device_ids: list[int],
     ) -> dict[str, object] | None:
         finish_date = intake_info.get("finish_date")
         if not finish_date:
@@ -522,8 +573,185 @@ class RepairshoprImporter(models.Model):
                 ]
                 if location_candidates:
                     window_candidates = location_candidates
+            device_candidates = self._filter_orders_by_device_ids(window_candidates, device_ids)
+            if device_candidates:
+                window_candidates = device_candidates
             return self._pick_best_transport_order(window_candidates, finish_date)
         return None
+
+    @staticmethod
+    def _filter_orders_by_device_ids(
+        candidates: list[dict[str, object]],
+        device_ids: list[int],
+    ) -> list[dict[str, object]]:
+        if not device_ids:
+            return []
+        device_id_set = set(device_ids)
+        return [
+            order_info
+            for order_info in candidates
+            if device_id_set.intersection(order_info.get("note_device_ids") or set())
+        ]
+
+    def _get_external_system_by_code(self, code: str) -> "odoo.model.external_system | None":
+        system_model = self.env["external.system"].sudo()
+        system = system_model.search([("code", "=", code)], limit=1)
+        return system if system else None
+
+    def _get_external_ids_for_model(
+        self,
+        system_id: int,
+        resource: str,
+        model_name: str,
+    ) -> list[int]:
+        external_id_model = self.env["external.id"].sudo().with_context(active_test=False)
+        records = external_id_model.search(
+            [
+                ("system_id", "=", system_id),
+                ("resource", "=", resource),
+                ("res_model", "=", model_name),
+            ]
+        )
+        return [record.res_id for record in records if record.res_id]
+
+    def _extract_transport_order_identifiers(
+        self,
+        transport_order: "odoo.model.service_transport_order",
+    ) -> dict[str, set[str]]:
+        notes = [
+            transport_order.cm_data_notes,
+            transport_order.cm_data_edit_notes,
+            transport_order.cm_data_ocr_notes,
+        ]
+        identifiers: dict[str, set[str]] = {}
+        for note in notes:
+            if not note:
+                continue
+            extracted = self._extract_identifiers_from_text(note)
+            for identifier_type, identifier_values in extracted.items():
+                identifiers.setdefault(identifier_type, set()).update(identifier_values)
+        return identifiers
+
+    def _extract_identifiers_from_text(self, text: str) -> dict[str, set[str]]:
+        identifiers: dict[str, set[str]] = {}
+        for pattern, group_name, identifier_type in (
+            (SERIAL_PATTERN, "serial", "serial"),
+            (ASSET_TAG_PATTERN, "tag", "asset_tag"),
+            (IMEI_PATTERN, "imei", "imei"),
+        ):
+            matches = [match.group(group_name) for match in pattern.finditer(text)]
+            cleaned_values = {value.strip() for value in matches if value and value.strip()}
+            if cleaned_values:
+                identifiers[identifier_type] = cleaned_values
+        return identifiers
+
+    def _resolve_devices_from_identifiers(
+        self,
+        identifiers: dict[str, set[str]],
+        *,
+        partner_id: int | None,
+    ) -> set[int]:
+        if not identifiers:
+            return set()
+        identifier_model = self.env["identifier.index"].sudo().with_context(active_test=False)
+        device_model = self.env["service.device"].sudo().with_context(active_test=False)
+        resolved_ids: set[int] = set()
+        fallback_ids: set[int] = set()
+
+        for identifier_type, identifier_values in identifiers.items():
+            for identifier_value in identifier_values:
+                normalized_value = self._normalize_identifier_value(identifier_value)
+                if not normalized_value:
+                    continue
+                preferred_ids: set[int] = set()
+                non_preferred_ids: set[int] = set()
+                index_matches = identifier_model.search(
+                    [
+                        ("identifier_type", "=", identifier_type),
+                        ("identifier_normalized", "=", normalized_value),
+                        ("res_model", "=", "service.device"),
+                    ]
+                )
+                for index_match in index_matches:
+                    device_record = device_model.browse(index_match.res_id)
+                    if not device_record.exists():
+                        continue
+                    if partner_id and device_record.owner and device_record.owner.id != partner_id:
+                        non_preferred_ids.add(device_record.id)
+                        continue
+                    preferred_ids.add(device_record.id)
+
+                if not preferred_ids:
+                    search_domain = self._build_device_search_domain(identifier_value)
+                    if partner_id:
+                        owner_domain = ["&", ("owner", "=", partner_id)]
+                        search_domain = owner_domain + search_domain
+                    matches = device_model.search(search_domain, limit=5)
+                    if not matches and partner_id:
+                        matches = device_model.search(self._build_device_search_domain(identifier_value), limit=5)
+                    if matches:
+                        preferred_ids.update(matches.ids)
+
+                if preferred_ids:
+                    resolved_ids.update(preferred_ids)
+                else:
+                    fallback_ids.update(non_preferred_ids)
+
+        return resolved_ids or fallback_ids
+
+    @staticmethod
+    def _build_device_search_domain(identifier_value: str) -> list[object]:
+        value = identifier_value.strip()
+        return [
+            "|",
+            "|",
+            "|",
+            ("serial_number", "ilike", value),
+            ("asset_tag", "ilike", value),
+            ("asset_tag_secondary", "ilike", value),
+            ("imei", "ilike", value),
+        ]
+
+    def _create_transport_devices_from_notes(
+        self,
+        transport_device_model: "odoo.model.service_transport_order.device",
+        transport_order_info: list[dict[str, object]],
+    ) -> int:
+        if not transport_order_info:
+            return 0
+        created_count = 0
+        commit_interval = self._get_commit_interval()
+        processed_count = 0
+        for order_info in transport_order_info:
+            transport_order_id = int(order_info.get("id") or 0)
+            if not transport_order_id:
+                continue
+            note_device_ids = set(order_info.get("note_device_ids") or set())
+            if not note_device_ids:
+                continue
+            existing_lines = transport_device_model.search(
+                [
+                    ("transport_order", "=", transport_order_id),
+                    ("device", "in", list(note_device_ids)),
+                ]
+            )
+            existing_device_ids = set(existing_lines.mapped("device").ids)
+            create_values = [
+                {
+                    "transport_order": transport_order_id,
+                    "device": device_id,
+                    "movement_type": "in",
+                }
+                for device_id in note_device_ids
+                if device_id not in existing_device_ids
+            ]
+            if create_values:
+                transport_device_model.create(create_values)
+                created_count += len(create_values)
+            processed_count += 1
+            if self._maybe_commit(processed_count, commit_interval, label="transport note device"):
+                transport_device_model = self.env["service.transport.order.device"].sudo().with_context(IMPORT_CONTEXT)
+        return created_count
 
     @staticmethod
     def _pick_best_transport_order(

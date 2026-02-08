@@ -20,16 +20,15 @@ def pre_init_hook(env_or_cursor: Environment | Cursor) -> None:
     _deduplicate_delivery_default_codes(cursor)
 
 
-def post_init_hook(*args: tuple) -> None:
+def post_init_hook(env_or_cursor: Environment | Cursor, registry: object | None = None) -> None:
     """
     TODO: Remove this hook after prod is upgraded to Odoo 19 and the legacy
     Shopify/eBay columns are fully retired from all live databases.
     """
-    if len(args) == 1:
-        env = args[0]
+    if isinstance(env_or_cursor, api.Environment):
+        env = env_or_cursor
     else:
-        cr, _registry = args
-        env = api.Environment(cr, SUPERUSER_ID, {})
+        env = api.Environment(env_or_cursor, SUPERUSER_ID, {})
     _migrate_marketplace_external_ids(env)
 
 

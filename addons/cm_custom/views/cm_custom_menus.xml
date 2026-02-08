@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
-    <menuitem id="menu_cm_custom_root" name="CM Operations" sequence="50"
+    <menuitem id="menu_cm_custom_root" name="CM Operations" sequence="10"
               web_icon="cm_custom,static/description/icon.png"/>
-    <menuitem id="menu_cm_admin_root" name="CM Admin" sequence="60"
+    <menuitem id="menu_cm_admin_root" name="CM Admin" sequence="11"
               web_icon="cm_custom,static/description/icon.png"/>
 
     <menuitem id="menu_cm_custom_config" name="CM Configuration"

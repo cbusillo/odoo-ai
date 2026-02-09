@@ -1,6 +1,6 @@
 {
     "name": "CM Device",
-    "version": "19.0.0.1",
+    "version": "19.0.0.2",
     "category": "Industries",
     "summary": "Device models for Cell Mechanic",
     "description": "Device catalog and identity records for Cell Mechanic workflows.",

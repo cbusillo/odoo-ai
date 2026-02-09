@@ -1,5 +1,5 @@
 from odoo import api, fields, models
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, ValidationError
 
 
 class Device(models.Model):
@@ -28,6 +28,11 @@ class Device(models.Model):
         "res.partner",
         ondelete="set null",
     )
+    is_historical_import = fields.Boolean(
+        default=False,
+        copy=False,
+        help="Set automatically for imported historical records that do not have a known payer.",
+    )
     bin = fields.Char()
     is_in_manufacturer_warranty = fields.Boolean()
     invoices = fields.Many2many(
@@ -37,6 +42,61 @@ class Device(models.Model):
         "move_id",
         domain="[('move_type', 'in', ['out_invoice', 'out_refund'])]",
     )
+
+    @api.model_create_multi
+    def create(self, values_list: list[dict[str, object]]):
+        normalized_values_list = [
+            self._normalize_payer_values(values, for_create=True) for values in values_list
+        ]
+        devices = super().create(normalized_values_list)
+        devices._validate_required_payer()
+        return devices
+
+    def write(self, values: dict[str, object]) -> bool:
+        normalized_values = self._normalize_payer_values(values, for_create=False)
+        result = super().write(normalized_values)
+        if "payer" in normalized_values or "is_historical_import" in normalized_values:
+            self._validate_required_payer()
+        return result
+
+    def copy(self, default: dict[str, object] | None = None):
+        default_values = dict(default or {})
+        payer_after_copy = default_values.get("payer") if "payer" in default_values else self.payer
+        preserve_historical_import = (
+            self.is_historical_import
+            and not payer_after_copy
+            and "is_historical_import" not in default_values
+        )
+        if preserve_historical_import:
+            default_values["is_historical_import"] = True
+        return super().copy(default_values)
+
+    @api.constrains("payer", "is_historical_import")
+    def _check_required_payer(self) -> None:
+        self._validate_required_payer()
+
+    def _normalize_payer_values(self, values: dict[str, object], *, for_create: bool) -> dict[str, object]:
+        normalized_values = dict(values)
+        is_system_user = self.env.su or self.env.user.has_group("base.group_system")
+        skip_required_fields = bool(self.env.context.get("cm_skip_required_fields")) and is_system_user
+        payer_is_missing_in_create = for_create and not normalized_values.get("payer")
+        payer_is_missing_in_write = (not for_create) and "payer" in normalized_values and not normalized_values.get("payer")
+
+        if skip_required_fields and (payer_is_missing_in_create or payer_is_missing_in_write):
+            normalized_values["is_historical_import"] = True
+
+        if "is_historical_import" in normalized_values and not is_system_user:
+            raise ValidationError(
+                "Historical import flag can only be set by administrators."
+            )
+        return normalized_values
+
+    def _validate_required_payer(self) -> None:
+        missing_payer_devices = self.filtered(
+            lambda device: not device.payer and not device.is_historical_import
+        )
+        if missing_payer_devices:
+            raise ValidationError("Payer is required for new device records.")
 
     @api.model
     def cleanup_identifiers(self, *, batch_size: int = 5000, commit_interval: int = 5000) -> dict[str, int]:

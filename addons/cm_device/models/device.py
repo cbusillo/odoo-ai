@@ -130,6 +130,6 @@ class Device(models.Model):
             digits = "".join(ch for ch in cleaned if ch.isdigit())
             return digits if len(digits) >= 8 else None
         if identifier_type in {"serial", "asset_tag"}:
-            if len(cleaned) < 4:
+            if len(cleaned) < 2:
                 return None
         return cleaned

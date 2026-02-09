@@ -143,7 +143,7 @@ class RepairshoprImporter(models.Model):
             digits = "".join(ch for ch in cleaned if ch.isdigit())
             return digits if len(digits) >= 8 else None
         if identifier_type in {"serial", "asset_tag"}:
-            if len(cleaned) < 4:
+            if len(cleaned) < 2:
                 return None
         return cleaned
 
@@ -261,7 +261,10 @@ class RepairshoprImporter(models.Model):
                 asset_secondary_domain.append(("owner", "=", partner.id))
             device_record = device_model.search(asset_secondary_domain, limit=1)
         if not device_record and imei:
-            device_record = device_model.search([("imei", "=", imei)], limit=1)
+            imei_domain = [("imei", "=", imei)]
+            if partner:
+                imei_domain.append(("owner", "=", partner.id))
+            device_record = device_model.search(imei_domain, limit=1)
 
         device_model_record = None
         if model_label:

@@ -1,4 +1,5 @@
 from odoo import api, fields, models
+from odoo.exceptions import AccessError
 
 
 class Device(models.Model):
@@ -39,6 +40,8 @@ class Device(models.Model):
 
     @api.model
     def cleanup_identifiers(self, *, batch_size: int = 5000, commit_interval: int = 5000) -> dict[str, int]:
+        if not self.env.user.has_group("base.group_system"):
+            raise AccessError("Only administrators can run device identifier cleanup.")
         cleanup_context = {
             "tracking_disable": True,
             "mail_create_nolog": True,

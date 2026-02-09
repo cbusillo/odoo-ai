@@ -113,9 +113,14 @@ class CmDataImporter(models.Model):
             with CmDataClient(self._get_connection_settings()) as client:
                 price_list_rows = client.fetch_price_lists(updated_at=None)
                 self._import_price_lists(price_list_rows, system, sync_started_at)
-                account_rows = client.fetch_account_names(updated_at=None)
-                account_partner_map = self._import_accounts(account_rows, system, sync_started_at)
-                self._import_account_aliases(account_rows, account_partner_map)
+                account_result = client.fetch_account_names(updated_at=None)
+                account_partner_map = self._import_accounts(
+                    account_result.rows,
+                    system,
+                    sync_started_at,
+                    rs_customer_id_available=account_result.rs_customer_id_available,
+                )
+                self._import_account_aliases(account_result.rows, account_partner_map)
                 pricing_catalog_rows = client.fetch_pricing_catalogs(updated_at=None)
                 pricing_line_rows = client.fetch_pricing_lines(updated_at=None)
                 catalog_row_map, catalog_id_map = self._import_pricing_catalogs(
@@ -142,7 +147,7 @@ class CmDataImporter(models.Model):
                     direction_rows=direction_rows,
                 )
                 location_partner_map = self._build_location_partner_map(
-                    account_rows,
+                    account_result.rows,
                     direction_rows,
                     account_partner_map,
                 )
@@ -236,6 +241,8 @@ class CmDataImporter(models.Model):
         account_rows: list[CmDataAccountName],
         system: "odoo.model.external_system",
         sync_started_at: datetime,
+        *,
+        rs_customer_id_available: bool = True,
     ) -> dict[str, int]:
         partner_model = self.env["res.partner"].sudo().with_context(IMPORT_CONTEXT)
         price_list_model = self.env["integration.cm_data.price.list"].sudo().with_context(IMPORT_CONTEXT)
@@ -246,16 +253,17 @@ class CmDataImporter(models.Model):
         repairshopr_system = self._get_external_system_by_code(REPAIRSHOPR_SYSTEM_CODE)
         billing_partner_cache: dict[str, int | None] = {}
         for row in account_rows:
-            billing_partner_id = self._resolve_repairshopr_partner_id(
-                row.rs_customer_id,
-                repairshopr_system,
-                billing_partner_cache,
-            )
+            billing_partner_id = None
+            if rs_customer_id_available and row.rs_customer_id:
+                billing_partner_id = self._resolve_repairshopr_partner_id(
+                    row.rs_customer_id,
+                    repairshopr_system,
+                    billing_partner_cache,
+                )
             values: "odoo.values.res_partner" = {
                 "name": row.account_name,
                 "cm_data_ticket_name": row.ticket_name,
                 "cm_data_ticket_name_report": row.ticket_name_report,
-                "cm_data_repairshopr_customer_id": row.rs_customer_id,
                 "cm_data_label_names": row.label_names,
                 "cm_data_multi_building_flag": row.multi_building_flag,
                 "cm_data_priority_flag": row.priority_flag,
@@ -265,8 +273,10 @@ class CmDataImporter(models.Model):
                 "cm_data_price_list_ids": row.price_list,
                 "cm_data_price_list_secondary_id": row.price_list_2,
             }
-            if billing_partner_id and "billing_partner_id" in partner_model._fields:
-                values["billing_partner_id"] = billing_partner_id
+            if rs_customer_id_available:
+                values["cm_data_repairshopr_customer_id"] = row.rs_customer_id
+                if "billing_partner_id" in partner_model._fields:
+                    values["billing_partner_id"] = billing_partner_id or False
             partner = self._get_or_create_by_external_id_with_sync(
                 partner_model,
                 system,

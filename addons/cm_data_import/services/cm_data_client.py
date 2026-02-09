@@ -48,6 +48,12 @@ class CmDataAccountName:
 
 
 @dataclass(frozen=True)
+class CmDataAccountNameResult:
+    rows: list[CmDataAccountName]
+    rs_customer_id_available: bool
+
+
+@dataclass(frozen=True)
 class CmDataContact:
     record_id: int
     account_name: str
@@ -299,7 +305,7 @@ class CmDataClient:
         self._connection.close()
         self._connection = None
 
-    def fetch_account_names(self, updated_at: datetime | None) -> list[CmDataAccountName]:
+    def fetch_account_names(self, updated_at: datetime | None) -> CmDataAccountNameResult:
         columns = [
             "id",
             "account_name",
@@ -317,6 +323,7 @@ class CmDataClient:
             "location_drop",
             "updated_at",
         ]
+        rs_customer_id_available = True
         try:
             rows = self._fetch_table_rows(
                 "account_names",
@@ -326,6 +333,7 @@ class CmDataClient:
         except pymysql.err.ProgrammingError as exc:
             if "rs_customer_id" not in str(exc).lower():
                 raise
+            rs_customer_id_available = False
             fallback_columns = [column for column in columns if column != "rs_customer_id"]
             rows = self._fetch_table_rows(
                 "account_names",
@@ -355,7 +363,11 @@ class CmDataClient:
                     updated_at=_to_datetime(row.get("updated_at")),
                 )
             )
-        return results
+        return CmDataAccountNameResult(
+            rows=results,
+            rs_customer_id_available=rs_customer_id_available,
+        )
+
 
     def fetch_contacts(self, updated_at: datetime | None) -> list[CmDataContact]:
         rows = self._fetch_table_rows(

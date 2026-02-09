@@ -34,6 +34,7 @@ class CmDataAccountName:
     account_name: str
     ticket_name: str | None
     ticket_name_report: str | None
+    rs_customer_id: str | None
     label_names: str | None
     claim_name_list: str | None
     multi_building_flag: bool
@@ -299,26 +300,38 @@ class CmDataClient:
         self._connection = None
 
     def fetch_account_names(self, updated_at: datetime | None) -> list[CmDataAccountName]:
-        rows = self._fetch_table_rows(
-            "account_names",
-            [
-                "id",
-                "account_name",
-                "ticket_name",
-                "ticket_name_report",
-                "label_names",
-                "claim_name_list",
-                "multi_building_flag",
-                "price_list",
-                "price_list_2",
-                "priority_flag",
-                "on_delivery_schedule",
-                "shipping_enable",
-                "location_drop",
-                "updated_at",
-            ],
-            updated_at=updated_at,
-        )
+        columns = [
+            "id",
+            "account_name",
+            "ticket_name",
+            "ticket_name_report",
+            "rs_customer_id",
+            "label_names",
+            "claim_name_list",
+            "multi_building_flag",
+            "price_list",
+            "price_list_2",
+            "priority_flag",
+            "on_delivery_schedule",
+            "shipping_enable",
+            "location_drop",
+            "updated_at",
+        ]
+        try:
+            rows = self._fetch_table_rows(
+                "account_names",
+                columns,
+                updated_at=updated_at,
+            )
+        except pymysql.err.ProgrammingError as exc:
+            if "rs_customer_id" not in str(exc).lower():
+                raise
+            fallback_columns = [column for column in columns if column != "rs_customer_id"]
+            rows = self._fetch_table_rows(
+                "account_names",
+                fallback_columns,
+                updated_at=updated_at,
+            )
         results: list[CmDataAccountName] = []
         for row in rows:
             record_id = _require_int(row.get("id"), field_name="account_names.id")
@@ -329,6 +342,7 @@ class CmDataClient:
                     account_name=account_name,
                     ticket_name=_to_text(row.get("ticket_name")),
                     ticket_name_report=_to_text(row.get("ticket_name_report")),
+                    rs_customer_id=_to_text(row.get("rs_customer_id")),
                     label_names=_to_text(row.get("label_names")),
                     claim_name_list=_to_text(row.get("claim_name_list")),
                     multi_building_flag=_to_bool(row.get("multi_building_flag")),

@@ -98,6 +98,12 @@ the linked docs, then keep prompts lean.
 - Prefer Odoo Intelligence MCP calls for model/field discovery, code search, or
   module updates before falling back to ad-hoc shell commands
   (`docs/tooling/odoo-intelligence.md`).
+- For browser-based validation, do not use `localhost` or `127.0.0.1` URLs.
+  Use the host IP or the environment hostname (for example
+  `cm-local.shinycomputers.com`) so the browser process can reach Odoo.
+- For long-running or high-output commands (for example imports, restore,
+  upgrade, large tests), run detached/in the background and redirect output to
+  a log file under `tmp/` instead of streaming full output in-session.
 - Mirror the design style and patterns already established in
   `addons/opw_custom/`; align new modules and views with that reference
   before inventing new approaches.

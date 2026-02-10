@@ -45,6 +45,20 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="/addons/cm_invoice_batch/security/ir.model.access.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="/addons/cm_quality_control/security/ir.model.access.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="/addons/cm_repair/security/ir.model.access.csv">
           <value>
             <Attribute>

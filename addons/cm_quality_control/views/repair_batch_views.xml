@@ -10,7 +10,7 @@
                     <field name="quality_control_orders">
                         <list>
                             <field name="name"/>
-                            <field name="state"/>
+                            <field name="stage_id"/>
                             <field name="start_date"/>
                             <field name="finish_date"/>
                             <field name="employee"/>

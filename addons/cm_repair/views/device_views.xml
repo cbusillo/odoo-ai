@@ -10,7 +10,7 @@
                     <field name="repair_batch_lines">
                         <list>
                             <field name="batch_id"/>
-                            <field name="state"/>
+                            <field name="stage_id"/>
                             <field name="start_date"/>
                             <field name="finish_date"/>
                         </list>

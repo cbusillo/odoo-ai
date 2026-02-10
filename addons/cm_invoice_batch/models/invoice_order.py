@@ -23,6 +23,16 @@ class InvoiceOrder(models.Model):
         tracking=True,
         required=True,
     )
+    stage_id = fields.Many2one(
+        "service.invoice.order.stage",
+        compute="_compute_stage_id",
+        inverse="_inverse_stage_id",
+        store=True,
+        tracking=True,
+        readonly=False,
+        group_expand="_read_group_stage_ids",
+        ondelete="restrict",
+    )
     client = fields.Many2one(
         "res.partner",
         ondelete="restrict",
@@ -181,3 +191,36 @@ class InvoiceOrder(models.Model):
                 raise ValidationError(
                     f"Missing required invoice fields for {order.billing_context_id.name}: {missing_list}"
                 )
+
+    @api.depends("state")
+    def _compute_stage_id(self) -> None:
+        stage_model = self.env["service.invoice.order.stage"]
+        stages_by_code = {stage.code: stage for stage in stage_model.search([])}
+        for order in self:
+            order.stage_id = stages_by_code.get(order.state)
+
+    def _inverse_stage_id(self) -> None:
+        for order in self:
+            if order.stage_id and order.stage_id.code and order.state != order.stage_id.code:
+                order.state = order.stage_id.code
+
+    @api.model
+    def _read_group_stage_ids(self, stages, _domain, order=None, *_args, **_kwargs):
+        return stages.search([], order=order or stages._order)
+
+
+class InvoiceOrderStage(models.Model):
+    _name = "service.invoice.order.stage"
+    _description = "Invoice Order Stage"
+    _order = "sequence, id"
+
+    name = fields.Char(required=True)
+    code = fields.Selection(INVOICE_ORDER_STATES, required=True, index=True)
+    sequence = fields.Integer(default=10)
+    fold = fields.Boolean(default=False)
+    active = fields.Boolean(default=True)
+
+    _code_unique = models.Constraint(
+        "unique(code)",
+        "Invoice order stage code must be unique.",
+    )

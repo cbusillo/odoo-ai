@@ -34,6 +34,7 @@
     ],
     "data": [
         "security/ir.model.access.csv",
+        "data/stage_data.xml",
         "views/res_partner_views.xml",
         "views/helpdesk_ticket_views.xml",
         "views/identifier_index_views.xml",

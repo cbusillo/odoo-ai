@@ -17,6 +17,7 @@
     ],
     "data": [
         "security/ir.model.access.csv",
+        "data/stage_data.xml",
         "views/device_views.xml",
         "views/transport_order_views.xml",
         "views/cm_transport_actions.xml",

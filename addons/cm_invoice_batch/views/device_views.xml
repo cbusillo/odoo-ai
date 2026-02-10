@@ -10,7 +10,7 @@
                     <field name="invoice_order_devices">
                         <list>
                             <field name="invoice_order"/>
-                            <field name="state"/>
+                            <field name="stage_id"/>
                             <field name="update_status"/>
                         </list>
                     </field>

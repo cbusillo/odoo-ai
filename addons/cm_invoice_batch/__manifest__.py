@@ -19,6 +19,7 @@
     ],
     "data": [
         "security/ir.model.access.csv",
+        "data/stage_data.xml",
         "views/invoice_order_views.xml",
         "views/invoice_note_template_views.xml",
         "views/call_authorization_views.xml",

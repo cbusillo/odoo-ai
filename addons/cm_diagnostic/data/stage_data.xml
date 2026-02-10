@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="service_diagnostic_order_stage_draft" model="service.diagnostic.order.stage">
+            <field name="name">Draft</field>
+            <field name="code">draft</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="service_diagnostic_order_stage_ready" model="service.diagnostic.order.stage">
+            <field name="name">Ready</field>
+            <field name="code">ready</field>
+            <field name="sequence">20</field>
+        </record>
+        <record id="service_diagnostic_order_stage_started" model="service.diagnostic.order.stage">
+            <field name="name">Started</field>
+            <field name="code">started</field>
+            <field name="sequence">30</field>
+        </record>
+        <record id="service_diagnostic_order_stage_finished" model="service.diagnostic.order.stage">
+            <field name="name">Finished</field>
+            <field name="code">finished</field>
+            <field name="sequence">40</field>
+            <field name="fold">True</field>
+        </record>
+
+        <record id="service_diagnostic_order_device_stage_started" model="service.diagnostic.order.device.stage">
+            <field name="name">Started</field>
+            <field name="code">started</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="service_diagnostic_order_device_stage_finished" model="service.diagnostic.order.device.stage">
+            <field name="name">Finished</field>
+            <field name="code">finished</field>
+            <field name="sequence">20</field>
+            <field name="fold">True</field>
+        </record>
+    </data>
+</odoo>

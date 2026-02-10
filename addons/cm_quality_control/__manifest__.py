@@ -17,6 +17,7 @@
     ],
     "data": [
         "security/ir.model.access.csv",
+        "data/stage_data.xml",
         "views/quality_control_order_views.xml",
         "views/quality_control_checklist_views.xml",
         "views/cm_quality_control_actions.xml",

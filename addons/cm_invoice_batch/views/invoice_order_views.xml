@@ -6,7 +6,7 @@
         <field name="arch" type="xml">
             <list>
                 <field name="name"/>
-                <field name="state"/>
+                <field name="stage_id"/>
                 <field name="client"/>
                 <field name="ticket_id"/>
                 <field name="invoice_date"/>
@@ -20,11 +20,14 @@
         <field name="model">service.invoice.order</field>
         <field name="arch" type="xml">
             <form string="Invoice Order">
+                <header>
+                    <field name="stage_id" widget="statusbar" options="{'clickable': True}"/>
+                </header>
                 <sheet>
                     <group>
                         <group>
                             <field name="name"/>
-                            <field name="state"/>
+                            <field name="state" invisible="1"/>
                             <field name="employee"/>
                         </group>
                         <group>
@@ -71,7 +74,7 @@
                             <field name="device_lines">
                                 <list editable="bottom">
                                     <field name="device"/>
-                                    <field name="state"/>
+                                    <field name="stage_id"/>
                                     <field name="update_status"/>
                                     <field name="needs_estimate"/>
                                     <field name="is_capped_pricing"/>
@@ -80,7 +83,8 @@
                                 <form string="Invoice Device">
                                     <group>
                                         <field name="device"/>
-                                        <field name="state"/>
+                                        <field name="stage_id"/>
+                                        <field name="state" invisible="1"/>
                                         <field name="quality_control_order_device"/>
                                     </group>
                                     <group>

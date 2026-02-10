@@ -1,3 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_service_intake_order_user,service.intake.order.user,model_service_intake_order,base.group_user,1,1,1,1
 access_service_intake_order_device_user,service.intake.order.device.user,model_service_intake_order_device,base.group_user,1,1,1,1
+access_service_intake_order_stage_admin,service.intake.order.stage.admin,model_service_intake_order_stage,base.group_system,1,1,1,1
+access_service_intake_order_stage_user,service.intake.order.stage.user,model_service_intake_order_stage,base.group_user,1,0,0,0

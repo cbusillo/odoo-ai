@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="service_call_authorization_stage_draft" model="service.call.authorization.stage">
+            <field name="name">Draft</field>
+            <field name="code">draft</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="service_call_authorization_stage_requested" model="service.call.authorization.stage">
+            <field name="name">Requested</field>
+            <field name="code">requested</field>
+            <field name="sequence">20</field>
+        </record>
+        <record id="service_call_authorization_stage_approved" model="service.call.authorization.stage">
+            <field name="name">Approved</field>
+            <field name="code">approved</field>
+            <field name="sequence">30</field>
+            <field name="fold">True</field>
+        </record>
+        <record id="service_call_authorization_stage_denied" model="service.call.authorization.stage">
+            <field name="name">Denied</field>
+            <field name="code">denied</field>
+            <field name="sequence">40</field>
+            <field name="fold">True</field>
+        </record>
+
+        <record id="service_invoice_batch_stage_draft" model="service.invoice.batch.stage">
+            <field name="name">Draft</field>
+            <field name="code">draft</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="service_invoice_batch_stage_prepared" model="service.invoice.batch.stage">
+            <field name="name">Prepared</field>
+            <field name="code">prepared</field>
+            <field name="sequence">20</field>
+        </record>
+        <record id="service_invoice_batch_stage_sent" model="service.invoice.batch.stage">
+            <field name="name">Sent</field>
+            <field name="code">sent</field>
+            <field name="sequence">30</field>
+        </record>
+        <record id="service_invoice_batch_stage_completed" model="service.invoice.batch.stage">
+            <field name="name">Completed</field>
+            <field name="code">completed</field>
+            <field name="sequence">40</field>
+            <field name="fold">True</field>
+        </record>
+        <record id="service_invoice_batch_stage_cancelled" model="service.invoice.batch.stage">
+            <field name="name">Cancelled</field>
+            <field name="code">cancelled</field>
+            <field name="sequence">50</field>
+            <field name="fold">True</field>
+        </record>
+
+        <record id="service_invoice_order_stage_draft" model="service.invoice.order.stage">
+            <field name="name">Draft</field>
+            <field name="code">draft</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="service_invoice_order_stage_ready" model="service.invoice.order.stage">
+            <field name="name">Ready</field>
+            <field name="code">ready</field>
+            <field name="sequence">20</field>
+        </record>
+        <record id="service_invoice_order_stage_invoiced" model="service.invoice.order.stage">
+            <field name="name">Invoiced</field>
+            <field name="code">invoiced</field>
+            <field name="sequence">30</field>
+        </record>
+        <record id="service_invoice_order_stage_paid" model="service.invoice.order.stage">
+            <field name="name">Paid</field>
+            <field name="code">paid</field>
+            <field name="sequence">40</field>
+            <field name="fold">True</field>
+        </record>
+        <record id="service_invoice_order_stage_cancelled" model="service.invoice.order.stage">
+            <field name="name">Cancelled</field>
+            <field name="code">cancelled</field>
+            <field name="sequence">50</field>
+            <field name="fold">True</field>
+        </record>
+
+        <record id="service_invoice_order_device_stage_pending" model="service.invoice.order.device.stage">
+            <field name="name">Pending</field>
+            <field name="code">pending</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="service_invoice_order_device_stage_ready" model="service.invoice.order.device.stage">
+            <field name="name">Ready</field>
+            <field name="code">ready</field>
+            <field name="sequence">20</field>
+        </record>
+        <record id="service_invoice_order_device_stage_invoiced" model="service.invoice.order.device.stage">
+            <field name="name">Invoiced</field>
+            <field name="code">invoiced</field>
+            <field name="sequence">30</field>
+            <field name="fold">True</field>
+        </record>
+    </data>
+</odoo>

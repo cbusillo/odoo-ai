@@ -6,7 +6,7 @@
         <field name="arch" type="xml">
             <list>
                 <field name="name"/>
-                <field name="state"/>
+                <field name="stage_id"/>
                 <field name="partner_id"/>
                 <field name="ticket_id"/>
                 <field name="invoice_order_id"/>
@@ -21,11 +21,14 @@
         <field name="model">service.call.authorization</field>
         <field name="arch" type="xml">
             <form>
+                <header>
+                    <field name="stage_id" widget="statusbar" options="{'clickable': True}"/>
+                </header>
                 <sheet>
                     <group>
                         <group>
                             <field name="name"/>
-                            <field name="state"/>
+                            <field name="state" invisible="1"/>
                             <field name="partner_id"/>
                         </group>
                         <group>

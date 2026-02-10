@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import api, fields, models
 
 REPAIR_BATCH_STATES = [
     ("draft", "Draft"),
@@ -21,6 +21,16 @@ class RepairBatch(models.Model):
         tracking=True,
         required=True,
     )
+    stage_id = fields.Many2one(
+        "repair.batch.stage",
+        compute="_compute_stage_id",
+        inverse="_inverse_stage_id",
+        store=True,
+        tracking=True,
+        readonly=False,
+        group_expand="_read_group_stage_ids",
+        ondelete="restrict",
+    )
     start_date = fields.Datetime(tracking=True)
     finish_date = fields.Datetime(tracking=True)
     bin = fields.Char()
@@ -28,4 +38,37 @@ class RepairBatch(models.Model):
         "repair.batch.device",
         "batch_id",
         string="Devices",
+    )
+
+    @api.depends("state")
+    def _compute_stage_id(self) -> None:
+        stage_model = self.env["repair.batch.stage"]
+        stages_by_code = {stage.code: stage for stage in stage_model.search([])}
+        for batch in self:
+            batch.stage_id = stages_by_code.get(batch.state)
+
+    def _inverse_stage_id(self) -> None:
+        for batch in self:
+            if batch.stage_id and batch.stage_id.code and batch.state != batch.stage_id.code:
+                batch.state = batch.stage_id.code
+
+    @api.model
+    def _read_group_stage_ids(self, stages, _domain, order=None, *_args, **_kwargs):
+        return stages.search([], order=order or stages._order)
+
+
+class RepairBatchStage(models.Model):
+    _name = "repair.batch.stage"
+    _description = "Repair Batch Stage"
+    _order = "sequence, id"
+
+    name = fields.Char(required=True)
+    code = fields.Selection(REPAIR_BATCH_STATES, required=True, index=True)
+    sequence = fields.Integer(default=10)
+    fold = fields.Boolean(default=False)
+    active = fields.Boolean(default=True)
+
+    _code_unique = models.Constraint(
+        "unique(code)",
+        "Repair batch stage code must be unique.",
     )

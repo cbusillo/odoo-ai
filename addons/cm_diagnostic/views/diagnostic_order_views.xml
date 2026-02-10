@@ -5,7 +5,7 @@
         <field name="model">service.diagnostic.order</field>
         <field name="arch" type="xml">
             <list>
-                <field name="state"/>
+                <field name="stage_id"/>
                 <field name="start_date"/>
                 <field name="finish_date"/>
                 <field name="bin"/>
@@ -18,10 +18,13 @@
         <field name="model">service.diagnostic.order</field>
         <field name="arch" type="xml">
             <form string="Diagnostic Order">
+                <header>
+                    <field name="stage_id" widget="statusbar" options="{'clickable': True}"/>
+                </header>
                 <sheet>
                     <group>
                         <group>
-                            <field name="state"/>
+                            <field name="state" invisible="1"/>
                             <field name="start_date"/>
                             <field name="finish_date"/>
                         </group>
@@ -34,7 +37,7 @@
                             <field name="devices">
                                 <list editable="bottom">
                                     <field name="device"/>
-                                    <field name="state"/>
+                                    <field name="stage_id"/>
                                     <field name="start_date"/>
                                     <field name="finish_date"/>
                                     <field name="tests" widget="many2many_tags"/>
@@ -42,7 +45,8 @@
                                 <form string="Diagnostic Device">
                                     <group>
                                         <field name="device"/>
-                                        <field name="state"/>
+                                        <field name="stage_id"/>
+                                        <field name="state" invisible="1"/>
                                         <field name="start_date"/>
                                         <field name="finish_date"/>
                                         <field name="tests" widget="many2many_tags"/>

@@ -10,7 +10,7 @@
                     <field name="quality_control_order_devices">
                         <list>
                             <field name="quality_control_order"/>
-                            <field name="state"/>
+                            <field name="stage_id"/>
                             <field name="start_date"/>
                             <field name="finish_date"/>
                         </list>

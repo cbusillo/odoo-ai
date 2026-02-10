@@ -1,5 +1,9 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_service_diagnostic_order_user,service.diagnostic.order.user,model_service_diagnostic_order,base.group_user,1,1,1,1
 access_service_diagnostic_order_device_user,service.diagnostic.order.device.user,model_service_diagnostic_order_device,base.group_user,1,1,1,1
+access_service_diagnostic_order_stage_admin,service.diagnostic.order.stage.admin,model_service_diagnostic_order_stage,base.group_system,1,1,1,1
+access_service_diagnostic_order_stage_user,service.diagnostic.order.stage.user,model_service_diagnostic_order_stage,base.group_user,1,0,0,0
+access_service_diagnostic_order_device_stage_admin,service.diagnostic.order.device.stage.admin,model_service_diagnostic_order_device_stage,base.group_system,1,1,1,1
+access_service_diagnostic_order_device_stage_user,service.diagnostic.order.device.stage.user,model_service_diagnostic_order_device_stage,base.group_user,1,0,0,0
 access_service_diagnostic_test_user,service.diagnostic.test.user,model_service_diagnostic_test,base.group_user,1,1,1,1
 access_service_diagnostic_result_user,service.diagnostic.result.user,model_service_diagnostic_result,base.group_user,1,1,1,1

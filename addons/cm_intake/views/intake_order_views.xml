@@ -5,7 +5,7 @@
         <field name="model">service.intake.order</field>
         <field name="arch" type="xml">
             <list>
-                <field name="state"/>
+                <field name="stage_id"/>
                 <field name="employee"/>
                 <field name="client"/>
                 <field name="transport_order"/>
@@ -19,10 +19,13 @@
         <field name="model">service.intake.order</field>
         <field name="arch" type="xml">
             <form string="Intake Order">
+                <header>
+                    <field name="stage_id" widget="statusbar" options="{'clickable': True}"/>
+                </header>
                 <sheet>
                     <group>
                         <group>
-                            <field name="state"/>
+                            <field name="state" invisible="1"/>
                             <field name="employee"/>
                             <field name="client"/>
                         </group>

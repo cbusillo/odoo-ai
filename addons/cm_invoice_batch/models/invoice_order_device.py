@@ -51,6 +51,16 @@ class InvoiceOrderDevice(models.Model):
         required=True,
         tracking=True,
     )
+    stage_id = fields.Many2one(
+        "service.invoice.order.device.stage",
+        compute="_compute_stage_id",
+        inverse="_inverse_stage_id",
+        store=True,
+        tracking=True,
+        readonly=False,
+        group_expand="_read_group_stage_ids",
+        ondelete="restrict",
+    )
     diagnosis_note = fields.Text()
     repair_note = fields.Text()
     summary_note = fields.Text()
@@ -89,3 +99,36 @@ class InvoiceOrderDevice(models.Model):
     def _onchange_summary_template_id(self) -> None:
         if self.summary_template_id and not self.summary_note:
             self.summary_note = self.summary_template_id.template_text
+
+    @api.depends("state")
+    def _compute_stage_id(self) -> None:
+        stage_model = self.env["service.invoice.order.device.stage"]
+        stages_by_code = {stage.code: stage for stage in stage_model.search([])}
+        for device_line in self:
+            device_line.stage_id = stages_by_code.get(device_line.state)
+
+    def _inverse_stage_id(self) -> None:
+        for device_line in self:
+            if device_line.stage_id and device_line.stage_id.code and device_line.state != device_line.stage_id.code:
+                device_line.state = device_line.stage_id.code
+
+    @api.model
+    def _read_group_stage_ids(self, stages, _domain, order=None, *_args, **_kwargs):
+        return stages.search([], order=order or stages._order)
+
+
+class InvoiceOrderDeviceStage(models.Model):
+    _name = "service.invoice.order.device.stage"
+    _description = "Invoice Order Device Stage"
+    _order = "sequence, id"
+
+    name = fields.Char(required=True)
+    code = fields.Selection(INVOICE_ORDER_DEVICE_STATUSES, required=True, index=True)
+    sequence = fields.Integer(default=10)
+    fold = fields.Boolean(default=False)
+    active = fields.Boolean(default=True)
+
+    _code_unique = models.Constraint(
+        "unique(code)",
+        "Invoice order device stage code must be unique.",
+    )

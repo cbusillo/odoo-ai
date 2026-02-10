@@ -6,7 +6,7 @@
         <field name="arch" type="xml">
             <list>
                 <field name="name"/>
-                <field name="state"/>
+                <field name="stage_id"/>
                 <field name="arrival_date"/>
                 <field name="scheduled_date"/>
                 <field name="departure_date"/>
@@ -22,11 +22,14 @@
         <field name="model">transport.order</field>
         <field name="arch" type="xml">
             <form string="Transport Order">
+                <header>
+                    <field name="stage_id" widget="statusbar" options="{'clickable': True}"/>
+                </header>
                 <sheet>
                     <group>
                         <group>
                             <field name="name"/>
-                            <field name="state"/>
+                            <field name="state" invisible="1"/>
                             <field name="employee"/>
                             <field name="client"/>
                             <field name="contact"/>

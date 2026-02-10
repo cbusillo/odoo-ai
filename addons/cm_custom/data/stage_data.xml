@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="transport_order_stage_draft" model="transport.order.stage">
+            <field name="name">Draft</field>
+            <field name="code">draft</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="transport_order_stage_ready" model="transport.order.stage">
+            <field name="name">Ready</field>
+            <field name="code">ready</field>
+            <field name="sequence">20</field>
+        </record>
+        <record id="transport_order_stage_transit_out" model="transport.order.stage">
+            <field name="name">Transit Out</field>
+            <field name="code">transit_out</field>
+            <field name="sequence">30</field>
+        </record>
+        <record id="transport_order_stage_at_client" model="transport.order.stage">
+            <field name="name">At Client</field>
+            <field name="code">at_client</field>
+            <field name="sequence">40</field>
+        </record>
+        <record id="transport_order_stage_transit_in" model="transport.order.stage">
+            <field name="name">Transit In</field>
+            <field name="code">transit_in</field>
+            <field name="sequence">50</field>
+        </record>
+        <record id="transport_order_stage_at_depot" model="transport.order.stage">
+            <field name="name">At Depot</field>
+            <field name="code">at_depot</field>
+            <field name="sequence">60</field>
+        </record>
+        <record id="transport_order_stage_intake_complete" model="transport.order.stage">
+            <field name="name">Intake Complete</field>
+            <field name="code">intake_complete</field>
+            <field name="sequence">70</field>
+            <field name="fold">True</field>
+        </record>
+
+        <record id="intake_order_stage_started" model="intake.order.stage">
+            <field name="name">Started</field>
+            <field name="code">started</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="intake_order_stage_finished" model="intake.order.stage">
+            <field name="name">Finished</field>
+            <field name="code">finished</field>
+            <field name="sequence">20</field>
+            <field name="fold">True</field>
+        </record>
+
+        <record id="diagnostic_order_stage_draft" model="diagnostic.order.stage">
+            <field name="name">Draft</field>
+            <field name="code">draft</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="diagnostic_order_stage_ready" model="diagnostic.order.stage">
+            <field name="name">Ready</field>
+            <field name="code">ready</field>
+            <field name="sequence">20</field>
+        </record>
+        <record id="diagnostic_order_stage_started" model="diagnostic.order.stage">
+            <field name="name">Started</field>
+            <field name="code">started</field>
+            <field name="sequence">30</field>
+        </record>
+        <record id="diagnostic_order_stage_finished" model="diagnostic.order.stage">
+            <field name="name">Finished</field>
+            <field name="code">finished</field>
+            <field name="sequence">40</field>
+            <field name="fold">True</field>
+        </record>
+
+        <record id="diagnostic_order_device_stage_started" model="diagnostic.order.device.stage">
+            <field name="name">Started</field>
+            <field name="code">started</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="diagnostic_order_device_stage_finished" model="diagnostic.order.device.stage">
+            <field name="name">Finished</field>
+            <field name="code">finished</field>
+            <field name="sequence">20</field>
+            <field name="fold">True</field>
+        </record>
+
+        <record id="repair_batch_stage_draft" model="repair.batch.stage">
+            <field name="name">Draft</field>
+            <field name="code">draft</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="repair_batch_stage_ready" model="repair.batch.stage">
+            <field name="name">Ready</field>
+            <field name="code">ready</field>
+            <field name="sequence">20</field>
+        </record>
+        <record id="repair_batch_stage_started" model="repair.batch.stage">
+            <field name="name">Started</field>
+            <field name="code">started</field>
+            <field name="sequence">30</field>
+        </record>
+        <record id="repair_batch_stage_finished" model="repair.batch.stage">
+            <field name="name">Finished</field>
+            <field name="code">finished</field>
+            <field name="sequence">40</field>
+            <field name="fold">True</field>
+        </record>
+
+        <record id="repair_batch_device_stage_started" model="repair.batch.device.stage">
+            <field name="name">Started</field>
+            <field name="code">started</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="repair_batch_device_stage_finished" model="repair.batch.device.stage">
+            <field name="name">Finished</field>
+            <field name="code">finished</field>
+            <field name="sequence">20</field>
+            <field name="fold">True</field>
+        </record>
+    </data>
+</odoo>

@@ -1,5 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
+    <record id="view_device_search" model="ir.ui.view">
+        <field name="name">service.device.search</field>
+        <field name="model">service.device</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="serial_number"/>
+                <field name="asset_tag"/>
+                <field name="owner"/>
+                <field name="payer"/>
+                <filter
+                    name="legacy_missing_payer"
+                    string="Legacy: Missing Payer"
+                    domain="[('payer', '=', False)]"
+                />
+            </search>
+        </field>
+    </record>
+
     <record id="view_device_tree" model="ir.ui.view">
         <field name="name">service.device.tree</field>
         <field name="model">service.device</field>

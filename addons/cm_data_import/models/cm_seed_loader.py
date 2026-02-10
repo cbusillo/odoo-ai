@@ -3,9 +3,8 @@ import logging
 import os
 from pathlib import Path
 
-from odoo import api, fields, models
+from odoo import api, models
 from odoo.exceptions import UserError
-
 
 _logger = logging.getLogger(__name__)
 

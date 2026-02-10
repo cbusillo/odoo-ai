@@ -11,7 +11,6 @@
                         <group>
                             <field name="partner_role_ids" widget="many2many_tags"/>
                             <field name="cm_data_ticket_name"/>
-                            <field name="cm_data_repairshopr_customer_id"/>
                             <field name="cm_data_label_names"/>
                         </group>
                         <group>
@@ -32,7 +31,6 @@
                 </page>
                 <page string="Billing">
                     <group>
-                        <field name="billing_partner_id"/>
                         <field name="billing_contract_ids">
                             <list>
                                 <field name="name"/>

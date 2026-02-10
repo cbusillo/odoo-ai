@@ -13,7 +13,6 @@ class ResPartner(models.Model):
 
     cm_data_ticket_name = fields.Char()
     cm_data_ticket_name_report = fields.Char()
-    cm_data_repairshopr_customer_id = fields.Char()
     cm_data_label_names = fields.Char()
     cm_data_location_drop = fields.Char()
     cm_data_multi_building_flag = fields.Boolean()
@@ -29,11 +28,6 @@ class ResPartner(models.Model):
         "school.billing.contract",
         "partner_id",
         string="Billing Contracts",
-    )
-    billing_partner_id = fields.Many2one(
-        "res.partner",
-        ondelete="set null",
-        string="Billing Account",
     )
 
     routing_rule_ids = fields.One2many(

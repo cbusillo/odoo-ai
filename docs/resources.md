@@ -60,7 +60,7 @@ guides and best practices.
 
 **Owl.js** - [Repository](https://github.com/odoo/owl)
 
-**ariadne-codegen** - [Docs](https://ariadne-codegen.readthedocs.io/)
+**ariadne-codegen** - [Docs](https://ariadnegraphql.org/client/intro)
 
 - GraphQL code generator (you generate from schema, docs rarely needed)
 

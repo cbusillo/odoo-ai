@@ -4,8 +4,8 @@ import re
 from datetime import datetime, timedelta
 
 from odoo import api, fields, models
-from odoo.exceptions import UserError
 from odoo.addons.transaction_utilities.models.cron_budget_mixin import CronRuntimeBudgetExceeded
+from odoo.exceptions import UserError
 
 from ..services.repairshopr_sync_client import RepairshoprSyncClient, RepairshoprSyncConnectionSettings
 
@@ -79,8 +79,6 @@ class RepairshoprImporter(models.Model):
     @api.model
     def run_scheduled_import(self) -> None:
         importer = self._with_cron_runtime_budget(job_name="RepairShopr Import")
-        # noinspection PyUnresolvedReferences
-        # False positive: with_context preserves the concrete importer model at runtime.
         importer._run_import(update_last_sync=True)
 
     @api.model

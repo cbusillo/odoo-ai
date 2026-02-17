@@ -42,8 +42,6 @@ class FishbowlImporter(models.Model):
     @api.model
     def run_scheduled_import(self) -> None:
         importer = self._with_cron_runtime_budget(job_name="Fishbowl Import")
-        # noinspection PyUnresolvedReferences
-        # False positive: with_context preserves the concrete importer model at runtime.
         importer._run_import(update_last_sync=True)
 
     @api.model

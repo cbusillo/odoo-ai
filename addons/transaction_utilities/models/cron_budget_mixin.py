@@ -1,5 +1,6 @@
 import logging
 from time import monotonic
+from typing import Self
 
 from odoo import models
 from odoo.tools import config
@@ -29,7 +30,7 @@ class CronBudgetMixin(models.AbstractModel):
         job_name: str,
         safety_margin_seconds: int = DEFAULT_CRON_RUNTIME_SAFETY_MARGIN_SECONDS,
         minimum_budget_seconds: int = DEFAULT_CRON_RUNTIME_MINIMUM_BUDGET_SECONDS,
-    ) -> models.AbstractModel:
+    ) -> Self:
         runtime_limit_seconds = self._get_cron_runtime_limit_seconds()
         if runtime_limit_seconds is None:
             return self

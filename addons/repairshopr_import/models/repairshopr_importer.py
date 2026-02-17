@@ -303,15 +303,14 @@ class RepairshoprImporter(models.Model):
             return
 
         device_counts: dict[int, int] = {}
-        grouped_counts = transport_device_model.read_group(
+        grouped_counts = transport_device_model._read_group(
             [("transport_order", "in", transport_order_ids)],
             ["transport_order"],
-            ["transport_order"],
+            ["__count"],
         )
-        for group in grouped_counts:
-            transport_id = group.get("transport_order")[0] if group.get("transport_order") else None
-            if transport_id:
-                device_counts[transport_id] = int(group.get("transport_order_count", 0) or 0)
+        for transport_order, grouped_count in grouped_counts:
+            if transport_order:
+                device_counts[transport_order.id] = int(grouped_count or 0)
 
         alias_map = self._build_cm_location_alias_map(cm_system)
 
@@ -466,16 +465,15 @@ class RepairshoprImporter(models.Model):
     ) -> list[int]:
         if not intake_order_ids:
             return []
-        grouped = intake_device_model.read_group(
+        grouped = intake_device_model._read_group(
             [("intake_order", "in", intake_order_ids)],
             ["intake_order"],
-            ["intake_order"],
+            ["__count"],
         )
         intake_ids: list[int] = []
-        for group in grouped:
-            intake_id = group.get("intake_order")[0] if group.get("intake_order") else None
-            if intake_id:
-                intake_ids.append(intake_id)
+        for intake_order, _grouped_count in grouped:
+            if intake_order:
+                intake_ids.append(intake_order.id)
         return intake_ids
 
     def _build_ticket_location_map(

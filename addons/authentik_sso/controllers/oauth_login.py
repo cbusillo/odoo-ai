@@ -45,8 +45,9 @@ def _build_authentik_auth_link(
 
 def _build_oauth_state(provider_id: int) -> dict[str, object]:
     redirect = request.params.get("redirect") or "web"
-    # noinspection HttpUrlsUsage
-    if not redirect.startswith(("//", "http://", "https://")):
+    parsed_redirect = werkzeug.urls.url_parse(redirect)
+    is_absolute_redirect = bool(parsed_redirect.scheme and parsed_redirect.netloc)
+    if not redirect.startswith("//") and not is_absolute_redirect:
         redirect = f"{request.httprequest.url_root}{redirect[1:] if redirect[0] == '/' else redirect}"
     state = {
         "d": request.session.db,

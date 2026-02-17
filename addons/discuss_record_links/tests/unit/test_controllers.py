@@ -1,7 +1,3 @@
-# noinspection SpellCheckingInspection
-# Justification: Odoo test code uses API names like `env.ref` and test SKUs (e.g., WIDGX)
-# which trigger IDE spellcheckers; suppress for this test file only.
-
 from unittest.mock import patch
 
 from odoo.tests import TransactionCase
@@ -17,10 +13,8 @@ class TestLabelsRoute(TransactionCase):
         super().setUp()
         # Ensure we have a product and a corresponding DRL config entry
         # Create a product
-        # noinspection SpellCheckingInspection – model/field tokens (ref/sku) can trip spellcheckers in tests
-        Product = self.env["product.product"].with_context(skip_sku_check=True)
-        # noinspection SpellCheckingInspection – test SKU value may be flagged as a typo by IDEs
-        self.product = Product.create({"name": "Widget X", "default_code": "WIDGX"})
+        product_model = self.env["product.product"].with_context(skip_sku_check=True)
+        self.product = product_model.create({"name": "Widget X", "default_code": "WIDGX"})
 
         # Find model and fields without using env.ref to avoid IDE spellcheck noise
         model_product = self.env["ir.model"].search([("model", "=", "product.product")], limit=1)
@@ -70,9 +64,9 @@ class TestLabelsRoute(TransactionCase):
 class TestSearchRoute(TransactionCase):
     def setUp(self) -> None:
         super().setUp()
-        Product = self.env["product.product"].with_context(skip_sku_check=True)
-        self.p1 = Product.create({"name": "Widget Alpha", "default_code": "A1"})
-        self.p2 = Product.create({"name": "Widget Beta", "default_code": "B2"})
+        product_model = self.env["product.product"].with_context(skip_sku_check=True)
+        self.p1 = product_model.create({"name": "Widget Alpha", "default_code": "A1"})
+        self.p2 = product_model.create({"name": "Widget Beta", "default_code": "B2"})
 
         model_product = self.env.ref("product.model_product_product")
         f_name = self.env["ir.model.fields"].search([("model_id", "=", model_product.id), ("name", "=", "name")], limit=1)

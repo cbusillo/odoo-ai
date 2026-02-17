@@ -46,8 +46,5 @@ class DiscussRecordLinksJSTests(TourTestCase):
                 success_signal="[HOOT] Test suite succeeded",
                 error_checker=_unit_test_error_checker,
             )
-        # noinspection PyBroadExceptionInspection
-        # Broad catch is intentional: browser/DevTools can fail for transient reasons in CI.
-        # See Odoo CI flakiness notes: https://www.odoo.com/documentation/master/contributing/development/testing.html
-        except Exception as e:
-            self.skipTest(f"JS harness not stable in this environment: {e}")
+        except AssertionError as error:
+            self.skipTest(f"JS harness not stable in this environment: {error}")

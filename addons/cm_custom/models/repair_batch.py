@@ -53,7 +53,12 @@ class RepairBatch(models.Model):
                 batch.state = batch.stage_id.code
 
     @api.model
-    def _read_group_stage_ids(self, stages, _domain, order=None, *_args, **_kwargs):
+    def _read_group_stage_ids(
+        self,
+        stages: models.Model,
+        _domain: fields.Domain,
+        order: str | None = None,
+    ) -> models.Model:
         return stages.search([], order=order or stages._order)
 
 

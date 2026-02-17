@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 from odoo import api, fields, models
 from odoo.exceptions import UserError
+from odoo.addons.transaction_utilities.models.cron_budget_mixin import CronRuntimeBudgetExceeded
 
 from ..services.repairshopr_sync_client import RepairshoprSyncClient, RepairshoprSyncConnectionSettings
 
@@ -73,10 +74,14 @@ IMPORT_CONTEXT = {
 class RepairshoprImporter(models.Model):
     _name = "repairshopr.importer"
     _description = "RepairShopr Importer"
+    _inherit = ["transaction.cron_budget.mixin"]
 
     @api.model
     def run_scheduled_import(self) -> None:
-        self._run_import(update_last_sync=True)
+        importer = self._with_cron_runtime_budget(job_name="RepairShopr Import")
+        # noinspection PyUnresolvedReferences
+        # False positive: with_context preserves the concrete importer model at runtime.
+        importer._run_import(update_last_sync=True)
 
     @api.model
     def run_full_import(self) -> None:
@@ -97,6 +102,11 @@ class RepairshoprImporter(models.Model):
             self._import_estimates(repairshopr_client, transaction_start_datetime, system, sync_started_at)
             self._import_invoices(repairshopr_client, transaction_start_datetime, system, sync_started_at)
             self._backfill_transport_order_devices()
+        except CronRuntimeBudgetExceeded as exception:
+            message = str(exception)
+            _logger.info(message)
+            self._record_last_run("partial", message)
+            return
         except Exception as exc:
             _logger.exception("RepairShopr import failed")
             self._record_last_run("failed", str(exc))
@@ -209,6 +219,7 @@ class RepairshoprImporter(models.Model):
         self.env.cr.execute("SET LOCAL synchronous_commit TO OFF")
         self.env.cr.commit()
         self.env.clear()
+        self._raise_if_cron_runtime_budget_exhausted(job_name="RepairShopr Import")
 
     def _get_commit_interval(self) -> int:
         return self._get_config_int(

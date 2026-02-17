@@ -14,6 +14,7 @@
         "sale",
         "purchase",
         "external_ids",
+        "transaction_utilities",
     ],
     "data": [
         "security/ir.model.access.csv",

@@ -12,6 +12,7 @@
         "contacts",
         "cm_custom",
         "external_ids",
+        "transaction_utilities",
         "hr",
         "hr_attendance",
         "hr_employee_name_extended",

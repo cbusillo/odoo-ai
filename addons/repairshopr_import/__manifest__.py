@@ -16,6 +16,7 @@
         "helpdesk",
         "external_ids",
         "cm_custom",
+        "transaction_utilities",
     ],
     "data": [
         "security/ir.model.access.csv",

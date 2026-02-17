@@ -7,6 +7,7 @@ from typing import Any, Protocol
 
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
+from odoo.addons.transaction_utilities.models.cron_budget_mixin import CronRuntimeBudgetExceeded
 from psycopg2 import errors as psycopg2_errors
 from pydantic import TypeAdapter
 
@@ -36,10 +37,14 @@ class _RowWithId(Protocol):
 class FishbowlImporter(models.Model):
     _name = "fishbowl.importer"
     _description = "Fishbowl Importer"
+    _inherit = ["transaction.cron_budget.mixin"]
 
     @api.model
     def run_scheduled_import(self) -> None:
-        self._run_import(update_last_sync=True)
+        importer = self._with_cron_runtime_budget(job_name="Fishbowl Import")
+        # noinspection PyUnresolvedReferences
+        # False positive: with_context preserves the concrete importer model at runtime.
+        importer._run_import(update_last_sync=True)
 
     @api.model
     def run_full_import(self) -> None:
@@ -114,6 +119,11 @@ class FishbowlImporter(models.Model):
                 )
                 time.sleep(sleep_for)
                 continue
+            except CronRuntimeBudgetExceeded as exception:
+                message = str(exception)
+                _logger.info(message)
+                self._record_last_run("partial", message)
+                return
             except Exception as exc:
                 _logger.exception("Fishbowl import failed")
                 self._record_last_run("failed", str(exc))
@@ -126,6 +136,7 @@ class FishbowlImporter(models.Model):
         self.env.cr.execute("SET LOCAL synchronous_commit TO OFF")
         self.env.cr.commit()
         self.env.clear()
+        self._raise_if_cron_runtime_budget_exhausted(job_name="Fishbowl Import")
 
     def _get_external_id_record(
         self,

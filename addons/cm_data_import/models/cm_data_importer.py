@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
+from odoo.addons.transaction_utilities.models.cron_budget_mixin import CronRuntimeBudgetExceeded
 
 from ..services.cm_data_client import (
     CmDataAccountName,
@@ -92,10 +93,14 @@ STATUS_MAP = {
 class CmDataImporter(models.Model):
     _name = "integration.cm_data.importer"
     _description = "CM Data Importer"
+    _inherit = ["transaction.cron_budget.mixin"]
 
     @api.model
     def run_scheduled_import(self) -> None:
-        self._run_import(update_last_sync=True)
+        importer = self._with_cron_runtime_budget(job_name="CM Data Import")
+        # noinspection PyUnresolvedReferences
+        # False positive: with_context preserves the concrete importer model at runtime.
+        importer._run_import(update_last_sync=True)
 
     @api.model
     def run_full_import(self) -> None:
@@ -170,6 +175,11 @@ class CmDataImporter(models.Model):
                 self._import_vacation_usage(vacation_rows, employee_map, system, sync_started_at)
                 timeclock_rows = client.fetch_timeclock_punches(updated_at=None)
                 self._import_timeclock_punches(timeclock_rows, timeclock_employee_map, system)
+        except CronRuntimeBudgetExceeded as exception:
+            message = str(exception)
+            _logger.info(message)
+            self._record_last_run("partial", message)
+            return
         except Exception as exc:
             _logger.exception("CM data import failed")
             self._record_last_run("failed", str(exc))
@@ -1893,6 +1903,7 @@ class CmDataImporter(models.Model):
         self.env.cr.execute("SET LOCAL synchronous_commit TO OFF")
         self.env.cr.commit()
         self.env.clear()
+        self._raise_if_cron_runtime_budget_exhausted(job_name="CM Data Import")
 
     def _get_commit_interval(self) -> int:
         return self._get_config_int(

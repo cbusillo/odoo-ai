@@ -178,8 +178,18 @@ class ShipmentLineRow(FishbowlRow):
     id: int
     shipId: int | None = None
     soItemId: int | None = None
+    xoItemId: int | None = None
+    itemId: int | None = None
     qtyShipped: float | None = None
     uomId: int | None = None
+
+
+# noinspection DuplicatedCode
+# Fishbowl row models intentionally mirror upstream schemas for traceability.
+class TransferOrderLineRow(FishbowlRow):
+    id: int
+    partId: int | None = None
+    partNum: str | None = None
 
 
 # noinspection DuplicatedCode
@@ -216,4 +226,7 @@ ORDER_ROWS_ADAPTER = TypeAdapter(list[OrderRow])
 SALES_ORDER_LINE_ROWS_ADAPTER = TypeAdapter(list[SalesOrderLineRow])
 PURCHASE_ORDER_LINE_ROWS_ADAPTER = TypeAdapter(list[PurchaseOrderLineRow])
 SHIPMENT_LINE_ROWS_ADAPTER = TypeAdapter(list[ShipmentLineRow])
+# noinspection DuplicatedCode
+# Adapter declarations stay explicit for discoverability.
+TRANSFER_ORDER_LINE_ROWS_ADAPTER = TypeAdapter(list[TransferOrderLineRow])
 RECEIPT_ITEM_ROWS_ADAPTER = TypeAdapter(list[ReceiptItemRow])

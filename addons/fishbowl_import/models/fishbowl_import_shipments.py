@@ -8,6 +8,7 @@ from . import fishbowl_rows
 from .fishbowl_import_constants import (
     EXTERNAL_SYSTEM_CODE,
     IMPORT_CONTEXT,
+    RESOURCE_PART,
     RESOURCE_SALES_ORDER_LINE,
     RESOURCE_SHIPMENT,
     RESOURCE_SHIPMENT_LINE,
@@ -137,7 +138,7 @@ class FishbowlImporterShipments(models.Model):
             "shipitem",
             "shipId",
             list(shipment_map.keys()),
-            select_columns="id, shipId, soItemId, qtyShipped, uomId",
+            select_columns="id, shipId, soItemId, xoItemId, itemId, qtyShipped, uomId",
             row_parser=fishbowl_rows.SHIPMENT_LINE_ROWS_ADAPTER.validate_python,
         )
         missing_sales_line_ids = {
@@ -163,6 +164,17 @@ class FishbowlImporterShipments(models.Model):
                     sales_line_external_map[int(record.external_id)] = record.res_id
                 except (TypeError, ValueError):
                     _logger.warning("Invalid Fishbowl sales line external id '%s'", record.external_id)
+        transfer_order_product_map = self._load_transfer_order_product_map(
+            client,
+            shipment_item_rows,
+            fishbowl_system.id,
+        )
+        shipment_part_ids = [
+            shipment_item_row.itemId
+            for shipment_item_row in shipment_item_rows
+            if shipment_item_row.itemId is not None
+        ]
+        shipment_part_product_map = self._load_part_product_map(fishbowl_system.id, shipment_part_ids)
         unit_map = self._load_unit_map()
         shipment_line_processed = 0
         shipment_line_log_every = 10000
@@ -214,6 +226,10 @@ class FishbowlImporterShipments(models.Model):
                 )
                 sale_line_id = sales_line.id if sales_line else False
                 product_id = sales_line.product_id.id if sales_line else None
+                if product_id is None and row.xoItemId is not None:
+                    product_id = transfer_order_product_map.get(row.xoItemId)
+                if product_id is None and row.itemId is not None:
+                    product_id = shipment_part_product_map.get(row.itemId)
                 # noinspection DuplicatedCode
                 # Receipt/shipment line handling stays explicit to keep line-field differences readable.
                 if not product_id:
@@ -342,3 +358,95 @@ class FishbowlImporterShipments(models.Model):
             self._commit_and_clear()
             finalize_elapsed = time.monotonic() - finalize_started_at
             _logger.info("Fishbowl import: finalized %s shipments in %.2fs", total_pickings, finalize_elapsed)
+
+    def _load_transfer_order_product_map(
+        self,
+        client: FishbowlClient,
+        shipment_item_rows: list[fishbowl_rows.ShipmentLineRow],
+        fishbowl_system_id: int,
+    ) -> dict[int, int]:
+        transfer_order_item_ids = {
+            shipment_item_row.xoItemId
+            for shipment_item_row in shipment_item_rows
+            if shipment_item_row.soItemId is None and shipment_item_row.xoItemId is not None
+        }
+        if not transfer_order_item_ids:
+            return {}
+        transfer_order_item_rows = self._fetch_rows_by_ids(
+            client,
+            "xoitem",
+            "id",
+            list(transfer_order_item_ids),
+            select_columns="id, partId, partNum",
+            row_parser=fishbowl_rows.TRANSFER_ORDER_LINE_ROWS_ADAPTER.validate_python,
+        )
+        if not transfer_order_item_rows:
+            return {}
+        part_ids = [
+            transfer_order_item_row.partId
+            for transfer_order_item_row in transfer_order_item_rows
+            if transfer_order_item_row.partId is not None
+        ]
+        part_product_map = self._load_part_product_map(fishbowl_system_id, part_ids)
+        part_numbers = [
+            transfer_order_item_row.partNum
+            for transfer_order_item_row in transfer_order_item_rows
+            if transfer_order_item_row.partNum
+        ]
+        product_by_default_code = self._load_product_default_code_map(part_numbers)
+        transfer_order_product_map: dict[int, int] = {}
+        for transfer_order_item_row in transfer_order_item_rows:
+            product_id = None
+            if transfer_order_item_row.partId is not None:
+                product_id = part_product_map.get(transfer_order_item_row.partId)
+            if product_id is None and transfer_order_item_row.partNum:
+                normalized_part_number = transfer_order_item_row.partNum.strip()
+                product_id = product_by_default_code.get(normalized_part_number)
+            if product_id:
+                transfer_order_product_map[transfer_order_item_row.id] = product_id
+        return transfer_order_product_map
+
+    def _load_part_product_map(self, fishbowl_system_id: int, part_ids: list[int]) -> dict[int, int]:
+        unique_part_ids = sorted(set(part_ids))
+        if not unique_part_ids:
+            return {}
+        part_external_ids = [str(part_id) for part_id in unique_part_ids]
+        external_id_records = (
+            self.env["external.id"]
+            .sudo()
+            .search(
+                [
+                    ("system_id", "=", fishbowl_system_id),
+                    ("resource", "=", RESOURCE_PART),
+                    ("res_model", "=", "product.product"),
+                    ("active", "=", True),
+                    ("external_id", "in", part_external_ids),
+                ]
+            )
+        )
+        part_product_map: dict[int, int] = {}
+        for external_id_record in external_id_records:
+            try:
+                part_id = int(external_id_record.external_id)
+            except (TypeError, ValueError):
+                _logger.warning("Invalid Fishbowl part external id '%s'", external_id_record.external_id)
+                continue
+            part_product_map[part_id] = external_id_record.res_id
+        return part_product_map
+
+    def _load_product_default_code_map(self, default_codes: list[str]) -> dict[str, int]:
+        normalized_default_codes = sorted({default_code.strip() for default_code in default_codes if default_code.strip()})
+        if not normalized_default_codes:
+            return {}
+        product_records = (
+            self.env["product.product"]
+            .sudo()
+            .with_context(active_test=False)
+            .search([("default_code", "in", normalized_default_codes)])
+        )
+        product_default_code_map: dict[str, int] = {}
+        for product_record in product_records:
+            default_code_value = (product_record.default_code or "").strip()
+            if default_code_value and default_code_value not in product_default_code_map:
+                product_default_code_map[default_code_value] = product_record.id
+        return product_default_code_map

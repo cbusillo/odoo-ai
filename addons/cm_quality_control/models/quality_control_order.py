@@ -71,9 +71,8 @@ class QualityControlOrder(models.Model):
         self,
         stages: models.Model,
         _domain: fields.Domain,
-        order: str | None = None,
     ) -> models.Model:
-        return stages.search([], order=order or stages._order)
+        return stages.search([], order=stages._order)
 
 
 class QualityControlOrderStage(models.Model):

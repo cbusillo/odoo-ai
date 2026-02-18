@@ -16,6 +16,7 @@
         "helpdesk",
         "external_ids",
         "cm_custom",
+        "cm_quality_control",
         "transaction_utilities",
     ],
     "data": [

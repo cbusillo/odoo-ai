@@ -18,6 +18,7 @@
         "hr_employee_name_extended",
         "hr_holidays",
         "cm_device",
+        "cm_quality_control",
         "cm_transport",
         "cm_school",
     ],

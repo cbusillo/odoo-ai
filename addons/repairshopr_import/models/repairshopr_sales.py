@@ -6,20 +6,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from psycopg2 import IntegrityError
-
 from odoo import fields, models
 from odoo.exceptions import UserError
+from psycopg2 import IntegrityError
 
 from ..services import repairshopr_sync_models as repairshopr_models
 from ..services.repairshopr_sync_client import RepairshoprSyncClient
-
 from .repairshopr_importer import (
     ASSET_TAG_PATTERN,
     CLAIM_PATTERN,
     EXTERNAL_SYSTEM_CODE,
-    IMPORT_CONTEXT,
     IMEI_PATTERN,
+    IMPORT_CONTEXT,
     PO_PATTERN,
     RESOURCE_ESTIMATE,
     RESOURCE_INVOICE,
@@ -300,9 +298,7 @@ class RepairshoprImporter(models.Model):
                 "imei": imei,
                 "model": device_model_record.id,
                 "owner": partner.id,
-                "is_serial_unavailable": is_placeholder or not any(
-                    [serial_number, asset_tag, asset_tag_secondary, imei]
-                ),
+                "is_serial_unavailable": is_placeholder or not any([serial_number, asset_tag, asset_tag_secondary, imei]),
             }
         )
 
@@ -474,9 +470,7 @@ class RepairshoprImporter(models.Model):
 
         if quality_control_candidates:
             quality_control_order_model = self.env["service.quality.control.order"].sudo().with_context(IMPORT_CONTEXT)
-            quality_control_device_model = self.env["service.quality.control.order.device"].sudo().with_context(
-                IMPORT_CONTEXT
-            )
+            quality_control_device_model = self.env["service.quality.control.order.device"].sudo().with_context(IMPORT_CONTEXT)
             finish_date = ticket.created_at
             quality_control_name = f"RepairShopr QC {ticket.id}"
             quality_control_order = quality_control_order_model.search(
@@ -514,11 +508,7 @@ class RepairshoprImporter(models.Model):
                     limit=1,
                 )
                 if existing:
-                    existing_lines = [
-                        line.strip()
-                        for line in (existing.summary_note or "").splitlines()
-                        if line.strip()
-                    ]
+                    existing_lines = [line.strip() for line in (existing.summary_note or "").splitlines() if line.strip()]
                     merged_lines: list[str] = []
                     for line in [*existing_lines, *summaries]:
                         cleaned = line.strip()
@@ -554,11 +544,7 @@ class RepairshoprImporter(models.Model):
                     )
                     if not existing:
                         raise
-                    existing_lines = [
-                        line.strip()
-                        for line in (existing.summary_note or "").splitlines()
-                        if line.strip()
-                    ]
+                    existing_lines = [line.strip() for line in (existing.summary_note or "").splitlines() if line.strip()]
                     merged_lines: list[str] = []
                     for line in [*existing_lines, *summaries]:
                         cleaned = line.strip()
@@ -640,11 +626,7 @@ class RepairshoprImporter(models.Model):
             candidate_ticket_ids.update(pair_to_ticket_ids.get(pair, set()))
         if not candidate_ticket_ids:
             return None
-        candidate_ticket_ids = {
-            ticket_id
-            for ticket_id in candidate_ticket_ids
-            if ticket_partner_map.get(ticket_id) == partner_id
-        }
+        candidate_ticket_ids = {ticket_id for ticket_id in candidate_ticket_ids if ticket_partner_map.get(ticket_id) == partner_id}
         if len(candidate_ticket_ids) != 1:
             return None
         return next(iter(candidate_ticket_ids))
@@ -757,9 +739,7 @@ class RepairshoprImporter(models.Model):
                 continue
             existing_updated_at = existing_estimate.updated_at
             incoming_updated_at = estimate.updated_at
-            if incoming_updated_at and (
-                not existing_updated_at or incoming_updated_at > existing_updated_at
-            ):
+            if incoming_updated_at and (not existing_updated_at or incoming_updated_at > existing_updated_at):
                 estimate_by_external_id[external_id_value] = estimate
         estimates = list(estimate_by_external_id.values())
         order_model = self.env["sale.order"].sudo().with_context(IMPORT_CONTEXT)
@@ -804,12 +784,16 @@ class RepairshoprImporter(models.Model):
                 continue
             estimate_id_values.append(estimate.id)
         line_items_by_estimate_id = repairshopr_client.prefetch_estimate_line_items(estimate_id_values)
+        source_ticket_field_name = "source_ticket_id"
+        has_sale_order_source_ticket = source_ticket_field_name in self.env["sale.order"]._fields
         create_values: list["odoo.values.sale_order"] = []
         create_external_ids: list[str] = []
+        source_ticket_by_external_id: dict[str, int] = {}
         sync_timestamps: dict[str, datetime] = {}
         identifiers_by_external_id: dict[str, dict[str, set[str]]] = {}
         pending_commit = False
         identifier_pairs_by_external_id: dict[str, set[tuple[str, str]]] = {}
+
         def should_commit() -> bool:
             return commit_interval > 0 and processed_count % commit_interval == 0
 
@@ -820,6 +804,10 @@ class RepairshoprImporter(models.Model):
             created_records = order_model.create(create_values)
             external_id_payloads: list["odoo.values.external_id"] = []
             for created_external_id, created_order in zip(create_external_ids, created_records, strict=True):
+                if created_external_id in source_ticket_by_external_id and has_sale_order_source_ticket:
+                    created_order.write(
+                        {source_ticket_field_name: source_ticket_by_external_id[created_external_id]}
+                    )
                 stale_record = stale_map.pop(created_external_id, None)
                 sync_time = sync_timestamps.get(created_external_id, sync_started_at)
                 if stale_record:
@@ -855,6 +843,7 @@ class RepairshoprImporter(models.Model):
                 self.env["external.id"].sudo().create(external_id_payloads)
             create_values = []
             create_external_ids = []
+            source_ticket_by_external_id.clear()
 
         ticket_properties_by_ticket_id = repairshopr_client.prefetch_ticket_properties_by_ticket_ids(
             [estimate.ticket_id for estimate in estimates if estimate.ticket_id]
@@ -870,9 +859,7 @@ class RepairshoprImporter(models.Model):
             last_sync = last_sync_map.get(external_id_value)
             if updated_at and last_sync and last_sync >= updated_at:
                 continue
-            identifiers = self._collect_identifiers_from_line_items(
-                line_items_by_estimate_id.get(estimate.id, [])
-            )
+            identifiers = self._collect_identifiers_from_line_items(line_items_by_estimate_id.get(estimate.id, []))
             ticket_id = estimate.ticket_id
             if ticket_id:
                 ticket_properties = ticket_properties_by_ticket_id.get(ticket_id)
@@ -881,9 +868,7 @@ class RepairshoprImporter(models.Model):
                         identifiers,
                         self._collect_identifiers_from_ticket_properties(ticket_properties),
                     )
-            identifier_pairs_by_external_id[external_id_value] = self._identifier_pairs_for_ticket_link(
-                identifiers
-            )
+            identifier_pairs_by_external_id[external_id_value] = self._identifier_pairs_for_ticket_link(identifiers)
         pair_to_ticket_ids, ticket_partner_map = self._build_ticket_identifier_cache(
             {pair for pairs in identifier_pairs_by_external_id.values() for pair in pairs}
         )
@@ -925,9 +910,7 @@ class RepairshoprImporter(models.Model):
                 ticket_record = self.env["helpdesk.ticket"].browse(ticket_record_id)
                 if ticket_record and not ticket_record.intake_order_id:
                     ticket_properties = (
-                        ticket_properties_by_ticket_id.get(ticket_id)
-                        if ticket_id
-                        else repairshopr_models.TicketProperties()
+                        ticket_properties_by_ticket_id.get(ticket_id) if ticket_id else repairshopr_models.TicketProperties()
                     )
                     intake_order, _ = self._build_intake_from_line_items(
                         ticket=repairshopr_models.Ticket(
@@ -955,7 +938,7 @@ class RepairshoprImporter(models.Model):
                     ticket_partner_map=ticket_partner_map,
                     partner_id=partner.id,
                 )
-            if "source_ticket_id" in self.env["sale.order"]._fields and not ticket_record_id:
+            if has_sale_order_source_ticket and not ticket_record_id:
                 _logger.info(
                     "Skipping estimate %s because no ticket link was found.",
                     estimate.id,
@@ -972,8 +955,8 @@ class RepairshoprImporter(models.Model):
                 billing_contract,
                 include_line_clear=bool(order_record_id),
             )
-            if ticket_record_id and "source_ticket_id" in self.env["sale.order"]._fields:
-                values["source_ticket_id"] = ticket_record_id
+            if ticket_record_id and has_sale_order_source_ticket:
+                source_ticket_by_external_id[external_id_value] = ticket_record_id
             if estimate.number:
                 identifiers.setdefault("ticket", set()).add(str(estimate.number))
             identifiers_by_external_id[external_id_value] = identifiers
@@ -984,6 +967,8 @@ class RepairshoprImporter(models.Model):
                     _logger.info("Skipping estimate %s because sale order is not editable", estimate.id)
                     continue
                 order_record.write(values)
+                if external_id_value in source_ticket_by_external_id and has_sale_order_source_ticket:
+                    order_record.write({source_ticket_field_name: source_ticket_by_external_id[external_id_value]})
                 record = record_map.get(external_id_value)
                 if record:
                     record.write({"last_sync": sync_timestamps[external_id_value]})
@@ -1035,9 +1020,7 @@ class RepairshoprImporter(models.Model):
                 continue
             existing_updated_at = existing_invoice.updated_at
             incoming_updated_at = invoice.updated_at
-            if incoming_updated_at and (
-                not existing_updated_at or incoming_updated_at > existing_updated_at
-            ):
+            if incoming_updated_at and (not existing_updated_at or incoming_updated_at > existing_updated_at):
                 invoice_by_external_id[external_id_value] = invoice
         invoices = list(invoice_by_external_id.values())
         move_model = self.env["account.move"].sudo().with_context(IMPORT_CONTEXT)
@@ -1097,22 +1080,14 @@ class RepairshoprImporter(models.Model):
             last_sync = last_sync_map.get(external_id_value)
             if updated_at and last_sync and last_sync >= updated_at:
                 continue
-            identifiers = self._collect_identifiers_from_line_items(
-                line_items_by_invoice_id.get(invoice.id, [])
-            )
-            ticket_properties = (
-                ticket_properties_by_ticket_id.get(invoice.ticket_id)
-                if invoice.ticket_id
-                else None
-            )
+            identifiers = self._collect_identifiers_from_line_items(line_items_by_invoice_id.get(invoice.id, []))
+            ticket_properties = ticket_properties_by_ticket_id.get(invoice.ticket_id) if invoice.ticket_id else None
             if ticket_properties:
                 identifiers = self._merge_identifier_maps(
                     identifiers,
                     self._collect_identifiers_from_ticket_properties(ticket_properties),
                 )
-            identifier_pairs_by_external_id[external_id_value] = self._identifier_pairs_for_ticket_link(
-                identifiers
-            )
+            identifier_pairs_by_external_id[external_id_value] = self._identifier_pairs_for_ticket_link(identifiers)
         pair_to_ticket_ids, ticket_partner_map = self._build_ticket_identifier_cache(
             {pair for pairs in identifier_pairs_by_external_id.values() for pair in pairs}
         )
@@ -1200,11 +1175,7 @@ class RepairshoprImporter(models.Model):
                 billing_contract=billing_contract,
                 pricing_catalog=pricing_catalog,
             )
-            ticket_properties = (
-                ticket_properties_by_ticket_id.get(invoice.ticket_id)
-                if invoice.ticket_id
-                else None
-            )
+            ticket_properties = ticket_properties_by_ticket_id.get(invoice.ticket_id) if invoice.ticket_id else None
             if ticket_properties:
                 identifiers = self._merge_identifier_maps(
                     identifiers,
@@ -1294,9 +1265,7 @@ class RepairshoprImporter(models.Model):
         include_line_clear: bool,
     ) -> "odoo.values.sale_order":
         order_model = self.env["sale.order"].sudo().with_context(IMPORT_CONTEXT)
-        default_values = order_model.default_get(
-            ["pricelist_id", "company_id", "team_id", "user_id"]
-        )
+        default_values = order_model.default_get(["pricelist_id", "company_id", "team_id", "user_id"])
         order_lines = list(line_commands)
         if include_line_clear:
             order_lines = [(5, 0, 0)] + order_lines

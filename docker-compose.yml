@@ -23,6 +23,11 @@ x-odoo-build: &odoo-build
 x-odoo-env: &odoo-env
   ODOO_DB_HOST: database
   ODOO_DB_PORT: "5432"
+  ODOO_DB_NAME: ${ODOO_DB_NAME:?missing}
+  ODOO_DB_USER: ${ODOO_DB_USER:?missing}
+  ODOO_DB_PASSWORD: ${ODOO_DB_PASSWORD:?missing}
+  ODOO_INSTALL_MODULES: ${ODOO_INSTALL_MODULES:-}
+  ODOO_UPDATE_MODULES: ${ODOO_UPDATE_MODULES:-AUTO}
   ODOO_ADDONS_PATH: /opt/project/addons,/opt/extra_addons,/opt/extra_addons/odoo-enterprise-mirror,/odoo/addons
   IMAGE_ODOO_ENTERPRISE_LOCATION: /volumes/enterprise_disabled
   IMAGE_EXTRA_ADDONS_LOCATION: /opt/extra_addons

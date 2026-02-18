@@ -24,6 +24,10 @@ Runtime data persistence uses Docker named volumes per context/instance:
 - `odoo-<context>-<instance>-logs` for `/volumes/logs`
 - `odoo-<context>-<instance>-db` for PostgreSQL data
 
+`web` startup now runs a bootstrap wrapper that auto-initializes first deploys
+using `install_modules` and then starts the normal Odoo HTTP server process.
+This keeps remote and local behavior consistent without manual first-run steps.
+
 ## Command Examples
 
 ```bash

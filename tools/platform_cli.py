@@ -251,7 +251,7 @@ def _write_runtime_env_file(repo_root: Path, runtime_selection: RuntimeSelection
         "ODOO_LONGPOLL_HOST_PORT": str(runtime_selection.longpoll_host_port),
         "ODOO_DB_HOST_PORT": str(runtime_selection.db_host_port),
         "ODOO_LIST_DB": "False",
-        "ODOO_WEB_COMMAND": f"/odoo/odoo-bin -c {runtime_selection.runtime_odoo_conf_path}",
+        "ODOO_WEB_COMMAND": f"python3 /volumes/scripts/run_odoo_bootstrap.py -c {runtime_selection.runtime_odoo_conf_path}",
         "RESTORE_SSH_DIR": source_environment.get("RESTORE_SSH_DIR", str(Path.home() / ".ssh")),
     }
 

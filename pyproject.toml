@@ -51,6 +51,7 @@ test = "tools.testkit.cli:main"  # example: uv run test unit --json
 test-validate = "tools.testkit.validate:main"
 prod-gate = "tools.prod_gate:main"
 ops = "tools.ops_cli:main"
+platform = "tools.platform_cli:main"
 
 [tool.uv]
 preview = true

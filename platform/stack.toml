@@ -1,0 +1,75 @@
+schema_version = 1
+odoo_version = "19.0"
+state_root = "~/Developer/odoo-state"
+addons_path = [
+    "/odoo/odoo/addons",
+    "/volumes/addons",
+    "/opt/extra_addons",
+]
+required_env_keys = [
+    "ODOO_MASTER_PASSWORD",
+    "ODOO_DB_USER",
+    "ODOO_DB_PASSWORD",
+]
+
+[contexts.cm]
+install_modules = [
+    "cm_custom",
+]
+
+[contexts.cm.instances.local]
+database = "cm"
+install_modules_add = [
+    "environment_overrides",
+    "fishbowl_import",
+    "repairshopr_import",
+    "cm_data_import",
+    "web_studio",
+]
+
+[contexts.cm.instances.dev]
+database = "cm"
+install_modules_add = [
+    "environment_overrides",
+    "fishbowl_import",
+    "repairshopr_import",
+]
+
+[contexts.cm.instances.testing]
+database = "cm"
+install_modules_add = [
+    "environment_overrides",
+    "fishbowl_import",
+    "repairshopr_import",
+]
+
+[contexts.cm.instances.prod]
+database = "cm"
+
+[contexts.opw]
+install_modules = ["opw_custom"]
+
+[contexts.opw.instances.local]
+database = "opw"
+install_modules_add = ["environment_overrides"]
+
+[contexts.opw.instances.dev]
+database = "opw"
+install_modules_add = ["environment_overrides"]
+
+[contexts.opw.instances.testing]
+database = "opw"
+install_modules_add = ["environment_overrides"]
+
+[contexts.opw.instances.prod]
+database = "opw"
+
+[contexts.qc]
+install_modules = [
+    "cm_custom",
+    "opw_custom",
+]
+
+[contexts.qc.instances.local]
+database = "qc"
+install_modules_add = ["environment_overrides"]

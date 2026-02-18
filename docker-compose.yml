@@ -37,8 +37,9 @@ services:
     <<: [ *odoo-base, *odoo-build ]
     command: /odoo/odoo-bin
     volumes:
-      - ${ODOO_DATA_MOUNT:?missing}:/volumes/data
-      - ${ODOO_LOG_MOUNT:?missing}:/volumes/logs
+      - odoo_data:/volumes/data
+      - odoo_logs:/volumes/logs
+      - ${ODOO_RUNTIME_CONF_HOST_PATH:?missing}:/volumes/data/platform.odoo.conf:ro
     environment:
       <<: *odoo-env
     healthcheck:
@@ -54,7 +55,7 @@ services:
     image: postgres:17
     restart: unless-stopped
     volumes:
-      - ${ODOO_DB_MOUNT:?missing}:/var/lib/postgresql/data
+      - odoo_db:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=postgres
       - POSTGRES_PASSWORD=${ODOO_DB_PASSWORD}
@@ -68,8 +69,9 @@ services:
   script-runner:
     <<: *odoo-base
     volumes:
-      - ${ODOO_DATA_MOUNT:?missing}:/volumes/data
-      - ${ODOO_LOG_MOUNT:?missing}:/volumes/logs
+      - odoo_data:/volumes/data
+      - odoo_logs:/volumes/logs
+      - ${ODOO_RUNTIME_CONF_HOST_PATH:?missing}:/volumes/data/platform.odoo.conf:ro
       - ${RESTORE_SSH_DIR:-/home/ubuntu/.ssh}:/home/ubuntu/.ssh:ro
       - ${RESTORE_SSH_DIR:-/home/ubuntu/.ssh}:/root/.ssh:ro
     command: tail -f /dev/null
@@ -91,6 +93,12 @@ services:
         --disable-features=TranslateUI,site-per-process,IsolateOrigins,BlockInsecurePrivateNetworkRequests
 
 volumes:
+  odoo_data:
+    name: ${ODOO_DATA_VOLUME:?missing}
+  odoo_logs:
+    name: ${ODOO_LOG_VOLUME:?missing}
+  odoo_db:
+    name: ${ODOO_DB_VOLUME:?missing}
   testkit_db:
   testkit_data:
   testkit_logs:

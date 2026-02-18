@@ -218,15 +218,22 @@ def _backfill_ready_for_sale_enabled_date(env: Environment) -> None:
         env.cr.execute(
             """
             WITH tracking AS (
-                SELECT mm.res_id AS product_id,
-                       MAX(mm.create_date) AS enabled_at
-                  FROM mail_message mm
-                  JOIN mail_tracking_value mtv ON mtv.mail_message_id = mm.id
-                  JOIN ir_model_fields field ON field.id = mtv.field_id
-                 WHERE mm.model = 'product.template'
-                   AND field.name = 'is_ready_for_sale'
-                   AND mtv.new_value_integer = 1
-                 GROUP BY mm.res_id
+                SELECT product_id, enabled_at
+                  FROM (
+                        SELECT mm.res_id AS product_id,
+                               mm.create_date AS enabled_at,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY mm.res_id
+                                   ORDER BY mm.create_date DESC
+                               ) AS enabled_rank
+                          FROM mail_message mm
+                          JOIN mail_tracking_value mtv ON mtv.mail_message_id = mm.id
+                          JOIN ir_model_fields field ON field.id = mtv.field_id
+                         WHERE mm.model = 'product.template'
+                           AND field.name = 'is_ready_for_sale'
+                           AND mtv.new_value_integer = 1
+                       ) ranked_tracking
+                 WHERE enabled_rank = 1
             )
             UPDATE product_template pt
                SET is_ready_for_sale_last_enabled_date = tracking.enabled_at

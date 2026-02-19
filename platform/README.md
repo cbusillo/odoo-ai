@@ -18,6 +18,9 @@ inspections, and remote deployment.
 Deploy commands (`ship`/`rollback`) read Dokploy credentials from `.env`
 (`DOKPLOY_HOST`, `DOKPLOY_TOKEN`).
 
+`ship` supports Dokploy application and compose targets. In `auto` mode it
+prefers compose when both names exist.
+
 Runtime data persistence uses Docker named volumes per context/instance:
 
 - `odoo-<context>-<instance>-data` for `/volumes/data` (includes filestore)

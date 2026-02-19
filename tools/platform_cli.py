@@ -402,6 +402,108 @@ def _resolve_dokploy_app_name(context_name: str, instance_name: str, environment
     return f"{context_name}-{instance_name}"
 
 
+def _resolve_dokploy_compose_name(context_name: str, instance_name: str, environment_values: dict[str, str]) -> str:
+    specific_key = f"DOKPLOY_COMPOSE_NAME_{context_name}_{instance_name}".upper()
+    specific_value = environment_values.get(specific_key, "").strip()
+    if specific_value:
+        return specific_value
+    return f"{context_name}-{instance_name}"
+
+
+def _collect_compose_records(payload: JsonValue) -> list[JsonObject]:
+    records: list[JsonObject] = []
+    seen_pairs: set[tuple[str, str]] = set()
+
+    def walk(node: JsonValue) -> None:
+        if isinstance(node, dict):
+            compose_id = node.get("composeId") or node.get("compose_id")
+            display_name = node.get("name")
+            internal_name = node.get("appName")
+            if compose_id is not None:
+                for candidate_name in (display_name, internal_name):
+                    if not isinstance(candidate_name, str) or not candidate_name:
+                        continue
+                    pair = (str(compose_id), candidate_name)
+                    if pair in seen_pairs:
+                        continue
+                    seen_pairs.add(pair)
+                    records.append(
+                        {
+                            "compose_id": str(compose_id),
+                            "compose_name": candidate_name,
+                        }
+                    )
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+
+    walk(payload)
+    return records
+
+
+def _resolve_dokploy_compose_id(
+    *,
+    host: str,
+    token: str,
+    context_name: str,
+    instance_name: str,
+    environment_values: dict[str, str],
+) -> tuple[str, str]:
+    specific_id_key = f"DOKPLOY_COMPOSE_ID_{context_name}_{instance_name}".upper()
+    explicit_compose_id = environment_values.get(specific_id_key, "").strip()
+    compose_name = _resolve_dokploy_compose_name(context_name, instance_name, environment_values)
+    if explicit_compose_id:
+        return explicit_compose_id, compose_name
+
+    projects_payload = _dokploy_request(host=host, token=token, path="/api/project.all")
+    records = _collect_compose_records(projects_payload)
+    matches = [record for record in records if record.get("compose_name") == compose_name]
+    if not matches:
+        specific_name_key = f"DOKPLOY_COMPOSE_NAME_{context_name}_{instance_name}".upper()
+        known_names = sorted(
+            {
+                record_name
+                for record in records
+                for record_name in (record.get("compose_name"),)
+                if isinstance(record_name, str) and record_name
+            }
+        )
+        preview = ", ".join(known_names[:20])
+        raise click.ClickException(
+            f"Dokploy compose '{compose_name}' not found. Set {specific_id_key}=<composeId> or "
+            f"{specific_name_key}=<name>. Known: {preview}"
+        )
+    if len(matches) > 1:
+        raise click.ClickException(
+            f"Multiple Dokploy compose entries match '{compose_name}'. "
+            f"Set {specific_id_key}=<composeId> to disambiguate."
+        )
+    matched_compose_id = matches[0].get("compose_id")
+    if not isinstance(matched_compose_id, str) or not matched_compose_id:
+        raise click.ClickException(
+            f"Dokploy compose '{compose_name}' returned an invalid compose id. Use {specific_id_key}=<composeId>."
+        )
+    return matched_compose_id, compose_name
+
+
+def _resolve_dokploy_ship_mode(
+    context_name: str,
+    instance_name: str,
+    environment_values: dict[str, str],
+) -> str:
+    specific_key = f"DOKPLOY_SHIP_MODE_{context_name}_{instance_name}".upper()
+    configured_mode = environment_values.get(specific_key, "").strip().lower()
+    if not configured_mode:
+        configured_mode = environment_values.get("DOKPLOY_SHIP_MODE", "auto").strip().lower() or "auto"
+    if configured_mode not in {"auto", "compose", "application"}:
+        raise click.ClickException(
+            f"Invalid Dokploy ship mode '{configured_mode}'. Expected auto, compose, or application."
+        )
+    return configured_mode
+
+
 def _resolve_dokploy_application_id(
     *,
     host: str,
@@ -454,6 +556,37 @@ def _latest_deployment_for_application(host: str, token: str, application_id: st
         query={"applicationId": application_id},
     )
     deployments = _extract_deployments(payload)
+    if not deployments:
+        return None
+
+    def sort_key(item: JsonObject) -> str:
+        for key in ("createdAt", "created_at", "updatedAt", "updated_at"):
+            value = item.get(key)
+            if value:
+                return str(value)
+        return _deployment_key(item)
+
+    return max(deployments, key=sort_key)
+
+
+def _latest_deployment_for_compose(host: str, token: str, compose_id: str) -> JsonObject | None:
+    compose_payload = _dokploy_request(
+        host=host,
+        token=token,
+        path="/api/compose.one",
+        query={"composeId": compose_id},
+    )
+    if not isinstance(compose_payload, dict):
+        return None
+    deployments_payload = compose_payload.get("deployments")
+    if not isinstance(deployments_payload, list):
+        return None
+
+    deployments: list[JsonObject] = []
+    for item in deployments_payload:
+        item_as_object = _as_json_object(cast(JsonValue, item))
+        if item_as_object is not None:
+            deployments.append(item_as_object)
     if not deployments:
         return None
 
@@ -523,6 +656,38 @@ def _wait_for_dokploy_deployment(
         time.sleep(3)
 
     raise click.ClickException("Timed out waiting for Dokploy deployment status.")
+
+
+def _wait_for_dokploy_compose_deployment(
+    *,
+    host: str,
+    token: str,
+    compose_id: str,
+    before_key: str,
+    timeout_seconds: int,
+) -> str:
+    success_statuses = {"success", "succeeded", "done", "completed", "healthy", "finished"}
+    failure_statuses = {"failed", "error", "canceled", "cancelled", "killed", "unhealthy", "timeout"}
+
+    start_time = time.monotonic()
+    while time.monotonic() - start_time <= timeout_seconds:
+        latest = _latest_deployment_for_compose(host, token, compose_id)
+        if not latest:
+            time.sleep(3)
+            continue
+
+        latest_key = _deployment_key(latest)
+        latest_status = _deployment_status(latest)
+        if latest_key and latest_key != before_key:
+            if latest_status in success_statuses:
+                return f"deployment={latest_key} status={latest_status}"
+            if latest_status in failure_statuses:
+                raise click.ClickException(f"Dokploy compose deployment failed: deployment={latest_key} status={latest_status}")
+            if not latest_status:
+                return f"deployment={latest_key} status=unknown"
+        time.sleep(3)
+
+    raise click.ClickException("Timed out waiting for Dokploy compose deployment status.")
 
 
 def _render_odoo_config(
@@ -885,30 +1050,103 @@ def ship(
 
     repo_root = _discover_repo_root(Path.cwd())
     _env_file_path, environment_values = _load_environment(repo_root, env_file)
+    ship_mode = _resolve_dokploy_ship_mode(context_name, instance_name, environment_values)
     try:
         host, token = _read_dokploy_config(environment_values)
     except click.ClickException as error:
         if dry_run:
-            app_name = _resolve_dokploy_app_name(context_name, instance_name, environment_values)
-            click.echo("ship_mode=dokploy-api")
-            click.echo(f"app_name={app_name}")
+            target_name = _resolve_dokploy_compose_name(context_name, instance_name, environment_values)
+            if ship_mode == "application":
+                target_name = _resolve_dokploy_app_name(context_name, instance_name, environment_values)
+            click.echo(f"ship_mode=dokploy-{ship_mode}-api")
+            click.echo(f"target_name={target_name}")
             click.echo(f"dry_run_note={error.message}")
             return
         raise
-    application_id, app_name = _resolve_dokploy_application_id(
-        host=host,
-        token=token,
-        context_name=context_name,
-        instance_name=instance_name,
-        environment_values=environment_values,
-    )
 
-    latest_before = _latest_deployment_for_application(host, token, application_id)
+    compose_resolution_error: click.ClickException | None = None
+    app_resolution_error: click.ClickException | None = None
+
+    selected_target_type = ""
+    selected_target_id = ""
+    selected_target_name = ""
+
+    if ship_mode in {"auto", "compose"}:
+        try:
+            compose_id, compose_name = _resolve_dokploy_compose_id(
+                host=host,
+                token=token,
+                context_name=context_name,
+                instance_name=instance_name,
+                environment_values=environment_values,
+            )
+            selected_target_type = "compose"
+            selected_target_id = compose_id
+            selected_target_name = compose_name
+        except click.ClickException as error:
+            compose_resolution_error = error
+            if ship_mode == "compose":
+                raise
+
+    if not selected_target_type:
+        try:
+            application_id, app_name = _resolve_dokploy_application_id(
+                host=host,
+                token=token,
+                context_name=context_name,
+                instance_name=instance_name,
+                environment_values=environment_values,
+            )
+            selected_target_type = "application"
+            selected_target_id = application_id
+            selected_target_name = app_name
+        except click.ClickException as error:
+            app_resolution_error = error
+
+    if not selected_target_type:
+        messages = ["No Dokploy deployment target resolved."]
+        if compose_resolution_error is not None:
+            messages.append(f"compose_error={compose_resolution_error.message}")
+        if app_resolution_error is not None:
+            messages.append(f"application_error={app_resolution_error.message}")
+        raise click.ClickException(" ".join(messages))
+
+    if selected_target_type == "compose":
+        latest_before = _latest_deployment_for_compose(host, token, selected_target_id)
+        before_key = _deployment_key(latest_before or {})
+
+        click.echo("ship_mode=dokploy-compose-api")
+        click.echo(f"compose_name={selected_target_name}")
+        click.echo(f"compose_id={selected_target_id}")
+        if dry_run:
+            return
+
+        _dokploy_request(
+            host=host,
+            token=token,
+            path="/api/compose.deploy",
+            method="POST",
+            payload={"composeId": selected_target_id},
+        )
+        click.echo("deploy_triggered=true")
+        if not wait:
+            return
+        result = _wait_for_dokploy_compose_deployment(
+            host=host,
+            token=token,
+            compose_id=selected_target_id,
+            before_key=before_key,
+            timeout_seconds=timeout_seconds,
+        )
+        click.echo(result)
+        return
+
+    latest_before = _latest_deployment_for_application(host, token, selected_target_id)
     before_key = _deployment_key(latest_before or {})
 
     click.echo(f"ship_mode=dokploy-api")
-    click.echo(f"app_name={app_name}")
-    click.echo(f"application_id={application_id}")
+    click.echo(f"app_name={selected_target_name}")
+    click.echo(f"application_id={selected_target_id}")
     if dry_run:
         return
 
@@ -917,7 +1155,7 @@ def ship(
         token=token,
         path="/api/application.deploy",
         method="POST",
-        payload={"applicationId": application_id},
+        payload={"applicationId": selected_target_id},
     )
     click.echo("deploy_triggered=true")
     if not wait:
@@ -925,7 +1163,7 @@ def ship(
     result = _wait_for_dokploy_deployment(
         host=host,
         token=token,
-        application_id=application_id,
+        application_id=selected_target_id,
         before_key=before_key,
         timeout_seconds=timeout_seconds,
     )
@@ -961,6 +1199,9 @@ def rollback(
 
     repo_root = _discover_repo_root(Path.cwd())
     _env_file_path, environment_values = _load_environment(repo_root, env_file)
+    ship_mode = _resolve_dokploy_ship_mode(context_name, instance_name, environment_values)
+    if ship_mode == "compose":
+        raise click.ClickException("Rollback in compose ship mode is not supported yet. Use Dokploy UI rollback controls.")
     try:
         host, token = _read_dokploy_config(environment_values)
     except click.ClickException as error:

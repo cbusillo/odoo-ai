@@ -44,7 +44,6 @@ services:
     volumes:
       - odoo_data:/volumes/data
       - odoo_logs:/volumes/logs
-      - ${ODOO_RUNTIME_CONF_HOST_PATH:?missing}:/volumes/data/platform.odoo.conf:ro
     environment:
       <<: *odoo-env
     healthcheck:
@@ -76,7 +75,6 @@ services:
     volumes:
       - odoo_data:/volumes/data
       - odoo_logs:/volumes/logs
-      - ${ODOO_RUNTIME_CONF_HOST_PATH:?missing}:/volumes/data/platform.odoo.conf:ro
       - ${RESTORE_SSH_DIR:-/home/ubuntu/.ssh}:/home/ubuntu/.ssh:ro
       - ${RESTORE_SSH_DIR:-/home/ubuntu/.ssh}:/root/.ssh:ro
     command: tail -f /dev/null

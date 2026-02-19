@@ -30,6 +30,9 @@ class BootstrapSettings:
     database_port: int
     database_user: str
     database_password: str
+    addons_path: str
+    data_dir: str
+    list_db: str
     install_modules: tuple[str, ...]
     ready_timeout_seconds: int
     poll_interval_seconds: float
@@ -69,10 +72,35 @@ def _load_settings(argument_namespace: argparse.Namespace) -> BootstrapSettings:
         database_port=database_port,
         database_user=os.environ.get("ODOO_DB_USER", "odoo").strip() or "odoo",
         database_password=os.environ.get("ODOO_DB_PASSWORD", ""),
+        addons_path=os.environ.get("ODOO_ADDONS_PATH", "").strip(),
+        data_dir=os.environ.get("ODOO_DATA_DIR", "/volumes/data").strip() or "/volumes/data",
+        list_db=os.environ.get("ODOO_LIST_DB", "False").strip() or "False",
         install_modules=install_modules,
         ready_timeout_seconds=180,
         poll_interval_seconds=2.0,
     )
+
+
+def _write_runtime_config(settings: BootstrapSettings) -> None:
+    config_lines = [
+        "[options]",
+        f"db_name = {settings.database_name}",
+        f"db_user = {settings.database_user}",
+        f"db_password = {settings.database_password}",
+        f"db_host = {settings.database_host}",
+        f"db_port = {settings.database_port}",
+        f"list_db = {settings.list_db}",
+        f"data_dir = {settings.data_dir}",
+    ]
+    if settings.addons_path:
+        config_lines.append(f"addons_path = {settings.addons_path}")
+
+    config_path = settings.config_path
+    config_directory = os.path.dirname(config_path)
+    if config_directory:
+        os.makedirs(config_directory, exist_ok=True)
+    with open(config_path, "w", encoding="utf-8") as config_file:
+        config_file.write("\n".join(config_lines) + "\n")
 
 
 def _wait_for_database(settings: BootstrapSettings) -> None:
@@ -187,6 +215,7 @@ def _run_initialization_if_needed(settings: BootstrapSettings) -> None:
 def main() -> None:
     arguments = _parse_arguments()
     settings = _load_settings(arguments)
+    _write_runtime_config(settings)
     _wait_for_database(settings)
     _run_initialization_if_needed(settings)
 

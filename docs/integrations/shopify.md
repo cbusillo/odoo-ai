@@ -79,6 +79,17 @@ uv run python docker/scripts/generate_shopify_models.py
 See `addons/shopify_sync/services/shopify/service.py` and
 `addons/shopify_sync/controllers/shopify_webhook.py` for the lookup logic.
 
+## Environment Override Safety
+
+- `environment_overrides` applies Shopify keys from `ENV_OVERRIDE_SHOPIFY__*`
+  during restore/init workflows.
+- If Shopify overrides are incomplete, the module clears Shopify config params
+  rather than leaving stale values.
+- `ENV_OVERRIDE_SHOPIFY__PRODUCTION_INDICATORS` blocks production-like
+  `shop_url_key` values by default.
+- Use `ENV_OVERRIDE_SHOPIFY__ALLOW_PRODUCTION=true` only as an intentional
+  break-glass override for prod-candidate environments.
+
 ## Images
 
 - Shopify exports use public image URLs. Product image attachments must be

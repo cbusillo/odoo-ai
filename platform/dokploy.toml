@@ -1,0 +1,97 @@
+schema_version = 1
+
+[[targets]]
+context = "cm"
+instance = "dev"
+target_type = "compose"
+target_id = "Vq1_XXJoDonnVssJjHig7"
+target_name = "cm-dev"
+git_branch = "cm-dev"
+auto_deploy = true
+require_test_gate = false
+require_prod_gate = false
+domains = ["cm-dev.shinycomputers.com"]
+
+[targets.env]
+ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://cm-dev.shinycomputers.com"
+ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"
+
+[[targets]]
+context = "cm"
+instance = "testing"
+target_type = "compose"
+target_id = "vSDNHhdSYS1IdoLXFFd0i"
+target_name = "cm-testing"
+git_branch = "cm-testing"
+auto_deploy = true
+require_test_gate = true
+require_prod_gate = false
+domains = ["cm-testing.shinycomputers.com"]
+
+[targets.env]
+ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://cm-testing.shinycomputers.com"
+ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"
+
+[[targets]]
+context = "cm"
+instance = "prod"
+target_type = "compose"
+target_id = "iYS9ceYAIL7UFhuysdiYF"
+target_name = "cm-prod"
+git_branch = "cm-prod"
+auto_deploy = false
+require_test_gate = false
+require_prod_gate = false
+domains = ["cm-prod.shinycomputers.com"]
+
+[targets.env]
+ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://cm-prod.shinycomputers.com"
+ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"
+
+[[targets]]
+context = "opw"
+instance = "dev"
+target_type = "compose"
+target_id = "fv4K09A3DmZLfNBAf-G4v"
+target_name = "opw-dev"
+git_branch = "opw-dev"
+auto_deploy = true
+require_test_gate = false
+require_prod_gate = false
+domains = ["opw-dev.shinycomputers.com"]
+
+[targets.env]
+ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://opw-dev.shinycomputers.com"
+ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"
+
+[[targets]]
+context = "opw"
+instance = "testing"
+target_type = "compose"
+target_id = "tpAsexVQNkCqL7J_JIX6j"
+target_name = "opw-testing"
+git_branch = "opw-testing"
+auto_deploy = true
+require_test_gate = true
+require_prod_gate = false
+domains = ["opw-testing.shinycomputers.com"]
+
+[targets.env]
+ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://opw-testing.shinycomputers.com"
+ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"
+
+[[targets]]
+context = "opw"
+instance = "prod"
+target_type = "compose"
+target_id = "15b5-sab4eFQ3VlpDUkBI"
+target_name = "opw-prod"
+git_branch = "opw-prod"
+auto_deploy = false
+require_test_gate = false
+require_prod_gate = false
+domains = ["opw-prod.shinycomputers.com"]
+
+[targets.env]
+ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://opw-prod.shinycomputers.com"
+ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"

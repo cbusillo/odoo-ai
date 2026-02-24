@@ -25,8 +25,13 @@ Routing
 - Integrations: [@docs/integrations/README.md](integrations/README.md) (Shopify:
   [@docs/integrations/shopify.md](integrations/shopify.md))
 - Data sources: [@docs/data-sources/README.md](data-sources/README.md)
-- Tooling: [@docs/tooling/codex-cli.md](tooling/codex-cli.md), [@docs/tooling/odoo-intelligence.md](tooling/odoo-intelligence.md),
-  [@docs/tooling/ops.md](tooling/ops.md), [@docs/tooling/docker.md](tooling/docker.md),
+- Tooling: [@docs/tooling/codex-cli.md](tooling/codex-cli.md),
+  [@docs/tooling/odoo-intelligence.md](tooling/odoo-intelligence.md),
+  [@docs/tooling/ops.md](tooling/ops.md),
+  [@docs/tooling/platform-cli.md](tooling/platform-cli.md),
+  [@docs/tooling/gate-benchmark.md](tooling/gate-benchmark.md),
+  [@docs/tooling/image-contracts.md](tooling/image-contracts.md),
+  [@docs/tooling/docker.md](tooling/docker.md),
   [@docs/tooling/cm-seeds.md](tooling/cm-seeds.md)
 - Architecture: [@docs/ARCHITECTURE.md](ARCHITECTURE.md), [@docs/resources.md](resources.md)
 - Roles: [@docs/roles.md](roles.md)

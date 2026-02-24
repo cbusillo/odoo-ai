@@ -1,0 +1,49 @@
+---
+name: test-gate
+
+'on':
+  workflow_dispatch:
+    inputs:
+      stack:
+        description: "Stack name for gate run (cm or opw)"
+        required: true
+        default: "cm"
+      extra_arguments:
+        description: "Additional arguments for `uv run test run`"
+        required: false
+        default: ""
+      runner_label:
+        description: "GitHub runner label (ubuntu-latest or self-hosted label)"
+        required: true
+        default: "ubuntu-latest"
+
+jobs:
+  gate:
+    runs-on: ${{ inputs.runner_label }}
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Sync environment
+        run: uv sync
+
+      - name: Run gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${{ inputs.extra_arguments }}" ]]; then
+            uv run test run --json --stack "${{ inputs.stack }}" \
+              ${{ inputs.extra_arguments }}
+          else
+            uv run test run --json --stack "${{ inputs.stack }}"
+          fi

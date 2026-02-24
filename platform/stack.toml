@@ -1,10 +1,14 @@
 schema_version = 1
 odoo_version = "19.0"
-state_root = "~/Developer/odoo-state"
 addons_path = [
+    "/odoo/addons",
     "/odoo/odoo/addons",
-    "/volumes/addons",
+    "/opt/project/addons",
     "/opt/extra_addons",
+    "/opt/enterprise",
+]
+addon_repositories = [
+    "cbusillo/disable_odoo_online@main",
 ]
 required_env_keys = [
     "ODOO_MASTER_PASSWORD",
@@ -12,13 +16,36 @@ required_env_keys = [
     "ODOO_DB_PASSWORD",
 ]
 
+[runtime_env]
+ODOO_DB_MAXCONN = 8
+ODOO_MAX_CRON_THREADS = 1
+ODOO_WORKERS = 3
+ODOO_LIMIT_TIME_CPU = 600
+ODOO_LIMIT_TIME_REAL = 1800
+ODOO_LIMIT_TIME_REAL_CRON = 1800
+ODOO_LIMIT_MEMORY_SOFT = 2147483648
+ODOO_LIMIT_MEMORY_HARD = 3221225472
+POSTGRES_MAX_CONNECTIONS = 100
+POSTGRES_SHARED_BUFFERS = "1GB"
+POSTGRES_EFFECTIVE_CACHE_SIZE = "4GB"
+POSTGRES_WORK_MEM = "32MB"
+POSTGRES_MAINTENANCE_WORK_MEM = "256MB"
+POSTGRES_MAX_WAL_SIZE = "1GB"
+POSTGRES_MIN_WAL_SIZE = "80MB"
+POSTGRES_CHECKPOINT_TIMEOUT = "5min"
+POSTGRES_RANDOM_PAGE_COST = 4
+POSTGRES_EFFECTIVE_IO_CONCURRENCY = 1
+
 [contexts.cm]
+database = "cm"
 install_modules = [
     "cm_custom",
 ]
 
+[contexts.cm.runtime_env]
+ODOO_DEV_MODE = ""
+
 [contexts.cm.instances.local]
-database = "cm"
 install_modules_add = [
     "environment_overrides",
     "fishbowl_import",
@@ -27,8 +54,23 @@ install_modules_add = [
     "web_studio",
 ]
 
+[contexts.cm.instances.local.runtime_env]
+ODOO_DEV_MODE = "reload"
+ODOO_WORKERS = 2
+
+[contexts.cm.instances.dev.runtime_env]
+ODOO_WORKERS = 4
+
+[contexts.cm.instances.testing.runtime_env]
+ODOO_WORKERS = 4
+
+[contexts.cm.instances.prod.runtime_env]
+ODOO_WORKERS = 6
+POSTGRES_SHARED_BUFFERS = "2GB"
+POSTGRES_EFFECTIVE_CACHE_SIZE = "6GB"
+POSTGRES_WORK_MEM = "64MB"
+
 [contexts.cm.instances.dev]
-database = "cm"
 install_modules_add = [
     "environment_overrides",
     "fishbowl_import",
@@ -36,40 +78,59 @@ install_modules_add = [
 ]
 
 [contexts.cm.instances.testing]
-database = "cm"
 install_modules_add = [
     "environment_overrides",
     "fishbowl_import",
     "repairshopr_import",
 ]
 
-[contexts.cm.instances.prod]
-database = "cm"
-
 [contexts.opw]
-install_modules = ["opw_custom"]
+database = "opw"
+install_modules = [
+    "opw_custom",
+    "environment_overrides",
+]
+
+[contexts.opw.runtime_env]
+ODOO_DEV_MODE = ""
 
 [contexts.opw.instances.local]
-database = "opw"
-install_modules_add = ["environment_overrides"]
+
+[contexts.opw.instances.local.runtime_env]
+ODOO_DEV_MODE = "reload"
+ODOO_WORKERS = 2
+ODOO_LIMIT_MEMORY_SOFT = 2147483648
+ODOO_LIMIT_MEMORY_HARD = 3221225472
 
 [contexts.opw.instances.dev]
-database = "opw"
-install_modules_add = ["environment_overrides"]
+
+[contexts.opw.instances.dev.runtime_env]
+ODOO_WORKERS = 4
 
 [contexts.opw.instances.testing]
-database = "opw"
-install_modules_add = ["environment_overrides"]
 
-[contexts.opw.instances.prod]
-database = "opw"
+[contexts.opw.instances.testing.runtime_env]
+ODOO_WORKERS = 4
+
+[contexts.opw.instances.prod.runtime_env]
+ODOO_WORKERS = 6
+POSTGRES_SHARED_BUFFERS = "2GB"
+POSTGRES_EFFECTIVE_CACHE_SIZE = "6GB"
+POSTGRES_WORK_MEM = "64MB"
 
 [contexts.qc]
+database = "qc"
 install_modules = [
     "cm_custom",
     "opw_custom",
 ]
 
+[contexts.qc.runtime_env]
+ODOO_DEV_MODE = ""
+
 [contexts.qc.instances.local]
-database = "qc"
 install_modules_add = ["environment_overrides"]
+
+[contexts.qc.instances.local.runtime_env]
+ODOO_DEV_MODE = "reload"
+ODOO_WORKERS = 2

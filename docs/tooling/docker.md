@@ -43,18 +43,33 @@ Tips
 - `DEPLOY_COMPOSE_FILES` accepts colon- or comma-delimited values. Example:
   `DEPLOY_COMPOSE_FILES=docker/config/base.yaml:docker/config/opw-local.yaml`.
 - `ODOO_INSTALL_MODULES` accepts a comma/colon list of modules to install on
-  init/restore (fallback: `ODOO_AUTO_MODULES`).
+  init/restore.
 - `ODOO_UPDATE_MODULES` accepts a comma/colon list of modules to upgrade; set
   `ODOO_UPDATE_MODULES=AUTO` to update all installed local addons.
-- `LOCAL_ADDONS_DIRS=/volumes/addons` (colon/comma delimited) controls the
+- `LOCAL_ADDONS_DIRS=/opt/project/addons` (colon/comma delimited) controls the
   auto-update search roots.
+- `ODOO_BASE_RUNTIME_IMAGE` and `ODOO_BASE_DEVTOOLS_IMAGE` set the runtime and
+  devtools base images for `docker/Dockerfile`.
+  For the three-layer strategy, these should point to private enterprise image
+  tags (for example `ghcr.io/cbusillo/odoo-enterprise-docker:19.0-runtime` and
+  `ghcr.io/cbusillo/odoo-enterprise-docker:19.0-devtools`), ideally pinned by
+  digest in promoted environments.
+- For private GHCR base images, local `ops` commands perform a registry login
+  preflight before build/restore. Provide either:
+  - `GHCR_TOKEN` (preferred) or `GITHUB_TOKEN`
+  - `GHCR_USERNAME` (falls back to image owner / `GITHUB_ACTOR`)
+  Tokens must include package read access (`read:packages`) for the private
+  image package.
+- Full tag and promotion contracts are documented in
+  `docs/tooling/image-contracts.md`.
+- The image-managed `odoo_paths.pth` includes `/opt/project/addons` so Odoo and
+  IDE integrations can resolve addon module dependencies from the same path set.
 - `ODOO_ADDON_REPOSITORIES` accepts a comma-separated list of addon repos
-  (cloned into `/opt/extra_addons/<repo>`). These are cloned with
-  `GITHUB_TOKEN`.
-  - Restore auto-updates skip enterprise addon repositories detected by the
-    Odoo Enterprise Edition license (or a `web_enterprise` module under the
-    repo root or `enterprise/` folder) inside `/opt/extra_addons`. Use
-    `ODOO_UPDATE_MODULES` to explicitly include them if needed.
+  (downloaded into `/opt/extra_addons/<repo>` as GitHub source archives).
+  The build consumes `GITHUB_TOKEN` through a BuildKit secret so tokens are
+  not persisted in image layers.
+- Enterprise addons should come from the private base image layer
+  (`/opt/enterprise`) rather than `ODOO_ADDON_REPOSITORIES`.
 
 ## Layered Compose Configuration
 

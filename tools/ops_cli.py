@@ -120,6 +120,11 @@ class PostDeploySettings:
 _OPS_CONFIG: OpsConfig | None = None
 _COOLIFY_APP_CACHE: dict[str, str] = {}
 _UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
+_GHCR_HOST = "ghcr.io"
+_DEFAULT_LOCAL_ODOO_BASE_RUNTIME_IMAGE = "ghcr.io/cbusillo/odoo-enterprise-docker:19.0-runtime"
+_DEFAULT_LOCAL_ODOO_BASE_DEVTOOLS_IMAGE = "ghcr.io/cbusillo/odoo-enterprise-docker:19.0-devtools"
+_REGISTRY_LOGINS_DONE: set[tuple[str, str]] = set()
+_VERIFIED_IMAGE_ACCESS: set[str] = set()
 
 
 def _expand_path(repo_root: Path, raw: str) -> Path:
@@ -305,6 +310,8 @@ def _favorite_label(state: OpsState) -> str:
     label = f"{state.target} {state.env} {state.action}"
     if state.action == "ship" and state.env in ("dev", "testing") and state.deploy:
         label = f"{label} +deploy"
+    if state.action == "ship" and state.no_cache:
+        label = f"{label} +no-cache"
     if state.env == "local" and state.action in ("up", "init", "restore"):
         if state.build:
             label = f"{label} +build"
@@ -341,6 +348,8 @@ def _render_cli_command(
         command_parts.extend(["ship", env, target])
         if not deploy:
             command_parts.append("--no-deploy")
+        if no_cache:
+            command_parts.append("--no-cache")
         if not wait_deploy:
             command_parts.append("--no-wait")
         if serial:
@@ -404,6 +413,153 @@ def _env_value(key: str, *, default: str | None = None) -> str | None:
         return os.environ[key]
     repo_env = _repo_env(_repo_root())
     return repo_env.get(key, default)
+
+
+def _extract_registry_host(image_reference: str) -> str | None:
+    candidate = image_reference.strip()
+    if not candidate:
+        return None
+    without_digest = candidate.split("@", 1)[0]
+    first_segment = without_digest.split("/", 1)[0]
+    if "." in first_segment or ":" in first_segment or first_segment == "localhost":
+        return first_segment.lower()
+    return None
+
+
+def _extract_registry_owner(image_reference: str) -> str | None:
+    candidate = image_reference.strip()
+    if not candidate:
+        return None
+    without_digest = candidate.split("@", 1)[0]
+    first_segment, separator, remainder = without_digest.partition("/")
+    if not separator:
+        return None
+    if not ("." in first_segment or ":" in first_segment or first_segment == "localhost"):
+        return None
+    owner, owner_separator, _package_name = remainder.partition("/")
+    if owner_separator and owner:
+        return owner
+    return None
+
+
+def _resolve_ghcr_username(settings: StackSettings, base_image: str) -> str | None:
+    candidates = (
+        settings.environment.get("GHCR_USERNAME"),
+        os.environ.get("GHCR_USERNAME"),
+        settings.environment.get("GITHUB_ACTOR"),
+        os.environ.get("GITHUB_ACTOR"),
+        _extract_registry_owner(base_image),
+    )
+    for candidate in candidates:
+        cleaned = _clean_optional_value(candidate)
+        if cleaned:
+            return cleaned
+    return None
+
+
+def _resolve_ghcr_token(settings: StackSettings) -> str | None:
+    candidates = (
+        settings.environment.get("GHCR_TOKEN"),
+        os.environ.get("GHCR_TOKEN"),
+        settings.environment.get("GHCR_READ_TOKEN"),
+        os.environ.get("GHCR_READ_TOKEN"),
+        settings.github_token,
+        settings.environment.get("GITHUB_TOKEN"),
+        os.environ.get("GITHUB_TOKEN"),
+    )
+    for candidate in candidates:
+        cleaned = _clean_optional_value(candidate)
+        if cleaned:
+            return cleaned
+    gh_token_result = subprocess.run(
+        ["gh", "auth", "token"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if gh_token_result.returncode == 0:
+        gh_token = _clean_optional_value(gh_token_result.stdout)
+        if gh_token:
+            return gh_token
+    return None
+
+
+def _verify_base_image_access(base_image: str, *, dry_run: bool) -> None:
+    if base_image in _VERIFIED_IMAGE_ACCESS:
+        return
+    if dry_run:
+        console.print(f"[dry-run] verify image access: {base_image}")
+        return
+    inspect_result = subprocess.run(
+        ["docker", "buildx", "imagetools", "inspect", base_image],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if inspect_result.returncode != 0:
+        details = _clean_optional_value(inspect_result.stderr) or _clean_optional_value(inspect_result.stdout)
+        raise click.ClickException(
+            "Unable to read base image metadata for "
+            f"'{base_image}'. Ensure the GHCR token grants read access to the package."
+            + (f"\nDocker reported: {details}" if details else ""),
+        )
+    _VERIFIED_IMAGE_ACCESS.add(base_image)
+
+
+def _ensure_registry_auth_for_local_base_image(settings: StackSettings, *, dry_run: bool) -> None:
+    runtime_image = _clean_optional_value(settings.environment.get("ODOO_BASE_RUNTIME_IMAGE"))
+    devtools_image = _clean_optional_value(settings.environment.get("ODOO_BASE_DEVTOOLS_IMAGE"))
+
+    if runtime_image is None:
+        runtime_image = _DEFAULT_LOCAL_ODOO_BASE_RUNTIME_IMAGE
+    if devtools_image is None:
+        devtools_image = _DEFAULT_LOCAL_ODOO_BASE_DEVTOOLS_IMAGE
+
+    candidate_images: list[str] = []
+    for image in (runtime_image, devtools_image):
+        if image and image not in candidate_images:
+            candidate_images.append(image)
+
+    ghcr_images = [image for image in candidate_images if _extract_registry_host(image) == _GHCR_HOST]
+    if not ghcr_images:
+        return
+
+    ghcr_username = _resolve_ghcr_username(settings, ghcr_images[0])
+    ghcr_token = _resolve_ghcr_token(settings)
+
+    if not ghcr_username:
+        raise click.ClickException(
+            "Missing GHCR username for private base image pull. Set GHCR_USERNAME in .env "
+            "or provide GITHUB_ACTOR in the current shell.",
+        )
+    if not ghcr_token:
+        raise click.ClickException(
+            "Missing GHCR token for private base image pull. Set GHCR_TOKEN (preferred) "
+            "or GITHUB_TOKEN in .env with read:packages access.",
+        )
+
+    login_key = (_GHCR_HOST, ghcr_username)
+    if login_key not in _REGISTRY_LOGINS_DONE:
+        if dry_run:
+            console.print(f"[dry-run] docker login {_GHCR_HOST} -u {ghcr_username} --password-stdin")
+        else:
+            login_result = subprocess.run(
+                ["docker", "login", _GHCR_HOST, "-u", ghcr_username, "--password-stdin"],
+                input=f"{ghcr_token}\n",
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if login_result.returncode != 0:
+                details = _clean_optional_value(login_result.stderr) or _clean_optional_value(login_result.stdout)
+                raise click.ClickException(
+                    "Docker login to GHCR failed. Ensure the token is valid and has package read permissions."
+                    + (f"\nDocker reported: {details}" if details else ""),
+                )
+        _REGISTRY_LOGINS_DONE.add(login_key)
+
+    for image in ghcr_images:
+        _verify_base_image_access(image, dry_run=dry_run)
 
 
 def _is_truthy(raw: str | None) -> bool:
@@ -610,19 +766,26 @@ def _coolify_find_app_uuid(app_ref: str) -> str:
     return uuid_str
 
 
-def _coolify_deploy(app_ref: str, *, dry_run: bool) -> None:
+def _coolify_deploy(app_ref: str, *, dry_run: bool, no_cache: bool) -> None:
     config = _load_ops_config()
     host = _env_value("COOLIFY_HOST", default=config.coolify_host)
     token = _env_value("COOLIFY_TOKEN")
     if not host or not token:
         raise click.ClickException("COOLIFY_HOST/COOLIFY_TOKEN not set; cannot trigger deploy.")
     app_uuid = _coolify_find_app_uuid(app_ref)
-    url = f"{host.rstrip('/')}/api/v1/applications/{app_uuid}/start"
+    path = f"/api/v1/applications/{app_uuid}/start"
+    if no_cache:
+        path += "?force=true"
+    url = f"{host.rstrip('/')}{path}"
+    payload = None
     if dry_run:
         console.print(f"$ POST {url}")
         return
-    req = urllib.request.Request(url, method="POST")
+    data = json.dumps(payload).encode() if payload else None
+    req = urllib.request.Request(url, method="POST", data=data)
     req.add_header("Authorization", f"Bearer {token}")
+    if data is not None:
+        req.add_header("Content-Type", "application/json")
     with urllib.request.urlopen(req, timeout=30) as response:
         response.read()
 
@@ -702,8 +865,12 @@ def _coolify_deployment_logs(app_ref: str) -> list[str]:
 
 
 def _coolify_application_logs(app_ref: str, *, lines: int) -> str:
+    app_uuid = _coolify_find_app_uuid(app_ref)
+    ssh_logs = _coolify_application_logs_via_ssh(app_uuid, lines=lines)
+    if ssh_logs is not None:
+        return ssh_logs
+
     try:
-        app_uuid = _coolify_find_app_uuid(app_ref)
         payload = _coolify_request(f"/api/v1/applications/{app_uuid}/logs?lines={lines}")
     except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as error:
         raise click.ClickException(f"Failed to fetch logs for {app_ref}: {error}") from error
@@ -714,6 +881,88 @@ def _coolify_application_logs(app_ref: str, *, lines: int) -> str:
     if isinstance(payload, str):
         return payload
     return ""
+
+
+def _coolify_application_logs_via_ssh(app_uuid: str, *, lines: int = 200) -> str | None:
+    try:
+        payload = _coolify_request(f"/api/v1/applications/{app_uuid}")
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+
+    destination = payload.get("destination")
+    if not isinstance(destination, dict):
+        return None
+    server = destination.get("server")
+    if not isinstance(server, dict):
+        return None
+
+    host = server.get("ip")
+    if not isinstance(host, str) or not host.strip():
+        return None
+    user_raw = server.get("user")
+    user = user_raw if isinstance(user_raw, str) and user_raw.strip() else None
+    port_raw = server.get("port")
+    port = int(port_raw) if isinstance(port_raw, int) else None
+
+    try:
+        names_output = _ssh_capture_output(host=host, user=user, port=port, command=["docker", "ps", "--format", "{{.Names}}"])
+    except click.ClickException:
+        return None
+    container_names = [line.strip() for line in names_output.splitlines() if line.strip()]
+    app_container_names = [name for name in container_names if f"-{app_uuid}-" in name]
+    if not app_container_names:
+        return None
+
+    container_name = _pick_preferred_app_container(app_uuid, app_container_names)
+    if not container_name:
+        return None
+
+    try:
+        return _ssh_capture_output(
+            host=host,
+            user=user,
+            port=port,
+            command=["docker", "container", "logs", "--tail", str(int(lines)), container_name],
+        )
+    except click.ClickException:
+        return None
+
+
+def _pick_preferred_app_container(app_uuid: str, container_names: list[str]) -> str | None:
+    ordered_names = sorted(container_names)
+    preferred_service_names = ("web", "app", "server")
+    for service_name in preferred_service_names:
+        prefix = f"{service_name}-{app_uuid}-"
+        for container_name in ordered_names:
+            if container_name.startswith(prefix):
+                return container_name
+
+    excluded_prefixes = ("database-", "db-", "postgres-", "script-runner-")
+    non_excluded = [name for name in ordered_names if not name.startswith(excluded_prefixes)]
+    if non_excluded:
+        return non_excluded[0]
+
+    return ordered_names[0] if ordered_names else None
+
+
+def _ssh_capture_output(host: str, user: str | None, port: int | None, command: list[str]) -> str:
+    ssh_command = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]
+    if port is not None:
+        ssh_command.extend(["-p", str(port)])
+    target = f"{user}@{host}" if user else host
+    ssh_command.append(target)
+    ssh_command.extend(command)
+    result = subprocess.run(ssh_command, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        stderr = (result.stderr or "").strip() or "unknown ssh error"
+        raise click.ClickException(f"SSH log fetch failed for {target}: {stderr}")
+    stdout = result.stdout or ""
+    stderr = result.stderr or ""
+    if stdout and stderr:
+        return f"{stdout}{stderr}"
+    return stdout or stderr
 
 
 def _compile_log_patterns(patterns: Sequence[str]) -> list[re.Pattern[str]]:
@@ -1414,6 +1663,7 @@ def _run_local_action(
                 env_file_path,
                 require_security=require_security,
             )
+            _ensure_registry_auth_for_local_base_image(settings, dry_run=dry_run)
             _run_local_restart(settings, dry_run=dry_run)
             console.print(f"{entry} local restart complete")
             continue
@@ -1423,6 +1673,7 @@ def _run_local_action(
                 env_file_path,
                 require_security=require_security,
             )
+            _ensure_registry_auth_for_local_base_image(settings, dry_run=dry_run)
             _run_local_upgrade(settings, dry_run=dry_run)
             console.print(f"{entry} local upgrade complete")
             continue
@@ -1432,6 +1683,7 @@ def _run_local_action(
                 env_file_path,
                 require_security=require_security,
             )
+            _ensure_registry_auth_for_local_base_image(settings, dry_run=dry_run)
             _run_local_upgrade(settings, dry_run=dry_run)
             _run_local_restart(settings, dry_run=dry_run)
             console.print(f"{entry} local upgrade + restart complete")
@@ -1442,6 +1694,7 @@ def _run_local_action(
                 env_file_path,
                 require_security=require_security,
             )
+            _ensure_registry_auth_for_local_base_image(settings, dry_run=dry_run)
             _run_local_openupgrade(settings, dry_run=dry_run)
             console.print(f"{entry} local openupgrade complete")
             continue
@@ -1451,6 +1704,7 @@ def _run_local_action(
                 env_file_path,
                 require_security=require_security,
             )
+            _ensure_registry_auth_for_local_base_image(settings, dry_run=dry_run)
             _run_local_exec(settings, command, service=service, skip_env=skip_env, dry_run=dry_run)
             continue
         if action == "shell":
@@ -1459,6 +1713,7 @@ def _run_local_action(
                 env_file_path,
                 require_security=require_security,
             )
+            _ensure_registry_auth_for_local_base_image(settings, dry_run=dry_run)
             _run_local_shell(settings, command, service=service, skip_env=skip_env, dry_run=dry_run)
             continue
         settings = _load_stack_settings_with_security_checks(
@@ -1466,6 +1721,7 @@ def _run_local_action(
             env_file_path,
             require_security=require_security,
         )
+        _ensure_registry_auth_for_local_base_image(settings, dry_run=dry_run)
         if dry_run:
             extras: list[str] = []
             if build:
@@ -1517,6 +1773,7 @@ def _run_ship(
     env: str,
     *,
     deploy: bool,
+    no_cache: bool,
     wait_deploy: bool,
     serial: bool,
     post_action: str | None,
@@ -1629,7 +1886,7 @@ def _run_ship(
                     if not app_ref:
                         console.print(f"No Coolify app ref for {entry} {env}; skipping deploy.")
                     else:
-                        _coolify_deploy(app_ref, dry_run=dry_run)
+                        _coolify_deploy(app_ref, dry_run=dry_run, no_cache=no_cache)
                 if wait_enabled:
                     if not app_ref:
                         console.print(f"No Coolify app ref for {entry} {env}; skipping wait.")
@@ -1648,7 +1905,7 @@ def _run_ship(
                     if not app_ref:
                         console.print(f"No Coolify app ref for {entry} {env}; skipping deploy.")
                         continue
-                    _coolify_deploy(app_ref, dry_run=dry_run)
+                    _coolify_deploy(app_ref, dry_run=dry_run, no_cache=no_cache)
 
             if wait_enabled:
                 for entry in entries:
@@ -1973,6 +2230,16 @@ def _interactive(*, dry_run: bool, remember: bool, wait_deploy: bool) -> None:
             deploy = state.deploy
             if action == "ship" and env in ("dev", "testing", "prod"):
                 deploy = Confirm.ask("Trigger Coolify deploy after push?", default=True)
+                if deploy:
+                    if questionary and sys.stdin.isatty():
+                        cache_choice = questionary.select(
+                            "Use deploy cache?",
+                            choices=["Yes", "No-cache"],
+                            default="Yes",
+                        ).ask()
+                        no_cache = cache_choice == "No-cache"
+                    else:
+                        no_cache = Confirm.ask("Use --no-cache?", default=False)
                 serial = Confirm.ask("Deploy serially?", default=False)
                 post_action_choices = list(POST_SHIP_ACTIONS)
                 if env == "prod":
@@ -2109,6 +2376,7 @@ def _execute(
             target,
             env,
             deploy=deploy,
+            no_cache=no_cache,
             wait_deploy=wait_deploy,
             serial=serial,
             post_action=post_action,
@@ -2117,7 +2385,16 @@ def _execute(
             require_confirm=require_confirm,
         )
         if record_history:
-            _record_history(OpsState(target=target, env=env, action=action, deploy=deploy, serial=serial))
+            _record_history(
+                OpsState(
+                    target=target,
+                    env=env,
+                    action=action,
+                    deploy=deploy,
+                    no_cache=no_cache,
+                    serial=serial,
+                )
+            )
         return
 
     if action == "gate":
@@ -2171,7 +2448,7 @@ def main(
         wait_deploy=wait,
         serial=serial,
         build=build if env_name == "local" else False,
-        no_cache=no_cache if env_name == "local" else False,
+        no_cache=no_cache,
         post_action=None,
         dry_run=dry_run,
         skip_tests=skip_tests,
@@ -2233,6 +2510,7 @@ def local_command(
 @click.option("--deploy/--no-deploy", default=True)
 @click.option("--wait/--no-wait", default=True, help="Wait for Coolify deploy to finish")
 @click.option("--serial/--parallel", default=False, help="Deploy one target at a time")
+@click.option("--no-cache", is_flag=True, help="Request a clean rebuild on remote deploy")
 @click.option("--after", type=click.Choice(POST_SHIP_ACTIONS, case_sensitive=False), default="none")
 @click.option("--skip-tests", is_flag=True)
 @click.option("--dry-run", is_flag=True)
@@ -2243,6 +2521,7 @@ def ship_command(
     deploy: bool,
     wait: bool,
     serial: bool,
+    no_cache: bool,
     after: str,
     skip_tests: bool,
     dry_run: bool,
@@ -2262,7 +2541,7 @@ def ship_command(
         wait_deploy=wait,
         serial=serial,
         build=False,
-        no_cache=False,
+        no_cache=no_cache,
         post_action=post_action,
         dry_run=dry_run,
         skip_tests=skip_tests,

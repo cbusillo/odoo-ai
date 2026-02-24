@@ -4,8 +4,14 @@ title: Ops CLI
 
 Purpose
 
-- Provide a single, UI-friendly command for the common OPW/CM workflows
-  (local init/restore/up/down, branch shipping, prod gating).
+- Document the legacy Ops CLI during platform migration.
+
+Status
+
+- `uv run platform ...` is the primary operator path.
+- `uv run ops ...` is transitional compatibility only and should not be used for
+  new workflow automation.
+- Prefer `@docs/tooling/platform-cli.md` for current commands.
 
 When
 
@@ -47,7 +53,9 @@ Quick start
   uv run ops ship testing opw
   uv run ops ship testing all
   uv run ops ship testing all --serial
+  uv run ops ship testing cm --no-cache
   uv run ops ship prod opw --confirm
+  uv run ops ship prod cm --no-cache --confirm
   uv run ops ship testing opw --after restore
 
   uv run ops gate opw --confirm
@@ -83,7 +91,8 @@ Configuration
 Conventions
 
 - Local stack name: `{target}-local`.
-- Local env file: `docker/config/{target}-local.env`.
+- Local env file: `docker/config/{target}-local.env` (or `local_env_file` from
+  `docker/config/ops.toml`).
 - Branch names: `{target}-dev`, `{target}-testing`, `{target}-prod`.
 - Coolify app names: `{target}-dev`, `{target}-testing`.
 
@@ -105,6 +114,10 @@ Behavior notes
   sanitize, addon updates, and environment cleanups). If installed, the
   `environment_overrides` addon applies `ENV_OVERRIDE_*` settings for SSO and
   integrations after each restore.
+- Restore now reconciles missing-manifest `to install` modules back to
+  `uninstalled` when they were already uninstalled before OpenUpgrade, then
+  fails closed if unresolved install-queue entries still remain. This prevents
+  partially upgraded module graphs from booting.
 - `uv run ops local restart` performs a fast `docker compose restart web` for the
   target stack.
 - `uv run ops local down` removes orphaned containers and anonymous volumes for
@@ -129,8 +142,10 @@ Behavior notes
 - `uv run ops ship prod <target> --after init` runs a prod bootstrap-only init
   via Coolify (sets the post-deploy command, deploys, waits for completion,
   then restores the previous post-deploy command). Requires the prod init guard.
-- `--no-cache` forces a clean local build; for `all`, only the first target
-  uses `--no-cache` and the rest use normal cache.
+- `--no-cache` forces a clean local build; for `all`, only the first local
+  target uses `--no-cache` and the rest use normal cache.
+- `uv run ops ship <env> <target> --no-cache` requests a force rebuild from
+  Coolify (`start?force=true`) for that deployment.
 - Ship actions push to the correct branch:
   - `opw-testing`, `cm-testing`, `opw-dev`, `cm-dev`, `opw-prod`, `cm-prod`.
 - Ship actions for dev/testing can optionally run a post-deploy `restore`,
@@ -161,14 +176,16 @@ Behavior notes
   Defaults to override/post-deploy markers; use `--all` or `--pattern` for
   broader output.
 - `uv run ops coolify app-logs` can fetch runtime application logs via the
-  Coolify API.
+  Coolify API. For compose apps, it prefers SSH + Docker logs from the app's
+  runtime server (favoring the `web` service container) and falls back to the
+  Coolify API endpoint when SSH is unavailable.
 - Use `--serial` to deploy one target at a time when shipping `all`.
 - `uv run ops status` uses the Coolify API and requires `COOLIFY_TOKEN` (waits by
   default; use `--no-wait`).
 - For interactive runs, `uv run ops --no-wait` skips deploy waiting.
 - Local actions default to `--no-build` for speed; pass `--build` to force a rebuild.
-- `ODOO_INSTALL_MODULES` controls the install list on init/restore (fallback:
-  `ODOO_AUTO_MODULES` if set). Use this to guarantee key addons are installed.
+- `ODOO_INSTALL_MODULES` controls the install list on init/restore. Use this to
+  guarantee key addons are installed.
   For non-prod, include `environment_overrides` here; omit it for prod once
   the instance is promoted.
 - `ODOO_UPDATE_MODULES=AUTO` upgrades all installed local addons; explicit lists

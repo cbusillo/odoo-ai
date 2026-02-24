@@ -23,6 +23,54 @@ _logger = logging.getLogger(__name__)
 
 RESTORE_SCRIPT = "/volumes/scripts/restore_from_upstream.py"
 
+RESTORE_SCRIPT_ENV_KEYS = {
+    "ODOO_DB_HOST",
+    "ODOO_DB_PORT",
+    "ODOO_DB_USER",
+    "ODOO_DB_PASSWORD",
+    "ODOO_DB_NAME",
+    "ODOO_FILESTORE_PATH",
+    "ODOO_FILESTORE_OWNER",
+    "RESTORE_SSH_DIR",
+    "RESTORE_SSH_KEY",
+    "ODOO_PROJECT_NAME",
+    "ODOO_VERSION",
+    "ODOO_ADDONS_PATH",
+    "ODOO_ADDON_REPOSITORIES",
+    "ODOO_INSTALL_MODULES",
+    "ODOO_UPDATE_MODULES",
+    "LOCAL_ADDONS_DIRS",
+    "OPENUPGRADE_ENABLED",
+    "OPENUPGRADE_SCRIPTS_PATH",
+    "OPENUPGRADE_TARGET_VERSION",
+    "OPENUPGRADE_SKIP_UPDATE_ADDONS",
+    "ODOO_KEY",
+    "ODOO_ADMIN_PASSWORD",
+    "ODOO_UPSTREAM_HOST",
+    "ODOO_UPSTREAM_USER",
+    "ODOO_UPSTREAM_DB_NAME",
+    "ODOO_UPSTREAM_DB_USER",
+    "ODOO_UPSTREAM_FILESTORE_PATH",
+    "BOOTSTRAP_ONLY",
+    "NO_SANITIZE",
+}
+
+RESTORE_SCRIPT_ENV_PREFIXES = (
+    "ENV_OVERRIDE_",
+    "OPENUPGRADE_",
+)
+
+
+def _restore_script_environment(env_values: dict[str, str]) -> dict[str, str]:
+    filtered_values: dict[str, str] = {}
+    for env_key, env_value in env_values.items():
+        if env_key in RESTORE_SCRIPT_ENV_KEYS:
+            filtered_values[env_key] = env_value
+            continue
+        if any(env_key.startswith(prefix) for prefix in RESTORE_SCRIPT_ENV_PREFIXES):
+            filtered_values[env_key] = env_value
+    return filtered_values
+
 
 def _ensure_stack_env(settings: StackSettings, stack_name: str) -> None:
     env_path = settings.env_file
@@ -203,13 +251,15 @@ def restore_stack(
             _ensure_stack_running()
             _wait_for_local_service(restore_settings, restore_settings.script_runner_service)
         _run_local_compose(restore_settings, ["stop", "web"], check=False)
+        restore_env_values = _restore_script_environment(env_values)
+
         exec_extra = [
             "exec",
             "-T",
             "--user",
             "root",
         ]
-        for env_key, env_value in env_values.items():
+        for env_key, env_value in restore_env_values.items():
             exec_extra.extend(["-e", f"{env_key}={env_value}"])
         _add_toggle_env_flags(exec_extra, bootstrap_only=bootstrap_only, no_sanitize=no_sanitize)
         exec_extra.extend(

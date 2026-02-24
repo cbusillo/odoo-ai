@@ -21,7 +21,7 @@ import psycopg2
 from passlib.context import CryptContext
 from psycopg2 import sql
 from psycopg2.extensions import connection
-from pydantic import Field, SecretStr, ValidationError, field_validator, model_validator
+from pydantic import Field, SecretStr, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logging.basicConfig(level=logging.INFO)
@@ -49,6 +49,18 @@ class ExitCode(IntEnum):
     BOOTSTRAP_FAILED = 20
     INVALID_ARGS = 30
     RESTORE_FAILED = 40
+
+
+def _format_bytes(num_bytes: int) -> str:
+    units = ["B", "KiB", "MiB", "GiB", "TiB"]
+    value = float(num_bytes)
+    for unit in units:
+        if value < 1024 or unit == units[-1]:
+            if unit == "B":
+                return f"{int(value)} {unit}"
+            return f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{num_bytes} B"
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -257,9 +269,7 @@ class LocalServerSettings(BaseSettings):
     addon_repositories: str | None = Field(None, alias="ODOO_ADDON_REPOSITORIES")
     install_modules: str | None = Field(None, alias="ODOO_INSTALL_MODULES")
     update_modules: str | None = Field(None, alias="ODOO_UPDATE_MODULES")
-    update_modules_legacy: str | None = Field(None, alias="ODOO_UPDATE")
     local_addons_dirs: str | None = Field(None, alias="LOCAL_ADDONS_DIRS")
-    auto_modules_raw: str | None = Field(None, alias="ODOO_AUTO_MODULES")
     openupgrade_enabled: bool = Field(False, alias="OPENUPGRADE_ENABLED")
     openupgrade_scripts_path: Path | None = Field(None, alias="OPENUPGRADE_SCRIPTS_PATH")
     openupgrade_target_version: str | None = Field(None, alias="OPENUPGRADE_TARGET_VERSION")
@@ -276,9 +286,7 @@ class LocalServerSettings(BaseSettings):
         "addon_repositories",
         "install_modules",
         "update_modules",
-        "update_modules_legacy",
         "local_addons_dirs",
-        "auto_modules_raw",
         "openupgrade_target_version",
         mode="before",
     )
@@ -290,12 +298,6 @@ class LocalServerSettings(BaseSettings):
     @classmethod
     def _normalize_openupgrade_scripts_path(cls, value: object) -> object:
         return _normalize_path(value)
-
-    @model_validator(mode="after")
-    def _merge_update_modules(self) -> "LocalServerSettings":
-        if not self.update_modules and self.update_modules_legacy:
-            self.update_modules = self.update_modules_legacy
-        return self
 
     @field_validator("restore_ssh_dir", "restore_ssh_key", mode="before")
     @classmethod
@@ -353,6 +355,8 @@ class OdooUpstreamRestorer:
                     self.local.restore_ssh_key,
                 )
         self._auto_addon_dirs: list[Path] = []
+        self._pre_openupgrade_module_states: dict[str, str] = {}
+        self._odoo_shell_preflight_checked = False
 
     def run_command(self, command: str) -> None:
         _logger.info(f"Running command: {command}")
@@ -361,10 +365,26 @@ class OdooUpstreamRestorer:
         except subprocess.CalledProcessError as command_error:
             raise OdooRestorerError(f"Command failed: {command}\nError: {command_error}") from command_error
 
+    def _local_database_filestore_path(self) -> Path:
+        filestore_root = self.local.filestore_path
+        if filestore_root.name == self.local.db_name:
+            return filestore_root
+        return filestore_root / self.local.db_name
+
     def _resolve_filestore_owner(self) -> str | None:
         owner = _blank_to_none(self.local.filestore_owner)
         if isinstance(owner, str) and owner.strip():
             return owner.strip()
+
+        # Keep filestore write permissions aligned with the mounted data volume
+        # owner so web workers can build/read assets after restore.
+        owner_probe_paths = [self.local.filestore_path.parent, Path("/volumes/data")]
+        for owner_probe_path in owner_probe_paths:
+            try:
+                owner_stats = owner_probe_path.stat()
+            except OSError:
+                continue
+            return f"{owner_stats.st_uid}:{owner_stats.st_gid}"
         return None
 
     def _resolve_restore_ssh_key(self) -> Path | None:
@@ -408,12 +428,100 @@ class OdooUpstreamRestorer:
             )
         return parts
 
+    def _read_upstream_filestore_size_bytes(self) -> int | None:
+        upstream = self._require_upstream()
+        ssh_parts = self._build_ssh_command()
+        ssh_command = shlex.join(ssh_parts)
+        remote_user = shlex.quote(upstream.user)
+        remote_host = shlex.quote(upstream.host)
+        remote_path = shlex.quote(str(upstream.filestore_path))
+        command = f"{ssh_command} {remote_user}@{remote_host} \"du -sb {remote_path}\""
+        try:
+            result = subprocess.run(
+                command,
+                shell=True,
+                env=self.os_env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except subprocess.CalledProcessError as command_error:
+            _logger.warning("Unable to estimate upstream filestore size: %s", command_error)
+            return None
+
+        output = result.stdout.strip()
+        if not output:
+            _logger.warning("Unable to estimate upstream filestore size: empty response.")
+            return None
+        size_token = output.split()[0]
+        if not size_token.isdigit():
+            _logger.warning("Unable to estimate upstream filestore size: unexpected output '%s'.", output)
+            return None
+        return int(size_token)
+
+    def _read_local_filestore_size_bytes(self) -> int:
+        local_database_filestore_path = self._local_database_filestore_path()
+        if not local_database_filestore_path.exists():
+            return 0
+
+        command = ["du", "-sb", str(local_database_filestore_path)]
+        try:
+            result = subprocess.run(
+                command,
+                env=self.os_env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except subprocess.CalledProcessError as command_error:
+            _logger.warning("Unable to estimate current local filestore size: %s", command_error)
+            return 0
+
+        output = result.stdout.strip()
+        if not output:
+            return 0
+        size_token = output.split()[0]
+        if not size_token.isdigit():
+            _logger.warning("Unable to estimate current local filestore size: unexpected output '%s'.", output)
+            return 0
+        return int(size_token)
+
+    def _assert_filestore_capacity(self) -> None:
+        upstream_size_bytes = self._read_upstream_filestore_size_bytes()
+        if upstream_size_bytes is None:
+            return
+
+        local_database_filestore_path = self._local_database_filestore_path()
+        local_database_filestore_path.mkdir(parents=True, exist_ok=True)
+        free_bytes = shutil.disk_usage(local_database_filestore_path).free
+        local_filestore_size_bytes = self._read_local_filestore_size_bytes()
+        effective_free_bytes = free_bytes + local_filestore_size_bytes
+        safety_buffer_bytes = 2 * 1024 * 1024 * 1024
+        required_bytes = upstream_size_bytes + safety_buffer_bytes
+        if effective_free_bytes >= required_bytes:
+            _logger.info(
+                "Filestore capacity check passed (required=%s, free=%s, reclaimable=%s, effective=%s).",
+                _format_bytes(required_bytes),
+                _format_bytes(free_bytes),
+                _format_bytes(local_filestore_size_bytes),
+                _format_bytes(effective_free_bytes),
+            )
+            return
+
+        raise OdooRestorerError(
+            "Insufficient local storage for filestore restore: "
+            f"required at least {_format_bytes(required_bytes)} (upstream {_format_bytes(upstream_size_bytes)} + 2.0 GiB buffer), "
+            f"but only {_format_bytes(free_bytes)} free and {_format_bytes(local_filestore_size_bytes)} reclaimable "
+            f"(effective {_format_bytes(effective_free_bytes)}) at {local_database_filestore_path}."
+        )
+
     def overwrite_filestore(self, target_owner: str | None) -> subprocess.Popen[bytes]:
         upstream = self._require_upstream()
         _logger.info("Overwriting filestore...")
-        self.local.filestore_path.mkdir(parents=True, exist_ok=True)
+        local_database_filestore_path = self._local_database_filestore_path()
+        local_database_filestore_path.mkdir(parents=True, exist_ok=True)
         remote_root = str(upstream.filestore_path).rstrip("/")
-        local_root = str(self.local.filestore_path).rstrip("/")
+        local_root = str(local_database_filestore_path).rstrip("/")
         chown_option = f"--chown={target_owner}" if target_owner else ""
         ssh_parts = self._build_ssh_command()
         ssh_command = shlex.join(ssh_parts)
@@ -431,8 +539,9 @@ class OdooUpstreamRestorer:
     def normalize_filestore_permissions(self, target_owner: str | None) -> None:
         if not target_owner:
             return
+        local_database_filestore_path = self._local_database_filestore_path()
         _logger.info("Normalizing filestore ownership to %s", target_owner)
-        chown_command = f"chown -R {target_owner} {shlex.quote(str(self.local.filestore_path))}"
+        chown_command = f"chown -R {target_owner} {shlex.quote(str(local_database_filestore_path))}"
         self.run_command(chown_command)
 
     def overwrite_database(self) -> None:
@@ -585,11 +694,11 @@ class OdooUpstreamRestorer:
         self._reset_db_connection()
 
     def _clean_filestore(self) -> None:
-        filestore = self.local.filestore_path
-        if filestore.exists():
-            _logger.info("Clearing filestore at %s", filestore)
-            shutil.rmtree(filestore, ignore_errors=True)
-        filestore.mkdir(parents=True, exist_ok=True)
+        local_database_filestore_path = self._local_database_filestore_path()
+        if local_database_filestore_path.exists():
+            _logger.info("Clearing filestore at %s", local_database_filestore_path)
+            shutil.rmtree(local_database_filestore_path, ignore_errors=True)
+        local_database_filestore_path.mkdir(parents=True, exist_ok=True)
 
     def call_odoo_sql(self, sql_call: SqlCall, call_type: SqlCallType) -> list[tuple] | None:
         self.connect_to_db()
@@ -715,15 +824,123 @@ class OdooUpstreamRestorer:
             if cursor.fetchone() is None:
                 raise OdooDatabaseUpdateError("Schema check failed: base.public_user xmlid not found")
 
+    def _module_names_with_states(self, states: Sequence[str]) -> list[str]:
+        self.connect_to_db()
+        with self.local.db_conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT name FROM ir_module_module WHERE state = ANY(%s) ORDER BY name",
+                (list(states),),
+            )
+            return [row[0] for row in cursor.fetchall()]
+
+    def _module_states_by_name(self) -> dict[str, str]:
+        self.connect_to_db()
+        with self.local.db_conn.cursor() as cursor:
+            cursor.execute("SELECT name, state FROM ir_module_module")
+            return {row[0]: row[1] for row in cursor.fetchall()}
+
+    def _discover_manifest_module_names(self) -> set[str]:
+        discovered_modules: set[str] = set()
+        for addons_root in self._resolve_addons_paths():
+            if not addons_root.is_dir():
+                continue
+            try:
+                addon_entries = list(addons_root.iterdir())
+            except OSError:
+                continue
+            for addon_entry in addon_entries:
+                if not addon_entry.is_dir() or addon_entry.name.startswith("."):
+                    continue
+                if (addon_entry / "__manifest__.py").is_file() or (addon_entry / "__openerp__.py").is_file():
+                    discovered_modules.add(addon_entry.name)
+        return discovered_modules
+
+    def _missing_manifest_install_queue_modules(self) -> list[str]:
+        queued_install_modules = self._module_names_with_states(("to install",))
+        if not queued_install_modules:
+            return []
+
+        discovered_modules = self._discover_manifest_module_names()
+        return sorted(module_name for module_name in queued_install_modules if module_name not in discovered_modules)
+
+    def snapshot_module_states_before_openupgrade(self) -> None:
+        self._pre_openupgrade_module_states = self._module_states_by_name()
+
+    def reconcile_missing_manifest_install_queue(self) -> None:
+        unresolved_modules = self._missing_manifest_install_queue_modules()
+        if not unresolved_modules:
+            return
+
+        if not self._pre_openupgrade_module_states:
+            return
+
+        demoted_modules: list[str] = []
+        for module_name in unresolved_modules:
+            previous_state = self._pre_openupgrade_module_states.get(module_name)
+            if previous_state in {"uninstalled", "uninstallable"}:
+                demoted_modules.append(module_name)
+
+        if not demoted_modules:
+            return
+
+        self.connect_to_db()
+        with self.local.db_conn.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE ir_module_module
+                SET state = 'uninstalled', latest_version = NULL, auto_install = FALSE
+                WHERE name = ANY(%s) AND state = 'to install'
+                """,
+                (demoted_modules,),
+            )
+        self.local.db_conn.commit()
+        _logger.info(
+            "Demoted missing-manifest install queue modules back to uninstalled based on pre-OpenUpgrade state: %s",
+            ", ".join(demoted_modules),
+        )
+
+    def assert_install_queue_is_resolvable(self) -> None:
+        unresolved_modules = self._missing_manifest_install_queue_modules()
+        if not unresolved_modules:
+            return
+
+        discovered_modules = self._discover_manifest_module_names()
+        if not discovered_modules:
+            addons_paths = ", ".join(str(path) for path in self._resolve_addons_paths())
+            raise OdooDatabaseUpdateError(
+                "Install queue check failed: discovered zero addon manifests while modules remain in "
+                f"'to install'. addons_path={addons_paths}"
+            )
+
+        addons_paths = ", ".join(str(path) for path in self._resolve_addons_paths())
+        raise OdooDatabaseUpdateError(
+            "Install queue check failed: modules left in 'to install' are missing addon manifests: "
+            f"{', '.join(unresolved_modules)}. addons_path={addons_paths}"
+        )
+
     def _odoo_shell_command(self) -> list[str]:
-        base_bin = Path("/odoo/odoo-bin")
-        if base_bin.exists():
-            command = [str(base_bin), "shell"]
-        else:
-            alt_python = Path("/opt/odoo/venv/bin/python")
-            if not alt_python.exists():
-                raise OdooRestorerError("Unable to locate odoo-bin executable for shell operations.")
-            command = [str(alt_python), "/odoo/odoo-bin", "shell"]
+        odoo_bin = Path("/odoo/odoo-bin")
+        if not odoo_bin.exists():
+            raise OdooRestorerError(
+                "Missing /odoo/odoo-bin in runtime image. "
+                "The base image must provide the Odoo CLI wrapper entrypoint."
+            )
+
+        command = [str(odoo_bin), "shell"]
+
+        # Provide explicit connection/addons arguments so shell execution is
+        # deterministic regardless of runtime defaults in config files.
+        environment_flag_map = (
+            ("ODOO_DB_HOST", "--db_host"),
+            ("ODOO_DB_PORT", "--db_port"),
+            ("ODOO_DB_USER", "--db_user"),
+            ("ODOO_ADDONS_PATH", "--addons-path"),
+            ("ODOO_DATA_DIR", "--data-dir"),
+        )
+        for environment_name, command_flag in environment_flag_map:
+            environment_value = (self.os_env.get(environment_name) or "").strip()
+            if environment_value:
+                command.append(f"{command_flag}={environment_value}")
 
         command += ["-d", self.local.db_name, "--no-http"]
         generated_config_path = Path("/volumes/config/_generated.conf")
@@ -731,9 +948,49 @@ class OdooUpstreamRestorer:
             command += ["--config", str(generated_config_path)]
         return command
 
+    @staticmethod
+    def _format_shell_command_for_log(command: Sequence[str]) -> str:
+        sanitized_parts: list[str] = []
+        for command_part in command:
+            if command_part.startswith("--db_password="):
+                sanitized_parts.append("--db_password=<redacted>")
+                continue
+            if command_part.startswith("PGPASSWORD="):
+                sanitized_parts.append("PGPASSWORD=<redacted>")
+                continue
+            sanitized_parts.append(command_part)
+        return " ".join(sanitized_parts)
+
+    def _ensure_odoo_shell_preflight(self) -> None:
+        if self._odoo_shell_preflight_checked:
+            return
+
+        preflight_command = [*self._odoo_shell_command(), "--help"]
+        try:
+            subprocess.run(
+                preflight_command,
+                env=self.os_env,
+                capture_output=True,
+                check=True,
+            )
+        except subprocess.CalledProcessError as command_error:
+            stderr_output = (command_error.stderr or b"").decode("utf-8", errors="ignore")
+            if "unrecognized parameters: shell" in stderr_output:
+                raise OdooRestorerError(
+                    "Odoo shell preflight failed: image CLI contract is broken. "
+                    "Use an image where `/odoo/odoo-bin shell` is callable."
+                ) from command_error
+            raise OdooRestorerError(
+                "Odoo shell preflight failed. "
+                f"Command: {self._format_shell_command_for_log(preflight_command)}"
+            ) from command_error
+
+        self._odoo_shell_preflight_checked = True
+
     def _run_odoo_shell(self, script: str, label: str) -> None:
+        self._ensure_odoo_shell_preflight()
         command = self._odoo_shell_command()
-        _logger.info("Executing odoo shell for %s: %s", label, " ".join(command))
+        _logger.info("Executing odoo shell for %s: %s", label, self._format_shell_command_for_log(command))
         try:
             subprocess.run(
                 command,
@@ -1053,6 +1310,8 @@ with registry.cursor() as cr:
         else:
             _logger.info("Skipping sanitization per --no-sanitize flag.")
 
+        self.assert_install_queue_is_resolvable()
+
         try:
             self.apply_environment_overrides()
         except OdooDatabaseUpdateError:
@@ -1101,7 +1360,6 @@ with registry.cursor() as cr:
 
         if not candidate_dirs:
             candidate_dirs = [
-                "/volumes/addons",
                 "/opt/project/addons",
             ]
 
@@ -1245,7 +1503,6 @@ with registry.cursor() as cr:
                         addons_paths.append(Path(raw_path))
         if not addons_paths:
             addons_paths = [
-                Path("/volumes/addons"),
                 Path("/opt/project/addons"),
                 Path("/odoo/addons"),
                 Path("/opt/extra_addons"),
@@ -1254,6 +1511,12 @@ with registry.cursor() as cr:
             for auto_dir in self._auto_addon_dirs:
                 if auto_dir not in addons_paths:
                     addons_paths.append(auto_dir)
+
+        # Ensure core addon roots are always considered for explicit updates
+        # (for example website refresh after OpenUpgrade).
+        for core_root in (Path("/odoo/addons"), Path("/odoo/odoo/addons")):
+            if core_root.is_dir() and core_root not in addons_paths:
+                addons_paths.append(core_root)
         return addons_paths
 
     @staticmethod
@@ -1268,9 +1531,6 @@ with registry.cursor() as cr:
         install_modules = self._split_module_list(self.local.install_modules)
         if install_modules:
             return install_modules, "ODOO_INSTALL_MODULES"
-        auto_modules = self._split_module_list(self.local.auto_modules_raw)
-        if auto_modules:
-            return auto_modules, "ODOO_AUTO_MODULES"
         return [], "none"
 
     def install_addons(self, reason: str | None = None) -> None:
@@ -1625,6 +1885,7 @@ with registry.cursor() as cr:
 
     def restore_from_upstream(self, do_sanitize: bool = True) -> None:
         self._require_upstream()
+        self._assert_filestore_capacity()
         target_owner = self._resolve_filestore_owner()
         _logger.info("Resolved filestore owner: %s", target_owner or "<default>")
         filestore_process = self.overwrite_filestore(target_owner)
@@ -1642,6 +1903,7 @@ with registry.cursor() as cr:
         _logger.info("Filestore overwrite completed.")
         self.normalize_filestore_permissions(target_owner)
         if self.local.openupgrade_enabled:
+            self.snapshot_module_states_before_openupgrade()
             try:
                 self.run_openupgrade()
             except OdooRestorerError:
@@ -1669,6 +1931,8 @@ with registry.cursor() as cr:
         else:
             self.update_addons(reason="restore upgrade")
         self.connect_to_db()
+        self.reconcile_missing_manifest_install_queue()
+        self.assert_install_queue_is_resolvable()
 
         try:
             self.apply_environment_overrides()

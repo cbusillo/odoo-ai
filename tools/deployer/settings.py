@@ -170,7 +170,7 @@ AUTO_INSTALLED_SENTINEL = "__AUTO_INSTALLED__"
 
 
 def resolve_update_modules(config: "StackConfig") -> tuple[str, ...]:
-    update_source = config.update_modules_raw or config.update_modules_legacy
+    update_source = config.update_modules_raw
     if update_source and update_source.strip().upper() not in {"AUTO", ""}:
         return split_modules(update_source)
     return (AUTO_INSTALLED_SENTINEL,)
@@ -208,7 +208,6 @@ class StackConfig(BaseModel):
     docker_image: str | None = Field(None, alias="DOCKER_IMAGE")
     base_url: str | None = Field(None, alias="ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL")
     update_modules_raw: str | None = Field(None, alias="ODOO_UPDATE_MODULES")
-    update_modules_legacy: str | None = Field(None, alias="ODOO_UPDATE")
     github_token: str | None = Field(None, alias="GITHUB_TOKEN")
     odoo_data_dir: str | None = Field(None, alias="ODOO_DATA_DIR")
     odoo_db_dir: str | None = Field(None, alias="ODOO_DB_DIR")

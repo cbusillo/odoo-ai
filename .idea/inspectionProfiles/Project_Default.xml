@@ -3,90 +3,116 @@
     <option name="myName" value="Project Default" />
     <option name="scopesOrder">
       <list>
-        <option value="Tests" />
-        <option value="Docs" />
-        <option value="Conf" />
+        <option value="Generated" />
         <option value="All Changed Files" />
         <option value="Open Files" />
         <option value="Project Files" />
         <option value="Scratches and Consoles" />
       </list>
     </option>
-    <inspection_tool class="Annotator" enabled="true" level="ERROR" enabled_by_default="true">
-      <scope name="Docs" level="ERROR" enabled="false" />
+    <inspection_tool class="CssOverwrittenProperties" enabled="true" level="WARNING" enabled_by_default="true">
+      <scope name="Generated" level="WARNING" enabled="false" />
     </inspection_tool>
-    <inspection_tool class="CssUnusedSymbol" enabled="true" level="WARNING" enabled_by_default="false">
-      <scope name="Odoo SCSS" level="WARNING" enabled="false" />
+    <inspection_tool class="CssRedundantUnit" enabled="true" level="WARNING" enabled_by_default="true">
+      <scope name="Generated" level="WARNING" enabled="false" />
     </inspection_tool>
-    <inspection_tool class="DuplicatedCode" enabled="true" level="WEAK WARNING" enabled_by_default="true">
-      <scope name="Tests" level="WEAK WARNING" enabled="false" />
+    <inspection_tool class="CssReplaceWithShorthandSafely" enabled="true" level="WEAK WARNING" enabled_by_default="true">
+      <scope name="Generated" level="WEAK WARNING" enabled="false" />
     </inspection_tool>
-    <inspection_tool class="EmptyDirectory" enabled="true" level="WARNING" enabled_by_default="true" />
-    <inspection_tool class="JsonSchemaCompliance" enabled="true" level="WARNING" enabled_by_default="true">
-      <scope name="Conf" level="WARNING" enabled="false" />
-    </inspection_tool>
-    <inspection_tool class="LongLine" enabled="false" level="WARNING" enabled_by_default="false">
-      <scope name="Docs" level="WARNING" enabled="false" />
-    </inspection_tool>
-    <inspection_tool class="OutdatedRequirementInspection" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
-    <inspection_tool class="PyArgumentEqualDefaultInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true" />
-    <inspection_tool class="PyAugmentAssignmentInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true" />
-    <inspection_tool class="PyBroadExceptionInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true">
-      <scope name="Docs" level="WEAK WARNING" enabled="false" />
-    </inspection_tool>
-    <inspection_tool class="PyCallingNonCallableInspection" enabled="true" level="WARNING" enabled_by_default="true">
-      <scope name="Docs" level="WARNING" enabled="false" />
-    </inspection_tool>
-    <inspection_tool class="PyCompatibilityInspection" enabled="true" level="WARNING" enabled_by_default="true">
-      <scope name="Docs" level="WARNING" enabled="false">
-        <option name="ourVersions">
+    <inspection_tool class="CssUnknownProperty" enabled="true" level="WARNING" enabled_by_default="true">
+      <scope name="Generated" level="WARNING" enabled="false">
+        <option name="myCustomPropertiesEnabled" value="false" />
+        <option name="myIgnoreVendorSpecificProperties" value="false" />
+        <option name="myCustomPropertiesList">
           <value>
-            <list size="2">
-              <item index="0" class="java.lang.String" itemvalue="2.7" />
-              <item index="1" class="java.lang.String" itemvalue="3.14" />
-            </list>
+            <list size="0" />
           </value>
         </option>
       </scope>
+      <option name="myCustomPropertiesEnabled" value="false" />
+      <option name="myIgnoreVendorSpecificProperties" value="false" />
+      <option name="myCustomPropertiesList">
+        <value>
+          <list size="0" />
+        </value>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="CssUnusedSymbol" enabled="true" level="WARNING" enabled_by_default="true">
+      <scope name="Generated" level="WARNING" enabled="false" />
+    </inspection_tool>
+    <inspection_tool class="DuplicatedCode" enabled="true" level="WEAK WARNING" enabled_by_default="true">
+      <scope name="Generated" level="WEAK WARNING" enabled="false" />
+    </inspection_tool>
+    <inspection_tool class="HttpUrlsUsage" enabled="true" level="WEAK WARNING" enabled_by_default="true">
+      <option name="ignoredUrls">
+        <list>
+          <option value="http://0.0.0.0" />
+          <option value="http://127.0.0.1" />
+          <option value="http://activemq.apache.org/schema/" />
+          <option value="http://cxf.apache.org/schemas/" />
+          <option value="http://evil.com" />
+          <option value="http://java.sun.com/" />
+          <option value="http://javafx.com/fxml" />
+          <option value="http://javafx.com/javafx/" />
+          <option value="http://json-schema.org/draft" />
+          <option value="http://localhost" />
+          <option value="http://maven.apache.org/POM/" />
+          <option value="http://maven.apache.org/xsd/" />
+          <option value="http://primefaces.org/ui" />
+          <option value="http://schema.cloudfoundry.org/spring/" />
+          <option value="http://schemas.xmlsoap.org/" />
+          <option value="http://tiles.apache.org/" />
+          <option value="http://www.ibm.com/webservices/xsd" />
+          <option value="http://www.jboss.com/xml/ns/" />
+          <option value="http://www.jboss.org/j2ee/schema/" />
+          <option value="http://www.springframework.org/schema/" />
+          <option value="http://www.springframework.org/security/tags" />
+          <option value="http://www.springframework.org/tags" />
+          <option value="http://www.thymeleaf.org" />
+          <option value="http://www.w3.org/" />
+          <option value="http://xmlns.jcp.org/" />
+        </list>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="PyArgumentEqualDefaultInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true" />
+    <inspection_tool class="PyAugmentAssignmentInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true" />
+    <inspection_tool class="PyClassicStyleClassInspection" enabled="true" level="WARNING" enabled_by_default="true" />
+    <inspection_tool class="PyCompatibilityInspection" enabled="true" level="WARNING" enabled_by_default="true">
       <option name="ourVersions">
         <value>
-          <list size="3">
+          <list size="2">
             <item index="0" class="java.lang.String" itemvalue="3.13" />
             <item index="1" class="java.lang.String" itemvalue="3.12" />
-            <item index="2" class="java.lang.String" itemvalue="3.14" />
           </list>
         </value>
       </option>
     </inspection_tool>
-    <inspection_tool class="PyInconsistentReturnsInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true">
-      <scope name="Docs" level="WEAK WARNING" enabled="false" />
+    <inspection_tool class="PyMethodMayBeStaticInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true">
+      <scope name="Generated" level="WEAK WARNING" enabled="false" />
     </inspection_tool>
     <inspection_tool class="PyMissingTypeHintsInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true">
-      <scope name="Docs" level="WEAK WARNING" enabled="false">
+      <scope name="Generated" level="WEAK WARNING" enabled="false">
         <option name="m_onlyWhenTypesAreKnown" value="false" />
       </scope>
       <option name="m_onlyWhenTypesAreKnown" value="false" />
     </inspection_tool>
-    <inspection_tool class="PyRedeclarationInspection" enabled="true" level="WARNING" enabled_by_default="true">
-      <scope name="Docs" level="WARNING" enabled="false" />
+    <inspection_tool class="PyPep8NamingInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true">
+      <scope name="Generated" level="WEAK WARNING" enabled="false" />
     </inspection_tool>
-    <inspection_tool class="PyStatementEffectInspection" enabled="true" level="WARNING" enabled_by_default="true">
-      <scope name="Docs" level="WARNING" enabled="false" />
+    <inspection_tool class="PyProtectedMemberInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true">
+      <scope name="Generated" level="WEAK WARNING" enabled="false" />
     </inspection_tool>
-    <inspection_tool class="PyTypeCheckerInspection" enabled="true" level="WARNING" enabled_by_default="true">
-      <scope name="Docs" level="WARNING" enabled="false" />
+    <inspection_tool class="PyShadowingBuiltinsInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true">
+      <scope name="Generated" level="WEAK WARNING" enabled="false" />
     </inspection_tool>
     <inspection_tool class="PyUnreachableCodeInspection" enabled="true" level="WARNING" enabled_by_default="true">
-      <scope name="Docs" level="WARNING" enabled="false" editorAttributes="NOT_USED_ELEMENT_ATTRIBUTES" />
-    </inspection_tool>
-    <inspection_tool class="PyUnresolvedReferencesInspection" enabled="true" level="WARNING" enabled_by_default="true">
-      <scope name="Docs" level="WARNING" enabled="false" />
+      <scope name="Generated" level="WARNING" enabled="false" editorAttributes="NOT_USED_ELEMENT_ATTRIBUTES" />
     </inspection_tool>
     <inspection_tool class="PyUnusedLocalInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true">
-      <scope name="Docs" level="WEAK WARNING" enabled="false" />
+      <scope name="Generated" level="WEAK WARNING" enabled="false" />
     </inspection_tool>
     <inspection_tool class="SpellCheckingInspection" enabled="true" level="TYPO" enabled_by_default="true">
-      <scope name="Conf" level="TYPO" enabled="false">
+      <scope name="Generated" level="TYPO" enabled="false">
         <option name="processCode" value="true" />
         <option name="processLiterals" value="true" />
         <option name="processComments" value="true" />
@@ -95,7 +121,5 @@
       <option name="processLiterals" value="true" />
       <option name="processComments" value="true" />
     </inspection_tool>
-    <inspection_tool class="TodoComment" enabled="true" level="WARNING" enabled_by_default="true" />
-    <inspection_tool class="UnsatisfiedRequirementInspection" enabled="false" level="WARNING" enabled_by_default="false" />
   </profile>
 </component>

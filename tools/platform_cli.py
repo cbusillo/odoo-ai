@@ -6,9 +6,11 @@ import subprocess
 import textwrap
 import time
 import tomllib
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Literal, cast
+from typing import Literal, cast
+from urllib.parse import urlparse
 
 import click
 import requests
@@ -113,6 +115,10 @@ PLATFORM_TUI_WORKFLOWS = (
 GHCR_HOST = "ghcr.io"
 DEFAULT_ODOO_BASE_RUNTIME_IMAGE = "ghcr.io/cbusillo/odoo-enterprise-docker:19.0-runtime"
 DEFAULT_ODOO_BASE_DEVTOOLS_IMAGE = "ghcr.io/cbusillo/odoo-enterprise-docker:19.0-devtools"
+DEFAULT_DOKPLOY_DEPLOY_TIMEOUT_SECONDS = 600
+DEFAULT_DOKPLOY_HEALTH_TIMEOUT_SECONDS = 180
+DEFAULT_DOKPLOY_HEALTHCHECK_PATH = "/web/health"
+HEALTHCHECK_PASS_STATUSES = {"pass", "ok", "healthy"}
 REGISTRY_LOGINS_DONE: set[tuple[str, str]] = set()
 VERIFIED_IMAGE_ACCESS: set[str] = set()
 
@@ -149,6 +155,10 @@ class DokployTargetDefinition(BaseModel):
     auto_deploy: bool | None = None
     require_test_gate: bool = False
     require_prod_gate: bool = False
+    deploy_timeout_seconds: int | None = Field(default=None, ge=1)
+    healthcheck_enabled: bool = True
+    healthcheck_path: str = DEFAULT_DOKPLOY_HEALTHCHECK_PATH
+    healthcheck_timeout_seconds: int | None = Field(default=None, ge=1)
     env: dict[str, str] = Field(default_factory=dict)
     domains: tuple[str, ...] = ()
 
@@ -2467,6 +2477,129 @@ def _wait_for_dokploy_compose_deployment(
     raise click.ClickException("Timed out waiting for Dokploy compose deployment status.")
 
 
+def _resolve_ship_timeout_seconds(
+    *,
+    timeout_override_seconds: int | None,
+    target_definition: DokployTargetDefinition | None,
+) -> int:
+    if timeout_override_seconds is not None:
+        if timeout_override_seconds <= 0:
+            raise click.ClickException("Ship timeout must be greater than zero seconds.")
+        return timeout_override_seconds
+
+    if target_definition is not None and target_definition.deploy_timeout_seconds is not None:
+        return target_definition.deploy_timeout_seconds
+    return DEFAULT_DOKPLOY_DEPLOY_TIMEOUT_SECONDS
+
+
+def _resolve_ship_health_timeout_seconds(
+    *,
+    health_timeout_override_seconds: int | None,
+    target_definition: DokployTargetDefinition | None,
+) -> int:
+    if health_timeout_override_seconds is not None:
+        if health_timeout_override_seconds <= 0:
+            raise click.ClickException("Ship health timeout must be greater than zero seconds.")
+        return health_timeout_override_seconds
+
+    if target_definition is not None and target_definition.healthcheck_timeout_seconds is not None:
+        return target_definition.healthcheck_timeout_seconds
+    return DEFAULT_DOKPLOY_HEALTH_TIMEOUT_SECONDS
+
+
+def _normalize_healthcheck_path(raw_healthcheck_path: str) -> str:
+    normalized_path = raw_healthcheck_path.strip() or DEFAULT_DOKPLOY_HEALTHCHECK_PATH
+    if not normalized_path.startswith("/"):
+        normalized_path = f"/{normalized_path}"
+    return normalized_path
+
+
+def _resolve_healthcheck_base_urls(
+    *,
+    target_definition: DokployTargetDefinition | None,
+    environment_values: dict[str, str],
+) -> tuple[str, ...]:
+    raw_base_urls: list[str] = []
+    if target_definition is not None:
+        raw_base_urls.extend(domain for domain in target_definition.domains if domain)
+
+    if not raw_base_urls:
+        fallback_base_url = environment_values.get("ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL", "").strip()
+        if fallback_base_url:
+            raw_base_urls.append(fallback_base_url)
+
+    normalized_base_urls: list[str] = []
+    for raw_base_url in raw_base_urls:
+        stripped_base_url = raw_base_url.strip()
+        if not stripped_base_url:
+            continue
+        parsed_base_url = urlparse(stripped_base_url)
+        if not parsed_base_url.scheme:
+            stripped_base_url = f"https://{stripped_base_url}"
+        stripped_base_url = stripped_base_url.rstrip("/")
+        if stripped_base_url and stripped_base_url not in normalized_base_urls:
+            normalized_base_urls.append(stripped_base_url)
+
+    return tuple(normalized_base_urls)
+
+
+def _resolve_ship_healthcheck_urls(
+    *,
+    target_definition: DokployTargetDefinition | None,
+    environment_values: dict[str, str],
+) -> tuple[str, ...]:
+    if target_definition is not None and not target_definition.healthcheck_enabled:
+        return ()
+
+    healthcheck_path = _normalize_healthcheck_path(
+        target_definition.healthcheck_path if target_definition is not None else DEFAULT_DOKPLOY_HEALTHCHECK_PATH
+    )
+    base_urls = _resolve_healthcheck_base_urls(target_definition=target_definition, environment_values=environment_values)
+    return tuple(f"{base_url}{healthcheck_path}" for base_url in base_urls)
+
+
+def _wait_for_ship_healthcheck(*, url: str, timeout_seconds: int) -> str:
+    deadline = time.monotonic() + timeout_seconds
+    last_result = "no response"
+
+    while time.monotonic() < deadline:
+        try:
+            response = requests.get(url, timeout=5)
+        except requests.RequestException as error:
+            last_result = str(error)
+            time.sleep(2)
+            continue
+
+        if response.status_code != 200:
+            last_result = f"http {response.status_code}"
+            time.sleep(2)
+            continue
+
+        try:
+            payload = response.json()
+        except ValueError:
+            return "http 200"
+
+        if isinstance(payload, dict) and "status" in payload:
+            normalized_status = str(payload.get("status") or "").strip().lower()
+            if normalized_status in HEALTHCHECK_PASS_STATUSES:
+                return f"http 200 status={normalized_status}"
+            last_result = f"http 200 status={normalized_status or 'unknown'}"
+            time.sleep(2)
+            continue
+
+        return "http 200"
+
+    raise click.ClickException(f"Health check failed for {url}. Last result: {last_result}")
+
+
+def _verify_ship_healthchecks(*, urls: tuple[str, ...], timeout_seconds: int) -> None:
+    for healthcheck_url in urls:
+        click.echo(f"healthcheck_url={healthcheck_url}")
+        result = _wait_for_ship_healthcheck(url=healthcheck_url, timeout_seconds=timeout_seconds)
+        click.echo(f"healthcheck_result={result}")
+
+
 def _render_odoo_config(
     *,
     stack_definition: StackDefinition,
@@ -3921,7 +4054,25 @@ def inspect_context(
 )
 @click.option("--env-file", type=click.Path(path_type=Path), default=None)
 @click.option("--wait/--no-wait", default=True)
-@click.option("--timeout", "timeout_seconds", default=600, show_default=True)
+@click.option(
+    "--timeout",
+    "timeout_override_seconds",
+    type=int,
+    default=None,
+    help="Deployment wait timeout in seconds. Defaults to platform/dokploy.toml per-target value or 600.",
+)
+@click.option(
+    "--verify-health/--no-verify-health",
+    default=True,
+    help="Verify /web/health endpoints after a successful deploy when --wait is enabled.",
+)
+@click.option(
+    "--health-timeout",
+    "health_timeout_override_seconds",
+    type=int,
+    default=None,
+    help="Health verification timeout in seconds per endpoint. Defaults to per-target value or 180.",
+)
 @click.option("--dry-run", is_flag=True, default=False)
 @click.option("--no-cache", is_flag=True, default=False, help="Request rebuild deployment on Dokploy target.")
 @click.option("--skip-gate", is_flag=True, default=False, help="Skip required test/prod gates from platform/dokploy.toml.")
@@ -3930,7 +4081,9 @@ def ship(
     instance_name: str,
     env_file: Path | None,
     wait: bool,
-    timeout_seconds: int,
+    timeout_override_seconds: int | None,
+    verify_health: bool,
+    health_timeout_override_seconds: int | None,
     dry_run: bool,
     no_cache: bool,
     skip_gate: bool,
@@ -3953,6 +4106,20 @@ def ship(
             context_name=context_name,
             instance_name=instance_name,
         )
+    deploy_timeout_seconds = _resolve_ship_timeout_seconds(
+        timeout_override_seconds=timeout_override_seconds,
+        target_definition=target_definition,
+    )
+    health_timeout_seconds = _resolve_ship_health_timeout_seconds(
+        health_timeout_override_seconds=health_timeout_override_seconds,
+        target_definition=target_definition,
+    )
+    healthcheck_urls = _resolve_ship_healthcheck_urls(
+        target_definition=target_definition,
+        environment_values=environment_values,
+    )
+    should_verify_health = verify_health and wait
+
     _run_required_gates(
         context_name=context_name,
         target_definition=target_definition,
@@ -3970,6 +4137,12 @@ def ship(
             click.echo(f"ship_mode=dokploy-{ship_mode}-api")
             click.echo(f"target_name={target_name}")
             click.echo(f"dry_run_note={error.message}")
+            click.echo(f"deploy_timeout_seconds={deploy_timeout_seconds}")
+            click.echo(f"verify_health={str(should_verify_health).lower()}")
+            if should_verify_health:
+                click.echo(f"health_timeout_seconds={health_timeout_seconds}")
+                for healthcheck_url in healthcheck_urls:
+                    click.echo(f"healthcheck_url={healthcheck_url}")
             return
         raise
 
@@ -4009,6 +4182,12 @@ def ship(
         click.echo(f"compose_id={selected_target_id}")
         click.echo(f"deploy_action={'redeploy' if no_cache else 'deploy'}")
         click.echo(f"no_cache={str(no_cache).lower()}")
+        click.echo(f"deploy_timeout_seconds={deploy_timeout_seconds}")
+        click.echo(f"verify_health={str(should_verify_health).lower()}")
+        if should_verify_health:
+            click.echo(f"health_timeout_seconds={health_timeout_seconds}")
+            for healthcheck_url in healthcheck_urls:
+                click.echo(f"healthcheck_url={healthcheck_url}")
         if dry_run:
             return
 
@@ -4027,9 +4206,14 @@ def ship(
             token=token,
             compose_id=selected_target_id,
             before_key=before_key,
-            timeout_seconds=timeout_seconds,
+            timeout_seconds=deploy_timeout_seconds,
         )
         click.echo(result)
+        if should_verify_health:
+            if not healthcheck_urls:
+                click.echo("healthcheck_result=skipped-no-target-domain")
+            else:
+                _verify_ship_healthchecks(urls=healthcheck_urls, timeout_seconds=health_timeout_seconds)
         return
 
     latest_before = _latest_deployment_for_application(host, token, selected_target_id)
@@ -4044,6 +4228,12 @@ def ship(
     click.echo(f"application_id={selected_target_id}")
     click.echo(f"deploy_action={'redeploy' if no_cache else 'deploy'}")
     click.echo(f"no_cache={str(no_cache).lower()}")
+    click.echo(f"deploy_timeout_seconds={deploy_timeout_seconds}")
+    click.echo(f"verify_health={str(should_verify_health).lower()}")
+    if should_verify_health:
+        click.echo(f"health_timeout_seconds={health_timeout_seconds}")
+        for healthcheck_url in healthcheck_urls:
+            click.echo(f"healthcheck_url={healthcheck_url}")
     if dry_run:
         return
 
@@ -4062,9 +4252,14 @@ def ship(
         token=token,
         application_id=selected_target_id,
         before_key=before_key,
-        timeout_seconds=timeout_seconds,
+        timeout_seconds=deploy_timeout_seconds,
     )
     click.echo(result)
+    if should_verify_health:
+        if not healthcheck_urls:
+            click.echo("healthcheck_result=skipped-no-target-domain")
+        else:
+            _verify_ship_healthchecks(urls=healthcheck_urls, timeout_seconds=health_timeout_seconds)
 
 
 @main.command("rollback")

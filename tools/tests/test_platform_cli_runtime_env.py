@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
+import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-import unittest
 from unittest.mock import patch
 
 from tools.platform_cli import (
     ContextDefinition,
+    DokployTargetDefinition,
     InstanceDefinition,
     RuntimeSelection,
     StackDefinition,
     _build_runtime_env_values,
     _load_environment,
+    _resolve_ship_health_timeout_seconds,
+    _resolve_ship_healthcheck_urls,
+    _resolve_ship_timeout_seconds,
     _run_with_web_temporarily_stopped,
 )
 
@@ -167,6 +171,76 @@ class PlatformWebPauseTests(unittest.TestCase):
         self.assertEqual(executed_commands[0], ["docker", "compose", "stop", "web"])
         self.assertEqual(executed_commands[1], ["operation"])
         self.assertEqual(executed_commands[2], ["docker", "compose", "up", "-d", "web"])
+
+
+class PlatformShipHealthcheckResolutionTests(unittest.TestCase):
+    def test_ship_timeout_prefers_target_override(self) -> None:
+        target_definition = DokployTargetDefinition(
+            context="cm",
+            instance="testing",
+            deploy_timeout_seconds=1800,
+        )
+
+        resolved_timeout_seconds = _resolve_ship_timeout_seconds(
+            timeout_override_seconds=None,
+            target_definition=target_definition,
+        )
+
+        self.assertEqual(resolved_timeout_seconds, 1800)
+
+    def test_ship_health_timeout_prefers_target_override(self) -> None:
+        target_definition = DokployTargetDefinition(
+            context="cm",
+            instance="testing",
+            healthcheck_timeout_seconds=420,
+        )
+
+        resolved_timeout_seconds = _resolve_ship_health_timeout_seconds(
+            health_timeout_override_seconds=None,
+            target_definition=target_definition,
+        )
+
+        self.assertEqual(resolved_timeout_seconds, 420)
+
+    def test_healthcheck_urls_resolve_from_target_domains(self) -> None:
+        target_definition = DokployTargetDefinition(
+            context="cm",
+            instance="testing",
+            domains=("cm-testing.shinycomputers.com",),
+            healthcheck_path="/web/health",
+        )
+
+        healthcheck_urls = _resolve_ship_healthcheck_urls(
+            target_definition=target_definition,
+            environment_values={},
+        )
+
+        self.assertEqual(healthcheck_urls, ("https://cm-testing.shinycomputers.com/web/health",))
+
+    def test_healthcheck_urls_fallback_to_base_url_env(self) -> None:
+        healthcheck_urls = _resolve_ship_healthcheck_urls(
+            target_definition=None,
+            environment_values={
+                "ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL": "https://cm-dev.shinycomputers.com",
+            },
+        )
+
+        self.assertEqual(healthcheck_urls, ("https://cm-dev.shinycomputers.com/web/health",))
+
+    def test_healthcheck_urls_respect_disabled_flag(self) -> None:
+        target_definition = DokployTargetDefinition(
+            context="cm",
+            instance="testing",
+            domains=("cm-testing.shinycomputers.com",),
+            healthcheck_enabled=False,
+        )
+
+        healthcheck_urls = _resolve_ship_healthcheck_urls(
+            target_definition=target_definition,
+            environment_values={},
+        )
+
+        self.assertEqual(healthcheck_urls, ())
 
 
 if __name__ == "__main__":

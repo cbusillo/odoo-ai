@@ -1,9 +1,8 @@
 x-odoo-base: &odoo-base
   # TODO: SECURITY WARNING - Never push this image to a registry!
-  # 1. GitHub token is embedded in Docker layer history
-  # 2. Contains proprietary Odoo Enterprise source code
-  # 3. To prevent accidental push: keep image name local (no registry prefix)
-  # If registry push ever needed: refactor Dockerfile to use BuildKit secrets
+  # 1. Contains proprietary Odoo Enterprise source code
+  # 2. To prevent accidental push: keep image name local (no registry prefix)
+  # Build already uses BuildKit secrets for addon fetch authentication.
   image: ${DOCKER_IMAGE:-odoo-ai}:${DOCKER_IMAGE_TAG:-latest}
   pull_policy: never
   restart: unless-stopped
@@ -14,11 +13,13 @@ x-odoo-build: &odoo-build
   build:
     dockerfile: docker/Dockerfile
     args:
-      PYTHON_VERSION: ${PYTHON_VERSION:-3.13}
       ODOO_VERSION: ${ODOO_VERSION:-19.0}
+      ODOO_BASE_RUNTIME_IMAGE: ${ODOO_BASE_RUNTIME_IMAGE:-ghcr.io/cbusillo/odoo-enterprise-docker:19.0-runtime}
+      ODOO_BASE_DEVTOOLS_IMAGE: ${ODOO_BASE_DEVTOOLS_IMAGE:-ghcr.io/cbusillo/odoo-enterprise-docker:19.0-devtools}
       ODOO_ADDON_REPOSITORIES: ${ODOO_ADDON_REPOSITORIES:-}
-      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
     target: ${COMPOSE_BUILD_TARGET:-development}
+    secrets:
+      - github_token
 
 x-odoo-env: &odoo-env
   ODOO_DB_HOST: database
@@ -26,9 +27,18 @@ x-odoo-env: &odoo-env
   ODOO_DB_NAME: ${ODOO_DB_NAME:?missing}
   ODOO_DB_USER: ${ODOO_DB_USER:?missing}
   ODOO_DB_PASSWORD: ${ODOO_DB_PASSWORD:?missing}
+  ODOO_DB_MAXCONN: ${ODOO_DB_MAXCONN:-}
+  ODOO_MAX_CRON_THREADS: ${ODOO_MAX_CRON_THREADS:-}
+  ODOO_WORKERS: ${ODOO_WORKERS:-}
+  ODOO_LIMIT_TIME_CPU: ${ODOO_LIMIT_TIME_CPU:-}
+  ODOO_LIMIT_TIME_REAL: ${ODOO_LIMIT_TIME_REAL:-}
+  ODOO_LIMIT_TIME_REAL_CRON: ${ODOO_LIMIT_TIME_REAL_CRON:-}
+  ODOO_LIMIT_MEMORY_SOFT: ${ODOO_LIMIT_MEMORY_SOFT:-}
+  ODOO_LIMIT_MEMORY_HARD: ${ODOO_LIMIT_MEMORY_HARD:-}
+  ODOO_DEV_MODE: ${ODOO_DEV_MODE:-}
   ODOO_INSTALL_MODULES: ${ODOO_INSTALL_MODULES:-}
   ODOO_UPDATE_MODULES: ${ODOO_UPDATE_MODULES:-AUTO}
-  ODOO_ADDONS_PATH: /opt/project/addons,/opt/extra_addons,/opt/extra_addons/odoo-enterprise-mirror,/odoo/addons
+  ODOO_ADDONS_PATH: ${ODOO_ADDONS_PATH:-/opt/project/addons,/opt/extra_addons,/opt/enterprise,/odoo/addons}
   IMAGE_ODOO_ENTERPRISE_LOCATION: /volumes/enterprise_disabled
   IMAGE_EXTRA_ADDONS_LOCATION: /opt/extra_addons
 
@@ -58,6 +68,28 @@ services:
   database:
     image: postgres:17
     restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - max_connections=${POSTGRES_MAX_CONNECTIONS:-100}
+      - -c
+      - shared_buffers=${POSTGRES_SHARED_BUFFERS:-1GB}
+      - -c
+      - effective_cache_size=${POSTGRES_EFFECTIVE_CACHE_SIZE:-4GB}
+      - -c
+      - work_mem=${POSTGRES_WORK_MEM:-32MB}
+      - -c
+      - maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-256MB}
+      - -c
+      - max_wal_size=${POSTGRES_MAX_WAL_SIZE:-1GB}
+      - -c
+      - min_wal_size=${POSTGRES_MIN_WAL_SIZE:-80MB}
+      - -c
+      - checkpoint_timeout=${POSTGRES_CHECKPOINT_TIMEOUT:-5min}
+      - -c
+      - random_page_cost=${POSTGRES_RANDOM_PAGE_COST:-4}
+      - -c
+      - effective_io_concurrency=${POSTGRES_EFFECTIVE_IO_CONCURRENCY:-1}
     volumes:
       - odoo_db:/var/lib/postgresql/data
     environment:
@@ -105,3 +137,7 @@ volumes:
   testkit_db:
   testkit_data:
   testkit_logs:
+
+secrets:
+  github_token:
+    environment: GITHUB_TOKEN

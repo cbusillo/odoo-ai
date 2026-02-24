@@ -3,6 +3,21 @@ set -eux
 
 export UV_PROJECT_ENVIRONMENT=/venv
 
+ensure_uv_environment() {
+  if [ -x "/venv/bin/python3" ]; then
+    return
+  fi
+
+  local python_command="python3"
+  if ! command -v "$python_command" >/dev/null 2>&1; then
+    python_command="python"
+  fi
+
+  uv venv /venv --python "$python_command"
+}
+
+ensure_uv_environment
+
 filter_uv_sync_extras() {
   if [ ! -x "/venv/bin/python3" ]; then
     echo ""
@@ -62,10 +77,10 @@ import site
 paths = [
     "/odoo",
     "/odoo/addons",
-    "/volumes/addons",
+    "/odoo/odoo/addons",
     "/opt/project/addons",
     "/opt/extra_addons",
-    "/opt/extra_addons/odoo-enterprise-mirror",
+    "/opt/enterprise",
     "/opt/extra_addons/OpenUpgrade",
 ]
 
@@ -139,7 +154,7 @@ install_addon_requirements() {
   done
 }
 
-install_addon_requirements /volumes/addons
+install_addon_requirements /opt/project/addons
 install_addon_requirements /opt/extra_addons
 
-cd /volumes/addons
+cd /opt/project/addons

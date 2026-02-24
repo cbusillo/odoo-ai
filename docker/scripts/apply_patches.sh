@@ -20,10 +20,13 @@ for patch in "$patch_dir"/*.patch; do
         exit 1
     fi
     target_path="$root_dir/$target_rel"
+    created_target_backup=0
     if [ ! -e "$target_path" ]; then
         alt_rel="${target_rel%.orig}"
         alt_path="$root_dir/$alt_rel"
         if [ "$alt_rel" != "$target_rel" ] && [ -e "$alt_path" ]; then
+            cp "$alt_path" "$target_path"
+            created_target_backup=1
             target_path="$alt_path"
         else
             echo "Skipping patch (target missing): $(basename "$patch")"
@@ -33,13 +36,22 @@ for patch in "$patch_dir"/*.patch; do
     echo "Applying patch: $(basename "$patch")"
     patch_log="$(mktemp)"
     if patch --batch --forward -p0 -d "$root_dir" < "$patch" >"$patch_log" 2>&1; then
+        if [ "$created_target_backup" -eq 1 ]; then
+            rm -f "$root_dir/$target_rel"
+        fi
         rm -f "$patch_log"
         continue
     fi
     if grep -q "Reversed (or previously applied) patch detected" "$patch_log"; then
         echo "Patch already applied: $(basename "$patch")"
+        if [ "$created_target_backup" -eq 1 ]; then
+            rm -f "$root_dir/$target_rel"
+        fi
         rm -f "$patch_log"
         continue
+    fi
+    if [ "$created_target_backup" -eq 1 ]; then
+        rm -f "$root_dir/$target_rel"
     fi
     cat "$patch_log"
     rm -f "$patch_log"

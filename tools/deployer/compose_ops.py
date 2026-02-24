@@ -1,6 +1,6 @@
+import os
 from collections.abc import Mapping, Sequence
 from pathlib import PurePosixPath
-import os
 
 from .command import run_process
 from .settings import StackSettings

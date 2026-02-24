@@ -8,9 +8,30 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 
+def _sanitize_command_for_display(command: Sequence[str]) -> tuple[str, ...]:
+    sanitized: list[str] = []
+    redact_next_env_value = False
+    for part in command:
+        if redact_next_env_value:
+            if "=" in part:
+                env_key, _env_value = part.split("=", 1)
+                sanitized.append(f"{env_key}=<redacted>")
+            else:
+                sanitized.append("<redacted>")
+            redact_next_env_value = False
+            continue
+
+        sanitized.append(part)
+        if part == "-e":
+            redact_next_env_value = True
+
+    return tuple(sanitized)
+
+
 class CommandError(RuntimeError):
     def __init__(self, command: Sequence[str], returncode: int, stdout: str | None, stderr: str | None) -> None:
-        joined_command = " ".join(shlex.quote(part) for part in command)
+        display_command = _sanitize_command_for_display(command)
+        joined_command = " ".join(shlex.quote(part) for part in display_command)
         message = f"command failed ({returncode}): {joined_command}"
         super().__init__(message)
         self.command = tuple(command)

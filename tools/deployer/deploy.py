@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import shlex
 import tempfile
 import time
 from collections.abc import Mapping
@@ -190,26 +191,60 @@ def _run_module_subcommand(settings: StackSettings, subcommand: list[str], *, re
 
 
 def _build_module_subcommand(settings: StackSettings, module_argument: str, operation_flag: str) -> list[str]:
+    odoo_command = _resolve_odoo_binary_command(settings)
     return [
         "exec",
         "-T",
+        "-u",
+        "root",
         settings.script_runner_service,
         "bash",
         "-lc",
-        f"{settings.odoo_bin_path} {operation_flag} {module_argument} -d $ODOO_DB_NAME --stop-after-init",
+        "odoo_config_arguments=\"\"; "
+        "if [ -r /volumes/config/_generated.conf ]; then "
+        "odoo_config_arguments=\"-c /volumes/config/_generated.conf\"; "
+        "fi; "
+        f"{odoo_command} $odoo_config_arguments --data-dir=/volumes/data "
+        f"{operation_flag} {module_argument} -d $ODOO_DB_NAME --no-http --stop-after-init",
     ]
 
 
 def _build_module_subcommand_flags(settings: StackSettings, flags: list[str]) -> list[str]:
     module_argument = " ".join(flags)
+    odoo_command = _resolve_odoo_binary_command(settings)
     return [
         "exec",
         "-T",
+        "-u",
+        "root",
         settings.script_runner_service,
         "bash",
         "-lc",
-        f"{settings.odoo_bin_path} {module_argument} -d $ODOO_DB_NAME --stop-after-init",
+        "odoo_config_arguments=\"\"; "
+        "if [ -r /volumes/config/_generated.conf ]; then "
+        "odoo_config_arguments=\"-c /volumes/config/_generated.conf\"; "
+        "fi; "
+        f"{odoo_command} $odoo_config_arguments --data-dir=/volumes/data "
+        f"{module_argument} -d $ODOO_DB_NAME --no-http --stop-after-init",
     ]
+
+
+def _resolve_odoo_binary_command(settings: StackSettings) -> str:
+    configured_binary = shlex.quote(settings.odoo_bin_path)
+    return (
+        f"odoo_binary_path={configured_binary}; "
+        "if [ ! -x \"$odoo_binary_path\" ]; then "
+        "for fallback_binary in /usr/bin/odoo /odoo/odoo-bin odoo; do "
+        "if [ -x \"$fallback_binary\" ] || command -v \"$fallback_binary\" >/dev/null 2>&1; then "
+        "odoo_binary_path=\"$fallback_binary\"; break; "
+        "fi; "
+        "done; "
+        "fi; "
+        "if [ ! -x \"$odoo_binary_path\" ] && ! command -v \"$odoo_binary_path\" >/dev/null 2>&1; then "
+        "echo \"Odoo executable not found: $odoo_binary_path\" >&2; exit 127; "
+        "fi; "
+        "\"$odoo_binary_path\""
+    )
 
 
 def _execute_module_action(
@@ -304,6 +339,18 @@ def _installed_module_names(settings: StackSettings) -> set[str]:
         if result.returncode == 0:
             break
         last_error = (result.stderr or "").strip()
+        if "database" in last_error and "does not exist" in last_error:
+            logging.getLogger("deploy.workflow").info(
+                "Database %s is missing; treating installed-module set as empty.",
+                db_name,
+            )
+            return set()
+        if "relation \"ir_module_module\" does not exist" in last_error:
+            logging.getLogger("deploy.workflow").info(
+                "Database %s is not initialized yet; treating installed-module set as empty.",
+                db_name,
+            )
+            return set()
         attempt += 1
         logging.getLogger("deploy.workflow").debug(
             "Module query failed (attempt %s/%s): %s",
@@ -354,7 +401,7 @@ def deploy_stack(
     remote: bool,
     skip_upgrade: bool = False,
     skip_health_check: bool = False,
-    health_timeout_seconds: int = 60,
+    health_timeout_seconds: int = 300,
     extra_env: Mapping[str, str] | None = None,
     repository_url: str | None = None,
     commit: str | None = None,

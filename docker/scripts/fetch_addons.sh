@@ -20,6 +20,50 @@ case ",${addons_repos}," in
 	;;
 esac
 
+download_archive() {
+	repository_full_name="$1"
+	repository_ref="$2"
+	target_directory="$3"
+
+	archive_url="https://codeload.github.com/${repository_full_name}/tar.gz/${repository_ref}"
+	tmp_archive="$(mktemp /tmp/addon-archive.XXXXXX)"
+	tmp_extract_root="$(mktemp -d /tmp/addon-extract.XXXXXX)"
+
+	log "Downloading ${repository_full_name}@${repository_ref}"
+	if ! curl --fail --location --show-error --silent \
+		-H "Authorization: Bearer ${GITHUB_TOKEN}" \
+		-H "Accept: application/vnd.github+json" \
+		"${archive_url}" \
+		-o "${tmp_archive}"; then
+		echo "Failed to download addon archive for ${repository_full_name}@${repository_ref}." >&2
+		rm -f "${tmp_archive}"
+		rm -rf "${tmp_extract_root}"
+		exit 1
+	fi
+
+	if ! tar -xzf "${tmp_archive}" -C "${tmp_extract_root}"; then
+		echo "Failed to extract addon archive for ${repository_full_name}@${repository_ref}." >&2
+		rm -f "${tmp_archive}"
+		rm -rf "${tmp_extract_root}"
+		exit 1
+	fi
+
+	extracted_root="$(find "${tmp_extract_root}" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+	if [ -z "${extracted_root}" ]; then
+		echo "Missing extracted repository directory for ${repository_full_name}@${repository_ref}." >&2
+		rm -f "${tmp_archive}"
+		rm -rf "${tmp_extract_root}"
+		exit 1
+	fi
+
+	rm -rf "${target_directory}"
+	mkdir -p "$(dirname "${target_directory}")"
+	mv "${extracted_root}" "${target_directory}"
+
+	rm -f "${tmp_archive}"
+	rm -rf "${tmp_extract_root}"
+}
+
 link_modules() {
 	repo_root="$1"
 	root_dir="$2"
@@ -66,10 +110,10 @@ link_modules() {
 
 if [ -n "$addons_repos" ]; then
 	if [ -z "${GITHUB_TOKEN:-}" ]; then
-		echo "GITHUB_TOKEN missing; cannot clone addons." >&2
+		echo "GITHUB_TOKEN missing; cannot download addons." >&2
 		exit 1
 	fi
-	log "Cloning addon repositories: ${addons_repos}"
+	log "Downloading addon repositories: ${addons_repos}"
 	old_ifs="$IFS"
 	IFS=','
 	for raw in ${addons_repos}; do
@@ -77,23 +121,16 @@ if [ -n "$addons_repos" ]; then
 		if [ -z "$repo" ]; then
 			continue
 		fi
-		branch="main"
+		ref_name="main"
 		case "$repo" in
 		*@*)
-			branch="${repo##*@}"
+			ref_name="${repo##*@}"
 			repo="${repo%@*}"
 			;;
 		esac
 		name="${repo##*/}"
-		remote_url="https://${GITHUB_TOKEN}@github.com/${repo}"
 		target_root="/extra_addons"
-		log "Cloning addon from ${repo} branch ${branch} into ${target_root}/${name}"
-		if ! git clone --branch "$branch" --single-branch --depth 1 \
-			"$remote_url" "${target_root}/${name}"; then
-			echo "Failed to clone addon repo ${repo} (branch ${branch})." >&2
-			exit 1
-		fi
-		rm -rf "${target_root}/${name}/.git"
+		download_archive "$repo" "$ref_name" "${target_root}/${name}"
 		link_modules "${target_root}/${name}" "$target_root"
 	done
 	IFS="$old_ifs"

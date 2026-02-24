@@ -13,6 +13,7 @@ executes when the target database is missing required installed modules.
 from __future__ import annotations
 
 import argparse
+import configparser
 import os
 import subprocess
 import sys
@@ -21,15 +22,28 @@ from dataclasses import dataclass
 
 import psycopg2
 
+RUNTIME_OPTION_MAP: tuple[tuple[str, str], ...] = (
+    ("ODOO_DB_MAXCONN", "db_maxconn"),
+    ("ODOO_MAX_CRON_THREADS", "max_cron_threads"),
+    ("ODOO_WORKERS", "workers"),
+    ("ODOO_LIMIT_TIME_CPU", "limit_time_cpu"),
+    ("ODOO_LIMIT_TIME_REAL", "limit_time_real"),
+    ("ODOO_LIMIT_TIME_REAL_CRON", "limit_time_real_cron"),
+    ("ODOO_LIMIT_MEMORY_SOFT", "limit_memory_soft"),
+    ("ODOO_LIMIT_MEMORY_HARD", "limit_memory_hard"),
+)
+
 
 @dataclass(frozen=True)
 class BootstrapSettings:
     config_path: str
+    base_config_path: str
     database_name: str
     database_host: str
     database_port: int
     database_user: str
     database_password: str
+    master_password: str
     addons_path: str
     data_dir: str
     list_db: str
@@ -64,14 +78,20 @@ def _load_settings(argument_namespace: argparse.Namespace) -> BootstrapSettings:
     database_port_raw = os.environ.get("ODOO_DB_PORT", "5432").strip() or "5432"
     database_port = int(database_port_raw)
     install_modules = _split_modules(os.environ.get("ODOO_INSTALL_MODULES", ""))
+    master_password = os.environ.get("ODOO_MASTER_PASSWORD", "").strip()
+    if not master_password:
+        raise RuntimeError("ODOO_MASTER_PASSWORD must be set for bootstrap startup.")
 
     return BootstrapSettings(
         config_path=argument_namespace.config_path,
+        base_config_path=os.environ.get("ODOO_CONFIG", "/volumes/config/_generated.conf").strip()
+        or "/volumes/config/_generated.conf",
         database_name=database_name,
         database_host=os.environ.get("ODOO_DB_HOST", "database").strip() or "database",
         database_port=database_port,
         database_user=os.environ.get("ODOO_DB_USER", "odoo").strip() or "odoo",
         database_password=os.environ.get("ODOO_DB_PASSWORD", ""),
+        master_password=master_password,
         addons_path=os.environ.get("ODOO_ADDONS_PATH", "").strip(),
         data_dir=os.environ.get("ODOO_DATA_DIR", "/volumes/data").strip() or "/volumes/data",
         list_db=os.environ.get("ODOO_LIST_DB", "False").strip() or "False",
@@ -82,25 +102,43 @@ def _load_settings(argument_namespace: argparse.Namespace) -> BootstrapSettings:
 
 
 def _write_runtime_config(settings: BootstrapSettings) -> None:
-    config_lines = [
-        "[options]",
-        f"db_name = {settings.database_name}",
-        f"db_user = {settings.database_user}",
-        f"db_password = {settings.database_password}",
-        f"db_host = {settings.database_host}",
-        f"db_port = {settings.database_port}",
-        f"list_db = {settings.list_db}",
-        f"data_dir = {settings.data_dir}",
-    ]
+    config_parser = configparser.ConfigParser(interpolation=None)
+    if settings.base_config_path and os.path.exists(settings.base_config_path):
+        config_parser.read(settings.base_config_path, encoding="utf-8")
+    if not config_parser.has_section("options"):
+        config_parser.add_section("options")
+
+    options = config_parser["options"]
+    options["admin_passwd"] = settings.master_password
+    options["db_name"] = settings.database_name
+    options["db_user"] = settings.database_user
+    options["db_password"] = settings.database_password
+    options["db_host"] = settings.database_host
+    options["db_port"] = str(settings.database_port)
+    options["list_db"] = settings.list_db
+    options["data_dir"] = settings.data_dir
     if settings.addons_path:
-        config_lines.append(f"addons_path = {settings.addons_path}")
+        options["addons_path"] = settings.addons_path
+
+    # Keep runtime tuning deterministic by overlaying supported env-driven
+    # options onto the generated base config on every container start.
+    for env_name, option_name in RUNTIME_OPTION_MAP:
+        option_value = os.environ.get(env_name, "").strip()
+        if option_value:
+            options[option_name] = option_value
+
+    dev_mode_value = os.environ.get("ODOO_DEV_MODE", "").strip()
+    if dev_mode_value:
+        options["dev_mode"] = dev_mode_value
+    elif "dev_mode" in options:
+        options.pop("dev_mode", None)
 
     config_path = settings.config_path
     config_directory = os.path.dirname(config_path)
     if config_directory:
         os.makedirs(config_directory, exist_ok=True)
     with open(config_path, "w", encoding="utf-8") as config_file:
-        config_file.write("\n".join(config_lines) + "\n")
+        config_parser.write(config_file)
 
 
 def _wait_for_database(settings: BootstrapSettings) -> None:

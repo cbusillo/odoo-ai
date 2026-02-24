@@ -5,6 +5,21 @@ export UV_HTTP_TIMEOUT=${UV_HTTP_TIMEOUT:-120}
 
 export UV_PROJECT_ENVIRONMENT=/venv
 
+ensure_uv_environment() {
+  if [ -x "/venv/bin/python3" ]; then
+    return
+  fi
+
+  local python_command="python3"
+  if ! command -v "$python_command" >/dev/null 2>&1; then
+    python_command="python"
+  fi
+
+  uv venv /venv --python "$python_command"
+}
+
+ensure_uv_environment
+
 addon_has_dev_extra() {
   local pyproject_path="$1"
   if [ ! -x "/venv/bin/python3" ]; then
@@ -64,7 +79,7 @@ install_addon_dev_requirements() {
   done
 }
 
-install_addon_dev_requirements /volumes/addons
+install_addon_dev_requirements /opt/project/addons
 install_addon_dev_requirements /opt/extra_addons
 
-cd /volumes/addons
+cd /opt/project/addons

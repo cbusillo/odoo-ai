@@ -75,6 +75,10 @@ authenticate with the default password. Prefer scoping these keys per context
 (for example `contexts.cm.shared` in `platform/secrets.toml`) so restore-based
 contexts without an `admin` login can leave credentials unchanged.
 
+`uv run platform init ...` and `uv run platform update ...` now stop `web`
+before running module mutations and bring it back up afterward. This avoids
+database serialization conflicts from concurrent writes.
+
 Composite workflows (`restore-init`, `restore-update`,
 `restore-init-update`) emit `workflow_phase_start=<phase>` and
 `workflow_phase_end=<phase>` markers to improve long-run progress visibility.

@@ -8,7 +8,7 @@ import time
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, cast
+from typing import Callable, Literal, cast
 
 import click
 import requests
@@ -1669,20 +1669,34 @@ def _run_init_workflow(
     ]
     if dry_run:
         compose_command = _compose_base_command(runtime_env_file)
-        click.echo(f"$ {' '.join(compose_command + ['exec', '-T', 'script-runner', *command])}")
+        _run_with_web_temporarily_stopped(
+            runtime_env_file,
+            operation=lambda: None,
+            dry_run=True,
+            dry_run_commands=(compose_command + ["exec", "-T", "script-runner", *command],),
+        )
         return
-    _compose_exec(runtime_env_file, "script-runner", command)
-    _apply_admin_password_if_configured(
+
+    def _run_init_operation() -> None:
+        _compose_exec(runtime_env_file, "script-runner", command)
+        _apply_admin_password_if_configured(
+            runtime_env_file,
+            runtime_selection,
+            loaded_stack.stack_definition,
+            loaded_environment,
+        )
+        _assert_active_admin_password_is_not_default(
+            runtime_env_file,
+            runtime_selection,
+            loaded_stack.stack_definition,
+            loaded_environment,
+        )
+
+    _run_with_web_temporarily_stopped(
         runtime_env_file,
-        runtime_selection,
-        loaded_stack.stack_definition,
-        loaded_environment,
-    )
-    _assert_active_admin_password_is_not_default(
-        runtime_env_file,
-        runtime_selection,
-        loaded_stack.stack_definition,
-        loaded_environment,
+        operation=_run_init_operation,
+        dry_run=False,
+        dry_run_commands=(),
     )
     click.echo(f"init={runtime_selection.project_name}")
 
@@ -1729,9 +1743,20 @@ def _run_update_workflow(
     ]
     if dry_run:
         compose_command = _compose_base_command(runtime_env_file)
-        click.echo(f"$ {' '.join(compose_command + ['exec', '-T', 'script-runner', *command])}")
+        _run_with_web_temporarily_stopped(
+            runtime_env_file,
+            operation=lambda: None,
+            dry_run=True,
+            dry_run_commands=(compose_command + ["exec", "-T", "script-runner", *command],),
+        )
         return
-    _compose_exec(runtime_env_file, "script-runner", command)
+
+    _run_with_web_temporarily_stopped(
+        runtime_env_file,
+        operation=lambda: _compose_exec(runtime_env_file, "script-runner", command),
+        dry_run=False,
+        dry_run_commands=(),
+    )
     click.echo(f"update={runtime_selection.project_name}")
 
 
@@ -3646,6 +3671,31 @@ def _compose_exec_with_input(
 ) -> None:
     compose_command = _compose_base_command(runtime_env_file)
     _run_command_with_input(compose_command + ["exec", "-T", container_service] + container_command, input_text)
+
+
+def _run_with_web_temporarily_stopped(
+    runtime_env_file: Path,
+    operation: Callable[[], None],
+    *,
+    dry_run: bool,
+    dry_run_commands: tuple[list[str], ...],
+) -> None:
+    compose_command = _compose_base_command(runtime_env_file)
+    stop_web_command = compose_command + ["stop", "web"]
+    up_web_command = compose_command + ["up", "-d", "web"]
+
+    if dry_run:
+        click.echo(f"$ {' '.join(stop_web_command)}")
+        for command in dry_run_commands:
+            click.echo(f"$ {' '.join(command)}")
+        click.echo(f"$ {' '.join(up_web_command)}")
+        return
+
+    _run_command_best_effort(stop_web_command)
+    try:
+        operation()
+    finally:
+        _run_command_best_effort(up_web_command)
 
 
 def _apply_admin_password_if_configured(

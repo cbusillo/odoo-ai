@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from tools.platform_cli import (
     ContextDefinition,
@@ -13,6 +14,7 @@ from tools.platform_cli import (
     StackDefinition,
     _build_runtime_env_values,
     _load_environment,
+    _run_with_web_temporarily_stopped,
 )
 
 
@@ -115,6 +117,57 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
             self.assertIsNone(opw_environment.get("ODOO_ADMIN_PASSWORD"))
 
 
+class PlatformWebPauseTests(unittest.TestCase):
+    def test_web_pause_wraps_operation_and_restarts(self) -> None:
+        executed_commands: list[list[str]] = []
+
+        def operation() -> None:
+            executed_commands.append(["operation"])
+
+        with (
+            patch("tools.platform_cli._compose_base_command", return_value=["docker", "compose"]),
+            patch(
+                "tools.platform_cli._run_command_best_effort",
+                side_effect=lambda command: executed_commands.append(command) or 0,
+            ),
+        ):
+            _run_with_web_temporarily_stopped(
+                Path("/tmp/runtime.env"),
+                operation,
+                dry_run=False,
+                dry_run_commands=(),
+            )
+
+        self.assertEqual(executed_commands[0], ["docker", "compose", "stop", "web"])
+        self.assertEqual(executed_commands[1], ["operation"])
+        self.assertEqual(executed_commands[2], ["docker", "compose", "up", "-d", "web"])
+
+    def test_web_pause_restarts_even_when_operation_fails(self) -> None:
+        executed_commands: list[list[str]] = []
+
+        def operation() -> None:
+            executed_commands.append(["operation"])
+            raise RuntimeError("boom")
+
+        with (
+            patch("tools.platform_cli._compose_base_command", return_value=["docker", "compose"]),
+            patch(
+                "tools.platform_cli._run_command_best_effort",
+                side_effect=lambda command: executed_commands.append(command) or 0,
+            ),
+        ):
+            with self.assertRaises(RuntimeError):
+                _run_with_web_temporarily_stopped(
+                    Path("/tmp/runtime.env"),
+                    operation,
+                    dry_run=False,
+                    dry_run_commands=(),
+                )
+
+        self.assertEqual(executed_commands[0], ["docker", "compose", "stop", "web"])
+        self.assertEqual(executed_commands[1], ["operation"])
+        self.assertEqual(executed_commands[2], ["docker", "compose", "up", "-d", "web"])
+
+
 if __name__ == "__main__":
     unittest.main()
-

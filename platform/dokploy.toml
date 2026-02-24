@@ -58,6 +58,8 @@ git_branch = "opw-dev"
 auto_deploy = true
 require_test_gate = false
 require_prod_gate = false
+deploy_timeout_seconds = 7200
+healthcheck_timeout_seconds = 600
 domains = ["opw-dev.shinycomputers.com"]
 
 [targets.env]
@@ -74,6 +76,8 @@ git_branch = "opw-testing"
 auto_deploy = true
 require_test_gate = true
 require_prod_gate = false
+deploy_timeout_seconds = 7200
+healthcheck_timeout_seconds = 600
 domains = ["opw-testing.shinycomputers.com"]
 
 [targets.env]
@@ -90,6 +94,8 @@ git_branch = "opw-prod"
 auto_deploy = false
 require_test_gate = false
 require_prod_gate = false
+deploy_timeout_seconds = 7200
+healthcheck_timeout_seconds = 600
 domains = ["opw-prod.shinycomputers.com"]
 
 [targets.env]

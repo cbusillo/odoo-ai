@@ -15,10 +15,10 @@ When
 
 Local stacks
 
-| Stack       | Purpose      | Ports           | Config source   |
-|-------------|--------------|-----------------|-----------------|
-| `opw-local` | OPW dev      | 8069/8072/15432 | `opw-local.env` |
-| `cm-local`  | CM isolation | 9069/9072/9432  | `cm-local.env`  |
+| Stack       | Purpose      | Ports             | Config source           |
+|-------------|--------------|-------------------|-------------------------|
+| `opw-local` | OPW dev      | 8069/8072/15432   | `opw-local.env`         |
+| `cm-local`  | CM isolation | 9069/9072/9432    | `cm-local.env`          |
 
 Quick flow
 
@@ -54,7 +54,6 @@ Notes
     script-runner:
       volumes:
         - ./docker/scripts:/volumes/scripts
-        - ./addons:/volumes/addons
         - ./pyproject.toml:/opt/project/pyproject.toml:ro
         - ./addons:/opt/project/addons
       environment:
@@ -68,7 +67,7 @@ Notes
   Create a **Python Debug Server** run configuration per stack:
   - Host: `0.0.0.0` (or `host.docker.internal`)
   - Port: `5678` (OPW) or `5679` (CM)
-  - Path mappings: `/volumes/addons` → `$PROJECT_DIR$/addons`
+  - Path mappings: `/opt/project/addons` → `$PROJECT_DIR$/addons`
   - Optional: enable “Suspend after connect” if you want to pause on startup
 - The Debug Server starts listening before “Before launch” tasks run, so it is
   safe to keep `uv run ops local upgrade-restart <target>` as a pre-step; Odoo

@@ -188,6 +188,9 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+# Platform-generated runtime artifacts
+.platform/
+
 *.override.yml
 odoo.*.cfg
 odoo.*.conf
@@ -205,6 +208,7 @@ docs/internal/
 # Claude Code agent stack files (recursion prevention)
 .claude/
 .code/
+platform/secrets.toml
 
 *.local.*
 *.env*

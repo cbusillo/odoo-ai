@@ -8,6 +8,8 @@ _logger = logging.getLogger(__name__)
 
 CONFIG_PARAM_PREFIX = "ENV_OVERRIDE_CONFIG_PARAM__"
 SHOPIFY_PREFIX = "ENV_OVERRIDE_SHOPIFY__"
+SHOPIFY_ALLOW_PRODUCTION_KEY = f"{SHOPIFY_PREFIX}ALLOW_PRODUCTION"
+AUTHENTIK_PREFIX = "ENV_OVERRIDE_AUTHENTIK__"
 AUTHENTIK_CONFIG_MODEL = "authentik.sso.config"
 AUTHENTIK_GROUP_MAPPING_MODEL = "authentik.sso.group.mapping"
 
@@ -47,6 +49,10 @@ class EnvironmentOverrides(models.AbstractModel):
         self._apply_shopify_overrides()
 
     def _apply_authentik_overrides(self) -> None:
+        has_authentik_overrides = any(raw_key.startswith(AUTHENTIK_PREFIX) for raw_key in os.environ)
+        if not has_authentik_overrides:
+            return
+
         authentik_config_model = self.env.get(AUTHENTIK_CONFIG_MODEL)
         if authentik_config_model is None:
             return
@@ -95,6 +101,7 @@ class EnvironmentOverrides(models.AbstractModel):
         api_version = os.environ.get(f"{SHOPIFY_PREFIX}API_VERSION", "").strip()
         test_store_raw = os.environ.get(f"{SHOPIFY_PREFIX}TEST_STORE")
         test_store = _parse_boolean(test_store_raw, default=False)
+        allow_production = _parse_boolean(os.environ.get(SHOPIFY_ALLOW_PRODUCTION_KEY), default=False)
 
         indicators_raw = os.environ.get(f"{SHOPIFY_PREFIX}PRODUCTION_INDICATORS")
         if indicators_raw is None:
@@ -113,9 +120,23 @@ class EnvironmentOverrides(models.AbstractModel):
             return
 
         shop_url_lower = shop_url_key.lower()
+        matched_indicator = ""
         for indicator in production_indicators:
             if indicator and indicator in shop_url_lower:
-                raise ValidationError(f"Shopify shop_url_key '{shop_url_key}' appears to be production (indicator: '{indicator}').")
+                matched_indicator = indicator
+                break
+        if matched_indicator and not allow_production:
+            raise ValidationError(
+                "Shopify shop_url_key "
+                f"'{shop_url_key}' appears to be production (indicator: '{matched_indicator}'). "
+                f"Set {SHOPIFY_ALLOW_PRODUCTION_KEY}=true only when this is intentional."
+            )
+        if matched_indicator and allow_production:
+            _logger.warning(
+                "Allowing production-like Shopify key '%s' because %s=true.",
+                shop_url_key,
+                SHOPIFY_ALLOW_PRODUCTION_KEY,
+            )
 
         parameter_model = self.env["ir.config_parameter"].sudo()
         parameter_model.set_param("shopify.shop_url_key", shop_url_key)

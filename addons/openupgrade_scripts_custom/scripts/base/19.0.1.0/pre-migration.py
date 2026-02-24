@@ -1,6 +1,7 @@
 import ast
 import csv
 import json
+import logging
 import re
 from pathlib import Path
 
@@ -9,6 +10,8 @@ from odoo.api import Environment
 from odoo.modules.module import get_module_path
 from odoo.sql_db import Cursor
 from openupgradelib import openupgrade
+
+_logger = logging.getLogger(__name__)
 
 _MISSING_MANIFEST_MODULES = (
     "account_auto_transfer",
@@ -323,6 +326,147 @@ def _clean_user_group_views(env: Environment) -> None:
         env.cr.execute("UPDATE ir_ui_view SET arch_db = %s WHERE id = %s", (updated_arch, view_id))
 
 
+def _normalize_legacy_search_group_tags(env: Environment) -> None:
+    """Normalize legacy search-view ``group`` tags for Odoo 19.
+
+    Odoo 19 search views no longer accept attributes on ``group`` tags. Legacy
+    noupdate views from 18.0 can still include attributes such as ``expand`` or
+    ``string``, which makes XML validation fail during module loading.
+    """
+
+    def _normalize_view_text(view_text: str) -> str:
+        if "search" not in view_text:
+            return view_text
+        return re.sub(r"<group\b[^>]*>", "<group>", view_text)
+
+    env.cr.execute(
+        "SELECT id, arch_db FROM ir_ui_view WHERE arch_db::text LIKE %s AND arch_db::text LIKE %s",
+        ("%search%", "%<group %"),
+    )
+    candidate_rows = env.cr.fetchall()
+    updated_view_count = 0
+
+    for view_id, view_arch in candidate_rows:
+        if isinstance(view_arch, dict):
+            updated_payload = {locale: _normalize_view_text(text) for locale, text in view_arch.items()}
+            if updated_payload == view_arch:
+                continue
+            env.cr.execute("UPDATE ir_ui_view SET arch_db = %s WHERE id = %s", (json.dumps(updated_payload), view_id))
+            updated_view_count += 1
+            continue
+
+        if isinstance(view_arch, str):
+            try:
+                parsed_payload = json.loads(view_arch)
+            except json.JSONDecodeError:
+                parsed_payload = None
+            if isinstance(parsed_payload, dict):
+                updated_payload = {locale: _normalize_view_text(text) for locale, text in parsed_payload.items()}
+                if updated_payload == parsed_payload:
+                    continue
+                env.cr.execute(
+                    "UPDATE ir_ui_view SET arch_db = %s WHERE id = %s",
+                    (json.dumps(updated_payload), view_id),
+                )
+                updated_view_count += 1
+                continue
+
+        updated_arch = _normalize_view_text(str(view_arch))
+        if updated_arch == str(view_arch):
+            continue
+        env.cr.execute("UPDATE ir_ui_view SET arch_db = %s WHERE id = %s", (updated_arch, view_id))
+        updated_view_count += 1
+
+    _logger.warning(
+        "Normalized legacy search view group tags (candidates=%s, updated=%s)",
+        len(candidate_rows),
+        updated_view_count,
+    )
+
+
+def _normalize_legacy_inventory_valuation_values(env: Environment) -> None:
+    """Map legacy valuation enum values removed in Odoo 19.
+
+    Odoo 18 databases can contain the selection value ``manual_periodic``.
+    Odoo 19 replaced it with ``manual``. Normalize persisted values before
+    module graph loading to avoid selection validation errors while updating
+    records during data imports.
+    """
+
+    def _normalize_selection_column_value(table_name: str, column_name: str, legacy_value: str, modern_value: str) -> int:
+        if not openupgrade.column_exists(env.cr, table_name, column_name):
+            return 0
+
+        env.cr.execute(
+            """
+            SELECT data_type
+            FROM information_schema.columns
+            WHERE table_name = %s AND column_name = %s
+            LIMIT 1
+            """,
+            (table_name, column_name),
+        )
+        metadata_row = env.cr.fetchone()
+        data_type = metadata_row[0] if metadata_row else "text"
+
+        quoted_legacy_value = json.dumps(legacy_value)
+        if data_type == "jsonb":
+            env.cr.execute(
+                f"""
+                UPDATE {table_name}
+                SET {column_name} = to_jsonb(%s::text)
+                WHERE {column_name}::text = %s
+                """,
+                (modern_value, quoted_legacy_value),
+            )
+            return env.cr.rowcount
+        if data_type == "json":
+            env.cr.execute(
+                f"""
+                UPDATE {table_name}
+                SET {column_name} = to_json(%s::text)
+                WHERE {column_name}::text = %s
+                """,
+                (modern_value, quoted_legacy_value),
+            )
+            return env.cr.rowcount
+
+        env.cr.execute(
+            f"UPDATE {table_name} SET {column_name} = %s WHERE {column_name} = %s",
+            (modern_value, legacy_value),
+        )
+        return env.cr.rowcount
+
+    updated_product_category_rows = _normalize_selection_column_value(
+        table_name="product_category",
+        column_name="property_valuation",
+        legacy_value="manual_periodic",
+        modern_value="manual",
+    )
+
+    updated_company_rows = _normalize_selection_column_value(
+        table_name="res_company",
+        column_name="inventory_valuation",
+        legacy_value="manual_periodic",
+        modern_value="manual",
+    )
+
+    updated_property_rows = 0
+    if openupgrade.column_exists(env.cr, "ir_property", "value_text"):
+        env.cr.execute(
+            "UPDATE ir_property SET value_text = %s WHERE value_text = %s",
+            ("manual", "manual_periodic"),
+        )
+        updated_property_rows = env.cr.rowcount
+
+    _logger.warning(
+        "Normalized legacy valuation values (product_category=%s, res_company=%s, ir_property=%s)",
+        updated_product_category_rows,
+        updated_company_rows,
+        updated_property_rows,
+    )
+
+
 def _ensure_env(cursor_or_env: Cursor | Environment) -> Environment:
     if isinstance(cursor_or_env, api.Environment):
         return cursor_or_env
@@ -334,6 +478,9 @@ def migrate(cr: Cursor, version: str) -> None:
     """Pre-migration hook for base (19.0.1.0)."""
     _ = version
     env = _ensure_env(cr)
+    _logger.warning("Running custom base pre-migration hook from openupgrade_scripts_custom")
     _mark_missing_manifest_modules_uninstalled(env)
     _rename_product_connect(env)
+    _normalize_legacy_inventory_valuation_values(env)
+    _normalize_legacy_search_group_tags(env)
     _clean_user_group_views(env)

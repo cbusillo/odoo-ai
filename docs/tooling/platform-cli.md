@@ -170,6 +170,9 @@ Behavior notes
 - Web bootstrap now starts its runtime config from
   `/volumes/config/_generated.conf` when present, preserving generated Odoo
   tuning values (for example workers, db_maxconn, and time/memory limits).
+- Dokploy targets pin `ODOO_WEB_COMMAND` to
+  `python3 /volumes/scripts/run_odoo_bootstrap.py -c /tmp/platform.odoo.conf`
+  so remote compose deploys use the same bootstrap/runtime contract as local.
 - For OPW-sized filestores, local Docker Desktop volume limits may be too low;
   treat full OPW restore as remote-first unless local Docker storage is
   expanded.

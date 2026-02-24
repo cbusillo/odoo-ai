@@ -15,6 +15,7 @@ domains = ["cm-dev.shinycomputers.com"]
 [targets.env]
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://cm-dev.shinycomputers.com"
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"
+ODOO_WEB_COMMAND = "python3 /volumes/scripts/run_odoo_bootstrap.py -c /tmp/platform.odoo.conf"
 
 [[targets]]
 context = "cm"
@@ -31,6 +32,7 @@ domains = ["cm-testing.shinycomputers.com"]
 [targets.env]
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://cm-testing.shinycomputers.com"
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"
+ODOO_WEB_COMMAND = "python3 /volumes/scripts/run_odoo_bootstrap.py -c /tmp/platform.odoo.conf"
 
 [[targets]]
 context = "cm"
@@ -47,6 +49,7 @@ domains = ["cm-prod.shinycomputers.com"]
 [targets.env]
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://cm-prod.shinycomputers.com"
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"
+ODOO_WEB_COMMAND = "python3 /volumes/scripts/run_odoo_bootstrap.py -c /tmp/platform.odoo.conf"
 
 [[targets]]
 context = "opw"
@@ -65,6 +68,7 @@ domains = ["opw-dev.shinycomputers.com"]
 [targets.env]
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://opw-dev.shinycomputers.com"
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"
+ODOO_WEB_COMMAND = "python3 /volumes/scripts/run_odoo_bootstrap.py -c /tmp/platform.odoo.conf"
 
 [[targets]]
 context = "opw"
@@ -83,6 +87,7 @@ domains = ["opw-testing.shinycomputers.com"]
 [targets.env]
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://opw-testing.shinycomputers.com"
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"
+ODOO_WEB_COMMAND = "python3 /volumes/scripts/run_odoo_bootstrap.py -c /tmp/platform.odoo.conf"
 
 [[targets]]
 context = "opw"
@@ -101,3 +106,4 @@ domains = ["opw-prod.shinycomputers.com"]
 [targets.env]
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://opw-prod.shinycomputers.com"
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"
+ODOO_WEB_COMMAND = "python3 /volumes/scripts/run_odoo_bootstrap.py -c /tmp/platform.odoo.conf"

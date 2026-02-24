@@ -28,6 +28,36 @@ RUN mkdir -p /opt \
     && rm -rf /opt/project \
     && ln -s /volumes /opt/project
 
+RUN set -eux; \
+    if grep -q "ODOO_SOURCE_BIN" /odoo/odoo-bin; then \
+        if [ ! -f /usr/local/bin/odoo-source-bin ]; then \
+            echo "Missing /usr/local/bin/odoo-source-bin while /odoo/odoo-bin is already a wrapper" >&2; \
+            exit 1; \
+        fi; \
+    else \
+        cp /odoo/odoo-bin /usr/local/bin/odoo-source-bin; \
+    fi; \
+    printf '%s\n' \
+        '#!/usr/bin/env bash' \
+        'set -euo pipefail' \
+        '' \
+        'odoo_script="${ODOO_SOURCE_BIN:-/usr/local/bin/odoo-source-bin}"' \
+        'python_executable="${ODOO_WRAPPER_PYTHON:-/venv/bin/python}"' \
+        '' \
+        'if [[ ! -x "$odoo_script" ]]; then' \
+        '  echo "Missing Odoo executable at ${odoo_script}" >&2' \
+        '  exit 1' \
+        'fi' \
+        '' \
+        'if [[ ! -x "$python_executable" ]]; then' \
+        '  echo "Missing Python executable at ${python_executable}" >&2' \
+        '  exit 1' \
+        'fi' \
+        '' \
+        'exec "$python_executable" "$odoo_script" "$@"' \
+        > /odoo/odoo-bin; \
+    chmod +x /odoo/odoo-bin /usr/local/bin/odoo-source-bin
+
 FROM ${ODOO_BASE_DEVTOOLS_IMAGE} AS base-devtools
 USER root
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -42,6 +72,36 @@ COPY /uv.lock /volumes/uv.lock
 RUN mkdir -p /opt \
     && rm -rf /opt/project \
     && ln -s /volumes /opt/project
+
+RUN set -eux; \
+    if grep -q "ODOO_SOURCE_BIN" /odoo/odoo-bin; then \
+        if [ ! -f /usr/local/bin/odoo-source-bin ]; then \
+            echo "Missing /usr/local/bin/odoo-source-bin while /odoo/odoo-bin is already a wrapper" >&2; \
+            exit 1; \
+        fi; \
+    else \
+        cp /odoo/odoo-bin /usr/local/bin/odoo-source-bin; \
+    fi; \
+    printf '%s\n' \
+        '#!/usr/bin/env bash' \
+        'set -euo pipefail' \
+        '' \
+        'odoo_script="${ODOO_SOURCE_BIN:-/usr/local/bin/odoo-source-bin}"' \
+        'python_executable="${ODOO_WRAPPER_PYTHON:-/venv/bin/python}"' \
+        '' \
+        'if [[ ! -x "$odoo_script" ]]; then' \
+        '  echo "Missing Odoo executable at ${odoo_script}" >&2' \
+        '  exit 1' \
+        'fi' \
+        '' \
+        'if [[ ! -x "$python_executable" ]]; then' \
+        '  echo "Missing Python executable at ${python_executable}" >&2' \
+        '  exit 1' \
+        'fi' \
+        '' \
+        'exec "$python_executable" "$odoo_script" "$@"' \
+        > /odoo/odoo-bin; \
+    chmod +x /odoo/odoo-bin /usr/local/bin/odoo-source-bin
 
 FROM base-runtime AS runtime-common
 ENV HOOK_SETUP_FILE=/volumes/scripts/hook_setup

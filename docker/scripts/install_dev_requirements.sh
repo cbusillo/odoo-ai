@@ -4,8 +4,18 @@ set -eux
 export UV_HTTP_TIMEOUT=${UV_HTTP_TIMEOUT:-120}
 
 export UV_PROJECT_ENVIRONMENT=/venv
+export UV_PYTHON_INSTALL_DIR=${UV_PYTHON_INSTALL_DIR:-/opt/uv}
+mkdir -p "$UV_PYTHON_INSTALL_DIR"
 
 ensure_uv_environment() {
+  local python_target=""
+  if [ -L "/venv/bin/python" ]; then
+    python_target="$(readlink -f /venv/bin/python || true)"
+    if [[ "$python_target" == /root/.local/share/uv/* ]]; then
+      rm -rf /venv
+    fi
+  fi
+
   if [ -x "/venv/bin/python3" ]; then
     return
   fi

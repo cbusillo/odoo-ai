@@ -716,10 +716,6 @@ def _build_runtime_env_values(
         "GITHUB_TOKEN": source_environment.get("GITHUB_TOKEN", ""),
     }
 
-    configured_admin_login = source_environment.get("ODOO_ADMIN_LOGIN", "").strip()
-    if configured_admin_login:
-        runtime_values["ODOO_ADMIN_LOGIN"] = configured_admin_login
-
     for environment_key in sorted(source_environment):
         include_value = environment_key in PLATFORM_RUNTIME_PASSTHROUGH_KEYS or any(
             environment_key.startswith(prefix) for prefix in PLATFORM_RUNTIME_PASSTHROUGH_PREFIXES
@@ -1779,6 +1775,37 @@ def _ordered_instance_names(context_definition: ContextDefinition) -> list[str]:
     return ordered_names
 
 
+def _run_workflow_phase(
+    *,
+    stack_file: Path,
+    context_name: str,
+    instance_name: str,
+    env_file: Path | None,
+    phase: str,
+    dry_run: bool,
+    no_cache: bool,
+    bootstrap_only: bool,
+    no_sanitize: bool,
+    force: bool,
+    reset_versions: bool,
+) -> None:
+    click.echo(f"workflow_phase_start={phase}")
+    _run_workflow(
+        stack_file=stack_file,
+        context_name=context_name,
+        instance_name=instance_name,
+        env_file=env_file,
+        workflow=phase,
+        dry_run=dry_run,
+        no_cache=no_cache,
+        bootstrap_only=bootstrap_only,
+        no_sanitize=no_sanitize,
+        force=force,
+        reset_versions=reset_versions,
+    )
+    click.echo(f"workflow_phase_end={phase}")
+
+
 def _run_workflow(
     *,
     stack_file: Path,
@@ -1845,12 +1872,12 @@ def _run_workflow(
         return
 
     if normalized_workflow == "restore-init":
-        _run_workflow(
+        _run_workflow_phase(
             stack_file=stack_file,
             context_name=context_name,
             instance_name=instance_name,
             env_file=env_file,
-            workflow="restore",
+            phase="restore",
             dry_run=dry_run,
             no_cache=no_cache,
             bootstrap_only=bootstrap_only,
@@ -1858,12 +1885,12 @@ def _run_workflow(
             force=force,
             reset_versions=reset_versions,
         )
-        _run_workflow(
+        _run_workflow_phase(
             stack_file=stack_file,
             context_name=context_name,
             instance_name=instance_name,
             env_file=env_file,
-            workflow="init",
+            phase="init",
             dry_run=dry_run,
             no_cache=no_cache,
             bootstrap_only=bootstrap_only,
@@ -1875,12 +1902,12 @@ def _run_workflow(
         return
 
     if normalized_workflow == "restore-update":
-        _run_workflow(
+        _run_workflow_phase(
             stack_file=stack_file,
             context_name=context_name,
             instance_name=instance_name,
             env_file=env_file,
-            workflow="restore",
+            phase="restore",
             dry_run=dry_run,
             no_cache=no_cache,
             bootstrap_only=bootstrap_only,
@@ -1888,12 +1915,12 @@ def _run_workflow(
             force=force,
             reset_versions=reset_versions,
         )
-        _run_workflow(
+        _run_workflow_phase(
             stack_file=stack_file,
             context_name=context_name,
             instance_name=instance_name,
             env_file=env_file,
-            workflow="update",
+            phase="update",
             dry_run=dry_run,
             no_cache=no_cache,
             bootstrap_only=bootstrap_only,
@@ -1905,12 +1932,12 @@ def _run_workflow(
         return
 
     if normalized_workflow == "restore-init-update":
-        _run_workflow(
+        _run_workflow_phase(
             stack_file=stack_file,
             context_name=context_name,
             instance_name=instance_name,
             env_file=env_file,
-            workflow="restore-init",
+            phase="restore-init",
             dry_run=dry_run,
             no_cache=no_cache,
             bootstrap_only=bootstrap_only,
@@ -1918,12 +1945,12 @@ def _run_workflow(
             force=force,
             reset_versions=reset_versions,
         )
-        _run_workflow(
+        _run_workflow_phase(
             stack_file=stack_file,
             context_name=context_name,
             instance_name=instance_name,
             env_file=env_file,
-            workflow="update",
+            phase="update",
             dry_run=dry_run,
             no_cache=no_cache,
             bootstrap_only=bootstrap_only,

@@ -68,10 +68,16 @@ The bootstrap runtime config now starts from `/volumes/config/_generated.conf`
 when present, so tuning keys (workers, db pool, limits, logging) remain active
 for the long-running web process.
 
-If `.env` defines both `ODOO_ADMIN_LOGIN` and `ODOO_ADMIN_PASSWORD`,
-`uv run platform init ...` applies the password to that login after module
-initialization and verifies the login does not still authenticate with the
-default password.
+If the merged runtime environment defines both `ODOO_ADMIN_LOGIN` and
+`ODOO_ADMIN_PASSWORD`, `uv run platform init ...` applies the password to that
+login after module initialization and verifies the login does not still
+authenticate with the default password. Prefer scoping these keys per context
+(for example `contexts.cm.shared` in `platform/secrets.toml`) so restore-based
+contexts without an `admin` login can leave credentials unchanged.
+
+Composite workflows (`restore-init`, `restore-update`,
+`restore-init-update`) emit `workflow_phase_start=<phase>` and
+`workflow_phase_end=<phase>` markers to improve long-run progress visibility.
 
 ## Command Examples
 

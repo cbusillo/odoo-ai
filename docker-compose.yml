@@ -39,6 +39,8 @@ x-odoo-env: &odoo-env
   ODOO_INSTALL_MODULES: ${ODOO_INSTALL_MODULES:-}
   ODOO_UPDATE_MODULES: ${ODOO_UPDATE_MODULES:-AUTO}
   ODOO_ADDONS_PATH: ${ODOO_ADDONS_PATH:-/opt/project/addons,/opt/extra_addons,/opt/enterprise,/odoo/addons}
+  ODOO_RESTORE_LOCK_FILE: ${ODOO_RESTORE_LOCK_FILE:-/volumes/data/.restore_in_progress}
+  ODOO_RESTORE_LOCK_TIMEOUT_SECONDS: ${ODOO_RESTORE_LOCK_TIMEOUT_SECONDS:-7200}
   IMAGE_ODOO_ENTERPRISE_LOCATION: /volumes/enterprise_disabled
   IMAGE_EXTRA_ADDONS_LOCATION: /opt/extra_addons
 

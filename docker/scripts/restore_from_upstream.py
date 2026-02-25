@@ -117,8 +117,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         _logger.info("Upstream settings incomplete: %s", exc)
 
     restorer = OdooUpstreamRestorer(local_settings, upstream_settings, env_file)
+    lock_acquired = False
 
     try:
+        restorer.acquire_restore_lock()
+        lock_acquired = True
         if update_only:
             restorer.update_addons(reason="post-deploy upgrade")
             _logger.info("Addon update completed successfully.")
@@ -145,6 +148,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (OdooRestorerError, OdooDatabaseUpdateError) as bootstrap_error:
         _logger.error("Bootstrap failed: %s", bootstrap_error)
         return ExitCode.BOOTSTRAP_FAILED
+    finally:
+        if lock_acquired:
+            restorer.release_restore_lock()
 
 
 def restore_from_upstream() -> int:  # Entry point for pyproject scripts
@@ -261,6 +267,7 @@ class LocalServerSettings(BaseSettings):
     filestore_owner: str | None = Field(None, alias="ODOO_FILESTORE_OWNER")
     restore_ssh_dir: Path | None = Field(None, alias="RESTORE_SSH_DIR")
     restore_ssh_key: Path | None = Field(None, alias="RESTORE_SSH_KEY")
+    restore_lock_file: Path = Field(Path("/volumes/data/.restore_in_progress"), alias="ODOO_RESTORE_LOCK_FILE")
     # Script/runtime toggles
     disable_cron: bool = Field(True, alias="ENV_OVERRIDE_DISABLE_CRON")
     project_name: str = Field("odoo", alias="ODOO_PROJECT_NAME")
@@ -299,7 +306,7 @@ class LocalServerSettings(BaseSettings):
     def _normalize_openupgrade_scripts_path(cls, value: object) -> object:
         return _normalize_path(value)
 
-    @field_validator("restore_ssh_dir", "restore_ssh_key", mode="before")
+    @field_validator("restore_ssh_dir", "restore_ssh_key", "restore_lock_file", mode="before")
     @classmethod
     def _normalize_restore_paths(cls, value: object) -> object:
         return _normalize_path(value)
@@ -357,6 +364,34 @@ class OdooUpstreamRestorer:
         self._auto_addon_dirs: list[Path] = []
         self._pre_openupgrade_module_states: dict[str, str] = {}
         self._odoo_shell_preflight_checked = False
+        self._restore_lock_path: Path | None = None
+
+    def acquire_restore_lock(self) -> None:
+        lock_path = self.local.restore_lock_file
+        lock_parent = lock_path.parent
+        lock_parent.mkdir(parents=True, exist_ok=True)
+
+        try:
+            lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        except FileExistsError as error:
+            raise OdooRestorerError(
+                f"Restore lock already exists at {lock_path}; another restore/bootstrap may still be running."
+            ) from error
+
+        with os.fdopen(lock_fd, "w", encoding="utf-8") as lock_file:
+            lock_file.write(f"pid={os.getpid()}\n")
+            lock_file.write(f"started_at={int(time.time())}\n")
+
+        self._restore_lock_path = lock_path
+        _logger.info("Acquired restore lock: %s", lock_path)
+
+    def release_restore_lock(self) -> None:
+        lock_path = self._restore_lock_path or self.local.restore_lock_file
+        try:
+            lock_path.unlink()
+            _logger.info("Released restore lock: %s", lock_path)
+        except FileNotFoundError:
+            pass
 
     def run_command(self, command: str) -> None:
         _logger.info(f"Running command: {command}")

@@ -48,6 +48,8 @@ class BootstrapSettings:
     data_dir: str
     list_db: str
     install_modules: tuple[str, ...]
+    restore_lock_file: str
+    restore_lock_timeout_seconds: int
     ready_timeout_seconds: int
     poll_interval_seconds: float
 
@@ -96,6 +98,11 @@ def _load_settings(argument_namespace: argparse.Namespace) -> BootstrapSettings:
         data_dir=os.environ.get("ODOO_DATA_DIR", "/volumes/data").strip() or "/volumes/data",
         list_db=os.environ.get("ODOO_LIST_DB", "False").strip() or "False",
         install_modules=install_modules,
+        restore_lock_file=os.environ.get("ODOO_RESTORE_LOCK_FILE", "/volumes/data/.restore_in_progress").strip()
+        or "/volumes/data/.restore_in_progress",
+        restore_lock_timeout_seconds=int(
+            os.environ.get("ODOO_RESTORE_LOCK_TIMEOUT_SECONDS", "7200").strip() or "7200"
+        ),
         ready_timeout_seconds=180,
         poll_interval_seconds=2.0,
     )
@@ -250,11 +257,39 @@ def _run_initialization_if_needed(settings: BootstrapSettings) -> None:
     subprocess.run(initialize_command, check=True)
 
 
+def _wait_for_restore_lock(settings: BootstrapSettings) -> None:
+    if not settings.restore_lock_file:
+        return
+
+    lock_path = settings.restore_lock_file
+    if not os.path.exists(lock_path):
+        return
+
+    deadline = time.monotonic() + settings.restore_lock_timeout_seconds
+    wait_seconds = 0
+    while os.path.exists(lock_path):
+        if time.monotonic() >= deadline:
+            raise RuntimeError(
+                f"Restore lock {lock_path} still present after {settings.restore_lock_timeout_seconds} seconds."
+            )
+        if wait_seconds % 10 == 0:
+            print(
+                "[platform-bootstrap] waiting for restore lock release: "
+                f"{lock_path}",
+                flush=True,
+            )
+        time.sleep(settings.poll_interval_seconds)
+        wait_seconds += 1
+
+    print("[platform-bootstrap] restore lock cleared; continuing startup", flush=True)
+
+
 def main() -> None:
     arguments = _parse_arguments()
     settings = _load_settings(arguments)
     _write_runtime_config(settings)
     _wait_for_database(settings)
+    _wait_for_restore_lock(settings)
     _run_initialization_if_needed(settings)
 
     print("[platform-bootstrap] starting Odoo web server", flush=True)

@@ -70,12 +70,43 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
                 "ODOO_ADMIN_LOGIN": "admin",
                 "ODOO_ADMIN_PASSWORD": "secure-password",
                 "ODOO_KEY": "key-from-source",
+                "ODOO_UPSTREAM_HOST": "opw-prod.shiny",
+                "ODOO_UPSTREAM_DB_NAME": "opw",
+                "ODOO_UPSTREAM_DB_USER": "odoo",
+                "ODOO_UPSTREAM_FILESTORE_PATH": "/opt/odoo/local_data/filestore",
+                "RESTORE_SSH_KEY": "/root/.ssh/id_rsa",
+                "ODOO_RESTORE_LOCK_FILE": "/volumes/data/.restore_in_progress",
+                "ODOO_RESTORE_LOCK_TIMEOUT_SECONDS": "7200",
             },
         )
 
         self.assertNotIn("ODOO_ADMIN_LOGIN", runtime_values)
         self.assertNotIn("ODOO_ADMIN_PASSWORD", runtime_values)
         self.assertEqual(runtime_values.get("ODOO_KEY"), "key-from-source")
+        self.assertEqual(runtime_values.get("ODOO_UPSTREAM_HOST"), "opw-prod.shiny")
+        self.assertEqual(runtime_values.get("RESTORE_SSH_KEY"), "/root/.ssh/id_rsa")
+        self.assertEqual(
+            runtime_values.get("ODOO_RESTORE_LOCK_FILE"),
+            "/volumes/data/.restore_in_progress",
+        )
+
+    def test_runtime_env_sets_restore_defaults(self) -> None:
+        runtime_values = _build_runtime_env_values(
+            runtime_env_file=Path("/tmp/cm.local.env"),
+            stack_definition=_sample_stack_definition(),
+            runtime_selection=_sample_runtime_selection(),
+            source_environment={
+                "ODOO_DB_USER": "odoo",
+                "ODOO_DB_PASSWORD": "database-password",
+            },
+        )
+
+        self.assertEqual(runtime_values.get("ODOO_FILESTORE_PATH"), "/volumes/data/filestore")
+        self.assertEqual(
+            runtime_values.get("ODOO_RESTORE_LOCK_FILE"),
+            "/volumes/data/.restore_in_progress",
+        )
+        self.assertEqual(runtime_values.get("ODOO_RESTORE_LOCK_TIMEOUT_SECONDS"), "7200")
 
     def test_load_environment_scopes_admin_keys_by_context(self) -> None:
         with TemporaryDirectory() as temporary_directory_name:

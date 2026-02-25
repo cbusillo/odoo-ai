@@ -143,6 +143,12 @@ Behavior notes
 - Platform env merge order for context-aware commands is:
   `.env`/`--env-file` -> `secrets.toml` shared -> context shared ->
   instance env overrides.
+- Runtime env generation passes through `ENV_OVERRIDE_*` and
+  `ODOO_UPSTREAM_*` keys so restore workflows keep per-instance upstream
+  sources instead of relying on global `.env` values.
+- Runtime restore env now also carries `ODOO_FILESTORE_PATH`,
+  `RESTORE_SSH_KEY`, and `ODOO_RESTORE_LOCK_*` so Dokploy/local restore runs
+  use the same filestore path, SSH identity, and bootstrap coordination lock.
 - Runtime tuning keys can be declared in `platform/stack.toml` under
   `runtime_env` at stack/context/instance scope. Merge order is
   `stack -> context -> instance`.
@@ -161,6 +167,10 @@ Behavior notes
 - Restore now performs a filestore capacity preflight before starting upstream
   copy. If local free space is insufficient, it fails fast with a clear error
   (instead of failing mid-transfer after DB work).
+- Restore acquires a shared lock file (`ODOO_RESTORE_LOCK_FILE`, default
+  `/volumes/data/.restore_in_progress`). Web bootstrap waits for lock release
+  before attempting module initialization, preventing restore/bootstrap race
+  conditions on restarted containers.
 - When `ODOO_FILESTORE_OWNER` is unset, restore now auto-aligns filestore
   ownership to the mounted data volume owner so web workers can write/read
   generated asset attachments after restore.

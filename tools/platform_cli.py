@@ -41,6 +41,7 @@ PLATFORM_RUNTIME_ENV_KEYS = (
     "ODOO_DB_NAME",
     "ODOO_DB_USER",
     "ODOO_DB_PASSWORD",
+    "ODOO_FILESTORE_PATH",
     "ODOO_MASTER_PASSWORD",
     "ODOO_ADMIN_LOGIN",
     "ODOO_INSTALL_MODULES",
@@ -52,6 +53,8 @@ PLATFORM_RUNTIME_ENV_KEYS = (
     "ODOO_DB_HOST_PORT",
     "ODOO_LIST_DB",
     "ODOO_WEB_COMMAND",
+    "ODOO_RESTORE_LOCK_FILE",
+    "ODOO_RESTORE_LOCK_TIMEOUT_SECONDS",
     "ODOO_DB_MAXCONN",
     "ODOO_DB_MAXCONN_GEVENT",
     "ODOO_WORKERS",
@@ -75,6 +78,12 @@ PLATFORM_RUNTIME_ENV_KEYS = (
     "POSTGRES_RANDOM_PAGE_COST",
     "POSTGRES_EFFECTIVE_IO_CONCURRENCY",
     "RESTORE_SSH_DIR",
+    "RESTORE_SSH_KEY",
+    "ODOO_UPSTREAM_HOST",
+    "ODOO_UPSTREAM_USER",
+    "ODOO_UPSTREAM_DB_NAME",
+    "ODOO_UPSTREAM_DB_USER",
+    "ODOO_UPSTREAM_FILESTORE_PATH",
     "OPENUPGRADE_ENABLED",
     "OPENUPGRADE_SCRIPTS_PATH",
     "OPENUPGRADE_TARGET_VERSION",
@@ -84,10 +93,12 @@ PLATFORM_RUNTIME_ENV_KEYS = (
 
 PLATFORM_RUNTIME_PASSTHROUGH_PREFIXES = (
     "ENV_OVERRIDE_",
+    "ODOO_UPSTREAM_",
 )
 
 PLATFORM_RUNTIME_PASSTHROUGH_KEYS = (
     "ODOO_KEY",
+    "RESTORE_SSH_KEY",
 )
 
 ENV_COLLISION_MODE_ENV_KEY = "PLATFORM_ENV_COLLISION_MODE"
@@ -719,6 +730,7 @@ def _build_runtime_env_values(
         "ODOO_DB_NAME": runtime_selection.database_name,
         "ODOO_DB_USER": source_environment.get("ODOO_DB_USER", "odoo"),
         "ODOO_DB_PASSWORD": source_environment.get("ODOO_DB_PASSWORD", ""),
+        "ODOO_FILESTORE_PATH": source_environment.get("ODOO_FILESTORE_PATH", "/volumes/data/filestore"),
         "ODOO_MASTER_PASSWORD": source_environment.get("ODOO_MASTER_PASSWORD", ""),
         "ODOO_INSTALL_MODULES": ",".join(runtime_selection.effective_install_modules),
         "ODOO_ADDON_REPOSITORIES": ",".join(runtime_selection.effective_addon_repositories),
@@ -729,6 +741,8 @@ def _build_runtime_env_values(
         "ODOO_DB_HOST_PORT": str(runtime_selection.db_host_port),
         "ODOO_LIST_DB": "False",
         "ODOO_WEB_COMMAND": f"python3 /volumes/scripts/run_odoo_bootstrap.py -c {runtime_selection.runtime_odoo_conf_path}",
+        "ODOO_RESTORE_LOCK_FILE": source_environment.get("ODOO_RESTORE_LOCK_FILE", "/volumes/data/.restore_in_progress"),
+        "ODOO_RESTORE_LOCK_TIMEOUT_SECONDS": source_environment.get("ODOO_RESTORE_LOCK_TIMEOUT_SECONDS", "7200"),
         "RESTORE_SSH_DIR": source_environment.get("RESTORE_SSH_DIR", str(Path.home() / ".ssh")),
         "OPENUPGRADE_ENABLED": source_environment.get("OPENUPGRADE_ENABLED", "False"),
         "OPENUPGRADE_SCRIPTS_PATH": source_environment.get("OPENUPGRADE_SCRIPTS_PATH", ""),

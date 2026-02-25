@@ -50,7 +50,10 @@ name: ${ODOO_PROJECT_NAME:-odoo}
 services:
   web:
     <<: [ *odoo-base, *odoo-build ]
-    command: /odoo/odoo-bin
+    command:
+      - /bin/sh
+      - -lc
+      - ${ODOO_WEB_COMMAND:-/odoo/odoo-bin}
     volumes:
       - odoo_data:/volumes/data
       - odoo_logs:/volumes/logs

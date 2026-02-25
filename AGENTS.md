@@ -57,6 +57,15 @@ the linked docs, then keep prompts lean.
   rather than pasting large snippets.
 - Preserve history (`git mv`, minimal diffs) and avoid destructive git actions
   unless the operator explicitly directs them.
+- Fix root causes, not symptoms: do not introduce workaround-only changes,
+  temporary fallbacks, or bypasses unless the operator explicitly asks for a
+  time-boxed mitigation.
+- If production/runtime behavior is broken, pause and diagnose first. Before
+  changing config/code, summarize the root cause hypothesis, validation steps,
+  and intended permanent fix.
+- Prefer fail-closed over silent degradation: if the right fix is blocked
+  (credentials, infrastructure, missing access), stop and report the blocker
+  clearly instead of masking it with alternate behavior.
 - Never commit secret or operator-local env overrides (for example `.env`,
   `docker/config/*-local.env`, `docker/config/base.env.local`). Tracked
   templates/defaults like `.env.example` and `docker/config/base.env` are

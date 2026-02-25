@@ -29,12 +29,6 @@ RUN mkdir -p /opt \
     && ln -s /volumes /opt/project
 
 RUN set -eux; \
-    if ! command -v uv >/dev/null 2>&1; then \
-        curl -LsSf https://astral.sh/uv/install.sh | sh; \
-        cp /root/.local/bin/uv* /usr/local/bin/; \
-    fi
-
-RUN set -eux; \
     if grep -q "ODOO_SOURCE_BIN" /odoo/odoo-bin; then \
         if [ ! -f /usr/local/bin/odoo-source-bin ]; then \
             echo "Missing /usr/local/bin/odoo-source-bin while /odoo/odoo-bin is already a wrapper" >&2; \
@@ -78,12 +72,6 @@ COPY /uv.lock /volumes/uv.lock
 RUN mkdir -p /opt \
     && rm -rf /opt/project \
     && ln -s /volumes /opt/project
-
-RUN set -eux; \
-    if ! command -v uv >/dev/null 2>&1; then \
-        curl -LsSf https://astral.sh/uv/install.sh | sh; \
-        cp /root/.local/bin/uv* /usr/local/bin/; \
-    fi
 
 RUN set -eux; \
     if grep -q "ODOO_SOURCE_BIN" /odoo/odoo-bin; then \

@@ -639,6 +639,20 @@ class OdooUpstreamRestorer:
                 self.local.db_conn.close()
             self.local.db_conn = None
 
+    def _odoo_runtime_connection_flags(self) -> list[str]:
+        command_flags = [
+            f"--db_host={self.local.host}",
+            f"--db_port={self.local.port}",
+            f"--db_user={self.local.db_user}",
+        ]
+        addons_path = (self.local.addons_path or "").strip()
+        if addons_path:
+            command_flags.append(f"--addons-path={addons_path}")
+        data_dir = (self.os_env.get("ODOO_DATA_DIR") or "").strip()
+        if data_dir:
+            command_flags.append(f"--data-dir={data_dir}")
+        return command_flags
+
     def database_exists(self) -> bool:
         try:
             with self._connect_with_retry("postgres") as conn:
@@ -685,6 +699,7 @@ class OdooUpstreamRestorer:
             "-i",
             "base",
         ]
+        cmd_parts += self._odoo_runtime_connection_flags()
         generated_config_path = "/volumes/config/_generated.conf"
         if Path(generated_config_path).exists():
             cmd_parts += ["--config", generated_config_path]
@@ -1690,6 +1705,7 @@ with registry.cursor() as cr:
             self.local.db_name,
             "--no-http",
         ]
+        cmd_parts += self._odoo_runtime_connection_flags()
         if self.local.openupgrade_enabled:
             cmd_parts += ["--load", "base,web,openupgrade_framework"]
         if to_install:
@@ -1823,6 +1839,7 @@ with registry.cursor() as cr:
             "--upgrade-path",
             ",".join(str(path) for path in scripts_paths),
         ]
+        cmd_parts += self._odoo_runtime_connection_flags()
 
         generated_config_path = "/volumes/config/_generated.conf"
         if Path(generated_config_path).exists():

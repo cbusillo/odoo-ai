@@ -118,6 +118,7 @@ DEFAULT_ODOO_BASE_DEVTOOLS_IMAGE = "ghcr.io/cbusillo/odoo-enterprise-docker:19.0
 DEFAULT_DOKPLOY_DEPLOY_TIMEOUT_SECONDS = 600
 DEFAULT_DOKPLOY_HEALTH_TIMEOUT_SECONDS = 180
 DEFAULT_DOKPLOY_HEALTHCHECK_PATH = "/web/health"
+DEFAULT_DOKPLOY_SHIP_SOURCE_GIT_REF = "main"
 HEALTHCHECK_PASS_STATUSES = {"pass", "ok", "healthy"}
 REGISTRY_LOGINS_DONE: set[tuple[str, str]] = set()
 VERIFIED_IMAGE_ACCESS: set[str] = set()
@@ -152,6 +153,7 @@ class DokployTargetDefinition(BaseModel):
     target_id: str = ""
     target_name: str = ""
     git_branch: str = ""
+    source_git_ref: str = DEFAULT_DOKPLOY_SHIP_SOURCE_GIT_REF
     auto_deploy: bool | None = None
     require_test_gate: bool = False
     require_prod_gate: bool = False
@@ -181,6 +183,15 @@ class StackDefinition(BaseModel):
     runtime_env: dict[str, str | int | float | bool] = Field(default_factory=dict)
     required_env_keys: tuple[str, ...] = ()
     contexts: dict[str, ContextDefinition]
+
+
+@dataclass(frozen=True)
+class ShipBranchSyncPlan:
+    source_git_ref: str
+    source_commit: str
+    target_branch: str
+    remote_branch_commit_before: str
+    branch_update_required: bool
 
 
 class PlatformSecretsInstanceDefinition(BaseModel):
@@ -990,6 +1001,74 @@ def _command_execution_env() -> dict[str, str]:
         if any(environment_key.startswith(prefix) for prefix in PLATFORM_RUNTIME_PASSTHROUGH_PREFIXES):
             execution_env.pop(environment_key, None)
     return execution_env
+
+
+def _resolve_local_git_commit(git_reference: str) -> str:
+    raw_output = _run_command_capture(["git", "rev-parse", "--verify", f"{git_reference}^{{commit}}"])
+    return raw_output.strip()
+
+
+def _resolve_remote_git_branch_commit(remote_name: str, branch_name: str) -> str:
+    raw_output = _run_command_capture(["git", "ls-remote", "--heads", remote_name, f"refs/heads/{branch_name}"])
+    for raw_line in raw_output.splitlines():
+        cleaned_line = raw_line.strip()
+        if not cleaned_line:
+            continue
+        split_line = cleaned_line.split()
+        if split_line:
+            return split_line[0].strip()
+    return ""
+
+
+def _resolve_ship_source_git_ref(
+    source_git_ref_override: str,
+    target_definition: DokployTargetDefinition | None,
+) -> str:
+    cleaned_override = source_git_ref_override.strip()
+    if cleaned_override:
+        return cleaned_override
+    if target_definition is not None:
+        cleaned_target_reference = target_definition.source_git_ref.strip()
+        if cleaned_target_reference:
+            return cleaned_target_reference
+    return DEFAULT_DOKPLOY_SHIP_SOURCE_GIT_REF
+
+
+def _prepare_ship_branch_sync(
+    source_git_ref_override: str,
+    target_definition: DokployTargetDefinition | None,
+) -> ShipBranchSyncPlan | None:
+    if target_definition is None:
+        return None
+    target_branch = target_definition.git_branch.strip()
+    if not target_branch:
+        return None
+
+    _run_command(["git", "fetch", "origin", "--prune"])
+    source_git_ref = _resolve_ship_source_git_ref(source_git_ref_override, target_definition)
+    source_commit = _resolve_local_git_commit(source_git_ref)
+    remote_branch_commit_before = _resolve_remote_git_branch_commit("origin", target_branch)
+    branch_update_required = source_commit != remote_branch_commit_before
+    return ShipBranchSyncPlan(
+        source_git_ref=source_git_ref,
+        source_commit=source_commit,
+        target_branch=target_branch,
+        remote_branch_commit_before=remote_branch_commit_before,
+        branch_update_required=branch_update_required,
+    )
+
+
+def _apply_ship_branch_sync(ship_branch_sync_plan: ShipBranchSyncPlan) -> None:
+    if not ship_branch_sync_plan.branch_update_required:
+        return
+    _run_command(
+        [
+            "git",
+            "push",
+            "origin",
+            f"+{ship_branch_sync_plan.source_commit}:refs/heads/{ship_branch_sync_plan.target_branch}",
+        ]
+    )
 
 
 def _parse_compose_ps_output(raw_output: str) -> list[JsonObject]:
@@ -4076,6 +4155,12 @@ def inspect_context(
 @click.option("--dry-run", is_flag=True, default=False)
 @click.option("--no-cache", is_flag=True, default=False, help="Request rebuild deployment on Dokploy target.")
 @click.option("--skip-gate", is_flag=True, default=False, help="Skip required test/prod gates from platform/dokploy.toml.")
+@click.option(
+    "--source-ref",
+    "source_git_ref",
+    default="",
+    help="Git reference used to sync the Dokploy target branch before deploy. Defaults to target source_git_ref or main.",
+)
 def ship(
     context_name: str,
     instance_name: str,
@@ -4087,6 +4172,7 @@ def ship(
     dry_run: bool,
     no_cache: bool,
     skip_gate: bool,
+    source_git_ref: str,
 ) -> None:
     if context_name not in {"cm", "opw"}:
         raise click.ClickException("Ship currently supports cm/opw contexts.")
@@ -4119,6 +4205,19 @@ def ship(
         environment_values=environment_values,
     )
     should_verify_health = verify_health and wait
+    ship_branch_sync_plan = _prepare_ship_branch_sync(source_git_ref, target_definition)
+
+    if ship_branch_sync_plan is None:
+        click.echo("branch_sync=false")
+    else:
+        click.echo("branch_sync=true")
+        click.echo(f"branch_sync_target_branch={ship_branch_sync_plan.target_branch}")
+        click.echo(f"branch_sync_source_ref={ship_branch_sync_plan.source_git_ref}")
+        click.echo(f"branch_sync_source_commit={ship_branch_sync_plan.source_commit}")
+        click.echo(
+            f"branch_sync_remote_before={ship_branch_sync_plan.remote_branch_commit_before or 'missing'}"
+        )
+        click.echo(f"branch_sync_update_required={str(ship_branch_sync_plan.branch_update_required).lower()}")
 
     _run_required_gates(
         context_name=context_name,
@@ -4139,6 +4238,8 @@ def ship(
             click.echo(f"dry_run_note={error.message}")
             click.echo(f"deploy_timeout_seconds={deploy_timeout_seconds}")
             click.echo(f"verify_health={str(should_verify_health).lower()}")
+            if ship_branch_sync_plan is not None:
+                click.echo("branch_sync_applied=false")
             if should_verify_health:
                 click.echo(f"health_timeout_seconds={health_timeout_seconds}")
                 for healthcheck_url in healthcheck_urls:
@@ -4169,9 +4270,24 @@ def ship(
             messages.append(f"application_error={app_resolution_error.message}")
         raise click.ClickException(" ".join(messages))
 
+    before_key = ""
     if selected_target_type == "compose":
         latest_before = _latest_deployment_for_compose(host, token, selected_target_id)
         before_key = _deployment_key(latest_before or {})
+    else:
+        latest_before = _latest_deployment_for_application(host, token, selected_target_id)
+        before_key = _deployment_key(latest_before or {})
+
+    branch_sync_applied = False
+    if ship_branch_sync_plan is not None:
+        if dry_run:
+            click.echo("branch_sync_applied=false")
+        else:
+            _apply_ship_branch_sync(ship_branch_sync_plan)
+            branch_sync_applied = ship_branch_sync_plan.branch_update_required
+            click.echo(f"branch_sync_applied={str(branch_sync_applied).lower()}")
+
+    if selected_target_type == "compose":
         compose_endpoint = "/api/compose.redeploy" if no_cache else "/api/compose.deploy"
         compose_payload: JsonObject = {"composeId": selected_target_id}
         if no_cache:
@@ -4216,8 +4332,6 @@ def ship(
                 _verify_ship_healthchecks(urls=healthcheck_urls, timeout_seconds=health_timeout_seconds)
         return
 
-    latest_before = _latest_deployment_for_application(host, token, selected_target_id)
-    before_key = _deployment_key(latest_before or {})
     application_endpoint = "/api/application.redeploy" if no_cache else "/api/application.deploy"
     application_payload: JsonObject = {"applicationId": selected_target_id}
     if no_cache:

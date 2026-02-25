@@ -69,6 +69,7 @@ Quick start
   uv run platform ship --context cm --instance testing --timeout 1800
   uv run platform ship --context cm --instance testing --health-timeout 300
   uv run platform ship --context cm --instance testing --no-verify-health
+  uv run platform ship --context cm --instance testing --source-ref release/cm-hotfix
   uv run platform ship --context cm --instance testing --dry-run
   uv run platform rollback --context cm --instance testing --list
   ```
@@ -111,6 +112,10 @@ Behavior notes
   Docker compose rebuilds without cache.
 - `platform ship --no-cache` requests a Dokploy redeploy endpoint
   (`*.redeploy`), which is Dokploy's rebuild path.
+- `platform ship` now syncs each target's deployment branch before triggering
+  Dokploy deploy/redeploy. By default the source reference comes from
+  `platform/dokploy.toml` (`source_git_ref`, default `main`), and can be
+  overridden with `--source-ref`.
 - `platform ship` now verifies each target domain's health endpoint after a
   successful deployment when `--wait` is enabled.
 - Health verification defaults to `https://<domain>/web/health` based on
@@ -123,9 +128,9 @@ Behavior notes
   before deploy and `require_prod_gate=true` runs
   `uv run prod-gate backup --target <context>` before deploy.
 - `platform/dokploy.toml` targets can optionally set
-  `deploy_timeout_seconds`, `healthcheck_enabled`, `healthcheck_path`, and
-  `healthcheck_timeout_seconds` to tune ship waits and endpoint checks per
-  environment.
+  `source_git_ref`, `deploy_timeout_seconds`, `healthcheck_enabled`,
+  `healthcheck_path`, and `healthcheck_timeout_seconds` to tune branch-sync
+  source refs, ship waits, and endpoint checks per environment.
 - Use `platform ship --skip-gate` to bypass those gates explicitly.
 - `platform dokploy logs` returns deployment metadata (status, timestamps,
   log path).

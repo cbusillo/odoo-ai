@@ -7,6 +7,7 @@ target_type = "compose"
 target_id = "Vq1_XXJoDonnVssJjHig7"
 target_name = "cm-dev"
 git_branch = "cm-dev"
+source_git_ref = "main"
 auto_deploy = true
 require_test_gate = false
 require_prod_gate = false
@@ -16,6 +17,8 @@ domains = ["cm-dev.shinycomputers.com"]
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://cm-dev.shinycomputers.com"
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"
 ODOO_WEB_COMMAND = "python3 /volumes/scripts/run_odoo_bootstrap.py -c /tmp/platform.odoo.conf"
+ODOO_BASE_RUNTIME_IMAGE = "ghcr.io/adomi-io/odoo:19.0"
+ODOO_BASE_DEVTOOLS_IMAGE = "ghcr.io/adomi-io/odoo:19.0"
 
 [[targets]]
 context = "cm"
@@ -24,6 +27,7 @@ target_type = "compose"
 target_id = "vSDNHhdSYS1IdoLXFFd0i"
 target_name = "cm-testing"
 git_branch = "cm-testing"
+source_git_ref = "main"
 auto_deploy = true
 require_test_gate = true
 require_prod_gate = false
@@ -33,6 +37,8 @@ domains = ["cm-testing.shinycomputers.com"]
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://cm-testing.shinycomputers.com"
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"
 ODOO_WEB_COMMAND = "python3 /volumes/scripts/run_odoo_bootstrap.py -c /tmp/platform.odoo.conf"
+ODOO_BASE_RUNTIME_IMAGE = "ghcr.io/adomi-io/odoo:19.0"
+ODOO_BASE_DEVTOOLS_IMAGE = "ghcr.io/adomi-io/odoo:19.0"
 
 [[targets]]
 context = "cm"
@@ -41,6 +47,7 @@ target_type = "compose"
 target_id = "iYS9ceYAIL7UFhuysdiYF"
 target_name = "cm-prod"
 git_branch = "cm-prod"
+source_git_ref = "main"
 auto_deploy = false
 require_test_gate = false
 require_prod_gate = false
@@ -50,6 +57,8 @@ domains = ["cm-prod.shinycomputers.com"]
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://cm-prod.shinycomputers.com"
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"
 ODOO_WEB_COMMAND = "python3 /volumes/scripts/run_odoo_bootstrap.py -c /tmp/platform.odoo.conf"
+ODOO_BASE_RUNTIME_IMAGE = "ghcr.io/adomi-io/odoo:19.0"
+ODOO_BASE_DEVTOOLS_IMAGE = "ghcr.io/adomi-io/odoo:19.0"
 
 [[targets]]
 context = "opw"
@@ -58,6 +67,7 @@ target_type = "compose"
 target_id = "fv4K09A3DmZLfNBAf-G4v"
 target_name = "opw-dev"
 git_branch = "opw-dev"
+source_git_ref = "main"
 auto_deploy = true
 require_test_gate = false
 require_prod_gate = false
@@ -69,6 +79,8 @@ domains = ["opw-dev.shinycomputers.com"]
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://opw-dev.shinycomputers.com"
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"
 ODOO_WEB_COMMAND = "python3 /volumes/scripts/run_odoo_bootstrap.py -c /tmp/platform.odoo.conf"
+ODOO_BASE_RUNTIME_IMAGE = "ghcr.io/adomi-io/odoo:19.0"
+ODOO_BASE_DEVTOOLS_IMAGE = "ghcr.io/adomi-io/odoo:19.0"
 
 [[targets]]
 context = "opw"
@@ -77,6 +89,7 @@ target_type = "compose"
 target_id = "tpAsexVQNkCqL7J_JIX6j"
 target_name = "opw-testing"
 git_branch = "opw-testing"
+source_git_ref = "main"
 auto_deploy = true
 require_test_gate = true
 require_prod_gate = false
@@ -88,6 +101,8 @@ domains = ["opw-testing.shinycomputers.com"]
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://opw-testing.shinycomputers.com"
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"
 ODOO_WEB_COMMAND = "python3 /volumes/scripts/run_odoo_bootstrap.py -c /tmp/platform.odoo.conf"
+ODOO_BASE_RUNTIME_IMAGE = "ghcr.io/adomi-io/odoo:19.0"
+ODOO_BASE_DEVTOOLS_IMAGE = "ghcr.io/adomi-io/odoo:19.0"
 
 [[targets]]
 context = "opw"
@@ -96,6 +111,7 @@ target_type = "compose"
 target_id = "15b5-sab4eFQ3VlpDUkBI"
 target_name = "opw-prod"
 git_branch = "opw-prod"
+source_git_ref = "main"
 auto_deploy = false
 require_test_gate = false
 require_prod_gate = false
@@ -107,3 +123,5 @@ domains = ["opw-prod.shinycomputers.com"]
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://opw-prod.shinycomputers.com"
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"
 ODOO_WEB_COMMAND = "python3 /volumes/scripts/run_odoo_bootstrap.py -c /tmp/platform.odoo.conf"
+ODOO_BASE_RUNTIME_IMAGE = "ghcr.io/adomi-io/odoo:19.0"
+ODOO_BASE_DEVTOOLS_IMAGE = "ghcr.io/adomi-io/odoo:19.0"

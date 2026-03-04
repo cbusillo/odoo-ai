@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "odoo-ai"
 version = "0.0.0"
-description = "AI-powered Odoo 18 Enterprise development framework"
+description = "AI-powered Odoo 19 Enterprise development framework"
 requires-python = ">=3.13"
 
 dependencies = [
@@ -18,7 +18,7 @@ dependencies = [
     "pydantic_settings",
     "questionary",
     "requests",
-    "PyMySQL==1.1.1",
+    "PyMySQL",
     "ruff",
     "rich",
     "mypy",
@@ -28,6 +28,7 @@ dependencies = [
 dev = [
     "coverage",
     "debugpy",
+    "docker",
     "lxml-stubs",
     "types-Werkzeug",
     "pip",
@@ -52,8 +53,7 @@ test = "tools.testkit.cli:main"  # example: uv run test unit --json
 test-validate = "tools.testkit.validate:main"
 gate-benchmark = "tools.gate_benchmark:main"
 prod-gate = "tools.prod_gate:main"
-ops = "tools.ops_cli:main"
-platform = "tools.platform_cli:main"
+platform = "tools.platform.cli:main"
 
 [tool.uv]
 preview = true

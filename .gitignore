@@ -195,8 +195,6 @@ cython_debug/
 odoo.*.cfg
 odoo.*.conf
 
-/docker/config/_generated.conf
-
 # Temporary files directory
 /tmp/*
 !/tmp/README.md
@@ -213,5 +211,5 @@ platform/secrets.toml
 *.local.*
 *.env*
 !*.env.example
-!docker/config/base.env
+!platform/config/base.env
 .worktrees

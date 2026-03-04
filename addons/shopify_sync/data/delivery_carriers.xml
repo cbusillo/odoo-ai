@@ -9,7 +9,7 @@
             <field name="fixed_price">0</field>
             <field name="active" eval="True"/>
         </record>
-        
+
         <record id="delivery_carrier_ups_2day" model="delivery.carrier">
             <field name="name">UPS 2nd Day Air</field>
             <field name="delivery_type">fixed</field>

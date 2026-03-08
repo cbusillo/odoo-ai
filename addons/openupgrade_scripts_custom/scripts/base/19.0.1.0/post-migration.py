@@ -141,8 +141,7 @@ def _ensure_env(cursor_or_env: Cursor | Environment) -> Environment:
 
 def _ensure_not_null_constraint(env: Environment, table_name: str, column_name: str) -> None:
     env.cr.execute(
-        "SELECT is_nullable FROM information_schema.columns "
-        "WHERE table_schema = 'public' AND table_name = %s AND column_name = %s",
+        "SELECT is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND table_name = %s AND column_name = %s",
         (table_name, column_name),
     )
     row = env.cr.fetchone()
@@ -211,8 +210,7 @@ def _backfill_ready_for_sale_enabled_date(env: Environment) -> None:
     logger.info("Backfilling ready-for-sale enabled dates using SQL.")
 
     has_tracking_tables = all(
-        _table_exists(env, table_name)
-        for table_name in ("mail_message", "mail_tracking_value", "ir_model_fields")
+        _table_exists(env, table_name) for table_name in ("mail_message", "mail_tracking_value", "ir_model_fields")
     )
     if has_tracking_tables:
         env.cr.execute(
@@ -260,15 +258,13 @@ def _fix_partner_data_issues(env: Environment) -> None:
     if not openupgrade.column_exists(env.cr, "res_partner", "autopost_bills"):
         return
 
-    env.cr.execute("SELECT COUNT(*) FROM res_partner WHERE autopost_bills IS NULL")
+    env.cr.execute("SELECT COUNT(*) FROM res_partner WHERE NULLIF(autopost_bills, '') IS NULL")
     null_count_before = env.cr.fetchone()[0]
     if null_count_before:
-        logger.info("Found %s partners with NULL autopost_bills", null_count_before)
-        env.cr.execute("UPDATE res_partner SET autopost_bills = 'ask' WHERE autopost_bills IS NULL")
+        logger.info("Found %s partners with missing autopost_bills", null_count_before)
+        env.cr.execute("UPDATE res_partner SET autopost_bills = 'ask' WHERE NULLIF(autopost_bills, '') IS NULL")
 
-    env.cr.execute(
-        "UPDATE res_partner SET name = phone WHERE name = '' AND type = 'contact' AND phone IS NOT NULL"
-    )
+    env.cr.execute("UPDATE res_partner SET name = phone WHERE name = '' AND type = 'contact' AND phone IS NOT NULL")
     contact_fixed = env.cr.rowcount
     if contact_fixed:
         logger.info("Fixed %s contacts by using phone as name", contact_fixed)

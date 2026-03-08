@@ -48,7 +48,7 @@ def _ensure_mail_link_preview_unique_source_url(env: Environment) -> None:
         message_link_preview_exists = True
 
     # Find duplicate source_url groups and keep the lowest id.
-    # noinspection SqlShouldBeInGroupBy
+    # noinspection SqlConstantExpression
     env.cr.execute(
         "SELECT source_url, MIN(id) FROM mail_link_preview WHERE source_url IS NOT NULL GROUP BY source_url HAVING COUNT(*) > 1",
     )

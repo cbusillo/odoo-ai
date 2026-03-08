@@ -1,11 +1,18 @@
 # Copyright 2026 Hunki Enterprises BV
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
+from typing import Any
+
 from odoo import SUPERUSER_ID, api
 from openupgradelib import openupgrade
 
 
-def _trim_record_translations_for_odoo_19(env, module, xml_ids, field_names):
+def _trim_record_translations_for_odoo_19(
+    env: Any,
+    module: str,
+    xml_ids: list[str] | tuple[str, ...],
+    field_names: list[str],
+) -> None:
     """Drop non-en_US JSONB translations for selected XML records.
 
     Odoo 19 stores ``ir_model_fields.translate`` as a string (for example,
@@ -90,15 +97,18 @@ def _trim_record_translations_for_odoo_19(env, module, xml_ids, field_names):
         )
 
 
-def _install_translate_aware_delete_record_translations_patch():
-    """Patch openupgradelib for Odoo 19 ``ir_model_fields.translate`` strings."""
-
+def _install_translate_aware_delete_record_translations_patch() -> None:
     if getattr(openupgrade, "_sc_translate_patch_installed", False):
         return
 
     original_delete_record_translations = openupgrade.delete_record_translations
 
-    def patched_delete_record_translations(cursor, module, xml_ids, field_list=None):
+    def patched_delete_record_translations(
+        cursor: Any,
+        module: str,
+        xml_ids: list[str] | tuple[str, ...],
+        field_list: list[str] | None = None,
+    ) -> None:
         cursor.execute(
             """
             SELECT data_type
@@ -115,16 +125,16 @@ def _install_translate_aware_delete_record_translations_patch():
                 xml_ids=xml_ids,
                 field_names=field_list or [],
             )
-            return
-
-        return original_delete_record_translations(cursor, module, xml_ids, field_list)
+        else:
+            original_delete_record_translations(cursor, module, xml_ids, field_list)
 
     openupgrade.delete_record_translations = patched_delete_record_translations
     openupgrade._sc_translate_patch_installed = True
 
 
 @openupgrade.migrate()
-def migrate(env, version):
+def migrate(env, version) -> None:
+    _ = version
     _install_translate_aware_delete_record_translations_patch()
     openupgrade.load_data(env, "auth_signup", "19.0.1.0/noupdate_changes.xml")
     openupgrade.delete_record_translations(

@@ -177,6 +177,7 @@ def _rename_product_connect(env: Environment) -> None:
         renamed_status = renamed_state.get("state")
         legacy_status = legacy_state.get("state")
         if renamed_status in {"uninstalled", "uninstallable"} and legacy_status not in {"uninstalled", "uninstallable"}:
+            # noinspection SqlResolve
             env.cr.execute(
                 """
                 UPDATE ir_module_module
@@ -453,6 +454,7 @@ def _normalize_legacy_inventory_valuation_values(env: Environment) -> None:
 
     updated_property_rows = 0
     if openupgrade.column_exists(env.cr, "ir_property", "value_text"):
+        # noinspection SqlResolve
         env.cr.execute(
             "UPDATE ir_property SET value_text = %s WHERE value_text = %s",
             ("manual", "manual_periodic"),

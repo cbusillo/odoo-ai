@@ -1,7 +1,7 @@
 from openupgradelib import openupgrade
 
 
-def _reset_mail_message_link_preview(env):
+def _reset_mail_message_link_preview(env) -> None:
     """Clear pre-existing relation rows before upstream 19.0.1.19 backfill.
 
     Some 18->19 datasets already have rows in `mail_message_link_preview`.
@@ -14,11 +14,12 @@ def _reset_mail_message_link_preview(env):
     table_name = env.cr.fetchone()[0]
     if table_name is None:
         return
+    # noinspection SqlWithoutWhere
     env.cr.execute("DELETE FROM mail_message_link_preview")
 
 
 @openupgrade.migrate()
-def migrate(env, version):
+def migrate(env, version) -> None:
     _ = version
     openupgrade.load_data(env, "mail", "19.0.1.19/noupdate_changes.xml")
     _reset_mail_message_link_preview(env)

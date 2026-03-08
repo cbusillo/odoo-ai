@@ -19,7 +19,16 @@ def _load_restore_module() -> types.ModuleType:
     psycopg2_module = types.ModuleType("psycopg2")
     psycopg2_sql_module = types.ModuleType("psycopg2.sql")
     psycopg2_extensions_module = types.ModuleType("psycopg2.extensions")
+
+    class _FakePsycopgError(Exception):
+        pass
+
+    def _unexpected_connect(*args, **kwargs):
+        raise AssertionError("psycopg2.connect should not be called in this test")
+
     setattr(psycopg2_module, "sql", psycopg2_sql_module)
+    setattr(psycopg2_module, "Error", _FakePsycopgError)
+    setattr(psycopg2_module, "connect", _unexpected_connect)
     setattr(psycopg2_extensions_module, "connection", object)
 
     passlib_module = types.ModuleType("passlib")

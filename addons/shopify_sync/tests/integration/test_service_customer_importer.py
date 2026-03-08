@@ -486,7 +486,7 @@ class TestCustomerImporter(IntegrationTestCase):
     def test_import_customers_batch(self) -> None:
         unique_id = uuid.uuid4().hex[:8]
 
-        base_id = int(common.time.common.time() * 1000) % 1000000  # Unique base ID
+        base_id = int(common.time.time() * 1000) % 1000000  # Unique base ID
 
         customers_data = []
         for i in range(1, 4):

@@ -29,6 +29,7 @@ RUNTIME_OPTION_MAP: tuple[tuple[str, str], ...] = (
     ("ODOO_LIMIT_TIME_CPU", "limit_time_cpu"),
     ("ODOO_LIMIT_TIME_REAL", "limit_time_real"),
     ("ODOO_LIMIT_TIME_REAL_CRON", "limit_time_real_cron"),
+    ("ODOO_LIMIT_TIME_WORKER_CRON", "limit_time_worker_cron"),
     ("ODOO_LIMIT_MEMORY_SOFT", "limit_memory_soft"),
     ("ODOO_LIMIT_MEMORY_HARD", "limit_memory_hard"),
 )
@@ -293,7 +294,7 @@ def main() -> None:
     _run_initialization_if_needed(settings)
 
     print("[platform-bootstrap] starting Odoo web server", flush=True)
-    server_command = _build_odoo_command(settings, initialize_modules=None, stop_after_init=False)
+    server_command = _build_odoo_command(settings, stop_after_init=False)
     os.execv(server_command[0], server_command)
 
 

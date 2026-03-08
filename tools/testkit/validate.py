@@ -2,6 +2,8 @@ import argparse
 import json
 from pathlib import Path
 
+from tools.environment_files import discover_repo_root
+
 from .counts import count_js_tests, count_py_tests
 from .sharding import discover_modules_with
 
@@ -18,7 +20,7 @@ def _source_counts(addons_root: Path) -> dict[str, int]:
         "unit": count_py_tests(addons_root.glob("**/tests/unit/**/*.py")),
         "integration": count_py_tests(addons_root.glob("**/tests/integration/**/*.py")),
         "tour": count_py_tests(addons_root.glob("**/tests/tour/**/*.py")),
-        "js": count_js_tests(addons_root.rglob("*.test.js")),
+        "js": count_js_tests(addons_root.glob("**/static/tests/**/*.test.js")),
     }
 
 
@@ -69,7 +71,7 @@ def _tag_requirements() -> dict[str, tuple[str, ...]]:
 def _missing_tagged_tests(addons_root: Path) -> dict[str, list[str]]:
     missing: dict[str, list[str]] = {phase: [] for phase in _tag_requirements()}
     for phase, needles in _tag_requirements().items():
-        for test_file in addons_root.glob(f"**/tests/{phase}/*.py"):
+        for test_file in addons_root.glob(f"**/tests/{phase}/**/*.py"):
             if test_file.name == "__init__.py":
                 continue
             text = test_file.read_text(errors="ignore")
@@ -81,7 +83,7 @@ def _missing_tagged_tests(addons_root: Path) -> dict[str, list[str]]:
 def _missing_test_package_inits(addons_root: Path) -> dict[str, list[str]]:
     missing: dict[str, list[str]] = {phase: [] for phase in _tag_requirements()}
     for phase in _tag_requirements():
-        for test_dir in addons_root.glob(f"*/tests/{phase}"):
+        for test_dir in addons_root.glob(f"**/tests/{phase}/**"):
             if not test_dir.is_dir():
                 continue
             py_files = [path for path in test_dir.glob("*.py") if path.name != "__init__.py"]
@@ -120,9 +122,10 @@ def _failures_summary(session_dir: Path) -> dict[str, dict[str, int]]:
 
 
 def validate(session: str | None = None, json_out: bool = False) -> int:
-    base_dir = Path("tmp/test-logs")
+    repo_root = discover_repo_root(Path.cwd())
+    base_dir = repo_root / "tmp" / "test-logs"
     session_dir = base_dir / session if session else base_dir / "latest"
-    addons_root = Path("addons")
+    addons_root = repo_root / "addons"
 
     source_counts = _source_counts(addons_root)
     executed_counts = _executed_counts(session_dir)

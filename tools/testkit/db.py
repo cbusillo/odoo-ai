@@ -1,14 +1,43 @@
 import json
 import logging
 import re
+import shlex
 import subprocess
 import time
 from pathlib import Path
 
-from .docker_api import compose_exec, ensure_services_up, get_database_service, get_script_runner_service
+from .docker_api import compose_env, compose_exec, ensure_services_up, get_database_service, get_script_runner_service
 from .settings import TestSettings
 
 _logger = logging.getLogger(__name__)
+DEFAULT_DATABASE_TARGET_MARKER = "database: default@default:default"
+
+
+def contains_default_database_target(log_output: str) -> bool:
+    return DEFAULT_DATABASE_TARGET_MARKER in log_output.lower()
+
+
+def assert_no_default_database_target(log_output: str, *, command_name: str) -> None:
+    if not contains_default_database_target(log_output):
+        return
+    raise RuntimeError(
+        f"{command_name} resolved default database target. "
+        "Refusing to continue because test harness DB settings were not applied."
+    )
+
+
+def resolve_database_connection_flags(environment_values: dict[str, str] | None = None) -> list[str]:
+    resolved_environment = environment_values if environment_values is not None else compose_env()
+    database_host = (resolved_environment.get("ODOO_DB_HOST") or "database").strip() or "database"
+    database_port = (resolved_environment.get("ODOO_DB_PORT") or "5432").strip() or "5432"
+    database_user = (resolved_environment.get("ODOO_DB_USER") or "odoo").strip() or "odoo"
+    database_password = resolved_environment.get("ODOO_DB_PASSWORD") or ""
+    return [
+        f"--db_host={database_host}",
+        f"--db_port={database_port}",
+        f"--db_user={database_user}",
+        f"--db_password={database_password}",
+    ]
 
 
 def get_db_user() -> str:
@@ -278,9 +307,12 @@ def clone_production_database(db_name: str) -> None:
     force_drop_database(db_name)
     if not _create_database(db_name, db_user):
         return
+    quoted_user = shlex.quote(db_user)
+    quoted_source_database = shlex.quote(production_db)
+    quoted_target_database = shlex.quote(db_name)
     cmd = (
-        f"set -o pipefail; pg_dump -Fc -U {db_user} {production_db} | "
-        f"pg_restore -U {db_user} -d {db_name} --no-owner --role={db_user}"
+        f"set -o pipefail; pg_dump -Fc -U {quoted_user} {quoted_source_database} | "
+        f"pg_restore -U {quoted_user} -d {quoted_target_database} --no-owner --role={quoted_user}"
     )
     compose_exec(get_database_service(), ["bash", "-lc", cmd])
 
@@ -295,9 +327,12 @@ def create_template_from_production(template_db: str, *, timeout_sec: int | None
         return
     # Clone from production
     production_db = get_production_db_name()
+    quoted_user = shlex.quote(db_user)
+    quoted_source_database = shlex.quote(production_db)
+    quoted_template_database = shlex.quote(template_db)
     dump_command = (
-        f"set -o pipefail; pg_dump -Fc -U {db_user} {production_db} | "
-        f"pg_restore -U {db_user} -d {template_db} --no-owner --role={db_user}"
+        f"set -o pipefail; pg_dump -Fc -U {quoted_user} {quoted_source_database} | "
+        f"pg_restore -U {quoted_user} -d {quoted_template_database} --no-owner --role={quoted_user}"
     )
     compose_exec(get_database_service(), ["bash", "-lc", dump_command], timeout=timeout_sec)
 
@@ -327,13 +362,16 @@ def build_module_template(
         "-i",
         module_list,
     ]
+    command.extend(resolve_database_connection_flags())
     result = compose_exec(get_script_runner_service(), command, timeout=timeout_sec)
+    combined_output = (result.stdout or "") + (result.stderr or "")
     if log_path:
         try:
             log_path.parent.mkdir(parents=True, exist_ok=True)
-            log_path.write_text((result.stdout or "") + (result.stderr or ""))
+            log_path.write_text(combined_output)
         except OSError as exc:
             _logger.debug("db: failed to write template log (%s)", exc)
+    assert_no_default_database_target(combined_output, command_name="module template build")
     if result.returncode != 0:
         raise RuntimeError(f"module template build failed (rc={result.returncode})")
 
@@ -344,8 +382,6 @@ def template_reuse_candidate(_base_db: str, ttl_sec: int) -> str | None:
     We record the last template name and time in tmp/test-logs/template.json.
     If REUSE_TEMPLATE is enabled and TTL not expired, and DB exists, reuse it.
     """
-    from time import time
-
     metadata_path = Path("tmp/test-logs/template.json")
     if not metadata_path.exists():
         return None
@@ -355,7 +391,7 @@ def template_reuse_candidate(_base_db: str, ttl_sec: int) -> str | None:
         created = float(data.get("created", 0))
         if not name:
             return None
-        if ttl_sec and (time() - created) > ttl_sec:
+        if ttl_sec and (time.time() - created) > ttl_sec:
             return None
         if _db_exists(name, get_db_user()):
             return name
@@ -366,11 +402,9 @@ def template_reuse_candidate(_base_db: str, ttl_sec: int) -> str | None:
 
 
 def record_template(template_db: str) -> None:
-    from time import time
-
     metadata_path = Path("tmp/test-logs/template.json")
     try:
         metadata_path.parent.mkdir(parents=True, exist_ok=True)
-        metadata_path.write_text(json.dumps({"name": template_db, "created": time()}))
+        metadata_path.write_text(json.dumps({"name": template_db, "created": time.time()}))
     except OSError as exc:
         _logger.debug("db: failed to record template metadata (%s)", exc)

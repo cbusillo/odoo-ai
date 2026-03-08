@@ -233,6 +233,12 @@ def _build_runtime_env_values(
     runtime_selection: RuntimeSelection,
     source_environment: dict[str, str],
 ) -> dict[str, str]:
+    effective_addon_repositories = platform_runtime.effective_runtime_addon_repositories(
+        stack_definition=stack_definition,
+        runtime_selection=runtime_selection,
+        source_environment=source_environment,
+    )
+
     runtime_values = {
         "PLATFORM_CONTEXT": runtime_selection.context_name,
         "PLATFORM_INSTANCE": runtime_selection.instance_name,
@@ -254,7 +260,7 @@ def _build_runtime_env_values(
         "ODOO_FILESTORE_PATH": source_environment.get("ODOO_FILESTORE_PATH", "/volumes/data/filestore"),
         "ODOO_MASTER_PASSWORD": source_environment.get("ODOO_MASTER_PASSWORD", ""),
         "ODOO_INSTALL_MODULES": ",".join(runtime_selection.effective_install_modules),
-        "ODOO_ADDON_REPOSITORIES": ",".join(runtime_selection.effective_addon_repositories),
+        "ODOO_ADDON_REPOSITORIES": ",".join(effective_addon_repositories),
         "ODOO_UPDATE_MODULES": runtime_selection.context_definition.update_modules,
         "ODOO_ADDONS_PATH": ",".join(stack_definition.addons_path),
         "ODOO_WEB_HOST_PORT": str(runtime_selection.web_host_port),
@@ -269,8 +275,14 @@ def _build_runtime_env_values(
         "OPENUPGRADE_SCRIPTS_PATH": source_environment.get("OPENUPGRADE_SCRIPTS_PATH", ""),
         "OPENUPGRADE_TARGET_VERSION": source_environment.get("OPENUPGRADE_TARGET_VERSION", ""),
         "OPENUPGRADE_SKIP_UPDATE_ADDONS": source_environment.get("OPENUPGRADE_SKIP_UPDATE_ADDONS", "True"),
+        "ODOO_PYTHON_SYNC_SKIP_ADDONS": source_environment.get("ODOO_PYTHON_SYNC_SKIP_ADDONS", ""),
         "GITHUB_TOKEN": source_environment.get("GITHUB_TOKEN", ""),
     }
+
+    if platform_runtime.openupgrade_enabled(source_environment):
+        runtime_values["ODOO_PYTHON_SYNC_SKIP_ADDONS"] = (
+            "openupgrade_framework,openupgrade_scripts,openupgrade_scripts_custom"
+        )
 
     for environment_key in sorted(source_environment):
         include_value = environment_key in PLATFORM_RUNTIME_PASSTHROUGH_KEYS or any(
@@ -381,6 +393,21 @@ def _run_command_with_input(command: list[str], input_text: str) -> None:
     if result.returncode != 0:
         joined_command = " ".join(command)
         raise click.ClickException(f"Command failed ({result.returncode}): {joined_command}")
+
+
+def _run_command_with_input_to_log(command: list[str], input_text: str, log_file: Path) -> None:
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    with log_file.open("wb") as log_handle:
+        result = subprocess.run(
+            command,
+            input=input_text.encode(),
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+            env=_command_execution_env(),
+        )
+    if result.returncode != 0:
+        joined_command = " ".join(command)
+        raise click.ClickException(f"Command failed ({result.returncode}): {joined_command}\nLog file: {log_file}")
 
 
 def _run_command_capture(command: list[str]) -> str:
@@ -1139,7 +1166,22 @@ def _render_odoo_config(
     return "\n".join(lines) + "\n"
 
 
-@click.group(help="Minimal platform contract CLI.")
+LOCAL_RUNTIME_CONTRACT_HELP = (
+    "Local host runtime only. Requires --instance local. "
+    "Remote dev/testing/prod instances use ship/rollback/gate/promote instead."
+)
+REMOTE_RUNTIME_CONTRACT_HELP = (
+    "Dokploy-managed remote workflow for dev/testing/prod. "
+    "Remote targets bootstrap on ship; init/restore/update remain local-only."
+)
+
+
+@click.group(
+    help=(
+        "Platform operator CLI. Local runtime mutations use --instance local; "
+        "Dokploy-managed remote targets use ship/rollback/gate/promote."
+    )
+)
 def main() -> None:
     return None
 
@@ -1296,7 +1338,13 @@ def render_odoo_conf(
     )
 
 
-@main.command("doctor")
+@main.command(
+    "doctor",
+    help=(
+        "Inspect the selected platform target without mutating it. "
+        "Reports local runtime status for --instance local and Dokploy target status for remote instances."
+    ),
+)
 @click.option(
     "--stack-file",
     type=click.Path(path_type=Path),
@@ -1391,7 +1439,13 @@ def status(
     )
 
 
-@main.command("gate")
+@main.command(
+    "gate",
+    help=(
+        "Run release checks for a selected target. "
+        "Use this for Dokploy-managed remote instances before client validation or promotion."
+    ),
+)
 @click.option("--context", "context_name", required=True)
 @click.option("--instance", "instance_name", default="local", show_default=True)
 @click.option("--env-file", type=click.Path(path_type=Path), default=None)
@@ -1440,7 +1494,13 @@ def gate(
     )
 
 
-@main.command("run")
+@main.command(
+    "run",
+    help=(
+        "Run local runtime workflows such as restore/init/update chains. "
+        f"{LOCAL_RUNTIME_CONTRACT_HELP}"
+    ),
+)
 @click.option(
     "--stack-file",
     type=click.Path(path_type=Path),
@@ -1824,7 +1884,7 @@ def dokploy_reconcile(
     )
 
 
-@main.command("select")
+@main.command("select", help=f"Render and select local runtime artifacts. {LOCAL_RUNTIME_CONTRACT_HELP}")
 @click.option(
     "--stack-file",
     type=click.Path(path_type=Path),
@@ -1863,7 +1923,7 @@ def select(
     )
 
 
-@main.command("up")
+@main.command("up", help=f"Start the local compose runtime. {LOCAL_RUNTIME_CONTRACT_HELP}")
 @click.option(
     "--stack-file",
     type=click.Path(path_type=Path),
@@ -1902,7 +1962,7 @@ def up(
     )
 
 
-@main.command("down")
+@main.command("down", help=f"Stop the local compose runtime. {LOCAL_RUNTIME_CONTRACT_HELP}")
 @click.option("--context", "context_name", required=True)
 @click.option("--instance", "instance_name", default="local", show_default=True)
 @click.option("--volumes", is_flag=True, default=False)
@@ -1917,7 +1977,7 @@ def down(context_name: str, instance_name: str, volumes: bool) -> None:
     )
 
 
-@main.command("logs")
+@main.command("logs", help=f"Read logs from the local compose runtime. {LOCAL_RUNTIME_CONTRACT_HELP}")
 @click.option("--context", "context_name", required=True)
 @click.option("--instance", "instance_name", default="local", show_default=True)
 @click.option("--service", default="web", show_default=True)
@@ -1954,7 +2014,7 @@ def _run_with_web_temporarily_stopped(
     )
 
 
-@main.command("build")
+@main.command("build", help=f"Build local compose images. {LOCAL_RUNTIME_CONTRACT_HELP}")
 @click.option(
     "--stack-file",
     type=click.Path(path_type=Path),
@@ -1990,7 +2050,56 @@ def build(
     )
 
 
-@main.command("inspect")
+@main.command("odoo-shell", help=f"Run an Odoo shell script against the local runtime. {LOCAL_RUNTIME_CONTRACT_HELP}")
+@click.option(
+    "--stack-file",
+    type=click.Path(path_type=Path),
+    default=Path("platform/stack.toml"),
+    show_default=True,
+)
+@click.option("--context", "context_name", required=True)
+@click.option("--instance", "instance_name", default="local", show_default=True)
+@click.option("--env-file", type=click.Path(path_type=Path), default=None)
+@click.option("--script", "script_path", type=click.Path(path_type=Path), required=True)
+@click.option("--service", default="script-runner", show_default=True)
+@click.option("--database", "database_name", default=None)
+@click.option("--log-file", type=click.Path(path_type=Path), default=None)
+@click.option("--dry-run", is_flag=True, default=False)
+def odoo_shell(
+    stack_file: Path,
+    context_name: str,
+    instance_name: str,
+    env_file: Path | None,
+    script_path: Path,
+    service: str,
+    database_name: str | None,
+    log_file: Path | None,
+    dry_run: bool,
+) -> None:
+    platform_commands_lifecycle.execute_odoo_shell(
+        stack_file=stack_file,
+        context_name=context_name,
+        instance_name=instance_name,
+        env_file=env_file,
+        script_path=script_path,
+        service=service,
+        database_name=database_name,
+        log_file=log_file,
+        dry_run=dry_run,
+        discover_repo_root_fn=_discover_repo_root,
+        load_stack_fn=_load_stack,
+        resolve_runtime_selection_fn=_resolve_runtime_selection,
+        load_environment_fn=_load_environment,
+        write_runtime_odoo_conf_file_fn=_write_runtime_odoo_conf_file,
+        write_runtime_env_file_fn=_write_runtime_env_file,
+        compose_base_command_fn=_compose_base_command,
+        run_command_with_input_fn=_run_command_with_input,
+        run_command_with_input_to_log_fn=_run_command_with_input_to_log,
+        echo_fn=click.echo,
+    )
+
+
+@main.command("inspect", help=f"Inspect rendered local runtime configuration. {LOCAL_RUNTIME_CONTRACT_HELP}")
 @click.option(
     "--stack-file",
     type=click.Path(path_type=Path),
@@ -2023,7 +2132,13 @@ def inspect_context(
     )
 
 
-@main.command("promote")
+@main.command(
+    "promote",
+    help=(
+        "Promote the exact tested commit from testing to prod for a Dokploy-managed target. "
+        f"{REMOTE_RUNTIME_CONTRACT_HELP}"
+    ),
+)
 @click.option("--context", "context_name", required=True)
 @click.option(
     "--from-instance",
@@ -2116,7 +2231,13 @@ def promote(
     )
 
 
-@main.command("ship")
+@main.command(
+    "ship",
+    help=(
+        "Deploy an exact git ref to a Dokploy-managed remote target. "
+        f"{REMOTE_RUNTIME_CONTRACT_HELP}"
+    ),
+)
 @click.option("--context", "context_name", required=True)
 @click.option(
     "--instance",
@@ -2152,13 +2273,13 @@ def promote(
     "--allow-dirty",
     is_flag=True,
     default=False,
-    help="Allow ship from a dirty tracked working tree (uncommitted changes).",
+    help="Allow ship from a dirty tracked working tree (uncommitted changes). Prefer a clean worktree plus --source-ref for surgical tests.",
 )
 @click.option(
     "--source-ref",
     "source_git_ref",
     default="",
-    help="Git reference used to sync the Dokploy target branch before deploy. Defaults to target source_git_ref or origin/main.",
+    help="Git reference used to sync the Dokploy target branch before deploy. Use this to test an exact commit or worktree HEAD. Defaults to target source_git_ref or origin/main.",
 )
 def ship(
     context_name: str,
@@ -2214,7 +2335,13 @@ def ship(
     )
 
 
-@main.command("rollback")
+@main.command(
+    "rollback",
+    help=(
+        "List or trigger Dokploy rollback targets for a remote deployment. "
+        f"{REMOTE_RUNTIME_CONTRACT_HELP}"
+    ),
+)
 @click.option("--context", "context_name", required=True)
 @click.option(
     "--instance",
@@ -2263,7 +2390,13 @@ def rollback(
     )
 
 
-@main.command("init")
+@main.command(
+    "init",
+    help=(
+        "Initialize the local runtime database and modules. "
+        f"{LOCAL_RUNTIME_CONTRACT_HELP}"
+    ),
+)
 @click.option(
     "--stack-file",
     type=click.Path(path_type=Path),
@@ -2300,7 +2433,13 @@ def init(
     )
 
 
-@main.command("openupgrade")
+@main.command(
+    "openupgrade",
+    help=(
+        "Run the local OpenUpgrade workflow. "
+        f"{LOCAL_RUNTIME_CONTRACT_HELP}"
+    ),
+)
 @click.option(
     "--stack-file",
     type=click.Path(path_type=Path),
@@ -2334,7 +2473,13 @@ def openupgrade(
     )
 
 
-@main.command("update")
+@main.command(
+    "update",
+    help=(
+        "Apply module updates against the local runtime. "
+        f"{LOCAL_RUNTIME_CONTRACT_HELP}"
+    ),
+)
 @click.option(
     "--stack-file",
     type=click.Path(path_type=Path),

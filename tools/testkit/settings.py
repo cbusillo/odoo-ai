@@ -1,7 +1,10 @@
+from pathlib import Path
 from typing import ClassVar
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from tools.environment_files import discover_repo_root
 
 # Summary schema version for all JSON outputs produced by test runner
 SUMMARY_SCHEMA_VERSION = "1.0"
@@ -11,7 +14,9 @@ def _load_pyproject_template_defaults() -> dict[str, object]:
     try:
         import tomllib
 
-        with open("pyproject.toml", "rb") as file_handle:
+        repo_root = discover_repo_root(Path(__file__).resolve().parent)
+        pyproject_file_path = repo_root / "pyproject.toml"
+        with pyproject_file_path.open("rb") as file_handle:
             data = tomllib.load(file_handle)
         return data.get("tool", {}).get("odoo-test", {}).get("template", {}) or {}
     except (OSError, ValueError):
@@ -73,6 +78,7 @@ class TestSettings(BaseSettings):
     integration_shards: int = Field(0, alias="INTEGRATION_SHARDS")
     tour_shards: int = Field(0, alias="TOUR_SHARDS")
     max_procs: int = Field(0, alias="TEST_MAX_PROCS")  # 0 -> auto
+    tour_max_procs: int = Field(0, alias="TOUR_MAX_PROCS")  # 0 -> inherit TEST_MAX_PROCS/auto
     shard_timeout: int = Field(0, alias="TESTKIT_SHARD_TIMEOUT")
     # Within-module sharding (split heavy modules by class/file)
     unit_within_shards: int = Field(0, alias="UNIT_WITHIN_SHARDS")

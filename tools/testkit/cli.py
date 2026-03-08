@@ -6,14 +6,30 @@ from shutil import disk_usage
 
 import click
 
-from tools.deployer.settings import discover_repo_root, load_stack_settings, security_environment_issues
+from tools.deployer.settings import load_stack_settings, security_environment_issues
 
 from .db import db_capacity
 from .docker_api import compose_env
 from .phases import PhaseOutcome
 from .reporter import load_json
-from .session import PhaseName, TestSession
+from .session import PhaseName, TestSession, _load_timeouts
 from .settings import TestSettings
+
+GATE_PROFILE_NAME = "gate"
+DEFAULT_PROFILE_NAME = "default"
+
+GATE_PROFILE_ENVIRONMENT: dict[str, str] = {
+    "UNIT_SHARDS": "4",
+    "JS_SHARDS": "1",
+    "INTEGRATION_SHARDS": "2",
+    "TOUR_SHARDS": "8",
+    "TOUR_MAX_PROCS": "1",
+    "PHASES_OVERLAP": "0",
+    "TEST_MAX_PROCS": "4",
+    "TESTKIT_DISABLE_DEV_MODE": "0",
+    "ODOO_LIMIT_MEMORY_SOFT": "2147483648",
+    "ODOO_LIMIT_MEMORY_HARD": "3221225472",
+}
 
 
 def _emit_bottom_line(latest: Path, as_json: bool) -> int:
@@ -75,45 +91,48 @@ def _normalize_stack_name(stack: str | None, env_file: Path | None) -> str | Non
         normalized = stack.strip()
         if not normalized:
             return None
-        if normalized.endswith(("-local", "-dev", "-testing", "-prod")):
+        stack_segments = normalized.split("-")
+        if len(stack_segments) == 1:
+            return f"{normalized}-local"
+        if len(stack_segments) == 2 and stack_segments[1] in {"local", "dev", "testing", "prod"}:
             return normalized
-        return f"{normalized}-local"
+        raise click.ClickException(
+            "Invalid --stack value. Use '<context>' or '<context>-<instance>' "
+            "where instance is one of: local, dev, testing, prod."
+        )
     if env_file:
+        if env_file.parent.name == "env" and env_file.parent.parent.name == ".platform":
+            filename_segments = env_file.name.split(".")
+            if len(filename_segments) == 3 and filename_segments[2] == "env" and all(filename_segments[:2]):
+                context_name, instance_name, _suffix = filename_segments
+                return f"{context_name}-{instance_name}"
+            raise click.ClickException(
+                "Invalid runtime env file name. Expected '.platform/env/<context>.<instance>.env'."
+            )
         return env_file.stem
     return None
 
 
-def _stack_is_ci(stack_name: str | None) -> bool:
-    if not stack_name:
-        return False
-    stack_segments = [segment for segment in stack_name.split("-") if segment]
-    return "ci" in stack_segments
-
-
-def _prefer_continuous_integration_stack(stack: str | None, env_file: Path | None) -> str | None:
-    if not stack or env_file:
-        return stack
-    cleaned = stack.strip()
-    if not cleaned:
-        return None
-    if cleaned.endswith(("-local", "-dev", "-testing", "-prod", "-ci")):
-        return cleaned
-    repo_root = discover_repo_root(Path.cwd())
-    candidate = f"{cleaned}-ci"
-    candidate_env_file = repo_root / "docker" / "config" / f"{candidate}-local.env"
-    if candidate_env_file.exists():
-        return candidate
-    return cleaned
+def _apply_test_profile_defaults() -> None:
+    profile_name = (os.environ.get("TESTKIT_PROFILE") or DEFAULT_PROFILE_NAME).strip().lower()
+    if profile_name in {"", DEFAULT_PROFILE_NAME}:
+        return
+    if profile_name != GATE_PROFILE_NAME:
+        raise click.ClickException(
+            f"Unsupported TESTKIT_PROFILE '{profile_name}'. "
+            f"Supported values: {DEFAULT_PROFILE_NAME}, {GATE_PROFILE_NAME}."
+        )
+    for environment_key, environment_value in GATE_PROFILE_ENVIRONMENT.items():
+        os.environ[environment_key] = environment_value
 
 
 def _apply_stack_env(stack: str | None, env_file: str | None) -> None:
     if not stack and not env_file:
         raise click.ClickException(
-            "Missing required --stack or --env-file (e.g. --stack opw or --env-file docker/config/opw-local.env)."
+            "Missing required --stack or --env-file (e.g. --stack opw or --env-file .platform/env/opw.local.env)."
         )
     env_path = Path(env_file).expanduser().resolve() if env_file else None
-    preferred_stack = _prefer_continuous_integration_stack(stack, env_path)
-    stack_name = _normalize_stack_name(preferred_stack, env_path)
+    stack_name = _normalize_stack_name(stack, env_path)
     if stack_name is None:
         raise click.ClickException("Unable to resolve stack name; provide --stack or --env-file.")
     settings = load_stack_settings(stack_name, env_path)
@@ -124,9 +143,8 @@ def _apply_stack_env(stack: str | None, env_file: str | None) -> None:
     os.environ.update(settings.environment)
     os.environ["TESTKIT_ENV_FILE"] = str(settings.env_file)
     os.environ["ODOO_STACK_NAME"] = stack_name
-    os.environ["TESTKIT_DISABLE_DEV_MODE"] = "1"
-    if _stack_is_ci(stack_name):
-        os.environ.setdefault("TESTKIT_VOLUME_CLEANUP", "1")
+    os.environ.setdefault("TESTKIT_DISABLE_DEV_MODE", "1")
+    _apply_test_profile_defaults()
 
 
 def _apply_shard_overrides(
@@ -192,6 +210,15 @@ def _run_phase_and_exit(test_session: TestSession, phase: PhaseName, timeout: in
     if json_out:
         _emit_bottom_line(Path("tmp/test-logs/latest"), True)
     sys.exit(return_code)
+
+
+def _resolve_phase_timeout(phase: PhaseName, fallback_seconds: int) -> int:
+    configured_timeouts = _load_timeouts()
+    raw_timeout = configured_timeouts.get(phase, fallback_seconds)
+    try:
+        return int(raw_timeout)
+    except (TypeError, ValueError):
+        return fallback_seconds
 
 
 @test.command("run")
@@ -389,7 +416,7 @@ def run_unit(
         unit_modules=_parse_multi(unit_modules) or None,
         unit_exclude=_parse_multi(unit_exclude) or None,
     )
-    _run_phase_and_exit(test_session, "unit", 600, json_out)
+    _run_phase_and_exit(test_session, "unit", _resolve_phase_timeout("unit", 600), json_out)
 
 
 @test.command("js")
@@ -458,7 +485,7 @@ def run_js(
         js_modules=_parse_multi(js_modules) or None,
         js_exclude=_parse_multi(js_exclude) or None,
     )
-    _run_phase_and_exit(test_session, "js", 1200, json_out)
+    _run_phase_and_exit(test_session, "js", _resolve_phase_timeout("js", 1200), json_out)
 
 
 @test.command("integration")
@@ -496,7 +523,7 @@ def run_integration(
         integration_modules=_parse_multi(integration_modules) or None,
         integration_exclude=_parse_multi(integration_exclude) or None,
     )
-    _run_phase_and_exit(test_session, "integration", 900, json_out)
+    _run_phase_and_exit(test_session, "integration", _resolve_phase_timeout("integration", 900), json_out)
 
 
 @test.command("tour")
@@ -568,7 +595,7 @@ def run_tour(
         tour_modules=_parse_multi(tour_modules) or None,
         tour_exclude=_parse_multi(tour_exclude) or None,
     )
-    _run_phase_and_exit(test_session, "tour", 1800, json_out)
+    _run_phase_and_exit(test_session, "tour", _resolve_phase_timeout("tour", 1800), json_out)
 
 
 @test.command("plan")
@@ -670,7 +697,7 @@ def rerun_failures(stack: str | None, env_file: str | None, json_out: bool) -> N
         print(json.dumps({"status": "no_latest"}) if json_out else "no_latest")
         sys.exit(2)
     phases = {"unit": [], "js": [], "integration": [], "tour": []}
-    for phase_name in phases.keys():
+    for phase_name in phases:
         phase_dir = base / phase_name
         if not phase_dir.exists():
             continue
@@ -689,8 +716,6 @@ def rerun_failures(stack: str | None, env_file: str | None, json_out: bool) -> N
     if not payload:
         print(json.dumps({"status": "nothing_to_rerun"}) if json_out else "nothing_to_rerun")
         sys.exit(0)
-    if json_out:
-        print(json.dumps({"phases": payload}))
     # Build flags
     args: list[str] = ["uv", "run", "test", "run"]
     for module_name in payload.get("unit", []):
@@ -705,6 +730,8 @@ def rerun_failures(stack: str | None, env_file: str | None, json_out: bool) -> N
         args += ["--stack", stack]
     if env_file:
         args += ["--env-file", env_file]
+    if json_out:
+        args += ["--json"]
     from subprocess import call
 
     sys.exit(call(args))

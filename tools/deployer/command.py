@@ -97,7 +97,7 @@ def run_process(
     capture_output: bool = False,
     check: bool = True,
 ) -> subprocess.CompletedProcess[str]:
-    logger = logging.getLogger("deploy.command")
+    logger = logging.getLogger("tools.deployer.command")
     logger.debug("$ %s", " ".join(shlex.quote(part) for part in command))
 
     is_docker = bool(command and command[0] == "docker")

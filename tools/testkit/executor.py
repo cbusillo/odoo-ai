@@ -1,4 +1,5 @@
 import json
+import hashlib
 import logging
 import os
 import re
@@ -8,6 +9,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from uuid import uuid4
 
 from .auth import setup_test_authentication
 from .browser import kill_browsers_and_zombies, restart_script_runner_with_orphan_cleanup
@@ -15,9 +17,11 @@ from .counts import count_js_tests, count_py_tests
 from .coverage import build_coverage_run
 from .db import (
     clone_production_database,
+    contains_default_database_target,
     drop_and_create,
     drop_and_create_test_database,
     get_production_db_name,
+    resolve_database_connection_flags,
     split_modules_for_install,
 )
 from .docker_api import _is_truthy, compose_env, get_script_runner_service
@@ -31,6 +35,21 @@ _ODOO_TEST_RESULT_RE = re.compile(r"of (\d+) tests")
 _ODOO_TEST_RESULT_COUNTS_RE = re.compile(r"(\d+) failed, (\d+) error\(s\) of (\d+) tests")
 _ODOO_TEST_STATS_RE = re.compile(r"odoo\.tests\.stats: .*?: (\d+) tests")
 _TESTKIT_PYTHONPATH = "/opt/project/tools/testkit"
+_SENSITIVE_ARGUMENT_NAMES = frozenset(
+    {
+        "PASSWORD",
+        "MASTER_PASSWORD",
+        "DB_PASSWORD",
+        "ODOO_DB_PASSWORD",
+        "ODOO_TEST_PASSWORD",
+        "ODOO_MASTER_PASSWORD",
+        "TOKEN",
+        "SECRET",
+        "ODOO_KEY",
+    }
+)
+_SENSITIVE_ARGUMENT_SUFFIXES = ("_PASSWORD", "_TOKEN", "_SECRET", "_KEY")
+_SENSITIVE_SPLIT_FLAGS = frozenset({"--password", "--master-password", "--db_password"})
 
 
 def _normalize(line: str) -> str:
@@ -80,6 +99,50 @@ def _sanitize_container_name(value: str) -> str:
     lowered = value.lower()
     sanitized = re.sub(r"[^a-z0-9_.-]+", "-", lowered)
     return sanitized.strip("-") or "testkit-shard"
+
+
+def _normalize_secret_key(raw_key: str) -> str:
+    return raw_key.strip().lstrip("-").replace("-", "_").upper()
+
+
+def _is_sensitive_key(raw_key: str) -> bool:
+    normalized_key = _normalize_secret_key(raw_key)
+    if normalized_key in _SENSITIVE_ARGUMENT_NAMES:
+        return True
+    return any(normalized_key.endswith(suffix) for suffix in _SENSITIVE_ARGUMENT_SUFFIXES)
+
+
+def _redact_assignment_token(token: str) -> str:
+    if "=" not in token:
+        return token
+    key, _, _value = token.partition("=")
+    if _is_sensitive_key(key):
+        return f"{key}=***"
+    return token
+
+
+def _redact_command_for_logging(command: list[str]) -> list[str]:
+    redacted_command: list[str] = []
+    index = 0
+    while index < len(command):
+        command_part = command[index]
+        if command_part == "-e" and index + 1 < len(command):
+            redacted_command.extend([command_part, _redact_assignment_token(command[index + 1])])
+            index += 2
+            continue
+
+        redacted_command.append(_redact_assignment_token(command_part))
+        if command_part in _SENSITIVE_SPLIT_FLAGS and index + 1 < len(command):
+            redacted_command.append("***")
+            index += 2
+            continue
+
+        index += 1
+    return redacted_command
+
+
+def _sanitize_database_flags_for_summary(database_flags: list[str]) -> list[str]:
+    return [_redact_assignment_token(database_flag) for database_flag in database_flags]
 
 
 @dataclass
@@ -139,7 +202,7 @@ class OdooExecutor:
             tag_parts.append(test_tags_override)
             test_tags_final = ",".join(tag_part for tag_part in tag_parts if tag_part)
             use_module_prefix = False
-            print(f"🎯 Using TEST_TAGS override: {test_tags_final}")
+            print(f"[override] Using TEST_TAGS override: {test_tags_final}")
         else:
             if not test_tags:
                 test_tags_final = ",".join([f"/{module_name}" for module_name in modules_to_install])
@@ -159,7 +222,7 @@ class OdooExecutor:
                     kept_tags = [tag_part for tag_part in tag_parts if tag_part != primary_tag]
                     test_tags_final = ",".join(kept_tags + scoped_tags)
 
-        print(f"🏷️  Final test tags: {test_tags_final}")
+        print(f"[tags] Final test tags: {test_tags_final}")
 
         # Pre-run DB/filestore setup
         restart_script_runner_with_orphan_cleanup()
@@ -201,8 +264,6 @@ class OdooExecutor:
             if use_module_prefix and len(module_names) == 1:
                 return module_names[0]
             module_key = ",".join(sorted(module_names))
-            import hashlib
-
             hash_prefix = hashlib.sha1(module_key.encode()).hexdigest()[:8]
             return f"shard-{hash_prefix}"
 
@@ -221,16 +282,30 @@ class OdooExecutor:
             _TESTKIT_PYTHONPATH,
         )
 
-        try:
-            project_name = (compose_env().get("ODOO_PROJECT_NAME") or "").strip()
-        except RuntimeError:
+        resolved_compose_environment = compose_env()
+        database_connection_flags = resolve_database_connection_flags(resolved_compose_environment)
+        limit_memory_flags: list[str] = []
+        for environment_key, cli_option in (
+            ("ODOO_LIMIT_MEMORY_SOFT", "--limit-memory-soft"),
+            ("ODOO_LIMIT_MEMORY_HARD", "--limit-memory-hard"),
+        ):
+            configured_value = (
+                os.environ.get(environment_key)
+                or resolved_compose_environment.get(environment_key)
+                or ""
+            ).strip()
+            if configured_value:
+                limit_memory_flags.append(f"{cli_option}={configured_value}")
+
+        project_name = (resolved_compose_environment.get("ODOO_PROJECT_NAME") or "").strip()
+        if not project_name:
             project_name = (os.environ.get("ODOO_PROJECT_NAME") or os.environ.get("ODOO_STACK_NAME") or "").strip()
         project_prefix = f"{project_name}-" if project_name else ""
 
         run_container_name = _sanitize_container_name(
-            f"{project_prefix}testkit-{self.category}-{shard_base}-{int(time.time() * 1000)}"
+            f"{project_prefix}testkit-{self.category}-{shard_base}-{os.getpid()}-{uuid4().hex[:6]}"
         )
-        command = ["docker", "compose", "run", "--rm", "--name", run_container_name]
+        command = ["docker", "compose", "run", "--rm", "--no-deps", "--name", run_container_name]
         if coverage_run:
             host_session_dir = coverage_run.data_directory.parent.resolve()
             container_session_dir = str(Path(coverage_run.container_directory).parent)
@@ -245,9 +320,12 @@ class OdooExecutor:
             if override_value:
                 command.extend(["-e", f"{env_var}={override_value}"])
 
+        worker_count = 0
+        development_mode = "none" if skip_autoreload else "assets"
         if is_tour_test or is_js_test:
             tour_workers_default = int(self.settings.tour_workers)
             js_workers_default = int(self.settings.js_workers)
+            worker_count = js_workers_default if is_js_test else tour_workers_default
             runner_command = [
                 "/odoo/odoo-bin",
                 "-d",
@@ -265,20 +343,21 @@ class OdooExecutor:
                     "--test-enable",
                     "--stop-after-init",
                     "--max-cron-threads=0",
-                    f"--workers={js_workers_default if is_js_test else tour_workers_default}",
+                    f"--workers={worker_count}",
                     f"--db-filter=^{db_name}$",
                     "--log-level=test",
                     "--without-demo",
                 ]
             )
+            runner_command.extend(database_connection_flags)
+            runner_command.extend(limit_memory_flags)
             if coverage_run:
                 runner_command = coverage_run.command_prefix + runner_command
             command.extend([script_runner_service, *runner_command])
-            if is_tour_test or is_js_test:
-                if skip_autoreload:
-                    command.append("--dev=none")
-                else:
-                    command.append("--dev=assets")
+            if skip_autoreload:
+                command.append("--dev=none")
+            else:
+                command.append("--dev=assets")
         else:
             runner_command = [
                 "/odoo/odoo-bin",
@@ -294,6 +373,8 @@ class OdooExecutor:
                 "--log-level=test",
                 "--without-demo",
             ]
+            runner_command.extend(database_connection_flags)
+            runner_command.extend(limit_memory_flags)
             if install_modules:
                 runner_command.extend(["-i", ",".join(install_modules)])
             if update_modules:
@@ -308,27 +389,12 @@ class OdooExecutor:
         log_file = phase_dir / f"{shard_base}.log"
         summary_file = phase_dir / f"{shard_base}.summary.json"
 
-        # redacted echo
-        redacted = []
-        index = 0
-        secret_prefixes = ("ODOO_TEST_PASSWORD=", "PASSWORD=", "TOKEN=", "KEY=")
-        while index < len(command):
-            part = command[index]
-            if part == "-e" and index + 1 < len(command):
-                env_pair = command[index + 1]
-                for secret_prefix in secret_prefixes:
-                    if env_pair.startswith(secret_prefix):
-                        env_pair = secret_prefix + "***"
-                        break
-                redacted.extend([part, env_pair])
-                index += 2
-                continue
-            redacted.append(part)
-            index += 1
+        redacted = _redact_command_for_logging(command)
+        sanitized_database_flags = _sanitize_database_flags_for_summary(database_connection_flags)
 
         # Secret hygiene: redaction already applied; avoid echoing any naked env pairs in logs
-        print(f"🚀 Command: {' '.join(redacted)}")
-        print(f"📁 Logs: {phase_dir}")
+        print(f"[command] {' '.join(redacted)}")
+        print(f"[logs] {phase_dir}")
 
         start_time = time.time()
         shard_timeout = int(self.settings.shard_timeout)
@@ -341,7 +407,7 @@ class OdooExecutor:
         summary = {
             "schema_version": SUMMARY_SCHEMA_VERSION,
             "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
-            "command": command,
+            "command": redacted,
             "test_type": "tour" if is_tour_test else ("js" if is_js_test else "unit/integration"),
             "category": self.category,
             "database": db_name,
@@ -377,12 +443,14 @@ class OdooExecutor:
                     stderr=subprocess.STDOUT,
                     text=True,
                     bufsize=1,
-                    env=compose_env(),
+                    env=resolved_compose_environment,
                 )
-                assert process.stdout is not None
+                if process.stdout is None:
+                    raise RuntimeError("subprocess stdout unavailable")
                 stdout = process.stdout
 
                 timed_out = False
+                found_default_database_target = False
                 last_output_time = time.time()
                 recent_lines: list[str] = []
                 seen_patterns: dict[str, int] = {}
@@ -409,17 +477,19 @@ class OdooExecutor:
                         subprocess.run(
                             ["docker", "rm", "-f", run_container_name],
                             capture_output=True,
-                            env=compose_env(),
+                            env=resolved_compose_environment,
                             timeout=10,
                         )
                     except subprocess.TimeoutExpired:
                         pass
 
                 def _reader() -> None:
-                    nonlocal stats_tests_total, result_tests_total, last_output_time
+                    nonlocal stats_tests_total, result_tests_total, last_output_time, found_default_database_target
                     try:
                         for raw_line in iter(stdout.readline, ""):
                             line = raw_line.rstrip("\n")
+                            if contains_default_database_target(line):
+                                found_default_database_target = True
                             log_handle.write(line + "\n")
                             # counters heuristic from Odoo test output
                             if "Ran " in line and " tests in " in line:
@@ -492,6 +562,12 @@ class OdooExecutor:
                 return_code = int(process.returncode or 0)
                 if timed_out and return_code == 0:
                     return_code = 1
+                if found_default_database_target:
+                    return_code = 1
+                    summary["database_target_error"] = (
+                        "Detected default@default database target in shard logs. "
+                        "This indicates missing DB configuration propagation."
+                    )
 
         except (OSError, subprocess.SubprocessError) as error:
             summary.update(
@@ -533,6 +609,11 @@ class OdooExecutor:
                 "elapsed_seconds": elapsed,
                 "returncode": return_code,
                 "success": return_code == 0,
+                "database_flags": sanitized_database_flags,
+                "memory_limit_flags": limit_memory_flags,
+                "test_profile": (resolved_compose_environment.get("TESTKIT_PROFILE") or "default").strip() or "default",
+                "odoo_workers": worker_count,
+                "odoo_dev_mode": development_mode,
             }
         )
         if expected_tests and counters.get("tests_run", 0) == 0:
@@ -542,7 +623,7 @@ class OdooExecutor:
                 return_code = 1
                 summary["returncode"] = return_code
                 summary["success"] = False
-            print(f"⚠️  No tests executed for {self.category} ({', '.join(modules_to_install)}); expected {expected_tests}.")
+            print(f"[warn] No tests executed for {self.category} ({', '.join(modules_to_install)}); expected {expected_tests}.")
         with open(summary_file, "w") as summary_handle:
             json.dump(summary, summary_handle, indent=2, default=str)
         try:

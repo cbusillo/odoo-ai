@@ -44,11 +44,3 @@ def upload_file(host: str, user: str | None, port: int | None, source: Path, des
 def ensure_remote_directory(host: str, user: str | None, port: int | None, path: Path) -> None:
     arguments = ["mkdir", "-p", str(path)]
     run_remote(host, user, port, arguments)
-
-
-def remote_path_exists(host: str, user: str | None, port: int | None, path: Path) -> bool:
-    arguments = ssh_arguments(user, host, port)
-    arguments.append(f"test -d {shlex.quote(str(path))}")
-    result = run_process(arguments, check=False)
-    return result.returncode == 0
-

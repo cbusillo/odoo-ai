@@ -97,8 +97,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if env_file and env_file.exists():
         settings_kwargs["_env_file"] = env_file
     elif env_file is not None:
-        _logger.warning("Env file %s not found; falling back to process environment", env_file)
-        env_file = None
+        _logger.error("Env file %s not found", env_file)
+        return ExitCode.INVALID_ARGS
 
     try:
         local_settings = LocalServerSettings(**settings_kwargs)
@@ -110,10 +110,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     no_sanitize = args.no_sanitize or local_settings.no_sanitize
     update_only = bool(args.update_only)
 
+    upstream_settings: UpstreamServerSettings | None = None
+    upstream_settings_error: ValidationError | None = None
     try:
         upstream_settings = UpstreamServerSettings(**settings_kwargs)
     except ValidationError as exc:
-        upstream_settings = None
+        upstream_settings_error = exc
         _logger.info("Upstream settings incomplete: %s", exc)
 
     restorer = OdooUpstreamRestorer(local_settings, upstream_settings, env_file)
@@ -132,9 +134,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             return ExitCode.SUCCESS
 
         if upstream_settings is None:
-            _logger.warning("Upstream settings unavailable; running bootstrap instead.")
-            restorer.bootstrap_database(do_sanitize=not no_sanitize)
-            return ExitCode.SUCCESS
+            if upstream_settings_error is not None:
+                _logger.error("Upstream restore settings missing/invalid: %s", upstream_settings_error)
+            else:
+                _logger.error("Upstream restore settings missing/invalid")
+            _logger.error("Refusing bootstrap fallback; pass --bootstrap-only to run bootstrap intentionally.")
+            return ExitCode.INVALID_ARGS
 
         try:
             restorer.restore_from_upstream(do_sanitize=not no_sanitize)
@@ -284,6 +289,7 @@ class LocalServerSettings(BaseSettings):
     odoo_key: SecretStr | None = Field(None, alias="ODOO_KEY")
     bootstrap_only: bool = Field(False, alias="BOOTSTRAP_ONLY")
     no_sanitize: bool = Field(False, alias="NO_SANITIZE")
+    admin_login: str = Field("admin", alias="ODOO_ADMIN_LOGIN")
     admin_password: SecretStr | None = Field(None, alias="ODOO_ADMIN_PASSWORD")
 
     @field_validator(
@@ -295,6 +301,7 @@ class LocalServerSettings(BaseSettings):
         "update_modules",
         "local_addons_dirs",
         "openupgrade_target_version",
+        "admin_login",
         mode="before",
     )
     @classmethod
@@ -722,7 +729,7 @@ class OdooUpstreamRestorer:
     def install_base_schema(self) -> None:
         odoo_bin = "/odoo/odoo-bin"
         if not Path(odoo_bin).exists():
-            odoo_bin = f"{Path('/opt/odoo/venv/bin/python')} /odoo/odoo-bin"
+            odoo_bin = f"{Path('/venv/bin/python')} /odoo/odoo-bin"
 
         cmd_parts = [
             odoo_bin,
@@ -1024,7 +1031,7 @@ class OdooUpstreamRestorer:
                 check=True,
             )
         except subprocess.CalledProcessError as command_error:
-            stderr_output = (command_error.stderr or b"").decode("utf-8", errors="ignore")
+            stderr_output = (command_error.stderr or b"").decode(errors="ignore")
             if "unrecognized parameters: shell" in stderr_output:
                 raise OdooRestorerError(
                     "Odoo shell preflight failed: image CLI contract is broken. "
@@ -1250,12 +1257,13 @@ with registry.cursor() as cr:
 
     def ensure_admin_user(self) -> None:
         """Ensure the admin user has safe credentials."""
+        configured_admin_login = (self.local.admin_login or "").strip() or "admin"
         self.connect_to_db()
         with self.local.db_conn.cursor() as cursor:
-            cursor.execute("SELECT id, partner_id FROM res_users WHERE login=%s LIMIT 1", ("admin",))
+            cursor.execute("SELECT id, partner_id FROM res_users WHERE login=%s LIMIT 1", (configured_admin_login,))
             row = cursor.fetchone()
         if not row:
-            _logger.warning("Admin user not found; skipping admin hardening.")
+            _logger.warning("Configured admin user '%s' not found; skipping admin hardening.", configured_admin_login)
             return
         _, partner_id = row
 
@@ -1290,17 +1298,17 @@ with registry.cursor() as cr:
 
         if not set_password and not set_email:
             _logger.info("Admin credentials already satisfy safety requirements; no changes needed.")
-            return
+        else:
+            payload = {
+                "db": self.local.db_name,
+                "login": configured_admin_login,
+                "set_password": set_password,
+                "password": password_plain or "",
+                "set_email": bool(partner_id and set_email),
+                "email": target_email,
+            }
 
-        payload = {
-            "db": self.local.db_name,
-            "set_password": set_password,
-            "password": password_plain or "",
-            "set_email": bool(partner_id and set_email),
-            "email": target_email,
-        }
-
-        script = textwrap.dedent("""
+            script = textwrap.dedent("""
 import json
 from odoo import api, SUPERUSER_ID
 from odoo.modules.registry import Registry
@@ -1309,7 +1317,7 @@ payload = json.loads('__PAYLOAD__')
 registry = Registry(payload['db'])
 with registry.cursor() as cr:
     env = api.Environment(cr, SUPERUSER_ID, {})
-    admin = env['res.users'].sudo().search([('login', '=', 'admin')], limit=1)
+    admin = env['res.users'].sudo().search([('login', '=', payload['login'])], limit=1)
     if admin:
         if payload['set_password']:
             admin.with_context(no_reset_password=True).sudo().password = payload['password']
@@ -1318,8 +1326,50 @@ with registry.cursor() as cr:
     cr.commit()
 """).replace("__PAYLOAD__", json.dumps(payload))
 
-        _logger.info("Hardening admin credentials (password=%s, email=%s)", set_password, set_email)
-        self._run_odoo_shell(script, "admin hardening")
+            _logger.info("Hardening admin credentials (password=%s, email=%s)", set_password, set_email)
+            self._run_odoo_shell(script, "admin hardening")
+            self._reset_db_connection()
+
+        login_names_to_check = ["admin"]
+        if configured_admin_login not in login_names_to_check:
+            login_names_to_check.append(configured_admin_login)
+
+        policy_payload = {
+            "db": self.local.db_name,
+            "logins": login_names_to_check,
+        }
+        policy_script = textwrap.dedent("""
+import json
+from odoo import api, SUPERUSER_ID
+from odoo.exceptions import AccessDenied
+from odoo.modules.registry import Registry
+
+payload = json.loads('__PAYLOAD__')
+registry = Registry(payload['db'])
+with registry.cursor() as cr:
+    env = api.Environment(cr, SUPERUSER_ID, {})
+    for login_name in payload['logins']:
+        target_user = env['res.users'].sudo().with_context(active_test=False).search(
+            [('login', '=', login_name)],
+            limit=1,
+        )
+        if not target_user:
+            continue
+
+        authenticated = False
+        try:
+            auth_info = env['res.users'].sudo().authenticate(
+                {'type': 'password', 'login': login_name, 'password': 'admin'},
+                {'interactive': False},
+            )
+            authenticated = bool(auth_info)
+        except AccessDenied:
+            authenticated = False
+
+        if authenticated:
+            raise ValueError(f"Insecure configuration: active password for {login_name} is 'admin'.")
+""").replace("__PAYLOAD__", json.dumps(policy_payload))
+        self._run_odoo_shell(policy_script, "admin password policy")
         self._reset_db_connection()
 
     def bootstrap_database(self, *, do_sanitize: bool) -> None:
@@ -1731,7 +1781,7 @@ with registry.cursor() as cr:
 
         odoo_bin = "/odoo/odoo-bin"
         if not Path(odoo_bin).exists():
-            odoo_bin = f"{Path('/opt/odoo/venv/bin/python')} /odoo/odoo-bin"
+            odoo_bin = f"{Path('/venv/bin/python')} /odoo/odoo-bin"
 
         cmd_parts = [
             odoo_bin,
@@ -1859,7 +1909,7 @@ with registry.cursor() as cr:
 
         odoo_bin = "/odoo/odoo-bin"
         if not Path(odoo_bin).exists():
-            odoo_bin = f"{Path('/opt/odoo/venv/bin/python')} /odoo/odoo-bin"
+            odoo_bin = f"{Path('/venv/bin/python')} /odoo/odoo-bin"
 
         cmd_parts = [
             odoo_bin,

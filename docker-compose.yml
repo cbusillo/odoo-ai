@@ -17,6 +17,7 @@ x-odoo-build: &odoo-build
       ODOO_BASE_RUNTIME_IMAGE: ${ODOO_BASE_RUNTIME_IMAGE:-ghcr.io/cbusillo/odoo-enterprise-docker:19.0-runtime}
       ODOO_BASE_DEVTOOLS_IMAGE: ${ODOO_BASE_DEVTOOLS_IMAGE:-ghcr.io/cbusillo/odoo-enterprise-docker:19.0-devtools}
       ODOO_ADDON_REPOSITORIES: ${ODOO_ADDON_REPOSITORIES:-}
+      ODOO_PYTHON_SYNC_SKIP_ADDONS: ${ODOO_PYTHON_SYNC_SKIP_ADDONS:-}
     target: ${COMPOSE_BUILD_TARGET:-development}
     secrets:
       - github_token

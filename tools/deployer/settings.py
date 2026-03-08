@@ -6,7 +6,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar
 
+import click
 from pydantic import BaseModel, ConfigDict, Field
+
+from tools.environment_files import discover_repo_root, parse_env_file
+from tools.platform import environment as platform_environment
 
 _logger = logging.getLogger(__name__)
 
@@ -21,33 +25,25 @@ def _paths_relative_to_repo(paths: Iterable[Path], repo_root: Path) -> list[str]
     return entries
 
 
-def discover_repo_root(start_directory: Path) -> Path:
-    current = start_directory.resolve()
-    for candidate in (current, *current.parents):
-        if (candidate / ".git").exists() or (candidate / "pyproject.toml").exists():
-            return candidate
-    return current
+def _validate_base_env_defaults(
+    *,
+    base_env_values: dict[str, str],
+    resolved_environment: dict[str, str],
+) -> None:
+    conflicting_keys = sorted(
+        key
+        for key, base_value in base_env_values.items()
+        if key in resolved_environment and resolved_environment[key] != base_value
+    )
+    if not conflicting_keys:
+        return
 
-
-def parse_env_file(path: Path) -> dict[str, str]:
-    values: dict[str, str] = {}
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-        if line.startswith("#"):
-            continue
-        if "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
-            value = value[1:-1]
-        if " #" in value:
-            value = value.split(" #", 1)[0].rstrip()
-        values[key] = value
-    return values
+    raise click.ClickException(
+        "Conflicting keys between canonical stack env and platform/config/base.env: "
+        f"{', '.join(conflicting_keys)}. "
+        "platform/config/base.env must match canonical runtime defaults for duplicate keys; "
+        "remove conflicting keys there or make values identical."
+    )
 
 
 _FALSY_SETTING_VALUES = {"false", "0", "no", "off"}
@@ -89,90 +85,13 @@ def split_values(raw_value: str | None) -> tuple[str, ...]:
     return tuple(cleaned)
 
 
-def split_modules(raw_value: str | None) -> tuple[str, ...]:
-    modules: list[str] = []
-    for item in split_values(raw_value):
-        modules.append(item)
-    return tuple(modules)
-
-
-def _map_addon_path(raw: str, repo_root: Path) -> Path:
-    expanded = os.path.expandvars(os.path.expanduser(raw))
-    path = Path(expanded)
-    if not path.is_absolute():
-        return (repo_root / path).resolve()
-    normalized = path.as_posix()
-    if normalized == "/volumes/addons":
-        return (repo_root / "addons").resolve()
-    if normalized.startswith("/volumes/addons/"):
-        suffix = normalized.removeprefix("/volumes/addons/")
-        return (repo_root / "addons" / suffix).resolve()
-    if normalized == "/opt/project/addons":
-        return (repo_root / "addons").resolve()
-    if normalized.startswith("/opt/project/addons/"):
-        suffix = normalized.removeprefix("/opt/project/addons/")
-        return (repo_root / "addons" / suffix).resolve()
-    if normalized == "/volumes/extra_addons":
-        return (repo_root / "extra_addons").resolve()
-    if normalized.startswith("/volumes/extra_addons/"):
-        suffix = normalized.removeprefix("/volumes/extra_addons/")
-        return (repo_root / "extra_addons" / suffix).resolve()
-    if normalized == "/opt/extra_addons":
-        return (repo_root / "extra_addons").resolve()
-    if normalized.startswith("/opt/extra_addons/"):
-        suffix = normalized.removeprefix("/opt/extra_addons/")
-        return (repo_root / "extra_addons" / suffix).resolve()
-    return path
-
-
-def _resolve_addon_dirs(environment: dict[str, str], repo_root: Path) -> list[Path]:
-    raw_dirs = environment.get("LOCAL_ADDONS_DIRS") or environment.get("ODOO_ADDONS_PATH") or ""
-    candidates = [_map_addon_path(item, repo_root) for item in split_values(raw_dirs)]
-    resolved: list[Path] = []
-    seen: set[Path] = set()
-    for path in candidates:
-        if not path.exists() or not path.is_dir():
-            continue
-        if path in seen:
-            continue
-        resolved.append(path)
-        seen.add(path)
-    if not resolved:
-        fallback = repo_root / "addons"
-        if fallback.exists() and fallback.is_dir():
-            resolved.append(fallback.resolve())
-    return resolved
-
-
-def resolve_addon_dirs(environment: dict[str, str], repo_root: Path) -> tuple[Path, ...]:
-    return tuple(_resolve_addon_dirs(environment, repo_root))
-
-
-def _discover_modules_from_dirs(addon_dirs: Iterable[Path]) -> tuple[str, ...]:
-    discovered: set[str] = set()
-    for base in addon_dirs:
-        if not base.exists() or not base.is_dir():
-            continue
-        for child in base.iterdir():
-            if not child.is_dir():
-                continue
-            if (child / "__manifest__.py").exists() or (child / "__openerp__.py").exists():
-                discovered.add(child.name)
-    return tuple(sorted(discovered))
-
-
-def discover_local_modules(environment: dict[str, str], repo_root: Path) -> tuple[str, ...]:
-    addon_dirs = _resolve_addon_dirs(environment, repo_root)
-    return _discover_modules_from_dirs(addon_dirs)
-
-
 AUTO_INSTALLED_SENTINEL = "__AUTO_INSTALLED__"
 
 
 def resolve_update_modules(config: "StackConfig") -> tuple[str, ...]:
     update_source = config.update_modules_raw
     if update_source and update_source.strip().upper() not in {"AUTO", ""}:
-        return split_modules(update_source)
+        return split_values(update_source)
     return (AUTO_INSTALLED_SENTINEL,)
 
 
@@ -184,6 +103,10 @@ def infer_project_slug(stack_name: str) -> str | None:
     if "-" in stack_name:
         return stack_name.split("-", 1)[0]
     return None
+
+
+def _resolve_platform_runtime_scope(stack_name: str) -> tuple[str, str] | None:
+    return platform_environment.resolve_stack_runtime_scope(stack_name)
 
 
 class StackConfig(BaseModel):
@@ -224,7 +147,8 @@ def compute_compose_files(name: str, repo_root: Path, config: StackConfig) -> tu
     base_file = repo_root / "docker-compose.yml"
     override_file = repo_root / "docker-compose.override.yml"
 
-    # Normalize and collect any explicitly provided compose files from the environment
+    # Normalize and collect any explicitly provided compose files from the environment.
+    # We do not auto-discover per-stack local overlays anymore.
     variant_files: list[Path] = []
     if config.compose_files_raw:
         for item in split_values(config.compose_files_raw):  # supports comma or colon
@@ -232,11 +156,6 @@ def compute_compose_files(name: str, repo_root: Path, config: StackConfig) -> tu
             if not path.is_absolute():
                 path = (repo_root / path).resolve()
             variant_files.append(path)
-    else:
-        # Fallback to a stack-specific config if it exists
-        candidate = repo_root / "docker" / "config" / f"{name}.yaml"
-        if candidate.exists():
-            variant_files.append(candidate.resolve())
 
     project_slug = infer_project_slug(name)
     if project_slug is None and config.project_name:
@@ -244,7 +163,7 @@ def compute_compose_files(name: str, repo_root: Path, config: StackConfig) -> tu
         if normalized:
             project_slug = normalized.split("-", 1)[0]
 
-    config_dir = repo_root / "docker" / "config"
+    config_dir = repo_root / "platform" / "compose"
     layered_files: list[Path] = []
     base_layer = config_dir / "base.yaml"
     project_layer = config_dir / f"{project_slug}.yaml" if project_slug else None
@@ -253,10 +172,10 @@ def compute_compose_files(name: str, repo_root: Path, config: StackConfig) -> tu
     ordered_candidates: list[Path] = []
     if base_file.exists():
         ordered_candidates.append(base_file.resolve())
-    if override_file.exists():
-        ordered_candidates.append(override_file.resolve())
     if base_layer.exists():
         ordered_candidates.append(base_layer.resolve())
+    if override_file.exists():
+        ordered_candidates.append(override_file.resolve())
     if project_layer and project_layer.exists():
         ordered_candidates.append(project_layer.resolve())
     ordered_candidates.extend(variant_files)
@@ -419,39 +338,31 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
     base = base_directory if base_directory is not None else Path.cwd()
     repo_root = discover_repo_root(base)
     env_path = select_env_file(name, repo_root, env_file).resolve()
-    stack_env_preview = parse_env_file(env_path)
+    runtime_scope = _resolve_platform_runtime_scope(name)
+    context_name = runtime_scope[0] if runtime_scope is not None else None
+    instance_name = runtime_scope[1] if runtime_scope is not None else None
 
-    project_slug = infer_project_slug(name)
-    if project_slug is None:
-        project_candidate = stack_env_preview.get("ODOO_PROJECT_NAME")
-        if project_candidate:
-            normalized = project_candidate.strip().lower()
-            if normalized:
-                project_slug = normalized.split("-", 1)[0]
+    loaded_environment = platform_environment.load_environment_with_details(
+        repo_root,
+        env_path,
+        context_name=context_name,
+        instance_name=instance_name,
+    )
+    raw_environment = loaded_environment.merged_values.copy()
+    resolved_env_chain: list[Path] = [env_path]
 
-    env_files_in_order: list[Path] = []
-    seen_env_paths: set[Path] = set()
-
-    def _register_env(path: Path) -> None:
-        if not path.exists():
-            return
-        resolved = path.resolve()
-        if resolved in seen_env_paths:
-            return
-        env_files_in_order.append(resolved)
-        seen_env_paths.add(resolved)
-
-    _register_env(repo_root / ".env")
-    _register_env(repo_root / "docker" / "config" / "base.env")
-    if project_slug:
-        _register_env(repo_root / "docker" / "config" / f"{project_slug}.env")
-    _register_env(env_path)
-
-    raw_environment: dict[str, str] = {}
-    resolved_env_chain: list[Path] = []
-    for env_file_path in env_files_in_order:
-        raw_environment.update(parse_env_file(env_file_path))
-        resolved_env_chain.append(env_file_path)
+    base_env_path = repo_root / "platform" / "config" / "base.env"
+    if base_env_path.exists():
+        base_env_values = parse_env_file(base_env_path)
+        _validate_base_env_defaults(
+            base_env_values=base_env_values,
+            resolved_environment=raw_environment,
+        )
+        # Base config values are fallback defaults for tool-driven runtime
+        # generation. Canonical stack resolution always wins over this file.
+        for environment_key, environment_value in base_env_values.items():
+            raw_environment.setdefault(environment_key, environment_value)
+        resolved_env_chain.insert(0, base_env_path.resolve())
 
     config = StackConfig.model_validate(raw_environment)
 
@@ -544,16 +455,9 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
 
 
 def select_env_file(name: str, repo_root: Path, explicit: Path | None) -> Path:
-    if explicit is not None:
-        return explicit.resolve()
-    project_slug = infer_project_slug(name)
-    candidates = [
-        repo_root / "docker" / "config" / f"{name}.env",
-        repo_root / "docker" / "config" / ".env.{name}",
-        repo_root / "docker" / "config" / f"{project_slug}.env" if project_slug else None,
-        repo_root / ".env",
-    ]
-    for candidate in [path for path in candidates if path is not None]:
-        if candidate.exists():
-            return candidate.resolve()
-    raise FileNotFoundError(f"no env file found for {name}")
+    return platform_environment.resolve_stack_env_file(
+        repo_root=repo_root,
+        stack_name=name,
+        explicit_env_file=explicit,
+        require_runtime_env=explicit is None,
+    )

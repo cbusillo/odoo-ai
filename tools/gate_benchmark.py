@@ -33,7 +33,7 @@ class WorkflowRunSample:
 
 
 def _run_command(command: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(command, capture_output=True, text=True, check=False)
+    return subprocess.run(command, capture_output=True, text=True)
 
 
 def _parse_iso8601(raw_timestamp: str) -> datetime:
@@ -253,7 +253,6 @@ def main(
         },
     }
 
-    local_durations: list[float] = []
     if not skip_local:
         local_samples_payload, local_error = _benchmark_local_gate(
             stack_name=stack_name,
@@ -268,11 +267,9 @@ def main(
             }
             for sample in local_samples_payload
         ]
-        local_durations = [sample.duration_seconds for sample in local_samples_payload]
-        payload["local"]["summary"] = _summarize(local_durations)
+        payload["local"]["summary"] = _summarize([sample.duration_seconds for sample in local_samples_payload])
         payload["local"]["error"] = local_error or ""
 
-    github_durations: list[float] = []
     if not skip_github:
         repository_slug = _discover_repository_slug(repository_root)
         payload["github"]["repository"] = repository_slug
@@ -296,8 +293,7 @@ def main(
             }
             for sample in workflow_samples_payload
         ]
-        github_durations = [sample.duration_seconds for sample in workflow_samples_payload]
-        payload["github"]["summary"] = _summarize(github_durations)
+        payload["github"]["summary"] = _summarize([sample.duration_seconds for sample in workflow_samples_payload])
         payload["github"]["error"] = github_error or ""
 
     local_summary = payload["local"].get("summary", {})

@@ -2,7 +2,6 @@ import os
 from collections.abc import Mapping, Sequence
 from pathlib import PurePosixPath
 
-from .command import run_process
 from .settings import StackSettings
 
 
@@ -28,14 +27,6 @@ def local_compose_env(settings: StackSettings) -> Mapping[str, str]:
     # stdin.
     env.setdefault("COMPOSE_INTERACTIVE_NO_CLI", "1")
     return env
-
-
-def local_compose(settings: StackSettings, extra: Sequence[str]) -> None:
-    run_process(
-        local_compose_command(settings, extra),
-        cwd=settings.repo_root,
-        env=local_compose_env(settings),
-    )
 
 
 def remote_compose_command(settings: StackSettings, extra: Sequence[str]) -> list[str]:

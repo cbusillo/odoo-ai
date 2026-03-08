@@ -40,8 +40,8 @@ def main(argument_values: Sequence[str] | None = None) -> int:
     if env_file and env_file.exists():
         settings_kwargs["_env_file"] = env_file
     elif env_file is not None:
-        logger.warning("Env file %s not found; falling back to process environment", env_file)
-        env_file = None
+        logger.error("Env file %s not found", env_file)
+        return int(ExitCode.INVALID_ARGS)
 
     try:
         local_settings = LocalServerSettings(**settings_kwargs)

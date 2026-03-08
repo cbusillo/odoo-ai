@@ -7,7 +7,7 @@ target_type = "compose"
 target_id = "Vq1_XXJoDonnVssJjHig7"
 target_name = "cm-dev"
 git_branch = "cm-dev"
-source_git_ref = "main"
+source_git_ref = "origin/main"
 auto_deploy = true
 require_test_gate = false
 require_prod_gate = false
@@ -25,7 +25,7 @@ target_type = "compose"
 target_id = "vSDNHhdSYS1IdoLXFFd0i"
 target_name = "cm-testing"
 git_branch = "cm-testing"
-source_git_ref = "main"
+source_git_ref = "origin/main"
 auto_deploy = true
 require_test_gate = true
 require_prod_gate = false
@@ -43,10 +43,10 @@ target_type = "compose"
 target_id = "iYS9ceYAIL7UFhuysdiYF"
 target_name = "cm-prod"
 git_branch = "cm-prod"
-source_git_ref = "main"
+source_git_ref = "origin/main"
 auto_deploy = false
 require_test_gate = false
-require_prod_gate = false
+require_prod_gate = true
 domains = ["cm-prod.shinycomputers.com"]
 
 [targets.env]
@@ -61,7 +61,7 @@ target_type = "compose"
 target_id = "fv4K09A3DmZLfNBAf-G4v"
 target_name = "opw-dev"
 git_branch = "opw-dev"
-source_git_ref = "main"
+source_git_ref = "origin/main"
 auto_deploy = true
 require_test_gate = false
 require_prod_gate = false
@@ -72,6 +72,7 @@ domains = ["opw-dev.shinycomputers.com"]
 [targets.env]
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://opw-dev.shinycomputers.com"
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"
+OPENUPGRADE_ENABLED = "True"
 ODOO_WEB_COMMAND = "python3 /volumes/scripts/run_odoo_bootstrap.py -c /tmp/platform.odoo.conf"
 
 [[targets]]
@@ -81,7 +82,7 @@ target_type = "compose"
 target_id = "tpAsexVQNkCqL7J_JIX6j"
 target_name = "opw-testing"
 git_branch = "opw-testing"
-source_git_ref = "main"
+source_git_ref = "origin/main"
 auto_deploy = true
 require_test_gate = true
 require_prod_gate = false
@@ -92,6 +93,7 @@ domains = ["opw-testing.shinycomputers.com"]
 [targets.env]
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://opw-testing.shinycomputers.com"
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"
+OPENUPGRADE_ENABLED = "True"
 ODOO_WEB_COMMAND = "python3 /volumes/scripts/run_odoo_bootstrap.py -c /tmp/platform.odoo.conf"
 
 [[targets]]
@@ -101,10 +103,10 @@ target_type = "compose"
 target_id = "15b5-sab4eFQ3VlpDUkBI"
 target_name = "opw-prod"
 git_branch = "opw-prod"
-source_git_ref = "main"
+source_git_ref = "origin/main"
 auto_deploy = false
 require_test_gate = false
-require_prod_gate = false
+require_prod_gate = true
 deploy_timeout_seconds = 7200
 healthcheck_timeout_seconds = 600
 domains = ["opw-prod.shinycomputers.com"]
@@ -112,4 +114,5 @@ domains = ["opw-prod.shinycomputers.com"]
 [targets.env]
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://opw-prod.shinycomputers.com"
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL_FREEZE = "True"
+OPENUPGRADE_ENABLED = "True"
 ODOO_WEB_COMMAND = "python3 /volumes/scripts/run_odoo_bootstrap.py -c /tmp/platform.odoo.conf"

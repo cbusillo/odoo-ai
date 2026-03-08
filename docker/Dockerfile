@@ -2,70 +2,45 @@
 ARG ODOO_VERSION=19.0
 ARG ODOO_BASE_RUNTIME_IMAGE=ghcr.io/cbusillo/odoo-enterprise-docker:19.0-runtime
 ARG ODOO_BASE_DEVTOOLS_IMAGE=ghcr.io/cbusillo/odoo-enterprise-docker:19.0-devtools
-
-FROM alpine:3.20 AS addon_sources
 ARG ODOO_ADDON_REPOSITORIES
-ARG ODOO_VERSION
-SHELL ["/bin/sh", "-euc"]
-RUN apk add --no-cache ca-certificates curl tar
-COPY /docker/scripts/fetch_addons.sh /usr/local/bin/fetch_addons.sh
+ARG ODOO_PYTHON_SYNC_SKIP_ADDONS
+
+FROM ${ODOO_BASE_RUNTIME_IMAGE} AS addon-sources
+ARG ODOO_ADDON_REPOSITORIES
+USER root
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN --mount=type=secret,id=github_token \
-    chmod +x /usr/local/bin/fetch_addons.sh \
-    && GITHUB_TOKEN="$(cat /run/secrets/github_token 2>/dev/null || true)" /usr/local/bin/fetch_addons.sh
+    GITHUB_TOKEN="$(cat /run/secrets/github_token 2>/dev/null || true)" \
+    ODOO_ADDON_REPOSITORIES="${ODOO_ADDON_REPOSITORIES}" \
+    /usr/local/bin/odoo-fetch-addons.sh
 
 FROM ${ODOO_BASE_RUNTIME_IMAGE} AS base-runtime
+ARG ODOO_ADDON_REPOSITORIES
+ARG ODOO_PYTHON_SYNC_SKIP_ADDONS
 USER root
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-COPY /docker/config /volumes/config
+COPY /platform/config /volumes/config
 COPY /docker/scripts /volumes/scripts
 COPY /addons /volumes/addons
-COPY --from=addon_sources /extra_addons /opt/extra_addons
+COPY --from=addon-sources --chown=ubuntu:ubuntu /opt/extra_addons /opt/extra_addons
 COPY /pyproject.toml /volumes/pyproject.toml
 COPY /uv.lock /volumes/uv.lock
 
 RUN mkdir -p /opt \
     && rm -rf /opt/project \
     && ln -s /volumes /opt/project
-
-RUN set -eux; \
-    if grep -q "ODOO_SOURCE_BIN" /odoo/odoo-bin; then \
-        if [ ! -f /usr/local/bin/odoo-source-bin ]; then \
-            echo "Missing /usr/local/bin/odoo-source-bin while /odoo/odoo-bin is already a wrapper" >&2; \
-            exit 1; \
-        fi; \
-    else \
-        cp /odoo/odoo-bin /usr/local/bin/odoo-source-bin; \
-    fi; \
-    printf '%s\n' \
-        '#!/usr/bin/env bash' \
-        'set -euo pipefail' \
-        '' \
-        'odoo_script="${ODOO_SOURCE_BIN:-/usr/local/bin/odoo-source-bin}"' \
-        'python_executable="${ODOO_WRAPPER_PYTHON:-/venv/bin/python}"' \
-        '' \
-        'if [[ ! -x "$odoo_script" ]]; then' \
-        '  echo "Missing Odoo executable at ${odoo_script}" >&2' \
-        '  exit 1' \
-        'fi' \
-        '' \
-        'if [[ ! -x "$python_executable" ]]; then' \
-        '  echo "Missing Python executable at ${python_executable}" >&2' \
-        '  exit 1' \
-        'fi' \
-        '' \
-        'exec "$python_executable" "$odoo_script" "$@"' \
-        > /odoo/odoo-bin; \
-    chmod +x /odoo/odoo-bin /usr/local/bin/odoo-source-bin
 
 FROM ${ODOO_BASE_DEVTOOLS_IMAGE} AS base-devtools
+ARG ODOO_ADDON_REPOSITORIES
+ARG ODOO_PYTHON_SYNC_SKIP_ADDONS
 USER root
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-COPY /docker/config /volumes/config
+COPY /platform/config /volumes/config
 COPY /docker/scripts /volumes/scripts
 COPY /addons /volumes/addons
-COPY --from=addon_sources /extra_addons /opt/extra_addons
+COPY --from=addon-sources --chown=ubuntu:ubuntu /opt/extra_addons /opt/extra_addons
 COPY /pyproject.toml /volumes/pyproject.toml
 COPY /uv.lock /volumes/uv.lock
 
@@ -73,59 +48,23 @@ RUN mkdir -p /opt \
     && rm -rf /opt/project \
     && ln -s /volumes /opt/project
 
-RUN set -eux; \
-    if grep -q "ODOO_SOURCE_BIN" /odoo/odoo-bin; then \
-        if [ ! -f /usr/local/bin/odoo-source-bin ]; then \
-            echo "Missing /usr/local/bin/odoo-source-bin while /odoo/odoo-bin is already a wrapper" >&2; \
-            exit 1; \
-        fi; \
-    else \
-        cp /odoo/odoo-bin /usr/local/bin/odoo-source-bin; \
-    fi; \
-    printf '%s\n' \
-        '#!/usr/bin/env bash' \
-        'set -euo pipefail' \
-        '' \
-        'odoo_script="${ODOO_SOURCE_BIN:-/usr/local/bin/odoo-source-bin}"' \
-        'python_executable="${ODOO_WRAPPER_PYTHON:-/venv/bin/python}"' \
-        '' \
-        'if [[ ! -x "$odoo_script" ]]; then' \
-        '  echo "Missing Odoo executable at ${odoo_script}" >&2' \
-        '  exit 1' \
-        'fi' \
-        '' \
-        'if [[ ! -x "$python_executable" ]]; then' \
-        '  echo "Missing Python executable at ${python_executable}" >&2' \
-        '  exit 1' \
-        'fi' \
-        '' \
-        'exec "$python_executable" "$odoo_script" "$@"' \
-        > /odoo/odoo-bin; \
-    chmod +x /odoo/odoo-bin /usr/local/bin/odoo-source-bin
-
 FROM base-runtime AS runtime-common
-ENV HOOK_SETUP_FILE=/volumes/scripts/hook_setup
-RUN if [ -f "$HOOK_SETUP_FILE" ]; then cp "$HOOK_SETUP_FILE" /; else echo "hook_setup file not found in /volumes/scripts, skipping"; fi
-RUN ln -sf /etc/ssl/certs/ca-certificates.crt /usr/lib/ssl/cert.pem
-ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
-
-# Production build stage - only prod dependencies
 FROM runtime-common AS production
-WORKDIR /volumes/addons
-RUN --mount=type=cache,target=/root/.cache/uv \
-    /volumes/scripts/install_prod_requirements.sh
+WORKDIR /opt/project
+RUN --mount=type=cache,target=/home/ubuntu/.cache/uv,uid=1000,gid=1000,sharing=locked \
+	ODOO_PYTHON_SYNC_SKIP_ADDONS="${ODOO_PYTHON_SYNC_SKIP_ADDONS}" /usr/local/bin/odoo-python-sync.sh prod
+RUN if [[ ",${ODOO_ADDON_REPOSITORIES}," == *,OCA/OpenUpgrade@* ]] || [[ ",${ODOO_ADDON_REPOSITORIES}," == *,OCA/OpenUpgrade,* ]]; then \
+		uv pip install --python /venv/bin/python openupgradelib==3.12.0; \
+	fi
 WORKDIR /
 USER ubuntu
 
-# Development build stage - prod + dev dependencies
 FROM base-devtools AS development
-WORKDIR /volumes/addons
+WORKDIR /opt/project
 
-ENV HOOK_SETUP_FILE=/volumes/scripts/hook_setup
-RUN if [ -f "$HOOK_SETUP_FILE" ]; then cp "$HOOK_SETUP_FILE" /; else echo "hook_setup file not found in /volumes/scripts, skipping"; fi
-RUN ln -sf /etc/ssl/certs/ca-certificates.crt /usr/lib/ssl/cert.pem
-ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
-
-RUN --mount=type=cache,target=/root/.cache/uv \
-    /volumes/scripts/install_dev_requirements.sh
+RUN --mount=type=cache,target=/home/ubuntu/.cache/uv,uid=1000,gid=1000,sharing=locked \
+	ODOO_PYTHON_SYNC_SKIP_ADDONS="${ODOO_PYTHON_SYNC_SKIP_ADDONS}" /usr/local/bin/odoo-python-sync.sh dev
+RUN if [[ ",${ODOO_ADDON_REPOSITORIES}," == *,OCA/OpenUpgrade@* ]] || [[ ",${ODOO_ADDON_REPOSITORIES}," == *,OCA/OpenUpgrade,* ]]; then \
+		uv pip install --python /venv/bin/python openupgradelib==3.12.0; \
+	fi
 USER ubuntu

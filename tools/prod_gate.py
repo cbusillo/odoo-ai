@@ -98,12 +98,10 @@ def _ssh_target(host: str, user: str | None) -> str:
 
 def _load_target_env(prefix: str) -> tuple[str, str | None, str]:
     host = _env(prefix, "PROD_PROXMOX_HOST", required=True)
-    if host is None:
-        raise click.ClickException(f"{prefix}_PROD_PROXMOX_HOST is required")
+    assert host is not None
     user = _env(prefix, "PROD_PROXMOX_USER", default="root")
     ctid = _env(prefix, "PROD_CT_ID", required=True)
-    if ctid is None:
-        raise click.ClickException(f"{prefix}_PROD_CT_ID is required")
+    assert ctid is not None
     return host, user, ctid
 
 

@@ -13,7 +13,7 @@ _logger = logging.getLogger(__name__)
 COVERAGE_DIRECTORY_NAME = "coverage"
 EXCLUDED_ADDONS = {
     "openupgrade_scripts_custom",
-    "test_web_tours",
+    "test_support",
 }
 
 

@@ -1,9 +1,22 @@
 import os
+import shlex
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
-from tools.deployer.settings import parse_env_file
+from tools.environment_files import parse_env_file
+
+DATABASE_SERVICE = "database"
+_SCRIPT_RUNNER_SERVICE_BY_PROJECT: dict[str, str] = {}
+_SERVICE_ENSURE_LOCK = threading.Lock()
+
+
+def _last_output_line(result_output: str | None) -> str:
+    if not result_output:
+        return ""
+    lines = [line.strip() for line in result_output.splitlines() if line.strip()]
+    return lines[-1] if lines else ""
 
 
 def _blank_to_none(value: str | None) -> str | None:
@@ -137,22 +150,61 @@ def compose_env() -> dict[str, str]:
 
 
 def cleanup_testkit_db_volume() -> None:
-    cleanup_testkit_named_volumes()
+    env = compose_env()
+    if not _is_truthy(env.get("TESTKIT_VOLUME_CLEANUP")) and not _is_truthy(env.get("TESTKIT_DB_VOLUME_CLEANUP")):
+        return
+    project_name = (_blank_to_none(env.get("ODOO_PROJECT_NAME")) or "odoo").strip()
+    volume_name = _blank_to_none(env.get("TESTKIT_DB_VOLUME_NAME")) or "testkit_db"
+    _remove_named_volume(project_name, volume_name)
 
 
 def ensure_named_volume_permissions() -> None:
     env = compose_env()
-    data_named = _blank_to_none(env.get("TESTKIT_DATA_VOLUME_MODE")) == "named"
-    log_named = _blank_to_none(env.get("TESTKIT_LOG_VOLUME_MODE")) == "named"
-    if not data_named and not log_named:
+    data_directory = _blank_to_none(env.get("ODOO_DATA_DIR")) or "/volumes/data"
+    log_directory = _blank_to_none(env.get("ODOO_LOG_DIR")) or "/volumes/logs"
+    paths = [data_directory, f"{data_directory}/filestore", log_directory]
+    deduped_paths: list[str] = []
+    for path in paths:
+        if path not in deduped_paths:
+            deduped_paths.append(path)
+    quoted_paths = " ".join(shlex.quote(path) for path in deduped_paths)
+    service = get_script_runner_service()
+
+    probe_command = [
+        "docker",
+        "compose",
+        "exec",
+        "-T",
+        service,
+        "/bin/bash",
+        "-lc",
+        (
+            "set -euo pipefail; "
+            f"for path in {quoted_paths}; do "
+            "mkdir -p \"$path\"; "
+            "probe_path=\"$path/.testkit_probe_$$\"; "
+            "mkdir -p \"$probe_path\"; "
+            "rmdir \"$probe_path\"; "
+            "done"
+        ),
+    ]
+
+    try:
+        probe_result = subprocess.run(
+            probe_command,
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=20,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError("Timed out while probing testkit volume permissions") from error
+    if probe_result.returncode == 0:
         return
-    paths: list[str] = []
-    if data_named:
-        paths.append("/volumes/data")
-    if log_named:
-        paths.append("/volumes/logs")
-    if not paths:
-        return
+
+    # The runtime image uses a non-root service user. Named volumes are created
+    # as root-owned, so template DB creation can fail on filestore writes unless
+    # we normalize ownership first.
     command = [
         "docker",
         "compose",
@@ -160,15 +212,36 @@ def ensure_named_volume_permissions() -> None:
         "-T",
         "--user",
         "root",
-        "script-runner",
+        service,
         "/bin/bash",
         "-lc",
-        f"mkdir -p {' '.join(paths)} && chown -R ubuntu:ubuntu {' '.join(paths)}",
+        (
+            "set -euo pipefail; "
+            f"mkdir -p {quoted_paths}; "
+            f"chown ubuntu:ubuntu {quoted_paths}; "
+            f"chmod ug+rwX {quoted_paths}"
+        ),
     ]
     try:
-        subprocess.run(command, capture_output=True, env=env, timeout=30)
-    except subprocess.TimeoutExpired:
-        return
+        normalization_result = subprocess.run(command, capture_output=True, text=True, env=env, timeout=45)
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError("Timed out while normalizing testkit volume permissions") from error
+    if normalization_result.returncode != 0:
+        detail = _last_output_line(normalization_result.stderr) or _last_output_line(normalization_result.stdout)
+        suffix = f": {detail}" if detail else ""
+        raise RuntimeError(f"Failed to normalize testkit volume permissions{suffix}")
+
+    verification_result = subprocess.run(
+        probe_command,
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=20,
+    )
+    if verification_result.returncode != 0:
+        detail = _last_output_line(verification_result.stderr) or _last_output_line(verification_result.stdout)
+        suffix = f": {detail}" if detail else ""
+        raise RuntimeError(f"Testkit volume permissions remain unwritable after normalization{suffix}")
 
 
 def cleanup_testkit_named_volumes() -> None:
@@ -184,8 +257,12 @@ def cleanup_testkit_named_volumes() -> None:
         if not cleanup_all and not _is_truthy(env.get(cleanup_flag)):
             continue
         volume_name = _blank_to_none(env.get(name_env)) or default_name
-        full_name = f"{project_name}_{volume_name}"
-        subprocess.run(["docker", "volume", "rm", "-f", full_name], capture_output=True)
+        _remove_named_volume(project_name, volume_name)
+
+
+def _remove_named_volume(project_name: str, volume_name: str) -> None:
+    full_name = f"{project_name}_{volume_name}"
+    subprocess.run(["docker", "volume", "rm", "-f", full_name], capture_output=True)
 
 
 def cleanup_orphan_testkit_containers() -> dict[str, object]:
@@ -214,21 +291,29 @@ def cleanup_orphan_testkit_containers() -> dict[str, object]:
 
 
 def get_script_runner_service() -> str:
+    env = compose_env()
+    project_name = (_blank_to_none(env.get("ODOO_PROJECT_NAME")) or "odoo").strip()
+    cached_service = _SCRIPT_RUNNER_SERVICE_BY_PROJECT.get(project_name)
+    if cached_service:
+        return cached_service
     result = subprocess.run(
         ["docker", "compose", "ps", "--services"],
         capture_output=True,
         text=True,
-        env=compose_env(),
+        env=env,
     )
-    services = result.stdout.strip().split("\n") if result.returncode == 0 else []
+    services = [service.strip() for service in (result.stdout or "").splitlines() if service.strip()] if result.returncode == 0 else []
     for service in services:
         if "script" in service.lower() and "runner" in service.lower():
+            _SCRIPT_RUNNER_SERVICE_BY_PROJECT[project_name] = service
             return service
+    if services:
+        _SCRIPT_RUNNER_SERVICE_BY_PROJECT[project_name] = "script-runner"
     return "script-runner"
 
 
 def get_database_service() -> str:
-    return "database"
+    return DATABASE_SERVICE
 
 
 def compose_exec(
@@ -244,29 +329,37 @@ def compose_exec(
 
 def ensure_services_up(services: list[str]) -> None:
     env = compose_env()
-    for service_name in services:
-        try:
-            running_result = subprocess.run(
-                ["docker", "compose", "ps", "-q", service_name],
-                capture_output=True,
-                text=True,
-                env=env,
-                timeout=10,
-            )
-            if running_result.returncode == 0 and running_result.stdout.strip():
-                continue
-        except subprocess.TimeoutExpired:
-            pass
-        try:
-            subprocess.run(
-                ["docker", "compose", "up", "-d", service_name],
-                capture_output=True,
-                env=env,
-                timeout=60,
-            )
-        except subprocess.TimeoutExpired:
-            continue
-
-
-def project_root() -> Path:
-    return Path.cwd()
+    with _SERVICE_ENSURE_LOCK:
+        for service_name in services:
+            try:
+                running_result = subprocess.run(
+                    ["docker", "compose", "ps", "--status", "running", "-q", service_name],
+                    capture_output=True,
+                    text=True,
+                    env=env,
+                    timeout=10,
+                )
+                if running_result.returncode != 0:
+                    detail = _last_output_line(running_result.stderr) or _last_output_line(running_result.stdout)
+                    suffix = f": {detail}" if detail else ""
+                    raise RuntimeError(f"Unable to inspect service status for '{service_name}'{suffix}")
+                if running_result.stdout.strip():
+                    continue
+            except subprocess.TimeoutExpired as error:
+                raise RuntimeError(f"Timed out while checking service status: {service_name}") from error
+            try:
+                start_result = subprocess.run(
+                    ["docker", "compose", "up", "-d", service_name],
+                    capture_output=True,
+                    text=True,
+                    env=env,
+                    timeout=60,
+                )
+            except subprocess.TimeoutExpired as error:
+                raise RuntimeError(f"Timed out while starting service: {service_name}") from error
+            if start_result.returncode != 0:
+                details = (start_result.stderr or start_result.stdout or "").strip()
+                message = f"Failed to start service: {service_name}"
+                if details:
+                    message = f"{message}: {details}"
+                raise RuntimeError(message)

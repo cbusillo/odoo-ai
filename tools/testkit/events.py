@@ -2,7 +2,6 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Any
 
 _logger = logging.getLogger(__name__)
 
@@ -17,7 +16,7 @@ class EventStream:
         except OSError as exc:
             _logger.debug("events: failed to touch %s (%s)", path, exc)
 
-    def emit(self, event: str, **payload: Any) -> None:
+    def emit(self, event: str, **payload: object) -> None:
         rec = {"ts": time.time(), "event": event, **payload}
         line = json.dumps(rec)
         try:

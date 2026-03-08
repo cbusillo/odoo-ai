@@ -57,18 +57,22 @@ install_modules_add = [
 [contexts.cm.instances.local.runtime_env]
 ODOO_DEV_MODE = "reload"
 ODOO_WORKERS = 2
+COMPOSE_BUILD_TARGET = "development"
 
 [contexts.cm.instances.dev.runtime_env]
 ODOO_WORKERS = 4
+COMPOSE_BUILD_TARGET = "production"
 
 [contexts.cm.instances.testing.runtime_env]
 ODOO_WORKERS = 4
+COMPOSE_BUILD_TARGET = "production"
 
 [contexts.cm.instances.prod.runtime_env]
 ODOO_WORKERS = 6
 POSTGRES_SHARED_BUFFERS = "2GB"
 POSTGRES_EFFECTIVE_CACHE_SIZE = "6GB"
 POSTGRES_WORK_MEM = "64MB"
+COMPOSE_BUILD_TARGET = "production"
 
 [contexts.cm.instances.dev]
 install_modules_add = [
@@ -101,36 +105,23 @@ ODOO_DEV_MODE = "reload"
 ODOO_WORKERS = 2
 ODOO_LIMIT_MEMORY_SOFT = 2147483648
 ODOO_LIMIT_MEMORY_HARD = 3221225472
+COMPOSE_BUILD_TARGET = "development"
 
 [contexts.opw.instances.dev]
 
 [contexts.opw.instances.dev.runtime_env]
 ODOO_WORKERS = 4
+COMPOSE_BUILD_TARGET = "production"
 
 [contexts.opw.instances.testing]
 
 [contexts.opw.instances.testing.runtime_env]
 ODOO_WORKERS = 4
+COMPOSE_BUILD_TARGET = "production"
 
 [contexts.opw.instances.prod.runtime_env]
 ODOO_WORKERS = 6
 POSTGRES_SHARED_BUFFERS = "2GB"
 POSTGRES_EFFECTIVE_CACHE_SIZE = "6GB"
 POSTGRES_WORK_MEM = "64MB"
-
-[contexts.qc]
-database = "qc"
-install_modules = [
-    "cm_custom",
-    "opw_custom",
-]
-
-[contexts.qc.runtime_env]
-ODOO_DEV_MODE = ""
-
-[contexts.qc.instances.local]
-install_modules_add = ["environment_overrides"]
-
-[contexts.qc.instances.local.runtime_env]
-ODOO_DEV_MODE = "reload"
-ODOO_WORKERS = 2
+COMPOSE_BUILD_TARGET = "production"

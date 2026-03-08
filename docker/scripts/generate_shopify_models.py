@@ -6,9 +6,30 @@ from pathlib import Path
 import requests
 from ariadne_codegen.main import client as codegen_client
 from graphql import IntrospectionQuery, build_client_schema, get_introspection_query, print_schema
+from tools.environment_files import parse_env_file
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 ADDONS_PATH = REPOSITORY_ROOT / "addons" / "shopify_sync"
+
+
+def load_runtime_env_values() -> dict[str, str]:
+    root_env_file = REPOSITORY_ROOT / ".env"
+    if root_env_file.exists():
+        return parse_env_file(root_env_file)
+    platform_env_file = REPOSITORY_ROOT / "platform" / ".env"
+    if platform_env_file.exists():
+        return parse_env_file(platform_env_file)
+    return {}
+
+
+def resolve_runtime_env_value(environment_values: dict[str, str], variable_name: str) -> str | None:
+    process_value = os.getenv(variable_name)
+    if process_value is not None and process_value.strip():
+        return process_value
+    file_value = environment_values.get(variable_name)
+    if file_value is not None and file_value.strip():
+        return file_value
+    return None
 
 
 def fetch_shopify_introspection(endpoint: str, token: str) -> dict[str, dict[str, str]]:
@@ -40,18 +61,22 @@ def save_schema_sdl(json_data: IntrospectionQuery, output_file_path: Path) -> No
 
 
 def main() -> None:
-    shopify_store_key = os.getenv("ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY") or os.getenv("SHOPIFY_STORE_URL_KEY")
-    shopify_api_token = os.getenv("ENV_OVERRIDE_SHOPIFY__API_TOKEN") or os.getenv("SHOPIFY_API_TOKEN")
-    shopify_api_version = os.getenv("ENV_OVERRIDE_SHOPIFY__API_VERSION") or os.getenv("SHOPIFY_API_VERSION")
+    runtime_env_values = load_runtime_env_values()
+    shopify_store_key = resolve_runtime_env_value(runtime_env_values, "ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY")
+    shopify_api_token = resolve_runtime_env_value(runtime_env_values, "ENV_OVERRIDE_SHOPIFY__API_TOKEN")
+    shopify_api_version = resolve_runtime_env_value(runtime_env_values, "ENV_OVERRIDE_SHOPIFY__API_VERSION")
     missing_vars: list[str] = []
     if not shopify_store_key:
-        missing_vars.append("ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY or SHOPIFY_STORE_URL_KEY")
+        missing_vars.append("ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY")
     if not shopify_api_token:
-        missing_vars.append("ENV_OVERRIDE_SHOPIFY__API_TOKEN or SHOPIFY_API_TOKEN")
+        missing_vars.append("ENV_OVERRIDE_SHOPIFY__API_TOKEN")
     if not shopify_api_version:
-        missing_vars.append("ENV_OVERRIDE_SHOPIFY__API_VERSION or SHOPIFY_API_VERSION")
+        missing_vars.append("ENV_OVERRIDE_SHOPIFY__API_VERSION")
     if missing_vars:
         raise RuntimeError(f"Missing required environment variables: {', '.join(missing_vars)}")
+    assert shopify_store_key is not None
+    assert shopify_api_token is not None
+    assert shopify_api_version is not None
 
     addon_path = Path(ADDONS_PATH)
     queries_path = addon_path / "graphql" / "shopify"

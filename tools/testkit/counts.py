@@ -3,7 +3,6 @@ import re
 from collections.abc import Iterable
 from pathlib import Path
 
-
 _logger = logging.getLogger(__name__)
 _PY_TEST_PATTERN = re.compile(r"^\s*def\s+test_", re.MULTILINE)
 _JS_TEST_PATTERN = re.compile(r"\btest\s*\(")

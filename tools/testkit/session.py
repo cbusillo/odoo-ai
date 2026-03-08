@@ -9,6 +9,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Literal, TypeVar
 
+from tools.environment_files import discover_repo_root
+
 from .coverage import finalize_coverage, prepare_coverage_directory
 from .db import (
     cleanup_test_databases,
@@ -59,11 +61,17 @@ def _load_timeouts() -> dict:
     try:
         import tomllib  # Python 3.11+
 
-        with open("pyproject.toml", "rb") as f:
-            data = tomllib.load(f)
+        repo_root = discover_repo_root(Path.cwd())
+        pyproject_file_path = repo_root / "pyproject.toml"
+        with pyproject_file_path.open("rb") as file_handle:
+            data = tomllib.load(file_handle)
         return data.get("tool", {}).get("odoo-test", {}).get("timeouts", {}) or {}
     except (OSError, ValueError):
         return {}
+
+
+def _stable_hash_suffix(seed: str) -> str:
+    return hashlib.sha1(seed.encode()).hexdigest()[:8]
 
 
 class TestSession:
@@ -87,6 +95,7 @@ class TestSession:
         self.session_dir: Path | None = None
         self.session_name: str | None = None
         self.session_started: float = 0.0
+        self._events = None
         self._include = set(include_modules or [])
         self._exclude = set(exclude_modules or [])
         self._p_include = {
@@ -247,10 +256,23 @@ class TestSession:
             _log_suppressed("write current pointer", exc)
 
     def _emit_event(self, event: str, **payload: object) -> None:
+        if self._events is None:
+            return
         try:
             self._events.emit(event, **payload)
         except (OSError, RuntimeError, TypeError, ValueError) as exc:
             _log_suppressed(f"emit {event}", exc)
+
+    def _require_session_dir(self) -> Path:
+        if self.session_dir is None:
+            raise RuntimeError("Session directory unavailable. Call _begin() before running phase operations.")
+        return self.session_dir
+
+    def _require_session_state(self) -> tuple[Path, str]:
+        session_dir = self._require_session_dir()
+        if not self.session_name:
+            raise RuntimeError("Session name unavailable. Call _begin() before finishing the run.")
+        return session_dir, self.session_name
 
     def _record_preflight_step(
         self,
@@ -339,7 +361,7 @@ class TestSession:
             self._emit_event("preflight_end", elapsed_seconds=end_time - started)
 
     def _finish(self, outcomes: dict[str, PhaseOutcome]) -> int:
-        assert self.session_dir and self.session_name
+        session_dir, _session_name = self._require_session_state()
         any_fail = any(outcome.return_code not in (None, 0) for outcome in outcomes.values())
 
         # Source counts (definition counts)
@@ -375,10 +397,10 @@ class TestSession:
         # Ensure per-phase aggregates exist even for single-phase runs
         summaries: dict[str, dict[str, object]] = {}
         for phase in ("unit", "js", "integration", "tour"):
-            phase_dir = self.session_dir / phase if self.session_dir else None
+            phase_dir = session_dir / phase
             if phase_dir and not (phase_dir / "all.summary.json").exists():
                 try:
-                    aggregate_phase(self.session_dir, phase)
+                    aggregate_phase(session_dir, phase)
                 except (OSError, RuntimeError, ValueError) as exc:
                     _log_suppressed("aggregate phase", exc)
             agg = None
@@ -415,7 +437,7 @@ class TestSession:
         }
 
         try:
-            coverage_payload = finalize_coverage(self.settings, self.session_dir)
+            coverage_payload = finalize_coverage(self.settings, session_dir)
         except (OSError, RuntimeError, ValueError) as exc:
             _log_suppressed("finalize coverage", exc)
             coverage_payload = None
@@ -447,36 +469,36 @@ class TestSession:
         if self._shard_plans:
             aggregate["sharding"] = self._shard_plans
         aggregate["artifacts"] = {
-            "events": str(self.session_dir / "events.ndjson"),
+            "events": str(session_dir / "events.ndjson"),
         }
 
         # Write artifacts
-        (self.session_dir / "summary.json").write_text(json.dumps(aggregate, indent=2))
-        write_latest_json(self.session_dir)
+        (session_dir / "summary.json").write_text(json.dumps(aggregate, indent=2))
+        write_latest_json(session_dir)
         try:
             from .reporter import write_llm_report
 
-            write_llm_report(self.session_dir, aggregate)
+            write_llm_report(session_dir, aggregate)
         except (ImportError, OSError, RuntimeError, ValueError) as exc:
             _log_suppressed("write llm report", exc)
-        write_digest(self.session_dir, aggregate)
-        write_session_index(self.session_dir, aggregate)
-        update_latest_symlink(self.session_dir)
+        write_digest(session_dir, aggregate)
+        write_session_index(session_dir, aggregate)
+        update_latest_symlink(session_dir)
         # JUnit CI artifacts and weight cache update
         try:
             for phase_name in ("unit", "js", "integration", "tour"):
-                write_junit_for_phase(self.session_dir, phase_name)
+                write_junit_for_phase(session_dir, phase_name)
             from .reporter import write_junit_root as _root
 
-            _root(self.session_dir)
+            _root(session_dir)
             from .reporter import update_weight_cache_from_session as _uw
 
-            _uw(self.session_dir)
+            _uw(session_dir)
         except (ImportError, OSError, RuntimeError, ValueError) as exc:
             _log_suppressed("write junit artifacts", exc)
 
         try:
-            write_manifest(self.session_dir)
+            write_manifest(session_dir)
         except OSError as exc:
             _log_suppressed("write manifest", exc)
 
@@ -496,11 +518,11 @@ class TestSession:
         except (OSError, RuntimeError, ValueError) as exc:
             _log_suppressed("cleanup testkit db volume", exc)
 
-        llm_path = self.session_dir / "llm.json"
+        llm_path = session_dir / "llm.json"
 
         if not any_fail:
             print("\n✅ All categories passed")
-            print(f"📁 Logs: {self.session_dir}")
+            print(f"📁 Logs: {session_dir}")
             if llm_path.exists():
                 print(f"🤖 LLM summary: {llm_path}")
             print("🟢 Everything is green")
@@ -514,8 +536,8 @@ class TestSession:
                 status = "OK"
             else:
                 status = "FAIL"
-            print(f"  {name:<11} {status}  → {self.session_dir}")
-        print(f"📁 Logs: {self.session_dir}")
+            print(f"  {name:<11} {status}  → {session_dir}")
+        print(f"📁 Logs: {session_dir}")
         if llm_path.exists():
             print(f"🤖 LLM summary: {llm_path}")
         print("🔴 Overall: NOT GREEN")
@@ -539,7 +561,7 @@ class TestSession:
             cleanup_filestores(root)
         except (OSError, RuntimeError, ValueError) as exc:
             _log_suppressed("pre-run cleanup", exc)
-        assert self.session_dir is not None
+        self._require_session_dir()
         timeouts = _load_timeouts()
 
         def _timeout(key: str, default: int) -> int:
@@ -727,13 +749,13 @@ class TestSession:
                 return cached
             if phase in self._phase_template_failed:
                 return None
-            assert self.session_dir is not None
+            session_dir = self._require_session_dir()
             base = get_production_db_name()
             module_key = ",".join(sorted(modules))
             hash_prefix = hashlib.sha1(module_key.encode()).hexdigest()[:8]
             suffix = (self.session_name or "template").replace("test-", "")
             template_name = f"{base}_test_template_{phase}_{hash_prefix}_{suffix}"
-            log_dir = self.session_dir / phase
+            log_dir = session_dir / phase
             log_path = log_dir / f"template-{hash_prefix}.log"
             try:
                 from .db import build_module_template
@@ -769,7 +791,7 @@ class TestSession:
                     return
                 first_mods = shards[0]
                 base = f"{settings.db_name}_test_{phase}"
-                db = base if len(shards) == 1 else f"{base}_{abs(hash('-'.join(first_mods))) % 10_000}"
+                db = base if len(shards) == 1 else f"{base}_{_stable_hash_suffix('-'.join(first_mods))}"
                 snapshot_filestore(db, get_production_db_name())
             except (OSError, RuntimeError, ValueError) as exc:
                 _log_suppressed("prefetch filestore", exc)
@@ -785,7 +807,7 @@ class TestSession:
         return self._apply_filters(modules, phase="unit")
 
     def _discover_js_modules(self) -> list[str]:
-        modules = self._manifest_modules(patterns=["**/tests/js/**/*.py"]) or self._all_modules()
+        modules = self._manifest_modules(patterns=["**/static/tests/**/*.test.js"]) or self._all_modules()
         return self._apply_filters(modules, phase="js")
 
     def _discover_integration_modules(self) -> list[str]:
@@ -996,9 +1018,16 @@ class TestSession:
         )
 
     def _fanout_shards(self, phase: str, shards: list[_T], runner: Callable[[_T], int]) -> PhaseOutcome:
-        assert self.session_dir is not None
-        max_workers = int(self.settings.max_procs) if self.settings.max_procs else min(8, len(shards))
-        return self._run_fanout(self.session_dir, phase, shards, max_workers, runner)
+        session_dir = self._require_session_dir()
+        max_workers = self._resolve_phase_max_workers(phase, len(shards))
+        return self._run_fanout(session_dir, phase, shards, max_workers, runner)
+
+    def _resolve_phase_max_workers(self, phase: str, shard_count: int) -> int:
+        if phase == "tour" and int(self.settings.tour_max_procs) > 0:
+            return max(1, min(int(self.settings.tour_max_procs), shard_count))
+        if self.settings.max_procs:
+            return max(1, min(int(self.settings.max_procs), shard_count))
+        return min(8, shard_count)
 
     def _fanout_method(
         self, phase: str, modules: list[str], timeout: int, slice_count: int, *, extra_env: dict[str, str] | None = None
@@ -1007,8 +1036,7 @@ class TestSession:
 
         from .executor import OdooExecutor
 
-        assert self.session_dir is not None
-        session_dir = self.session_dir
+        session_dir = self._require_session_dir()
         slice_count = self._cap_by_db_guardrail(max(1, int(slice_count)))
         print(f"▶️  Phase {phase} with {slice_count} method-slice shard(s)")
         phase_template = self._ensure_phase_template_db(phase, modules, timeout)
@@ -1045,7 +1073,7 @@ class TestSession:
                 shard_label=f"ms{slice_index:03d}",
             ).returncode
 
-        max_workers = int(self.settings.max_procs) if self.settings.max_procs else min(8, slice_count)
+        max_workers = self._resolve_phase_max_workers(phase, slice_count)
         aggregate_return_code = 0
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
             futures = {pool.submit(_run, slice_index): slice_index for slice_index in range(slice_count)}
@@ -1056,7 +1084,7 @@ class TestSession:
         return PhaseOutcome(
             phase,
             0 if aggregate_return_code == 0 else aggregate_return_code,
-            self.session_dir / phase,
+            session_dir / phase,
             None,
         )
 
@@ -1065,8 +1093,7 @@ class TestSession:
     ) -> PhaseOutcome:
         from .executor import OdooExecutor
 
-        assert self.session_dir is not None
-        session_dir = self.session_dir
+        session_dir = self._require_session_dir()
         print(f"▶️  Phase {phase} with {len(shards)} shard(s)")
         phase_modules = sorted({module_name for shard in shards for module_name in shard})
         phase_template = self._ensure_phase_template_db(phase, phase_modules, timeout)
@@ -1085,7 +1112,7 @@ class TestSession:
             template_db = self._ensure_template_db() if use_prod else phase_template
             return executor.run(
                 test_tags=tags,
-                db_name=db if len(shards) == 1 else f"{db}_{abs(hash('-'.join(shard_modules))) % 10_000}",
+                db_name=db if len(shards) == 1 else f"{db}_{_stable_hash_suffix('-'.join(shard_modules))}",
                 modules_to_install=shard_modules,
                 timeout=timeout,
                 is_tour_test=is_tour,
@@ -1103,8 +1130,7 @@ class TestSession:
     ) -> PhaseOutcome:
         from .executor import OdooExecutor
 
-        assert self.session_dir is not None
-        session_dir = self.session_dir
+        session_dir = self._require_session_dir()
         print(f"▶️  Phase {phase} with {len(shards)} class-shard(s)")
         phase_modules = sorted({item["module"] for shard in shards for item in shard})
         phase_template = self._ensure_phase_template_db(phase, phase_modules, timeout)
@@ -1126,7 +1152,7 @@ class TestSession:
             template_db = self._ensure_template_db() if use_prod else phase_template
             return executor.run(
                 test_tags=tag_expr,
-                db_name=f"{db}_{abs(hash('::'.join(parts))) % 10_000}",
+                db_name=f"{db}_{_stable_hash_suffix('::'.join(parts))}",
                 modules_to_install=modules,
                 timeout=timeout,
                 is_tour_test=is_tour,

@@ -13,9 +13,9 @@ class DiscussRecordLinks(http.Controller):
         model_filter, query = parse_prefix(term or "", cfg)
         tokens = [t for t in (query or "").strip().split() if t]
 
-        def build_domain(model_config: ModelCfg) -> fields.Domain | list:
+        def build_domain(model_config: ModelCfg) -> fields.Domain:
             if not tokens:
-                return []
+                return fields.Domain([])
             search_fields = model_config.search or ["name"]
             search_domain: fields.Domain | None = None
             for token in tokens:

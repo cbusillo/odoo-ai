@@ -271,12 +271,14 @@ class ProductTemplate(models.Model):
         for product in self:
             product.initial_cost_total = product.initial_quantity * product.standard_price
 
-    @api.constrains("default_code")
+    @api.constrains("default_code", "source", "type")
     def check_sku(self) -> None:
         if self.env.context.get("skip_sku_check"):
             return
         for product in self:
             if not product.default_code or product.type != "consu":
+                continue
+            if product.source == "shopify" and not self.env.context.get("force_sku_check"):
                 continue
             if not self.SKU_PATTERN.fullmatch(product.default_code):
                 raise ValidationError(self.env._("SKU must be 4-8 digits."))

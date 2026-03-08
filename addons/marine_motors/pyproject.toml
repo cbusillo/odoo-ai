@@ -10,7 +10,6 @@ requires-python = ">=3.13"
 dependencies = [
     "printnodeapi @ git+https://github.com/cbusillo/PrintNode-Python@master",
     "simple_zpl2 @ git+https://github.com/sacherjj/simple_zpl2@master",
-    "qrcode",
 ]
 
 [tool.setuptools]

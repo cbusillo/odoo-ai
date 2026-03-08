@@ -2,6 +2,7 @@ import { GraphRenderer } from "@web/views/graph/graph_renderer"
 import { loadBundle } from "@web/core/assets"
 import { onWillStart, onMounted, onWillUnmount, useRef } from "@odoo/owl"
 
+// noinspection JSUnusedGlobalSymbols
 /**
  * Chart.js config stubs for JSDoc-aware tooling.
  * @typedef {{ callback?: (value: number) => string }} ChartAxisTicks

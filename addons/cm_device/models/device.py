@@ -1,5 +1,6 @@
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, ValidationError
+from odoo.addons.cm_device.utils import clean_identifier_value
 
 
 class Device(models.Model):
@@ -108,7 +109,7 @@ class Device(models.Model):
             "mail_notrack": True,
             "mail_create_nosubscribe": True,
         }
-        device_model = self.sudo().with_context(cleanup_context)
+        device_model: "odoo.model.service_device" = self.sudo().with_context(cleanup_context)
         last_id = 0
         processed_count = 0
         updated_count = 0
@@ -136,13 +137,13 @@ class Device(models.Model):
 
     @classmethod
     def _build_cleanup_values(cls, device: "Device") -> dict[str, object]:
-        serial_number = cls._clean_identifier_value(device.serial_number, identifier_type="serial")
-        asset_tag = cls._clean_identifier_value(device.asset_tag, identifier_type="asset_tag")
-        asset_tag_secondary = cls._clean_identifier_value(
+        serial_number = clean_identifier_value(device.serial_number, identifier_type="serial")
+        asset_tag = clean_identifier_value(device.asset_tag, identifier_type="asset_tag")
+        asset_tag_secondary = clean_identifier_value(
             device.asset_tag_secondary,
             identifier_type="asset_tag",
         )
-        imei = cls._clean_identifier_value(device.imei, identifier_type="imei")
+        imei = clean_identifier_value(device.imei, identifier_type="imei")
 
         if asset_tag and serial_number and asset_tag == serial_number:
             asset_tag = None
@@ -178,21 +179,3 @@ class Device(models.Model):
             update_values["is_serial_unavailable"] = False
 
         return update_values
-
-    @staticmethod
-    def _clean_identifier_value(value: str | None, *, identifier_type: str) -> str | None:
-        if not value:
-            return None
-        cleaned = " ".join(str(value).strip().split())
-        if not cleaned:
-            return None
-        normalized = cleaned.lower()
-        if normalized in {"n/a", "na", "none", "unknown", "unk", "tbd", "null", "-"}:
-            return None
-        if identifier_type == "imei":
-            digits = "".join(ch for ch in cleaned if ch.isdigit())
-            return digits if len(digits) >= 8 else None
-        if identifier_type in {"serial", "asset_tag"}:
-            if len(cleaned) < 2:
-                return None
-        return cleaned

@@ -63,6 +63,7 @@ export class HtmlTemplateWidget extends HtmlField {
             : (resources.powerbox_items ? [resources.powerbox_items] : [])
 
         if (!userCommands.some((command) => command.id === commandId)) {
+            // noinspection JSUnusedGlobalSymbols
             userCommands.push({
                 id: commandId,
                 title: _t("Insert template tag"),

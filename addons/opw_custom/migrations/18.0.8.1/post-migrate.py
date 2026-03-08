@@ -17,16 +17,15 @@ def migrate(cr: Cursor, version: str) -> None:
     _logger.info("Starting migration to fix partner data issues...")
 
     # Fix 1: Set default autopost_bills value for partners missing it
-    cr.execute("SELECT COUNT(*) FROM res_partner WHERE autopost_bills IS NULL")
+    cr.execute("SELECT COUNT(*) FROM res_partner WHERE NULLIF(autopost_bills, '') IS NULL")
     null_count_before = cr.fetchone()[0]
 
     if null_count_before > 0:
-        _logger.info(f"Found {null_count_before} partners with NULL autopost_bills")
-
+        _logger.info(f"Found {null_count_before} partners with missing autopost_bills")
         cr.execute("""
             UPDATE res_partner 
             SET autopost_bills = 'ask' 
-            WHERE autopost_bills IS NULL
+            WHERE NULLIF(autopost_bills, '') IS NULL
         """)
 
         _logger.info(f"Updated {cr.rowcount} partner records with autopost_bills")
@@ -67,7 +66,7 @@ def migrate(cr: Cursor, version: str) -> None:
         _logger.info(f"Fixed {address_fixed} delivery/invoice partners by setting name to NULL")
 
     # Verify results
-    cr.execute("SELECT COUNT(*) FROM res_partner WHERE autopost_bills IS NULL")
+    cr.execute("SELECT COUNT(*) FROM res_partner WHERE NULLIF(autopost_bills, '') IS NULL")
     null_count_after = cr.fetchone()[0]
 
     cr.execute("SELECT COUNT(*) FROM res_partner WHERE name = ''")
@@ -77,6 +76,6 @@ def migrate(cr: Cursor, version: str) -> None:
         _logger.info("✓ Migration successful: All partner data issues fixed")
     else:
         if null_count_after > 0:
-            _logger.error(f"✗ {null_count_after} partners still have NULL autopost_bills")
+            _logger.error(f"✗ {null_count_after} partners still have missing autopost_bills")
         if empty_names_after > 0:
             _logger.error(f"✗ {empty_names_after} partners still have empty names")

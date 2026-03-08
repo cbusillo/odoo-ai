@@ -8,9 +8,16 @@
     "maintainers": ["cbusillo"],
     "depends": [
         "base",
+        "mail",
         "product",
+        "web",
     ],
     "data": [],
+    "assets": {
+        "web.assets_backend": [
+            "environment_overrides/static/src/js/notification_permission_patch.js",
+        ],
+    },
     "installable": True,
     "application": False,
     "license": "LGPL-3",

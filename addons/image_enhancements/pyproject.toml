@@ -7,9 +7,7 @@ name = "image_enhancements"
 version = "0.0.0"  # Real version in __manifest__.py
 description = "Extended image metadata helpers"
 requires-python = ">=3.13"
-dependencies = [
-    "pillow",
-]
+dependencies = []
 
 [tool.setuptools]
 packages = []

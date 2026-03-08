@@ -1,17 +1,15 @@
 {
-  "compilerOptions": {
-    "target": "ES2021",
-    "module": "ES2020",
-    "strict": true,
-    "moduleResolution": "node",
-    "baseUrl": ".",
-    "paths": {
-      "@opw_custom/*": [
-        "static/src/*"
-      ]
-    }
-  },
-  "include": [
-    "static/src/**/*"
-  ]
+    "compilerOptions": {
+        "target": "ES2021",
+        "module": "ES2020",
+        "strict": true,
+        "allowJs": true,
+        "noEmit": true,
+        "moduleResolution": "node",
+        "baseUrl": ".",
+        "paths": {
+            "@opw_custom/*": ["static/src/*"]
+        }
+    },
+    "include": ["static/src/**/*", "static/tests/**/*"]
 }

@@ -1,5 +1,4 @@
 from odoo import api, fields, models
-from odoo.exceptions import ValidationError
 
 
 class HelpdeskTicket(models.Model):
@@ -167,31 +166,9 @@ class HelpdeskTicket(models.Model):
         for ticket in self:
             if not ticket.billing_context_id:
                 continue
-            missing = []
-            requirements = ticket.billing_context_id.requirement_ids.filtered(
-                lambda requirement: requirement.is_required
-                and requirement.requirement_group in {"intake", "both"}
-                and requirement.target_model == "helpdesk.ticket"
-                and requirement.field_name
+            ticket.billing_context_id.validate_required_fields(
+                ticket,
+                requirement_group="intake",
+                target_model="helpdesk.ticket",
+                workflow_label="intake",
             )
-            for requirement in requirements:
-                field_name = requirement.field_name
-                if not hasattr(ticket, field_name):
-                    missing.append(requirement.name)
-                    continue
-                value = ticket[field_name]
-                if isinstance(value, models.BaseModel):
-                    if not value:
-                        missing.append(requirement.name)
-                    continue
-                if isinstance(value, str):
-                    if not value.strip():
-                        missing.append(requirement.name)
-                    continue
-                if not value:
-                    missing.append(requirement.name)
-            if missing:
-                missing_list = ", ".join(missing)
-                raise ValidationError(
-                    f"Missing required intake fields for {ticket.billing_context_id.name}: {missing_list}"
-                )

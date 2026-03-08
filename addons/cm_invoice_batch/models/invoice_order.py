@@ -1,5 +1,4 @@
 from odoo import api, fields, models
-from odoo.exceptions import ValidationError
 
 INVOICE_ORDER_STATES = [
     ("draft", "Draft"),
@@ -155,42 +154,19 @@ class InvoiceOrder(models.Model):
         "other_override_id",
     )
     def _check_required_invoice_fields(self) -> None:
+        if self.env.context.get("cm_skip_required_fields"):
+            return
         for order in self:
-            if self.env.context.get("cm_skip_required_fields"):
-                continue
             if order.state not in {"ready", "invoiced", "paid"}:
                 continue
             if not order.billing_context_id:
                 continue
-
-            missing = []
-            requirements = order.billing_context_id.requirement_ids.filtered(
-                lambda requirement: requirement.is_required
-                and requirement.requirement_group in {"invoice", "both"}
-                and requirement.target_model == "service.invoice.order"
-                and requirement.field_name
+            order.billing_context_id.validate_required_fields(
+                order,
+                requirement_group="invoice",
+                target_model="service.invoice.order",
+                workflow_label="invoice",
             )
-            for requirement in requirements:
-                field_name = requirement.field_name
-                if not hasattr(order, field_name):
-                    missing.append(requirement.name)
-                    continue
-                value = order[field_name]
-                if isinstance(value, models.BaseModel):
-                    if not value:
-                        missing.append(requirement.name)
-                    continue
-                if isinstance(value, str):
-                    if not value.strip():
-                        missing.append(requirement.name)
-                    continue
-                if not value:
-                    missing.append(requirement.name)
-            if missing:
-                missing_list = ", ".join(missing)
-                raise ValidationError(
-                    f"Missing required invoice fields for {order.billing_context_id.name}: {missing_list}"
-                )
 
     @api.depends("state")
     def _compute_stage_id(self) -> None:

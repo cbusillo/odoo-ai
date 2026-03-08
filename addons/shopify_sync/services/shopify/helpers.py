@@ -6,7 +6,6 @@ from typing import TypeVar, Self, Protocol, Iterable
 
 from odoo import api, models
 from odoo.exceptions import UserError
-from odoo.tools import float_compare
 from psycopg2.errors import UniqueViolation
 
 from .gql.base_model import BaseModel
@@ -255,44 +254,6 @@ class ShopifyMissingSkuFieldError(ShopifyDataError):
 
 class ShopifyStaleRunTimeout(Exception):
     pass
-
-
-def write_if_changed(
-    record: "odoo.model.product_product | odoo.model.product_template | odoo.model.sale_order | odoo.model.sale_order_line | odoo.model.res_partner",
-    vals: "odoo.values.product_product | odoo.values.product_template | odoo.values.sale_order | odoo.values.sale_order_line | odoo.values.res_partner",
-) -> bool:
-    remaining_values = vals.copy()
-
-    for field_name, new_value in list(remaining_values.items()):
-        current_value = record[field_name]
-        field = record._fields[field_name]
-
-        if isinstance(new_value, (list, tuple)):
-            raise UserError(f"write_if_changed(): unsupported value for field '{field_name}'. lists and tuples are not supported.")
-        if isinstance(current_value, models.BaseModel):
-            if len(current_value) > 1:
-                raise UserError(
-                    f"write_if_changed(): field '{field_name}' contains a multi‑record recordset which is not supported."
-                )
-            current_id = current_value.id if current_value else False
-            new_id = new_value.id if isinstance(new_value, models.BaseModel) else new_value
-            if current_id == new_id:
-                remaining_values.pop(field_name)
-            continue
-        if isinstance(current_value, float):
-            digits_specification = getattr(field, "digits", None)
-            raw_digits = digits_specification(record.env) if callable(digits_specification) else digits_specification
-            precision_digits = raw_digits[1] if isinstance(raw_digits, (list, tuple)) and len(raw_digits) > 1 else 2
-            if float_compare(current_value, new_value, precision_digits=precision_digits) == 0:
-                remaining_values.pop(field_name)
-            continue
-        if current_value == new_value:
-            remaining_values.pop(field_name)
-
-    if remaining_values:
-        record.with_context(skip_shopify_sync=True, force_sku_check=True).write(remaining_values)
-
-    return bool(remaining_values)
 
 
 def parse_shopify_datetime_to_utc(value: datetime | str) -> datetime:

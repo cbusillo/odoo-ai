@@ -180,6 +180,12 @@ class TestShopifyHelpers(UnitTestCase):
         with self.assertRaises(common.UserError):
             change_detection.write_if_changed(product, {"list_price": ["bad"]})
 
+        with self.assertRaises(common.UserError):
+            change_detection.write_if_changed(product, {"list_price": "bad"})
+
+        with self.assertRaises(common.UserError):
+            change_detection.write_if_changed(product, {"list_price": None})
+
     def test_determine_latest_odoo_product_modification_time(self) -> None:
         class Tmpl:
             def __init__(self, write_date: common.datetime) -> None:

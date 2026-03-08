@@ -91,13 +91,7 @@ class ShopifyService:
                     _logger.info(f"Low API points. Waiting for {wait_time:.2f} seconds...")
                     sleep(wait_time)
 
-        client = Client(
-            headers=headers,
-            timeout=timeout,
-            limits=limits,
-            event_hooks={"response": [rate_limit_hook]},
-            http2=True,
-        )
+        client = Client(headers=headers, timeout=timeout, limits=limits, event_hooks={"response": [rate_limit_hook]})
 
         original_send = client.send
 

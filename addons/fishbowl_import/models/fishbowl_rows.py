@@ -10,6 +10,14 @@ class FishbowlRow(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", populate_by_name=True, arbitrary_types_allowed=True)
 
 
+def build_rows_adapter(row_model: type[FishbowlRow]) -> TypeAdapter:
+    return TypeAdapter(list[row_model])
+
+
+def build_rows_adapters(*row_models: type[FishbowlRow]) -> tuple[TypeAdapter, ...]:
+    return tuple(build_rows_adapter(row_model) for row_model in row_models)
+
+
 class UnitRow(FishbowlRow):
     id: int
     name: str | None = None
@@ -204,29 +212,50 @@ class ReceiptItemRow(FishbowlRow):
     poId: int | None = None
 
 
-# noinspection DuplicatedCode
-UNIT_ROWS_ADAPTER = TypeAdapter(list[UnitRow])
-UNIT_CONVERSION_ROWS_ADAPTER = TypeAdapter(list[UnitConversionRow])
-CUSTOMER_ROWS_ADAPTER = TypeAdapter(list[CustomerRow])
-VENDOR_ROWS_ADAPTER = TypeAdapter(list[VendorRow])
-ADDRESS_ROWS_ADAPTER = TypeAdapter(list[AddressRow])
-ADDRESS_TYPE_ROWS_ADAPTER = TypeAdapter(list[AddressTypeRow])
-COUNTRY_ROWS_ADAPTER = TypeAdapter(list[CountryRow])
-STATE_ROWS_ADAPTER = TypeAdapter(list[StateRow])
-PART_ROWS_ADAPTER = TypeAdapter(list[PartRow])
-PRODUCT_ROWS_ADAPTER = TypeAdapter(list[ProductRow])
-# noinspection DuplicatedCode
-PART_TYPE_ROWS_ADAPTER = TypeAdapter(list[PartTypeRow])
-PART_COST_ROWS_ADAPTER = TypeAdapter(list[PartCostRow])
-PART_COST_HISTORY_ROWS_ADAPTER = TypeAdapter(list[PartCostHistoryRow])
-SALES_PRICE_ROWS_ADAPTER = TypeAdapter(list[SalesPriceRow])
-INVENTORY_ROWS_ADAPTER = TypeAdapter(list[InventoryRow])
-STATUS_ROWS_ADAPTER = TypeAdapter(list[StatusRow])
-ORDER_ROWS_ADAPTER = TypeAdapter(list[OrderRow])
-SALES_ORDER_LINE_ROWS_ADAPTER = TypeAdapter(list[SalesOrderLineRow])
-PURCHASE_ORDER_LINE_ROWS_ADAPTER = TypeAdapter(list[PurchaseOrderLineRow])
-SHIPMENT_LINE_ROWS_ADAPTER = TypeAdapter(list[ShipmentLineRow])
-# noinspection DuplicatedCode
-# Adapter declarations stay explicit for discoverability.
-TRANSFER_ORDER_LINE_ROWS_ADAPTER = TypeAdapter(list[TransferOrderLineRow])
-RECEIPT_ITEM_ROWS_ADAPTER = TypeAdapter(list[ReceiptItemRow])
+(
+    UNIT_ROWS_ADAPTER,
+    UNIT_CONVERSION_ROWS_ADAPTER,
+    CUSTOMER_ROWS_ADAPTER,
+    VENDOR_ROWS_ADAPTER,
+    ADDRESS_ROWS_ADAPTER,
+    ADDRESS_TYPE_ROWS_ADAPTER,
+    COUNTRY_ROWS_ADAPTER,
+    STATE_ROWS_ADAPTER,
+    PART_ROWS_ADAPTER,
+    PRODUCT_ROWS_ADAPTER,
+    PART_TYPE_ROWS_ADAPTER,
+    PART_COST_ROWS_ADAPTER,
+    PART_COST_HISTORY_ROWS_ADAPTER,
+    SALES_PRICE_ROWS_ADAPTER,
+    INVENTORY_ROWS_ADAPTER,
+    STATUS_ROWS_ADAPTER,
+    ORDER_ROWS_ADAPTER,
+    SALES_ORDER_LINE_ROWS_ADAPTER,
+    PURCHASE_ORDER_LINE_ROWS_ADAPTER,
+    SHIPMENT_LINE_ROWS_ADAPTER,
+    TRANSFER_ORDER_LINE_ROWS_ADAPTER,
+    RECEIPT_ITEM_ROWS_ADAPTER,
+) = build_rows_adapters(
+    UnitRow,
+    UnitConversionRow,
+    CustomerRow,
+    VendorRow,
+    AddressRow,
+    AddressTypeRow,
+    CountryRow,
+    StateRow,
+    PartRow,
+    ProductRow,
+    PartTypeRow,
+    PartCostRow,
+    PartCostHistoryRow,
+    SalesPriceRow,
+    InventoryRow,
+    StatusRow,
+    OrderRow,
+    SalesOrderLineRow,
+    PurchaseOrderLineRow,
+    ShipmentLineRow,
+    TransferOrderLineRow,
+    ReceiptItemRow,
+)

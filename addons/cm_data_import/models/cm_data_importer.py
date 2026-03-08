@@ -2,18 +2,19 @@ import logging
 import os
 import re
 from datetime import date, datetime, time
-from zoneinfo import ZoneInfo
+from typing import TypeVar
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from odoo import api, fields, models
-from odoo.exceptions import UserError, ValidationError
 from odoo.addons.transaction_utilities.models.cron_budget_mixin import CronRuntimeBudgetExceeded
+from odoo.exceptions import UserError, ValidationError
 
 from ..services.cm_data_client import (
     CmDataAccountName,
     CmDataClient,
     CmDataConnectionSettings,
-    CmDataDirection,
     CmDataDeliveryLog,
+    CmDataDirection,
     CmDataEmployee,
     CmDataNoteRow,
     CmDataPriceList,
@@ -28,6 +29,8 @@ from ..services.cm_data_client import (
 )
 
 _logger = logging.getLogger(__name__)
+
+ExternalIdRecordModel = TypeVar("ExternalIdRecordModel", bound=models.Model)
 
 EXTERNAL_SYSTEM_CODE = "cm_data"
 EXTERNAL_SYSTEM_APPLICABLE_MODEL_XMLIDS = (
@@ -508,9 +511,7 @@ class CmDataImporter(models.Model):
         sync_started_at: datetime,
     ) -> None:
         note_model = self.env["integration.cm_data.note"].sudo().with_context(IMPORT_CONTEXT)
-        checklist_item_model = self.env["service.quality.control.checklist.item"].sudo().with_context(
-            IMPORT_CONTEXT
-        )
+        checklist_item_model = self.env["service.quality.control.checklist.item"].sudo().with_context(IMPORT_CONTEXT)
         commit_interval = self._get_commit_interval()
         processed_count = 0
         resource = NOTE_TYPE_RESOURCES[note_type]
@@ -549,13 +550,11 @@ class CmDataImporter(models.Model):
             processed_count += 1
             if self._maybe_commit(processed_count, commit_interval, label=f"{note_type} note"):
                 note_model = self.env["integration.cm_data.note"].sudo().with_context(IMPORT_CONTEXT)
-                checklist_item_model = self.env["service.quality.control.checklist.item"].sudo().with_context(
-                    IMPORT_CONTEXT
-                )
+                checklist_item_model = self.env["service.quality.control.checklist.item"].sudo().with_context(IMPORT_CONTEXT)
 
     def _import_quality_control_checklist_item(
         self,
-        checklist_item_model: models.Model,
+        checklist_item_model: "odoo.model.service_quality_control_checklist_item",
         note_row: CmDataNoteRow,
         partner_id: int,
         system: "odoo.model.external_system",
@@ -1364,7 +1363,7 @@ class CmDataImporter(models.Model):
             if self._maybe_commit(processed_count, commit_interval, label="attendance"):
                 attendance_model = self.env["hr.attendance"].sudo().with_context(IMPORT_CONTEXT)
 
-        for employee_id, attendance_id in list(open_attendance_by_employee.items()):
+        for attendance_id in open_attendance_by_employee.values():
             attendance = attendance_model.browse(attendance_id).exists()
             if not attendance or attendance.check_out:
                 continue
@@ -1408,16 +1407,15 @@ class CmDataImporter(models.Model):
         partner_map[normalized] = partner.id
         return partner
 
-    def _log_unmatched_transport_locations(self, unmatched_locations: dict[str, int]) -> None:
+    @staticmethod
+    def _log_unmatched_transport_locations(unmatched_locations: dict[str, int]) -> None:
         if not unmatched_locations:
             return
         sorted_locations = sorted(
             unmatched_locations.items(),
             key=lambda item: (-item[1], item[0].lower()),
         )
-        top_locations = ", ".join(
-            f"{name} ({count})" for name, count in sorted_locations[:25]
-        )
+        top_locations = ", ".join(f"{name} ({count})" for name, count in sorted_locations[:25])
         _logger.warning(
             "CM delivery locations missing account mapping (top %s of %s): %s",
             min(25, len(sorted_locations)),
@@ -1432,22 +1430,26 @@ class CmDataImporter(models.Model):
         partner_map: dict[str, int],
     ) -> dict[str, int]:
         location_partner_map: dict[str, int] = {}
+
+        def register_location_tokens(account_name: str, tokens: tuple[str | None, ...]) -> None:
+            partner_id = partner_map.get(self._normalize_key(account_name))
+            if not partner_id:
+                return
+            for token in tokens:
+                normalized = self._normalize_key(token)
+                if normalized and normalized not in location_partner_map:
+                    location_partner_map[normalized] = partner_id
+
         for row in account_rows:
-            partner_id = partner_map.get(self._normalize_key(row.account_name))
-            if not partner_id:
-                continue
-            for token in (row.account_name, row.ticket_name, row.ticket_name_report):
-                normalized = self._normalize_key(token)
-                if normalized and normalized not in location_partner_map:
-                    location_partner_map[normalized] = partner_id
+            register_location_tokens(
+                row.account_name,
+                (row.account_name, row.ticket_name, row.ticket_name_report),
+            )
         for row in direction_rows:
-            partner_id = partner_map.get(self._normalize_key(row.account_name))
-            if not partner_id:
-                continue
-            for token in (row.ticket_title_name, row.school_name, row.account_name):
-                normalized = self._normalize_key(token)
-                if normalized and normalized not in location_partner_map:
-                    location_partner_map[normalized] = partner_id
+            register_location_tokens(
+                row.account_name,
+                (row.ticket_title_name, row.school_name, row.account_name),
+            )
         return location_partner_map
 
     def _build_location_alias_partner_map(
@@ -1552,11 +1554,11 @@ class CmDataImporter(models.Model):
             if not match:
                 _logger.info("CM data value '%s' did not include an id; skipping.", token)
                 continue
-            id_values.append(match.group(0))
+            id_values.append(match.group())
         return list(dict.fromkeys(id_values))
 
+    @staticmethod
     def _resolve_price_list_record_ids(
-        self,
         price_list_model: "odoo.model.integration_cm_data_price_list",
         external_ids: list[str],
     ) -> list[int]:
@@ -1597,10 +1599,10 @@ class CmDataImporter(models.Model):
             "ENV_OVERRIDE_CONFIG_PARAM__CM_DATA__TIMECLOCK_CLOSE_TIME",
         )
         if not value:
-            return time(17, 0)
+            return time(17)
         cleaned = value.strip()
         if not cleaned:
-            return time(17, 0)
+            return time(17)
         try:
             parts = cleaned.split(":")
             hour = int(parts[0])
@@ -1613,7 +1615,7 @@ class CmDataImporter(models.Model):
         tz_name = self.env.user.tz or "UTC"
         try:
             return ZoneInfo(tz_name)
-        except Exception:
+        except (ZoneInfoNotFoundError, TypeError, ValueError):
             _logger.warning("Unknown timezone '%s'; falling back to UTC.", tz_name)
             return ZoneInfo("UTC")
 
@@ -1703,8 +1705,8 @@ class CmDataImporter(models.Model):
             return
         self._log_attendance_fix(attendance, adjusted_check_out, reason)
 
+    @staticmethod
     def _log_attendance_fix(
-        self,
         attendance: "odoo.model.hr_attendance",
         close_at: datetime,
         reason: str,
@@ -1718,8 +1720,8 @@ class CmDataImporter(models.Model):
             reason,
         )
 
+    @staticmethod
     def _log_attendance_fix_failure(
-        self,
         attendance: "odoo.model.hr_attendance",
         *,
         check_out_time: datetime,
@@ -1736,8 +1738,8 @@ class CmDataImporter(models.Model):
             error,
         )
 
+    @staticmethod
     def _find_overlapping_attendance(
-        self,
         attendance_model: "odoo.model.hr_attendance",
         *,
         employee_id: int,
@@ -1757,8 +1759,8 @@ class CmDataImporter(models.Model):
             limit=1,
         )
 
+    @staticmethod
     def _log_attendance_overlap(
-        self,
         attendance: "odoo.model.hr_attendance",
         *,
         check_time: datetime,
@@ -1973,7 +1975,7 @@ class CmDataImporter(models.Model):
 
     def _get_or_create_by_external_id_with_sync(
         self,
-        record_model: "odoo.model.external_id_mixin",
+        record_model: ExternalIdRecordModel,
         system: "odoo.model.external_system",
         external_id_value: str,
         values: dict[str, object],
@@ -1981,8 +1983,10 @@ class CmDataImporter(models.Model):
         resource: str,
         updated_at: datetime | None,
         sync_started_at: datetime,
-    ) -> "odoo.model.external_id_mixin":
+    ) -> ExternalIdRecordModel:
         if updated_at and not self._should_process_external_row(system, external_id_value, resource, updated_at):
+            # noinspection PyUnresolvedReferences
+            # False positive: record_model is constrained to external.id.mixin callers at runtime.
             existing_record = record_model.search_by_external_id(
                 EXTERNAL_SYSTEM_CODE,
                 external_id_value,
@@ -1990,6 +1994,8 @@ class CmDataImporter(models.Model):
             )
             if existing_record:
                 return existing_record
+        # noinspection PyUnresolvedReferences
+        # False positive: record_model is constrained to external.id.mixin callers at runtime.
         record = record_model.get_or_create_by_external_id(
             EXTERNAL_SYSTEM_CODE,
             external_id_value,

@@ -94,40 +94,42 @@ class TicketComment:
 
 
 @dataclass
-class Ticket:
+class CustomerActivity:
     id: int
-    number: int | None = None
-    subject: str | None = None
     created_at: datetime | None = None
     customer_id: int | None = None
     customer_business_then_name: str | None = None
+    updated_at: datetime | None = None
+
+
+@dataclass
+class Ticket(CustomerActivity):
+    number: int | None = None
+    subject: str | None = None
     problem_type: str | None = None
     status: str | None = None
     priority: str | None = None
-    updated_at: datetime | None = None
     properties: TicketProperties = field(default_factory=TicketProperties)
     comments: list[TicketComment] = field(default_factory=list)
 
 
 @dataclass
-class SalesDocument:
-    id: int
-    customer_id: int | None = None
-    customer_business_then_name: str | None = None
+class SalesDocument(CustomerActivity):
     number: str | None = None
-    created_at: datetime | None = None
     date: datetime | None = None
-    updated_at: datetime | None = None
 
 
 @dataclass
-class Estimate(SalesDocument):
-    employee: str | None = None
+class TicketSalesDocument(SalesDocument):
     ticket_id: int | None = None
 
 
 @dataclass
-class Invoice(SalesDocument):
+class Estimate(TicketSalesDocument):
+    employee: str | None = None
+
+
+@dataclass
+class Invoice(TicketSalesDocument):
     due_date: datetime | None = None
     note: str | None = None
-    ticket_id: int | None = None

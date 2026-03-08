@@ -1,6 +1,6 @@
 import base64
 import logging
-from datetime import timedelta
+from dataclasses import dataclass
 from tempfile import NamedTemporaryFile
 from typing import Optional
 
@@ -17,20 +17,52 @@ from ...gql import (
     ProductFieldsMediaNodesMediaImage,
 )
 from ..base import ShopifyBaseImporter
+from ..change_detection import changed_values, write_if_changed
 from ...helpers import (
     SyncMode,
     ShopifyDataError,
     ShopifyMissingSkuFieldError,
-    determine_latest_odoo_product_modification_time,
     find_record_by_external_id,
     image_order_key,
     parse_shopify_id_from_gid,
     parse_shopify_sku_field_to_sku_and_bin,
     upsert_external_id,
-    write_if_changed,
 )
 
 _logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ProductSyncValues:
+    product_values: "odoo.values.product_product"
+    template_values: "odoo.values.product_template"
+
+
+@dataclass
+class ExistingProductEvaluation:
+    sync_values: ProductSyncValues
+    linked_missing_external_ids: bool
+    has_failed_images: bool
+    manufacturer_changed: bool
+    part_type_changed: bool
+    quantity_changed: bool
+    images_in_sync: bool
+    product_changes: dict
+    template_changes: dict
+
+    @property
+    def requires_related_record_resolution(self) -> bool:
+        return self.manufacturer_changed or self.part_type_changed
+
+    @property
+    def should_update(self) -> bool:
+        return bool(
+            self.product_changes
+            or self.template_changes
+            or self.requires_related_record_resolution
+            or self.quantity_changed
+            or not self.images_in_sync
+        )
 
 
 class ProductImporter(ShopifyBaseImporter[ProductFields]):
@@ -55,59 +87,30 @@ class ProductImporter(ShopifyBaseImporter[ProductFields]):
             _logger.warning(f"Missing SKU for product {shopify_product.id} {shopify_product.title}")
             return False
 
-        product_model = self.env["product.product"].with_context(skip_shopify_sync=True)
-        shopify_product_id = parse_shopify_id_from_gid(shopify_product.id)
-        odoo_product = find_record_by_external_id(
-            self.env,
-            model_name="product.product",
-            system_code="shopify",
-            resource="product",
-            external_id_value=shopify_product_id,
-        )
-        if not odoo_product:
-            shopify_variant_id = parse_shopify_id_from_gid(variant.id)
-            odoo_product = find_record_by_external_id(
-                self.env,
-                model_name="product.product",
-                system_code="shopify",
-                resource="variant",
-                external_id_value=shopify_variant_id,
-            )
-        if not odoo_product:
-            odoo_product = product_model.search(
-                [
-                    ("default_code", "=", shopify_sku),
-                    ("active", "in", [True, False]),
-                ],
-                limit=1,
-            )
+        odoo_product = self._find_matching_odoo_product(shopify_product, shopify_sku)
 
         if self._has_processing_images(shopify_product, odoo_product):
             return False
 
         try:
             if odoo_product:
-                latest_write_date = determine_latest_odoo_product_modification_time(odoo_product)
-                images = shopify_product.media.nodes
+                evaluation = self._evaluate_existing_product(odoo_product, shopify_product)
 
-                if any(image.status == MediaStatus.FAILED for image in images):
+                if evaluation.has_failed_images:
                     _logger.debug(f"Product {odoo_product.id} has media failed. Flagging for re‑import.")
                     odoo_product.shopify_next_export = True
 
-                # Avoid re-importing our own exports when timestamps differ by a few seconds.
-                if shopify_product.updated_at > (latest_write_date + timedelta(seconds=5)):
+                if evaluation.should_update:
                     _logger.debug(f"Updating existing product {odoo_product.id} from Shopify")
-                    odoo_product = self.save_odoo_product(odoo_product, shopify_product)
-                    return True
-
-                shopify_images = [image for image in shopify_product.media.nodes if image.status == MediaStatus.READY]
-                if not self._images_are_in_sync(odoo_product, shopify_images):
-                    _logger.debug(f"Product {odoo_product.id} has image order changes, updating from Shopify")
-                    odoo_product = self.save_odoo_product(odoo_product, shopify_product)
+                    odoo_product = self.save_odoo_product(
+                        odoo_product,
+                        shopify_product,
+                        sync_values=None if evaluation.requires_related_record_resolution else evaluation.sync_values,
+                    )
                     return True
 
                 _logger.debug(f"Product {odoo_product.id} is up to date with Shopify")
-                return False
+                return evaluation.linked_missing_external_ids or evaluation.has_failed_images
             else:
                 _logger.debug(f"Creating new product {shopify_product.id} from Shopify")
                 odoo_product = self.save_odoo_product(None, shopify_product)
@@ -119,6 +122,117 @@ class ProductImporter(ShopifyBaseImporter[ProductFields]):
                 shopify_record=shopify_product,
                 odoo_record=odoo_product,
             ) from error
+
+    def _find_matching_odoo_product(
+        self,
+        shopify_product: ProductFields,
+        shopify_sku: str,
+    ) -> "odoo.model.product_product":
+        product_model: "odoo.model.product_product" = self.env["product.product"].with_context(skip_shopify_sync=True)
+        shopify_product_id = parse_shopify_id_from_gid(shopify_product.id)
+        product_match = find_record_by_external_id(
+            self.env,
+            model_name="product.product",
+            system_code="shopify",
+            resource="product",
+            external_id_value=shopify_product_id,
+        )
+        if product_match:
+            return product_model.browse(product_match.id)
+
+        variant = shopify_product.variants.nodes[0]
+        shopify_variant_id = parse_shopify_id_from_gid(variant.id)
+        variant_match = find_record_by_external_id(
+            self.env,
+            model_name="product.product",
+            system_code="shopify",
+            resource="variant",
+            external_id_value=shopify_variant_id,
+        )
+        if variant_match:
+            return product_model.browse(variant_match.id)
+
+        return product_model.search(
+            [
+                ("default_code", "=", shopify_sku),
+                ("active", "in", [True, False]),
+            ],
+            limit=1,
+        )
+
+    def _evaluate_existing_product(
+        self,
+        odoo_product: "odoo.model.product_product",
+        shopify_product: ProductFields,
+    ) -> ExistingProductEvaluation:
+        sync_values = self._build_odoo_product_values(shopify_product)
+        shopify_images = [image for image in shopify_product.media.nodes if image.status == MediaStatus.READY]
+        return ExistingProductEvaluation(
+            sync_values=sync_values,
+            linked_missing_external_ids=self._link_missing_external_ids(odoo_product, shopify_product),
+            has_failed_images=any(image.status == MediaStatus.FAILED for image in shopify_product.media.nodes),
+            manufacturer_changed=self._manufacturer_change_detected(odoo_product, shopify_product),
+            part_type_changed=self._part_type_change_detected(odoo_product, shopify_product),
+            quantity_changed=(
+                shopify_product.total_inventory is not None and shopify_product.total_inventory != odoo_product.qty_available
+            ),
+            images_in_sync=self._images_are_in_sync(odoo_product, shopify_images),
+            product_changes=changed_values(
+                odoo_product.with_context(skip_sku_check=True),
+                sync_values.product_values,
+            ),
+            template_changes=changed_values(
+                odoo_product.product_tmpl_id.with_context(skip_sku_check=True),
+                sync_values.template_values,
+            ),
+        )
+
+    @staticmethod
+    def _link_missing_external_ids(
+        odoo_product: "odoo.model.product_product",
+        shopify_product: ProductFields,
+    ) -> bool:
+        variant = shopify_product.variants.nodes[0]
+        metafields_by_key = {metafield.key: metafield for metafield in shopify_product.metafields.nodes}
+        condition_metafield = metafields_by_key.get("condition")
+        ebay_category_metafield = metafields_by_key.get("ebay_category_id")
+
+        desired_external_ids = {
+            "product": parse_shopify_id_from_gid(shopify_product.id),
+            "variant": parse_shopify_id_from_gid(variant.id),
+            "condition": parse_shopify_id_from_gid(condition_metafield.id) if condition_metafield else None,
+            "ebay_category": parse_shopify_id_from_gid(ebay_category_metafield.id) if ebay_category_metafield else None,
+        }
+        linked_missing_external_ids = False
+        for resource, external_id_value in desired_external_ids.items():
+            if not external_id_value:
+                continue
+            if (odoo_product.get_external_system_id("shopify", resource) or None) == external_id_value:
+                continue
+            upsert_external_id(
+                odoo_product,
+                system_code="shopify",
+                resource=resource,
+                external_id_value=external_id_value,
+            )
+            linked_missing_external_ids = True
+        return linked_missing_external_ids
+
+    @staticmethod
+    def _upsert_optional_external_id(
+        odoo_product: "odoo.model.product_product",
+        *,
+        resource: str,
+        external_id_value: str | None,
+    ) -> None:
+        if not external_id_value:
+            return
+        upsert_external_id(
+            odoo_product,
+            system_code="shopify",
+            resource=resource,
+            external_id_value=external_id_value,
+        )
 
     def _has_processing_images(self, shopify_product: ProductFields, odoo_product: Optional["odoo.model.product_product"]) -> bool:
         images = shopify_product.media.nodes
@@ -174,6 +288,9 @@ class ProductImporter(ShopifyBaseImporter[ProductFields]):
             manufacturer = self.env["product.manufacturer"].create({"name": manufacturer_name})
         return manufacturer
 
+    def _get_manufacturer(self, manufacturer_name: str) -> "odoo.model.product_manufacturer":
+        return self.env["product.manufacturer"].search([("name", "=", manufacturer_name)], limit=1)
+
     def get_or_create_part_type(self, part_type_name: str, ebay_category_id: str) -> "odoo.model.product_type":
         if not ebay_category_id or not ebay_category_id.isdigit() or ebay_category_id == "0":
             raise ShopifyDataError(f"Invalid ebay_category_id {ebay_category_id}")
@@ -191,6 +308,59 @@ class ProductImporter(ShopifyBaseImporter[ProductFields]):
             part_type = self.env["product.type"].create({"name": part_type_name, "ebay_category_id": ebay_category_id})
 
         return part_type
+
+    def _get_part_type(self, part_type_name: str, ebay_category_id: str) -> "odoo.model.product_type":
+        if not ebay_category_id or not ebay_category_id.isdigit() or ebay_category_id == "0" or not part_type_name:
+            return self.env["product.type"].browse()
+
+        return self.env["product.type"].search(
+            [
+                ("name", "=", part_type_name),
+                ("ebay_category_id", "=", ebay_category_id),
+            ],
+            limit=1,
+        )
+
+    @staticmethod
+    def _manufacturer_change_detected(
+        odoo_product: "odoo.model.product_product",
+        shopify_product: ProductFields,
+    ) -> bool:
+        template = odoo_product.product_tmpl_id
+        incoming_vendor = shopify_product.vendor or ""
+        if not incoming_vendor:
+            return False
+
+        current_manufacturer = template.manufacturer
+        if not current_manufacturer:
+            return True
+        return current_manufacturer.name != incoming_vendor
+
+    def _part_type_change_detected(self, odoo_product: "odoo.model.product_product", shopify_product: ProductFields) -> bool:
+        metafields_by_key = {metafield.key: metafield for metafield in shopify_product.metafields.nodes}
+        ebay_category_metafield = metafields_by_key.get("ebay_category_id")
+
+        if not ebay_category_metafield:
+            return False
+
+        ebay_category_id = ebay_category_metafield.value
+        if not ebay_category_id or not ebay_category_id.isdigit() or ebay_category_id == "0":
+            return False
+
+        incoming_part_type_name = shopify_product.product_type or ""
+        if not incoming_part_type_name:
+            return False
+
+        current_part_type = odoo_product.product_tmpl_id.part_type
+        matched_part_type = self._get_part_type(incoming_part_type_name, ebay_category_id)
+        if not matched_part_type:
+            if not current_part_type:
+                return True
+            if str(current_part_type.ebay_category_id) != ebay_category_id:
+                return True
+            return current_part_type.name != incoming_part_type_name
+
+        return current_part_type != matched_part_type
 
     def import_images_from_shopify(self, odoo_product: "odoo.model.product_product", shopify_product: ProductFields) -> None:
         shopify_images = [image for image in shopify_product.media.nodes if image.status == MediaStatus.READY]
@@ -275,64 +445,123 @@ class ProductImporter(ShopifyBaseImporter[ProductFields]):
     def _sync_images_bidirectional(self, odoo_product: "odoo.model.product_product", shopify_product: ProductFields) -> None:
         self.import_images_from_shopify(odoo_product, shopify_product)
 
+    def _build_odoo_product_values(
+        self,
+        shopify_product: ProductFields,
+        *,
+        create_related_records: bool = False,
+    ) -> ProductSyncValues:
+        variant = shopify_product.variants.nodes[0]
+        sku, bin_location = parse_shopify_sku_field_to_sku_and_bin(variant.sku or "")
+        metafields_by_key = {metafield.key: metafield for metafield in shopify_product.metafields.nodes}
+
+        if shopify_product.vendor:
+            if create_related_records:
+                manufacturer = self.get_or_create_manufacturer(shopify_product.vendor)
+            else:
+                manufacturer = self._get_manufacturer(shopify_product.vendor)
+        else:
+            manufacturer = False
+
+        odoo_product_input: "odoo.values.product_product" = {
+            "shopify_created_at": shopify_product.created_at,
+            "name": html2plaintext(shopify_product.title).strip() if shopify_product.title else "",
+            "default_code": sku,
+            "website_description": shopify_product.description_html,
+            "list_price": float(variant.price),
+            "standard_price": float(variant.inventory_item.unit_cost.amount or 0 if variant.inventory_item.unit_cost else 0),
+            "mpn": variant.barcode,
+            "weight": variant.inventory_item.measurement.weight.value if variant.inventory_item.measurement.weight else 0,
+        }
+        if manufacturer:
+            odoo_product_input["manufacturer"] = manufacturer.id
+
+        template_vals: "odoo.values.product_template" = {}
+        template_model = self.env["product.template"]
+        if "bin" in template_model._fields:
+            template_vals["bin"] = bin_location
+
+        condition_metafield = metafields_by_key.get("condition")
+        if condition_metafield:
+            condition = self.env["product.condition"].search([("code", "=", condition_metafield.value)], limit=1)
+            if condition:
+                template_vals["condition"] = condition.id
+
+        ebay_category_from_shopify = metafields_by_key.get("ebay_category_id")
+        if ebay_category_from_shopify:
+            part_type = self._get_part_type(shopify_product.product_type, ebay_category_from_shopify.value)
+            if create_related_records and not part_type and shopify_product.product_type:
+                part_type = self.get_or_create_part_type(shopify_product.product_type, ebay_category_from_shopify.value)
+
+            if part_type:
+                template_vals["part_type"] = part_type.id
+
+        return ProductSyncValues(
+            product_values=odoo_product_input,
+            template_values=template_vals,
+        )
+
+    def _apply_sync_defaults(
+        self,
+        sync_values: ProductSyncValues,
+    ) -> ProductSyncValues:
+        odoo_product_input = sync_values.product_values.copy()
+        template_vals = sync_values.template_values.copy()
+
+        odoo_product_input["type"] = "consu"
+        odoo_product_input["is_storable"] = True
+        odoo_product_input["is_published"] = True
+        odoo_product_input["active"] = True
+
+        template_vals["active"] = True
+        template_model = self.env["product.template"]
+        if "is_ready_for_sale" in template_model._fields:
+            template_vals["is_ready_for_sale"] = True
+        if "source" in template_model._fields:
+            template_vals["source"] = "shopify"
+            odoo_product_input["source"] = "shopify"
+
+        return ProductSyncValues(
+            product_values=odoo_product_input,
+            template_values=template_vals,
+        )
+
     def save_odoo_product(
-        self, odoo_product: Optional["odoo.model.product_product"], shopify_product: ProductFields
+        self,
+        odoo_product: Optional["odoo.model.product_product"],
+        shopify_product: ProductFields,
+        *,
+        sync_values: ProductSyncValues | None = None,
     ) -> "odoo.model.product_product":
         try:
             variant = shopify_product.variants.nodes[0]
-            sku, bin_location = parse_shopify_sku_field_to_sku_and_bin(variant.sku or "")
             metafields = shopify_product.metafields.nodes
             metafields_by_key = {mf.key: mf for mf in metafields}
             shopify_product_id = parse_shopify_id_from_gid(shopify_product.id)
             shopify_variant_id = parse_shopify_id_from_gid(variant.id)
 
-            odoo_product_input: "odoo.values.product_product" = {
-                "shopify_created_at": shopify_product.created_at,
-                "name": html2plaintext(shopify_product.title).strip() if shopify_product.title else "",
-                "default_code": sku,
-                "website_description": shopify_product.description_html,
-                "list_price": float(variant.price),
-                "standard_price": float(variant.inventory_item.unit_cost.amount or 0 if variant.inventory_item.unit_cost else 0),
-                "mpn": variant.barcode,
-                "weight": variant.inventory_item.measurement.weight.value if variant.inventory_item.measurement.weight else 0,
-                "type": "consu",
-                "is_storable": True,
-                "manufacturer": self.get_or_create_manufacturer(shopify_product.vendor).id if shopify_product.vendor else False,
-                "is_published": True,  # Always true for products imported from Shopify
-                "active": True,
-            }
-
-            template_vals = {"active": True}
-            template_model = self.env["product.template"]
-            if "bin" in template_model._fields:
-                template_vals["bin"] = bin_location
-            if "is_ready_for_sale" in template_model._fields:
-                template_vals["is_ready_for_sale"] = True
+            if sync_values is None:
+                sync_values = self._build_odoo_product_values(
+                    shopify_product,
+                    create_related_records=True,
+                )
+            sync_values = self._apply_sync_defaults(sync_values)
+            odoo_product_input = sync_values.product_values
+            template_vals = sync_values.template_values
 
             condition_metafield = metafields_by_key.get("condition")
-            if condition_metafield:
-                condition = self.env["product.condition"].search([("code", "=", condition_metafield.value)], limit=1)
-                if condition:
-                    template_vals["condition"] = condition.id
-
             ebay_category_from_shopify = metafields_by_key.get("ebay_category_id")
-            if ebay_category_from_shopify:
-                template_vals["part_type"] = self.get_or_create_part_type(
-                    shopify_product.product_type, ebay_category_from_shopify.value
-                ).id
 
             if odoo_product:
-                write_if_changed(odoo_product, odoo_product_input)
+                write_if_changed(odoo_product.with_context(skip_sku_check=True), odoo_product_input)
                 if template_vals:
-                    write_if_changed(odoo_product.product_tmpl_id, template_vals)
+                    write_if_changed(odoo_product.product_tmpl_id.with_context(skip_sku_check=True), template_vals)
             else:
-                if "source" in template_model._fields:
-                    template_vals["source"] = "shopify"
                 odoo_product = (
-                    self.env["product.product"].with_context(skip_shopify_sync=True, force_sku_check=True).create(odoo_product_input)
+                    self.env["product.product"].with_context(skip_shopify_sync=True, skip_sku_check=True).create(odoo_product_input)
                 )
                 if template_vals:
-                    write_if_changed(odoo_product.product_tmpl_id, template_vals)
+                    write_if_changed(odoo_product.product_tmpl_id.with_context(skip_sku_check=True), template_vals)
 
             upsert_external_id(odoo_product, system_code="shopify", resource="product", external_id_value=shopify_product_id)
             upsert_external_id(odoo_product, system_code="shopify", resource="variant", external_id_value=shopify_variant_id)
@@ -341,9 +570,8 @@ class ProductImporter(ShopifyBaseImporter[ProductFields]):
                 if condition_metafield and getattr(condition_metafield, "id", None)
                 else None
             )
-            upsert_external_id(
+            self._upsert_optional_external_id(
                 odoo_product,
-                system_code="shopify",
                 resource="condition",
                 external_id_value=condition_external_id,
             )
@@ -352,9 +580,8 @@ class ProductImporter(ShopifyBaseImporter[ProductFields]):
                 if ebay_category_from_shopify and getattr(ebay_category_from_shopify, "id", None)
                 else None
             )
-            upsert_external_id(
+            self._upsert_optional_external_id(
                 odoo_product,
-                system_code="shopify",
                 resource="ebay_category",
                 external_id_value=ebay_category_external_id,
             )

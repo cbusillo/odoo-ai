@@ -6,7 +6,7 @@ from psycopg2 import IntegrityError
 from odoo import models
 
 from ..services import repairshopr_sync_models as repairshopr_models
-from ..services.repairshopr_sync_client import RepairshoprSyncClient
+from ..services.repairshopr_sync_client import RepairshoprImportClient
 from .repairshopr_importer import (
     BID_PATTERN,
     DEFAULT_HELPDESK_TEAM_NAME,
@@ -112,7 +112,7 @@ class RepairshoprImporter(models.Model):
 
     def _import_tickets(
         self,
-        repairshopr_client: RepairshoprSyncClient,
+        repairshopr_client: RepairshoprImportClient,
         start_datetime: datetime | None,
         system: "odoo.model.external_system",
         sync_started_at: datetime,

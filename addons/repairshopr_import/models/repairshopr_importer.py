@@ -2,12 +2,13 @@ import logging
 import os
 import re
 from datetime import datetime, timedelta
+from typing import TypedDict, cast
 
 from odoo import api, fields, models
 from odoo.addons.transaction_utilities.models.cron_budget_mixin import CronRuntimeBudgetExceeded
 from odoo.exceptions import UserError
 
-from ..services.repairshopr_sync_client import RepairshoprSyncClient, RepairshoprSyncConnectionSettings
+from ..services.repairshopr_sync_client import RepairshoprImportClient, RepairshoprSyncClient, RepairshoprSyncConnectionSettings
 
 _logger = logging.getLogger(__name__)
 
@@ -71,6 +72,17 @@ IMPORT_CONTEXT = {
 }
 
 
+class TransportOrderInfo(TypedDict):
+    id: int
+    partner_id: int
+    date: datetime | None
+    location_key: str
+    location_option_id: int | None
+    capacity: int
+    used: int
+    note_device_ids: set[int]
+
+
 class RepairshoprImporter(models.Model):
     _name = "repairshopr.importer"
     _description = "RepairShopr Importer"
@@ -91,7 +103,7 @@ class RepairshoprImporter(models.Model):
         use_last_sync_at = self._use_last_sync_at()
         start_datetime = self._get_last_sync_at() if update_last_sync and use_last_sync_at else None
         transaction_start_datetime = self._apply_transaction_cutoff(start_datetime)
-        repairshopr_client = self._build_client()
+        repairshopr_client = cast(RepairshoprImportClient, cast(object, self._build_client()))
         try:
             system = self._get_repairshopr_system()
             self._import_customers(repairshopr_client, start_datetime, system, sync_started_at)
@@ -314,8 +326,8 @@ class RepairshoprImporter(models.Model):
 
         alias_map = self._build_cm_location_alias_map(cm_system)
 
-        transport_order_info: list[dict[str, object]] = []
-        orders_by_partner: dict[int, list[dict[str, object]]] = {}
+        transport_order_info: list[TransportOrderInfo] = []
+        orders_by_partner: dict[int, list[TransportOrderInfo]] = {}
         for transport_order in transport_orders:
             partner_id = transport_order.client.id if transport_order.client else None
             if not partner_id:
@@ -330,7 +342,7 @@ class RepairshoprImporter(models.Model):
                 note_identifiers,
                 partner_id=partner_id,
             )
-            info: dict[str, object] = {
+            info: TransportOrderInfo = {
                 "id": transport_order.id,
                 "partner_id": partner_id,
                 "date": order_date,
@@ -381,7 +393,8 @@ class RepairshoprImporter(models.Model):
             device_ids = devices_by_intake_id.get(intake_id, [])
             if not device_ids:
                 continue
-            partner_id = intake_info.get("client_id")
+            partner_id_value = intake_info.get("client_id")
+            partner_id = int(str(partner_id_value)) if partner_id_value else None
             if not partner_id:
                 continue
             candidate_orders = orders_by_partner.get(partner_id, [])
@@ -411,7 +424,8 @@ class RepairshoprImporter(models.Model):
             )
             if created_count > 0:
                 created_devices += created_count
-                used_count = int(selected_order.get("used", 0))
+                used_value = selected_order.get("used")
+                used_count = int(str(used_value)) if used_value else 0
                 selected_order["used"] = used_count + created_count
             if ticket_linked:
                 linked_tickets += 1
@@ -541,14 +555,14 @@ class RepairshoprImporter(models.Model):
         self,
         intake_info: dict[str, object],
         ticket_info: dict[str, object] | None,
-        candidate_orders: list[dict[str, object]],
+        candidate_orders: list[TransportOrderInfo],
         device_ids: list[int],
-    ) -> dict[str, object] | None:
-        finish_date = intake_info.get("finish_date")
+    ) -> TransportOrderInfo | None:
+        finish_date: datetime | None = intake_info.get("finish_date")
         if not finish_date:
             return None
 
-        def matches_location(order_info: dict[str, object]) -> bool:
+        def matches_location(order_info: TransportOrderInfo) -> bool:
             if not ticket_info:
                 return False
             ticket_option_ids = ticket_info.get("location_option_ids") or []
@@ -561,11 +575,14 @@ class RepairshoprImporter(models.Model):
                 return order_location_key in ticket_keys
             return False
 
-        def is_within_window(order_info: dict[str, object], window_days: int) -> bool:
+        def is_within_window(
+            order_info: TransportOrderInfo,
+            candidate_window_days: int,
+        ) -> bool:
             order_date = order_info.get("date")
             if not order_date:
                 return False
-            window = timedelta(days=window_days)
+            window = timedelta(days=candidate_window_days)
             return abs(order_date - finish_date) <= window
 
         for window_days in (2, 7):
@@ -590,9 +607,9 @@ class RepairshoprImporter(models.Model):
 
     @staticmethod
     def _filter_orders_by_device_ids(
-        candidates: list[dict[str, object]],
+        candidates: list[TransportOrderInfo],
         device_ids: list[int],
-    ) -> list[dict[str, object]]:
+    ) -> list[TransportOrderInfo]:
         if not device_ids:
             return []
         device_id_set = set(device_ids)
@@ -636,12 +653,13 @@ class RepairshoprImporter(models.Model):
         for note in notes:
             if not note:
                 continue
-            extracted = self._extract_identifiers_from_text(note)
+            extracted = self._extract_transport_note_identifiers(note)
             for identifier_type, identifier_values in extracted.items():
                 identifiers.setdefault(identifier_type, set()).update(identifier_values)
         return identifiers
 
-    def _extract_identifiers_from_text(self, text: str) -> dict[str, set[str]]:
+    @staticmethod
+    def _extract_transport_note_identifiers(text: str) -> dict[str, set[str]]:
         identifiers: dict[str, set[str]] = {}
         for pattern, group_name, identifier_type in (
             (SERIAL_PATTERN, "serial", "serial"),
@@ -690,7 +708,7 @@ class RepairshoprImporter(models.Model):
                 if not preferred_ids:
                     search_domain = self._build_device_search_domain(identifier_value)
                     if partner_id:
-                        owner_domain = ["&", ("owner", "=", partner_id)]
+                        owner_domain = fields.Domain([("owner", "=", partner_id)])
                         search_domain = owner_domain + search_domain
                     matches = device_model.search(search_domain, limit=5)
                     if not matches and partner_id:
@@ -704,9 +722,9 @@ class RepairshoprImporter(models.Model):
         return resolved_ids
 
     @staticmethod
-    def _build_device_search_domain(identifier_value: str) -> list[object]:
+    def _build_device_search_domain(identifier_value: str) -> fields.Domain:
         value = identifier_value.strip()
-        return [
+        return fields.Domain([
             "|",
             "|",
             "|",
@@ -714,12 +732,12 @@ class RepairshoprImporter(models.Model):
             ("asset_tag", "ilike", value),
             ("asset_tag_secondary", "ilike", value),
             ("imei", "ilike", value),
-        ]
+        ])
 
     def _create_transport_devices_from_notes(
         self,
-        transport_device_model: "odoo.model.service_transport_order.device",
-        transport_order_info: list[dict[str, object]],
+        transport_device_model: "odoo.model.service_transport_order_device",
+        transport_order_info: list[TransportOrderInfo],
     ) -> int:
         if not transport_order_info:
             return 0
@@ -727,10 +745,10 @@ class RepairshoprImporter(models.Model):
         commit_interval = self._get_commit_interval()
         processed_count = 0
         for order_info in transport_order_info:
-            transport_order_id = int(order_info.get("id") or 0)
+            transport_order_id = order_info["id"]
             if not transport_order_id:
                 continue
-            note_device_ids = set(order_info.get("note_device_ids") or set())
+            note_device_ids = order_info["note_device_ids"]
             if not note_device_ids:
                 continue
             existing_lines = transport_device_model.search(
@@ -759,38 +777,38 @@ class RepairshoprImporter(models.Model):
 
     @staticmethod
     def _pick_best_transport_order(
-        candidates: list[dict[str, object]],
+        candidates: list[TransportOrderInfo],
         finish_date: datetime,
-    ) -> dict[str, object] | None:
+    ) -> TransportOrderInfo | None:
         if not candidates:
             return None
 
-        def sort_key(order_info: dict[str, object]) -> tuple[bool, timedelta, datetime, int]:
+        def sort_key(order_info: TransportOrderInfo) -> tuple[bool, timedelta, datetime, int]:
             order_date = order_info.get("date") or finish_date
-            capacity = int(order_info.get("capacity", 0) or 0)
-            used = int(order_info.get("used", 0) or 0)
-            is_full = capacity > 0 and used >= capacity
+            capacity = order_info["capacity"]
+            used = order_info["used"]
+            is_full = 0 < capacity <= used
             return (
                 is_full,
                 abs(order_date - finish_date),
                 order_date,
-                int(order_info.get("id", 0) or 0),
+                order_info["id"],
             )
 
         candidates.sort(key=sort_key)
         return candidates[0]
 
+    @staticmethod
     def _link_intake_to_transport_order(
-        self,
         intake_id: int,
         device_ids: list[int],
-        order_info: dict[str, object],
+        order_info: TransportOrderInfo,
         ticket_info: dict[str, object] | None,
         transport_device_model: "odoo.model.service_transport_order_device",
         intake_order_model: "odoo.model.service_intake_order",
         ticket_model: "odoo.model.helpdesk_ticket",
     ) -> tuple[int, bool]:
-        transport_order_id = int(order_info.get("id") or 0)
+        transport_order_id = order_info["id"]
         if not transport_order_id:
             return 0, False
         unique_device_ids = list({device_id for device_id in device_ids if device_id})

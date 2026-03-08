@@ -3,15 +3,16 @@ import logging
 import re
 from collections import defaultdict
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
-from typing import Any
 
 from odoo import fields, models
+from odoo.addons.cm_device.utils import clean_identifier_value
 from odoo.exceptions import UserError
 from psycopg2 import IntegrityError
 
 from ..services import repairshopr_sync_models as repairshopr_models
-from ..services.repairshopr_sync_client import RepairshoprSyncClient
+from ..services.repairshopr_sync_client import RepairshoprImportClient
 from .repairshopr_importer import (
     ASSET_TAG_PATTERN,
     CLAIM_PATTERN,
@@ -26,6 +27,8 @@ from .repairshopr_importer import (
 )
 
 _logger = logging.getLogger(__name__)
+
+RepairshoprLineItem = dict[str, object]
 
 
 class RepairshoprImporter(models.Model):
@@ -106,44 +109,26 @@ class RepairshoprImporter(models.Model):
     def _extract_device_identifiers_from_line(cls, text: str) -> dict[str, str]:
         identifiers: dict[str, str] = {}
         for match in SERIAL_PATTERN.finditer(text):
-            cleaned = cls._clean_identifier_value(match.group("serial"), identifier_type="serial")
+            cleaned = clean_identifier_value(match.group("serial"), identifier_type="serial")
             if cleaned:
                 identifiers.setdefault("serial", cleaned)
         for match in ASSET_TAG_PATTERN.finditer(text):
-            cleaned = cls._clean_identifier_value(match.group("tag"), identifier_type="asset_tag")
+            cleaned = clean_identifier_value(match.group("tag"), identifier_type="asset_tag")
             if cleaned:
                 identifiers.setdefault("asset_tag", cleaned)
         for match in IMEI_PATTERN.finditer(text):
-            cleaned = cls._clean_identifier_value(match.group("imei"), identifier_type="imei")
+            cleaned = clean_identifier_value(match.group("imei"), identifier_type="imei")
             if cleaned:
                 identifiers.setdefault("imei", cleaned)
         for match in CLAIM_PATTERN.finditer(text):
-            cleaned = cls._clean_identifier_value(match.group("claim"), identifier_type="claim")
+            cleaned = clean_identifier_value(match.group("claim"), identifier_type="claim")
             if cleaned:
                 identifiers.setdefault("claim", cleaned)
         for match in PO_PATTERN.finditer(text):
-            cleaned = cls._clean_identifier_value(match.group("po"), identifier_type="po")
+            cleaned = clean_identifier_value(match.group("po"), identifier_type="po")
             if cleaned:
                 identifiers.setdefault("po", cleaned)
         return identifiers
-
-    @staticmethod
-    def _clean_identifier_value(value: str | None, *, identifier_type: str) -> str | None:
-        if not value:
-            return None
-        cleaned = " ".join(str(value).strip().split())
-        if not cleaned:
-            return None
-        normalized = cleaned.lower()
-        if normalized in {"n/a", "na", "none", "unknown", "unk", "tbd", "null", "-"}:
-            return None
-        if identifier_type == "imei":
-            digits = "".join(ch for ch in cleaned if ch.isdigit())
-            return digits if len(digits) >= 8 else None
-        if identifier_type in {"serial", "asset_tag"}:
-            if len(cleaned) < 2:
-                return None
-        return cleaned
 
     @classmethod
     def _extract_identifiers_from_comments(
@@ -170,6 +155,47 @@ class RepairshoprImporter(models.Model):
             values = comment_identifiers.get(key) or set()
             if len(values) == 1:
                 target[key] = next(iter(values))
+
+    @staticmethod
+    def _merge_quality_control_summary_text(existing_summary: str | None, summaries: list[str]) -> str:
+        existing_lines = [line.strip() for line in (existing_summary or "").splitlines() if line.strip()]
+        merged_lines: list[str] = []
+        for line in [*existing_lines, *summaries]:
+            cleaned = line.strip()
+            if cleaned and cleaned not in merged_lines:
+                merged_lines.append(cleaned)
+        return "\n".join(merged_lines)
+
+    def _update_quality_control_device_summary(
+        self,
+        quality_control_device: "odoo.model.service_quality_control_order_device",
+        summaries: list[str],
+    ) -> None:
+        update_values: dict[str, object] = {}
+        merged_summary = self._merge_quality_control_summary_text(
+            quality_control_device.summary_note,
+            summaries,
+        )
+        if merged_summary and merged_summary != (quality_control_device.summary_note or ""):
+            update_values["summary_note"] = merged_summary
+        if quality_control_device.state in {"pending", "started"}:
+            update_values["state"] = "passed"
+        if update_values:
+            quality_control_device.write(update_values)
+
+    @staticmethod
+    def _find_quality_control_device(
+        quality_control_device_model: "odoo.model.service_quality_control_order_device",
+        quality_control_order: "odoo.model.service_quality_control_order",
+        device_record: "odoo.model.service_device",
+    ) -> "odoo.model.service_quality_control_order_device":
+        return quality_control_device_model.search(
+            [
+                ("quality_control_order", "=", quality_control_order.id),
+                ("device", "=", device_record.id),
+            ],
+            limit=1,
+        )
 
     @staticmethod
     def _build_placeholder_serial(
@@ -307,7 +333,7 @@ class RepairshoprImporter(models.Model):
         ticket: repairshopr_models.Ticket,
         partner: "odoo.model.res_partner",
         *,
-        line_items: list[dict[str, Any]],
+        line_items: list[RepairshoprLineItem],
     ) -> tuple["odoo.model.service_intake_order | None", list["odoo.model.service_intake_order_device"]]:
         if not line_items:
             return None, []
@@ -495,37 +521,23 @@ class RepairshoprImporter(models.Model):
                 summaries = candidate.get("summaries")
                 if not isinstance(device_record, models.BaseModel):
                     continue
+                quality_control_device_record: "odoo.model.service_device" = device_record
                 if not isinstance(summaries, list):
                     continue
                 summary_text = "\n".join(summary for summary in summaries if isinstance(summary, str) and summary.strip())
                 if not summary_text:
                     continue
-                existing = quality_control_device_model.search(
-                    [
-                        ("quality_control_order", "=", quality_control_order.id),
-                        ("device", "=", device_record.id),
-                    ],
-                    limit=1,
+                existing = self._find_quality_control_device(
+                    quality_control_device_model,
+                    quality_control_order,
+                    quality_control_device_record,
                 )
                 if existing:
-                    existing_lines = [line.strip() for line in (existing.summary_note or "").splitlines() if line.strip()]
-                    merged_lines: list[str] = []
-                    for line in [*existing_lines, *summaries]:
-                        cleaned = line.strip()
-                        if cleaned and cleaned not in merged_lines:
-                            merged_lines.append(cleaned)
-                    update_values: dict[str, object] = {}
-                    merged_text = "\n".join(merged_lines)
-                    if merged_text and merged_text != (existing.summary_note or ""):
-                        update_values["summary_note"] = merged_text
-                    if existing.state in {"pending", "started"}:
-                        update_values["state"] = "passed"
-                    if update_values:
-                        existing.write(update_values)
+                    self._update_quality_control_device_summary(existing, summaries)
                     continue
                 create_values = {
                     "quality_control_order": quality_control_order.id,
-                    "device": device_record.id,
+                    "device": quality_control_device_record.id,
                     "state": "passed",
                     "start_date": finish_date,
                     "finish_date": finish_date,
@@ -535,29 +547,14 @@ class RepairshoprImporter(models.Model):
                     with self.env.cr.savepoint():
                         quality_control_device_model.create(create_values)
                 except IntegrityError:
-                    existing = quality_control_device_model.search(
-                        [
-                            ("quality_control_order", "=", quality_control_order.id),
-                            ("device", "=", device_record.id),
-                        ],
-                        limit=1,
+                    existing = self._find_quality_control_device(
+                        quality_control_device_model,
+                        quality_control_order,
+                        quality_control_device_record,
                     )
                     if not existing:
                         raise
-                    existing_lines = [line.strip() for line in (existing.summary_note or "").splitlines() if line.strip()]
-                    merged_lines: list[str] = []
-                    for line in [*existing_lines, *summaries]:
-                        cleaned = line.strip()
-                        if cleaned and cleaned not in merged_lines:
-                            merged_lines.append(cleaned)
-                    update_values: dict[str, object] = {}
-                    merged_text = "\n".join(merged_lines)
-                    if merged_text and merged_text != (existing.summary_note or ""):
-                        update_values["summary_note"] = merged_text
-                    if existing.state in {"pending", "started"}:
-                        update_values["state"] = "passed"
-                    if update_values:
-                        existing.write(update_values)
+                    self._update_quality_control_device_summary(existing, summaries)
 
         return intake_order, created_lines
 
@@ -638,7 +635,7 @@ class RepairshoprImporter(models.Model):
     # Estimates/invoices run in parallel for clarity; abstraction would hide model-specific rules.
     def _import_estimates(
         self,
-        repairshopr_client: RepairshoprSyncClient,
+        repairshopr_client: RepairshoprImportClient,
         start_datetime: datetime | None,
         system: "odoo.model.external_system",
         sync_started_at: datetime,
@@ -678,7 +675,7 @@ class RepairshoprImporter(models.Model):
     # Estimates/invoices run in parallel for clarity; abstraction would hide model-specific rules.
     def _import_invoices(
         self,
-        repairshopr_client: RepairshoprSyncClient,
+        repairshopr_client: RepairshoprImportClient,
         start_datetime: datetime | None,
         system: "odoo.model.external_system",
         sync_started_at: datetime,
@@ -728,7 +725,7 @@ class RepairshoprImporter(models.Model):
         processed_count: int,
         partner_cache: dict[int, int],
         billing_cache: dict[int, int | None],
-        repairshopr_client: RepairshoprSyncClient,
+        repairshopr_client: RepairshoprImportClient,
     ) -> int:
         estimate_by_external_id: dict[str, repairshopr_models.Estimate] = {}
         for estimate in estimates:
@@ -805,9 +802,7 @@ class RepairshoprImporter(models.Model):
             external_id_payloads: list["odoo.values.external_id"] = []
             for created_external_id, created_order in zip(create_external_ids, created_records, strict=True):
                 if created_external_id in source_ticket_by_external_id and has_sale_order_source_ticket:
-                    created_order.write(
-                        {source_ticket_field_name: source_ticket_by_external_id[created_external_id]}
-                    )
+                    created_order.write({source_ticket_field_name: source_ticket_by_external_id[created_external_id]})
                 stale_record = stale_map.pop(created_external_id, None)
                 sync_time = sync_timestamps.get(created_external_id, sync_started_at)
                 if stale_record:
@@ -1008,7 +1003,7 @@ class RepairshoprImporter(models.Model):
         processed_count: int,
         partner_cache: dict[int, int],
         billing_cache: dict[int, int | None],
-        repairshopr_client: RepairshoprSyncClient,
+        repairshopr_client: RepairshoprImportClient,
         sales_journal_id: int,
     ) -> int:
         invoice_by_external_id: dict[str, repairshopr_models.Invoice] = {}
@@ -1322,10 +1317,10 @@ class RepairshoprImporter(models.Model):
     # Estimates/invoices run in parallel for clarity; abstraction would hide model-specific rules.
     def _build_sale_order_lines(
         self,
-        repairshopr_client: RepairshoprSyncClient,
+        repairshopr_client: RepairshoprImportClient,
         estimate_id: int | None,
         *,
-        line_items: list[dict[str, Any]] | None = None,
+        line_items: list[RepairshoprLineItem] | None = None,
         billing_contract: "odoo.model.school_billing_contract | None",
         pricing_catalog: "RepairshoprPricingCatalog",
     ) -> tuple[list[tuple], dict[str, set[str]]]:
@@ -1347,10 +1342,10 @@ class RepairshoprImporter(models.Model):
     # Estimates/invoices run in parallel for clarity; abstraction would hide model-specific rules.
     def _build_invoice_lines(
         self,
-        repairshopr_client: RepairshoprSyncClient,
+        repairshopr_client: RepairshoprImportClient,
         invoice_id: int | None,
         *,
-        line_items: list[dict[str, Any]] | None = None,
+        line_items: list[RepairshoprLineItem] | None = None,
         billing_contract: "odoo.model.school_billing_contract | None",
         pricing_catalog: "RepairshoprPricingCatalog",
     ) -> tuple[list[tuple], dict[str, set[str]]]:
@@ -1372,7 +1367,7 @@ class RepairshoprImporter(models.Model):
     # Estimates/invoices run in parallel for clarity; abstraction would hide model-specific rules.
     def _build_sale_order_line_values(
         self,
-        line_item_data: dict[str, Any],
+        line_item_data: RepairshoprLineItem,
         *,
         billing_contract: "odoo.model.school_billing_contract | None",
         pricing_catalog: "RepairshoprPricingCatalog",
@@ -1406,7 +1401,7 @@ class RepairshoprImporter(models.Model):
     # Estimates/invoices run in parallel for clarity; abstraction would hide model-specific rules.
     def _build_invoice_line_values(
         self,
-        line_item_data: dict[str, Any],
+        line_item_data: RepairshoprLineItem,
         *,
         billing_contract: "odoo.model.school_billing_contract | None",
         pricing_catalog: "RepairshoprPricingCatalog",
@@ -1527,7 +1522,7 @@ class RepairshoprImporter(models.Model):
     def _has_no_charge_note(
         self,
         header_note: str | None,
-        line_items: list[dict[str, Any]],
+        line_items: list[RepairshoprLineItem],
     ) -> bool:
         note_value = (header_note or "").strip().lower()
         if self._NO_CHARGE_NOTE in note_value:
@@ -1541,7 +1536,7 @@ class RepairshoprImporter(models.Model):
 
     def _resolve_pricing_override(
         self,
-        line_item_data: dict[str, Any],
+        line_item_data: RepairshoprLineItem,
         billing_contract: "odoo.model.school_billing_contract | None",
         pricing_catalog: "RepairshoprPricingCatalog",
     ) -> float | None:
@@ -1556,7 +1551,7 @@ class RepairshoprImporter(models.Model):
         return pricing_catalog.get_price(catalog_key, model_key, repair_key)
 
     @staticmethod
-    def _split_model_repair(line_item_data: dict[str, Any]) -> tuple[str | None, str | None]:
+    def _split_model_repair(line_item_data: RepairshoprLineItem) -> tuple[str | None, str | None]:
         candidate_texts = [line_item_data.get("name"), line_item_data.get("item")]
         for candidate in candidate_texts:
             raw_text = str(candidate or "").strip()
@@ -1580,11 +1575,11 @@ class RepairshoprImporter(models.Model):
 
     @staticmethod
     def _fetch_line_items(
-        repairshopr_client: RepairshoprSyncClient,
+        repairshopr_client: RepairshoprImportClient,
         *,
         estimate_id: int | None = None,
         invoice_id: int | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> list[RepairshoprLineItem]:
         line_items = repairshopr_client.fetch_line_items(estimate_id=estimate_id, invoice_id=invoice_id)
         return list(line_items or [])
 
@@ -1595,11 +1590,19 @@ class RepairshoprImporter(models.Model):
         return journal
 
     @staticmethod
-    def _to_float(value: Any, *, default: float) -> float:
-        try:
-            return float(value) if value not in (None, "") else default
-        except (TypeError, ValueError):
+    def _to_float(value: object, *, default: float) -> float:
+        if value in (None, ""):
             return default
+        if isinstance(value, bool):
+            return default
+        if isinstance(value, (float, int, Decimal)):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value)
+            except ValueError:
+                return default
+        return default
 
 
 class RepairshoprPricingCatalog:

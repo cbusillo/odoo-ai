@@ -38,8 +38,8 @@ from ...helpers import (
     image_order_key,
     parse_shopify_id_from_gid,
     upsert_external_id,
-    write_if_changed,
 )
+from ..change_detection import write_if_changed
 from ..base import ShopifyBaseExporter
 
 _logger = logging.getLogger(__name__)

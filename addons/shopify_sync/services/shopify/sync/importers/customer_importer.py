@@ -1,9 +1,10 @@
 import logging
 import re
 
+from odoo import fields
 from odoo.api import Environment
-from odoo.addons.phone_validation.tools.phone_validation import phone_format
 from odoo.exceptions import UserError
+from odoo.addons.phone_validation.tools.phone_validation import phone_format
 
 from ...gql import (
     Client,
@@ -20,8 +21,8 @@ from ...helpers import (
     normalize_str,
     shopify_address_resource_for_role,
     upsert_external_id,
-    write_if_changed,
 )
+from ..change_detection import write_if_changed
 from typing import Literal
 
 _logger = logging.getLogger(__name__)
@@ -504,17 +505,17 @@ class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
 
         state = False
         if country and (address.province_code or address.province):
-            domain: list[tuple] = [("country_id", "=", country.id)]
+            domain = fields.Domain([("country_id", "=", country.id)])
             if address.province_code and address.province:
-                domain = [
+                domain = fields.Domain([
                     "|",
                     ("code", "=", address.province_code.strip()),
                     ("name", "ilike", address.province.strip()),
-                ] + domain
+                ]) & domain
             elif address.province_code:
-                domain.append(("code", "=", address.province_code.strip()))
+                domain &= fields.Domain([("code", "=", address.province_code.strip())])
             else:
-                domain.append(("name", "ilike", address.province.strip()))
+                domain &= fields.Domain([("name", "ilike", address.province.strip())])
             state = self.env["res.country.state"].search(domain, limit=1)
 
         formatted_phone = self._format_phone_number(address.phone) if address.phone else ""

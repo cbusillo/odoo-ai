@@ -22,8 +22,8 @@ from ...helpers import (
     map_records_by_external_ids,
     parse_shopify_id_from_gid,
     parse_shopify_sku_field_to_sku_and_bin,
-    write_if_changed,
 )
+from ..change_detection import write_if_changed
 from ..base import ShopifyBaseImporter, ShopifyPage
 from .customer_importer import AddressRole, CustomerImporter
 

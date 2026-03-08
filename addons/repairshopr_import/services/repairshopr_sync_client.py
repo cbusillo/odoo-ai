@@ -4,7 +4,7 @@ from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, overload
+from typing import Any, Protocol, overload
 
 import pymysql
 from odoo.addons.external_ids.utils.ssl_context import build_ssl_context
@@ -35,6 +35,85 @@ class RepairshoprSyncConnectionSettings:
     use_ssl: bool = True
     ssl_verify: bool = True
     batch_size: int = 500
+
+
+class RepairshoprImportClient(Protocol):
+    def clear_cache(self) -> None:
+        ...
+
+    @overload
+    def get_model(
+        self,
+        model_type: type[repairshopr_models.Customer],
+        *,
+        updated_at: datetime | None = None,
+    ) -> Iterable[repairshopr_models.Customer]:
+        ...
+
+    @overload
+    def get_model(
+        self,
+        model_type: type[repairshopr_models.Product],
+        *,
+        updated_at: datetime | None = None,
+    ) -> Iterable[repairshopr_models.Product]:
+        ...
+
+    @overload
+    def get_model(
+        self,
+        model_type: type[repairshopr_models.Ticket],
+        *,
+        updated_at: datetime | None = None,
+    ) -> Iterable[repairshopr_models.Ticket]:
+        ...
+
+    @overload
+    def get_model(
+        self,
+        model_type: type[repairshopr_models.Estimate],
+        *,
+        updated_at: datetime | None = None,
+    ) -> Iterable[repairshopr_models.Estimate]:
+        ...
+
+    @overload
+    def get_model(
+        self,
+        model_type: type[repairshopr_models.Invoice],
+        *,
+        updated_at: datetime | None = None,
+    ) -> Iterable[repairshopr_models.Invoice]:
+        ...
+
+    def get_model(self, model_type: type[object], *, updated_at: datetime | None = None) -> Iterable[object]:
+        ...
+
+    def fetch_line_items(
+        self,
+        *,
+        estimate_id: int | None = None,
+        invoice_id: int | None = None,
+    ) -> list[dict[str, object]] | None:
+        ...
+
+    def prefetch_estimate_line_items(
+        self,
+        estimate_id_values: Sequence[int],
+    ) -> dict[int, list[dict[str, object]]]:
+        ...
+
+    def prefetch_invoice_line_items(
+        self,
+        invoice_id_values: Sequence[int],
+    ) -> dict[int, list[dict[str, object]]]:
+        ...
+
+    def prefetch_ticket_properties_by_ticket_ids(
+        self,
+        ticket_ids: Sequence[int],
+    ) -> dict[int, repairshopr_models.TicketProperties]:
+        ...
 
 
 class RepairshoprSyncClient:

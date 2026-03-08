@@ -3,7 +3,7 @@ from datetime import datetime
 from odoo import models
 
 from ..services import repairshopr_sync_models as repairshopr_models
-from ..services.repairshopr_sync_client import RepairshoprSyncClient
+from ..services.repairshopr_sync_client import RepairshoprImportClient
 from .repairshopr_importer import EXTERNAL_SYSTEM_CODE, IMPORT_CONTEXT, RESOURCE_CONTACT, RESOURCE_CUSTOMER
 
 
@@ -12,7 +12,7 @@ class RepairshoprImporter(models.Model):
 
     def _import_customers(
         self,
-        repairshopr_client: RepairshoprSyncClient,
+        repairshopr_client: RepairshoprImportClient,
         start_datetime: datetime | None,
         system: "odoo.model.external_system",
         sync_started_at: datetime,

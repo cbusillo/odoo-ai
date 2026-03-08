@@ -25,23 +25,25 @@ Odoo-specific
   `docker restart ${ODOO_PROJECT_NAME}-web-1 ${ODOO_PROJECT_NAME}-script-runner-1`
 - Update module:
   `docker exec ${ODOO_PROJECT_NAME}-script-runner-1 /odoo/odoo-bin -u <module> --stop-after-init`
-- Restore data: `uv run ops local restore <target>`
-  - Targets: `opw`, `cm` (local stack names default to `opw-local`, `cm-local`)
-  - Ensure `RESTORE_SSH_DIR` points at a host SSH directory so the base compose
-    mounts it into the container for upstream access
-  - When an upstream dump is unavailable, bootstrap with
-    `uv run ops local init <target>`
+- Restore data:
+  `uv run platform run --context <target> --instance local --workflow restore`
+  Targets: `opw`, `cm`.
+  Ensure `RESTORE_SSH_DIR` points at a host SSH directory so the base compose
+  mounts it into the container for upstream access.
+  When an upstream dump is unavailable, bootstrap with
+  `uv run platform run --context <target> --instance local --workflow init`.
 
 Tips
 
 - Filter containers: `docker ps | grep odoo`
 - Stream long logs with `-f`, then Ctrl+C
 - Prefer updates via script-runner; avoid mutating the web container
+- `docker/scripts/run_odoo_with_debug.sh` is a local debug launcher only.
+  It bypasses bootstrap safeguards (`run_odoo_bootstrap.py`) such as DB
+  readiness checks, restore-lock waiting, and initialization gates.
 
 ## Environment Variable Quick Reference
 
-- `DEPLOY_COMPOSE_FILES` accepts colon- or comma-delimited values. Example:
-  `DEPLOY_COMPOSE_FILES=docker/config/base.yaml:docker/config/opw-local.yaml`.
 - `ODOO_INSTALL_MODULES` accepts a comma/colon list of modules to install on
   init/restore.
 - `ODOO_UPDATE_MODULES` accepts a comma/colon list of modules to upgrade; set
@@ -54,58 +56,58 @@ Tips
   tags (for example `ghcr.io/cbusillo/odoo-enterprise-docker:19.0-runtime` and
   `ghcr.io/cbusillo/odoo-enterprise-docker:19.0-devtools`), ideally pinned by
   digest in promoted environments.
-- For private GHCR base images, local `ops` commands perform a registry login
+- For private GHCR base images, `platform` commands perform a registry login
   preflight before build/restore. Provide either:
   - `GHCR_TOKEN` (preferred) or `GITHUB_TOKEN`
   - `GHCR_USERNAME` (falls back to image owner / `GITHUB_ACTOR`)
   Tokens must include package read access (`read:packages`) for the private
   image package.
 - Full tag and promotion contracts are documented in
-  `docs/tooling/image-contracts.md`.
-- The image-managed `odoo_paths.pth` includes `/opt/project/addons` so Odoo and
-  IDE integrations can resolve addon module dependencies from the same path set.
+  [@docs/tooling/image-contracts.md](image-contracts.md).
 - `ODOO_ADDON_REPOSITORIES` accepts a comma-separated list of addon repos
-  (downloaded into `/opt/extra_addons/<repo>` as GitHub source archives).
-  The build consumes `GITHUB_TOKEN` through a BuildKit secret so tokens are
-  not persisted in image layers.
+  (downloaded into `/opt/extra_addons/<repo>` as GitHub source archives by the
+  inherited `odoo-fetch-addons.sh` helper from the base image).
+  The build consumes `GITHUB_TOKEN` through a BuildKit secret so tokens are not
+  persisted in image layers.
 - Enterprise addons should come from the private base image layer
   (`/opt/enterprise`) rather than `ODOO_ADDON_REPOSITORIES`.
+- Upgrade-only repositories such as OpenUpgrade are not auto-added to every
+  build. Platform derives them for workflows that set `OPENUPGRADE_ENABLED`, so
+  steady-state builds stay clean while restore/openupgrade flows still fetch the
+  required addon repo explicitly.
+- When OpenUpgrade is enabled, platform also sets
+  `ODOO_PYTHON_SYNC_SKIP_ADDONS=openupgrade_framework,openupgrade_scripts,openupgrade_scripts_custom`
+  so those addon paths are available to Odoo without trying to package them
+  into `/venv`.
+- `odoo-ai` keeps the remaining OpenUpgrade-specific Python support locally:
+  when `OCA/OpenUpgrade` is present in the external addon repo list, the image
+  also installs `openupgradelib==3.12.0` into `/venv`.
 
 ## Layered Compose Configuration
 
-Local stacks use layered configs stored in `docker/config/`. The concise source
-of truth is `docker/config/README.md`.
+Local stacks use layered configs under `platform/config/` and
+`platform/compose/`. The concise source of truth is `platform/config/README.md`.
 
 `docker-compose.override.yml` is local-only (ignored by git). Create it when
 you need port bindings or live code mounts; see
-`docs/workflows/multi-project.md` for an example.
+@docs/workflows/multi-project.md for an example.
 
-The `uv run ops local up <target>` command reads `DEPLOY_COMPOSE_FILES` and
-assembles the correct file order automatically.
+Platform local lifecycle commands (`up`, `build`, `down`, `logs`) use the
+platform runtime env (`.platform/env/<context>.<instance>.env`) and base compose
+file stack:
 
-## Bind-Mount Conventions
+```text
+docker-compose.yml
+→ platform/compose/base.yaml
+→ docker-compose.override.yml (if present)
+```
 
-- Always set `ODOO_STATE_ROOT` for each stack. The deploy tooling derives
-  `ODOO_DATA_DIR`, `ODOO_DB_DIR`, and `ODOO_LOG_DIR` from that root
-  (`filestore/`, `postgres/`, `logs/` subdirectories) before writing the merged
-  `.env` that Compose and Pydantic consume. The merged compose env is stored at
-  `${ODOO_STATE_ROOT}/.compose.env`. Stack env sources live in
-  `docker/config/<project>-local.env` (tracked, non-secret). If the state root is
-  not writable (remote stacks), the CLI falls back to
-  `~/.odoo-ai/stack-env/<stack>.env`. If `ODOO_STATE_ROOT` is omitted (e.g.,
-  local dev), the CLI defaults to `~/odoo-ai/${ODOO_PROJECT_NAME}/...`.
-- `ODOO_DATA_HOST_DIR`, `ODOO_LOG_HOST_DIR`, and `ODOO_DB_HOST_DIR` are
-  required for Compose. On remote hosts, create the target directories before
-  the first deploy (for example,
-  `mkdir -p /opt/odoo-ai/data/<stack>/{data,logs,postgres}`) so bind mounts do
-  not fail.
-- For Coolify deployments, use explicit bind mounts (`/host/path:/container`)
-  instead of named volumes. Coolify rewrites named volumes per app, which
-  bypasses `driver_opts` bindings. The Coolify apps point at
-  `docker/coolify/<app>.yml` with hard-coded host paths so the bind mounts are
-  enforced. These files are standalone and are not generated from
-  `docker-compose.yml` or the `docker/config/*.yaml` overlays used locally.
-- Keep `ODOO_LOGFILE` pointed inside `/volumes/logs/` (e.g.
-  `/volumes/logs/odoo.log`) so log rotation targets the bind-mounted directory.
-- Remote hosts are managed in Coolify; local stacks should keep state under
-  `~/odoo-ai/<stack>`.
+## Persistence Notes
+
+- Local platform workflows use named volumes per context/instance and
+  `.platform/state/<context>-<instance>/` for generated runtime artifacts.
+- Dokploy-managed targets keep remote persistence in Dokploy target settings.
+  Use `uv run platform dokploy env-get|env-set|env-unset` for managed env
+  updates rather than ad-hoc scripts.
+- Keep `ODOO_LOGFILE` under `/volumes/logs/` (for example
+  `/volumes/logs/odoo.log`) so logs remain in persisted storage.

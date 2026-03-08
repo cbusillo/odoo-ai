@@ -49,7 +49,6 @@ of objects.
 - `location_option_aliases`
 - `delivery_days`
 - `delivery_day_aliases`
-- `return_methods`
 - `return_method_aliases`
 
 Example (template only, no real data)

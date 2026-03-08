@@ -1,11 +1,12 @@
 # Temporary Files Directory
 
-This directory contains all temporary files for the project, keeping the root directory clean and organized.
+This directory holds temporary project artifacts so the repo root stays clean.
 
 ## Directory Structure
 
 ```text
 tmp/
+├── logs/           # Ad-hoc command logs and captured command output
 ├── test-logs/      # Test runner output (created automatically)
 ├── scripts/        # Temporary analysis and utility scripts (create on demand)
 ├── data/           # Scratch data extracts (create on demand)
@@ -16,40 +17,44 @@ tmp/
 
 The `tmp/` directory is used for:
 
-1. **Test Results** (`test-logs/`)
-   - Output from `uv run test *` (see `docs/TESTING.md`)
-   - Testkit keeps the latest JSON summaries under `tmp/test-logs/latest/`
-   - Older runs live in timestamped folders for diffing or provenance
+1. **Logs** (`logs/`)
+   - Captured output from long-running or noisy commands
+   - Keep command output here instead of streaming large logs in-session
 
-2. **Temporary Scripts** (`scripts/`)
+2. **Test Results** (`test-logs/`)
+   - Output from `uv run test *` (see `docs/TESTING.md`)
+   - Testkit writes the latest summaries under `tmp/test-logs/latest/` when a
+     session exists
+   - Older runs may be kept briefly for comparison, then pruned
+
+3. **Temporary Scripts** (`scripts/`)
    - One-off analysis scripts and verification utilities
    - Long-running experiments that would otherwise require heredocs
-   - Create the directory when you first need it: `mkdir -p tmp/scripts`
-   - Execute with `uv run python tmp/scripts/<name>.py` (respects the sandbox bypass rules)
+   - Execute with `uv run python tmp/scripts/<name>.py`
 
-3. **Temporary Data** (`data/`)
+4. **Temporary Data** (`data/`)
    - Export/import staging
    - Local analysis results or generated fixtures
-   - Create with `mkdir -p tmp/data` as needed
 
 ## Important Notes
 
 - **This directory is gitignored** - Nothing here will be committed
-- **Safe for AI agents** - Can read/write without system restrictions
-- **Clean regularly** - Delete old test results to save disk space
-- **No production code** - Only temporary/test files belong here
-- **Local TODOs / longer notes** - Use `docs/todo/` (gitignored) for scratch docs you want to keep between sessions
+- **Clean regularly** - Delete old logs, caches, and test runs to save space
+- **No production code** - Only temporary files belong here
+- **Local-only scratch docs** - Use `docs/internal/todo/` for private notes you
+  want to keep between sessions; use `docs/todo/` only for notes you intend to
+  keep in the shared tracked docs set
 
 ## Cleanup
 
-To clean old test results:
+Typical cleanup:
 
 ```bash
-# Remove test results older than 7 days
-find tmp/tests -type d -name "odoo-tests-*" -mtime +7 -exec rm -rf {} +
+# Remove generated logs and cached test output
+rm -rf tmp/logs/* tmp/test-logs/*
 
-# Remove all test results
-rm -rf tmp/tests/odoo-tests-*
+# Remove cached Python bytecode from tmp scripts
+find tmp/scripts -type d -name '__pycache__' -prune -exec rm -rf {} +
 ```
 
 ## Why tmp/ instead of /tmp?

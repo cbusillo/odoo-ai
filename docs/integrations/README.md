@@ -12,12 +12,16 @@ When
 
 ## Shopify
 
-- Canonical guide: docs/integrations/shopify.md
+- Canonical guide: @docs/integrations/shopify.md
 - Do not modify generated files: `addons/shopify_sync/services/shopify/gql/*`
 
 ## Authentik
 
-- Canonical guide: docs/integrations/authentik.md
+- Canonical guide: @docs/integrations/authentik.md
+
+## eBay
+
+- Notes and planned enhancements: @docs/integrations/ebay.md
 
 ## ShipStation
 

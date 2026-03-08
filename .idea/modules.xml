@@ -2,7 +2,11 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/image_enhancements.iml" filepath="$PROJECT_DIR$/.idea/image_enhancements.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/marine_motors.iml" filepath="$PROJECT_DIR$/.idea/marine_motors.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/odoo-ai.iml" filepath="$PROJECT_DIR$/.idea/odoo-ai.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/opw_custom.iml" filepath="$PROJECT_DIR$/.idea/opw_custom.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/shopify_sync.iml" filepath="$PROJECT_DIR$/.idea/shopify_sync.iml" />
     </modules>
   </component>
 </project>

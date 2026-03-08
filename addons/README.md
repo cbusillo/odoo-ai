@@ -20,7 +20,8 @@ you isolate client-specific addons by directory.
   tickets, estimates, invoices)
 
 Private addons (not stored in this repo) are pulled during build using
-`ODOO_ADDON_REPOSITORIES`.
+`ODOO_ADDON_REPOSITORIES`, which the inherited `odoo-fetch-addons.sh` helper
+resolves into `/opt/extra_addons`.
 
 ## Adding Your Own Addon
 

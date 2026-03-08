@@ -118,3 +118,6 @@ Branch/worktree hygiene
 - Remove merged or abandoned Code branches (local + origin).
 - Prune stale worktrees and remote refs (`git worktree prune`,
   `git fetch --prune`).
+- For surgical platform deployment tests, prefer a clean temporary worktree plus
+  `uv run platform ship --source-ref HEAD` over shipping from a dirty repo with
+  `--allow-dirty`.

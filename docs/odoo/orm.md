@@ -1,5 +1,5 @@
 ---
-title: Odoo ORM Sources of Truth (18)
+title: Odoo ORM Sources of Truth
 ---
 
 
@@ -14,9 +14,9 @@ When
 Sources of Truth
 
 - `addons/*/models/*.py` — real ORM usage in this repo.
-- `docs/odoo/workflow.md` — module layout and container paths.
-- `docs/odoo/performance.md` — performance review workflow.
-- `docs/resources.md` — external Odoo ORM references.
+- @docs/odoo/workflow.md — module layout and container paths.
+- @docs/odoo/performance.md — performance review workflow.
+- @docs/resources.md — external Odoo ORM references.
 
 ## Batch Operations
 

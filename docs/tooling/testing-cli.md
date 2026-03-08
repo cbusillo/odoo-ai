@@ -30,12 +30,11 @@ Commands
   large run.
 - `uv run test validate --json` — verify all tests executed + summarize
   failures.
-- `--stack opw|cm` (or `--env-file docker/config/<stack>-local.env`) —
-  load the matching local stack env before running. When a `*-ci-local` stack
-  exists (for example `cm-ci-local`), `--stack cm` automatically prefers the
-  CI stack. Use `--stack cm-local` to target the dev stack explicitly.
-- Test runs require a resolved stack context; the harness refuses to run
-  without one to avoid starting an unintended default stack.
+- `--stack opw|cm` (or `--env-file .platform/env/<context>.<instance>.env`) —
+  load the matching local stack env before running.
+- Test runs require a resolved stack context. Stack-based runs fail closed when
+  `.platform/env/<context>.<instance>.env` is missing; generate it first with
+  `uv run platform select --context <context> --instance <instance>`.
 
 Scoping Flags
 
@@ -63,17 +62,14 @@ Environment Flags
 - `TESTKIT_DISABLE_DEV_MODE=1` (default for `uv run test --stack`) forces
   `--dev=none`, including tours; set to `0` if you need `--dev=assets` while
   debugging JS/tours.
-- `TESTKIT_DB_VOLUME_MODE=named` — use a named Docker volume for the test DB
-  (recommended on macOS CI stacks to avoid gRPC-FUSE crashes).
-- `TESTKIT_DB_VOLUME_NAME=testkit_db` — override the named volume key.
-- `TESTKIT_DB_VOLUME_CLEANUP=1` — remove the named test DB volume after the run.
-- `TESTKIT_DATA_VOLUME_MODE=named` — use a named Docker volume for `/volumes/data`.
-- `TESTKIT_DATA_VOLUME_NAME=testkit_data` — override the named data volume key.
-- `TESTKIT_DATA_VOLUME_CLEANUP=1` — remove the named data volume after the run.
-- `TESTKIT_LOG_VOLUME_MODE=named` — use a named Docker volume for `/volumes/logs`.
-- `TESTKIT_LOG_VOLUME_NAME=testkit_logs` — override the named log volume key.
-- `TESTKIT_LOG_VOLUME_CLEANUP=1` — remove the named log volume after the run.
-- `TESTKIT_VOLUME_CLEANUP=1` — remove all named testkit volumes after the run.
+- `TESTKIT_PROFILE=gate` applies deterministic gate defaults for local code
+  gate runs with the reproducible shard/process/memory defaults from
+  `tools/testkit/cli.py`. Use it for gate behavior, not interactive loops.
+- `TOUR_STEP_DELAY_SECONDS=0` is the fixture default for tour tests. Set a
+  non-zero value only for local debugging when you need slower visual stepping.
+- Named-volume controls for DB/data/logs live under the `TESTKIT_*_VOLUME_*`
+  env vars in `tools/testkit/docker_api.py`. Use them when macOS Docker volume
+  behavior needs tuning or cleanup after runs.
 - `TESTKIT_SHARD_TIMEOUT=1800` — hard cap for any single shard (seconds). If
   set, it overrides the per-phase timeout from `pyproject.toml`.
 - Template reuse defaults can be set in `pyproject.toml` under

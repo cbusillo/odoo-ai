@@ -1,5 +1,5 @@
 ---
-title: Odoo Security Sources of Truth (18)
+title: Odoo Security Sources of Truth
 ---
 
 
@@ -30,6 +30,6 @@ reference implementation:
 
 Related Guides
 
-- `docs/odoo/orm.md` — access rules and recordset behavior.
-- `docs/odoo/workflow.md` — module layout and security file locations.
-- `docs/integrations/shopify.md` — integration entry points.
+- @docs/odoo/orm.md — access rules and recordset behavior.
+- @docs/odoo/workflow.md — module layout and security file locations.
+- @docs/integrations/shopify.md — integration entry points.

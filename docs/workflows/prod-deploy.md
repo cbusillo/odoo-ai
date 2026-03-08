@@ -4,8 +4,9 @@ title: Production Deploy Gate
 
 Purpose
 
-- Keep production deploys deliberate: run tests, take a full Proxmox backup and
-  snapshot, then deploy via Coolify. Rollbacks use snapshots.
+- Keep production deploys deliberate: run tests, take a pre-deploy backup
+  (including Proxmox snapshot/vzdump where that infrastructure exists), then
+  deploy via Dokploy. Rollbacks use the recorded backup path.
 
 When
 
@@ -39,8 +40,9 @@ Deploy flow (OPW example)
 1) Run tests + backup gate:
    - `uv run prod-gate backup --target opw --run-tests`
 
-2) Deploy in Coolify (prod app) or run `uv run ops ship prod <target>` to
-   trigger the deploy + post-deploy upgrade.
+2) Promote testing to prod with platform:
+   - `uv run platform promote --context <target> --from-instance testing \
+     --to-instance prod`
 
 3) If rollback needed:
    - `uv run prod-gate list --target opw`

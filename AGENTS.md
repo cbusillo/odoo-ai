@@ -7,9 +7,9 @@ the linked docs, then keep prompts lean.
 
 - Use the documentation table of contents (`docs/README.md`) to grab handles
   instead of copying long excerpts.
-- Ops entrypoint: `uv run ops` for up/down/init/restore/build/ship/gate
-  workflows (docs `docs/tooling/ops.md`; CLI `tools/ops_cli.py`; config
-  `docker/config/ops.toml`).
+- Platform entrypoint: `uv run platform` for up/down/init/restore/build/ship/
+  gate workflows (docs `docs/tooling/platform-cli.md`; implementation
+  `tools/platform/cli.py`).
 - Before changing code, open the matching style page (`docs/style/python.md`, `docs/style/javascript.md`,
   `docs/style/testing.md`).
 - Clarify your role expectations with @docs/roles.md (analyst, engineer,
@@ -26,7 +26,7 @@ the linked docs, then keep prompts lean.
 - Never call the system Python directly; use `uv run python ...` (or the
   scripted helpers) so the managed env stays in sync.
 - Common helper entry points are defined in `[project.scripts]` inside
-  `pyproject.toml` (examples: `test`, `restore`). Prefer them over ad-hoc
+  `pyproject.toml` (examples: `test`, `platform`). Prefer them over ad-hoc
   commands and suggest additions when a useful script is missing.
 - GPT service users seed automatically during restores when `.env` defines
   `ODOO_KEY`; see `docs/tooling/gpt-service-user.md` for provisioning details
@@ -67,8 +67,8 @@ the linked docs, then keep prompts lean.
   (credentials, infrastructure, missing access), stop and report the blocker
   clearly instead of masking it with alternate behavior.
 - Never commit secret or operator-local env overrides (for example `.env`,
-  `docker/config/*-local.env`, `docker/config/base.env.local`). Tracked
-  templates/defaults like `.env.example` and `docker/config/base.env` are
+  `.platform/env/*.env`, `platform/secrets.toml`). Tracked
+  templates/defaults like `.env.example` and `platform/config/base.env` are
   intended to be committed and must stay non-secret.
 - Keep branch/worktree hygiene per @docs/roles.md (clean up Code-created
   branches as you go).
@@ -78,15 +78,16 @@ the linked docs, then keep prompts lean.
 - The working loop (plan → patch → inspect → targeted tests → iterate → gate)
   is spelled out in `docs/workflows/codex-workflow.md`.
 - Use `docs/TESTING.md` to scope and shard tests via JSON summaries.
-- Large refactors, migrations, debugging, or performance work each have their
-  own playbooks under `docs/workflows/`—open the relevant one before diving in.
+- Open the matching workflow playbook before deeper work:
+  `docs/workflows/refactor.md`, `docs/workflows/debugging.md`,
+  `docs/workflows/multi-project.md`, and `docs/workflows/prod-deploy.md`.
 
 ## Proactive Improvements
 
 - Proactively suggest small environment or tooling improvements when you notice
   friction (scripts, config, runtime baselines); keep suggestions brief and
-  link to the relevant docs (e.g., `docs/tooling/ops.md`,
-  `docs/tooling/runtime-baselines.md`, `docs/tooling/coolify.md`).
+  link to the relevant docs (e.g., `docs/tooling/platform-cli.md`,
+  `docs/tooling/runtime-baselines.md`, `docs/tooling/dokploy.md`).
 - Let the operator decide; don’t apply environment changes without explicit
   approval.
 - If guidance is missing, suggest updates to the relevant docs instead of
@@ -121,8 +122,8 @@ the linked docs, then keep prompts lean.
 - Use Codex built-ins for routine file reads/searches and `apply_patch`; reserve
   JetBrains automation for IDE-only tasks.
 - Sandbox/approval profiles are documented in `docs/tooling/codex-cli.md`.
-- Coolify env edits should go through `uv run ops coolify env-set` / `env-get`
-  / `env-unset` instead of ad-hoc scripts.
+- Dokploy env edits should go through `uv run platform dokploy env-set` /
+  `env-get` / `env-unset` instead of ad-hoc scripts.
 
 ## Domain Notes
 
@@ -160,7 +161,8 @@ the linked docs, then keep prompts lean.
   `docs/TESTING.md`
 - Performance & bulk operations: `docs/odoo/performance.md`, `docs/odoo/orm.md`
 - Planning & estimation: `docs/workflows/codex-workflow.md`
-- Environment utilities: restore helpers in `tools/` (use `uv run restore`)
+- Environment utilities: restore helpers in `tools/`
+  (use `uv run platform run --workflow restore --context <ctx> --instance <instance>`)
 
 Keep AGENTS.md thin: route deeper guidance to the linked pages so we maintain a
 single, accurate source of truth.

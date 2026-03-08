@@ -31,12 +31,7 @@ When
 
 ## Sync
 
-- `addons/shopify_sync/models/shopify_sync.py` — state machine, health
-  checks, and async execution.
-- `addons/shopify_sync/services/shopify/helpers.py` — `SyncMode` and resource
-  metadata.
-- `addons/shopify_sync/services/shopify/sync/` — importers, exporters, and
-  deleters.
+- Sync orchestration lives in the sources-of-truth files above.
 - Sync runs can be canceled from the UI and will stop at the next safe
   checkpoint; canceled runs move to the `canceled` state.
 
@@ -54,12 +49,26 @@ See `addons/shopify_sync/services/shopify/sync/importers/order_importer.py`.
 
 - `addons/shopify_sync/controllers/shopify_webhook.py` — entry point, topic
   routing, and signature verification.
-- `docs/odoo/security.md#http-controllers` — controller security patterns.
+- @docs/odoo/security.md#http-controllers — controller security patterns.
 
 ## GraphQL
 
 - `addons/shopify_sync/graphql/shopify/*.graphql` — hand-edited operations
   and fragments.
+- `addons/shopify_sync/graphql/shopify/graphql.config.yml` targets the live
+  Shopify Admin GraphQL endpoint and requires:
+  `ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY`,
+  `ENV_OVERRIDE_SHOPIFY__API_VERSION`, and
+  `ENV_OVERRIDE_SHOPIFY__API_TOKEN`.
+- For local tooling, define the four `ENV_OVERRIDE_SHOPIFY__*` variables in
+  your shell or root `.env` before GraphQL introspection.
+- For platform runtime consistency, mirror those values in
+  `platform/secrets.toml` under `contexts.opw.instances.local.env`, then run
+  `uv run platform select --context opw --instance local` so they are written to
+  `.platform/env/opw.local.env`.
+- Checked-in schema snapshots remain under
+  `addons/shopify_sync/graphql/schema/` for reference and generated client
+  history.
 - `addons/shopify_sync/services/shopify/gql/` — generated client and models
   (do not edit).
 
@@ -99,4 +108,4 @@ See `addons/shopify_sync/services/shopify/service.py` and
 
 ## Related Guides
 
-- `docs/odoo/security.md#http-controllers` — controller security patterns.
+- @docs/odoo/security.md#http-controllers — controller security patterns.

@@ -3,5 +3,6 @@
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$/addons/image_enhancements" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="jdk" jdkName="Remote 3.13 Docker (odoo-ai:latest)" jdkType="Python SDK" />
   </component>
 </module>

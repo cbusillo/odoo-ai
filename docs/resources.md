@@ -64,20 +64,11 @@ guides and best practices.
 
 - GraphQL code generator (you generate from schema, docs rarely needed)
 
-## Quick Reference Commands
+## Project Command Routing
 
-```bash
-# Check your package versions
-grep -r "from pydantic" addons/shopify_sync/
-grep -r "import httpx" addons/shopify_sync/
-
-# Check modern Python features in use
-# (See `pyproject.toml` → `requires-python` for the baseline.)
-grep -r "type \|match \|case " addons/shopify_sync/
-
-# Check PostgreSQL version
-docker exec ${ODOO_PROJECT_NAME}-database-1 psql -U odoo -c "SELECT version();"
-
-# Search Shopify schema for specific types
-grep -A10 "^type Product" addons/shopify_sync/graphql/schema/shopify_schema_2026-01.sdl
-```
+- For local runtime and deploy commands, start with
+  [@docs/tooling/platform-cli.md](tooling/platform-cli.md).
+- For test and gate commands, use [@docs/TESTING.md](TESTING.md) and
+  [@docs/tooling/testing-cli.md](tooling/testing-cli.md).
+- For Docker and Compose troubleshooting, use
+  [@docs/tooling/docker.md](tooling/docker.md).

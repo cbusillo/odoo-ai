@@ -4,10 +4,10 @@ title: Multi-Project Configuration (Local Dev)
 
 Purpose
 
-- Run multiple isolated stacks locally (OPW + Cell Mechanic) using layered
+- Run multiple isolated stacks locally (OPW + CM/Connect Motors) using layered
   Docker Compose configs.
-- Remote environments are managed in Coolify and do not use the overlays in
-  `docker/config/`.
+- Remote environments are managed in Dokploy and do not use the overlays in
+  `platform/config/` and `platform/compose/`.
 
 When
 
@@ -15,30 +15,39 @@ When
 
 Local stacks
 
-| Stack       | Purpose      | Ports             | Config source           |
-|-------------|--------------|-------------------|-------------------------|
-| `opw-local` | OPW dev      | 8069/8072/15432   | `opw-local.env`         |
-| `cm-local`  | CM isolation | 9069/9072/9432    | `cm-local.env`          |
+| Stack       | Purpose      | Ports           | Config source   |
+|-------------|--------------|-----------------|-----------------|
+| `opw-local` | OPW dev      | 8069/8072/15432 | platform config |
+| `cm-local`  | CM isolation | 9069/9072/25432 | platform config |
+
+`platform config` means `platform/stack.toml` and `platform/secrets.toml`.
 
 Quick flow
 
-1. Update the stack env file (`docker/config/opw-local.env`).
+1. Set context/instance values in `platform/secrets.toml` and/or `.env`.
 
-2. Start the stack (add `--build` if you need a rebuild):
+2. Select and inspect the runtime env for the stack:
 
    ```bash
-   uv run ops local up opw --build
+   uv run platform select --context opw --instance local --dry-run
+   uv run platform select --context opw --instance local
    ```
 
-3. (Optional) Restore upstream data:
+3. Start the stack (add `--build` if you need a rebuild):
 
    ```bash
-   uv run ops local restore opw
+   uv run platform up --context opw --instance local --build
+   ```
+
+4. (Optional) Restore upstream data:
+
+   ```bash
+   uv run platform run --context opw --instance local --workflow restore
    ```
 
 Notes
 
-- Layer order and env merge rules are documented in `docker/config/README.md`.
+- Layer order and env merge rules are documented in `platform/config/README.md`.
 - Create a local `docker-compose.override.yml` to expose ports and mount the
   repo for live-editing. Example:
 
@@ -61,8 +70,7 @@ Notes
   ```
 
 - Use unique `ODOO_STATE_ROOT` per stack to avoid sharing filestore/postgres.
-- Switch stacks by stopping one (`uv run ops local down cm`) before
-  starting the other.
+- You can run both local stacks at once when host resources allow it.
 - Local stack env files run the web service under the PyCharm debugger.
   Create a **Python Debug Server** run configuration per stack:
   - Host: `0.0.0.0` (or `host.docker.internal`)
@@ -70,10 +78,12 @@ Notes
   - Path mappings: `/opt/project/addons` → `$PROJECT_DIR$/addons`
   - Optional: enable “Suspend after connect” if you want to pause on startup
 - The Debug Server starts listening before “Before launch” tasks run, so it is
-  safe to keep `uv run ops local upgrade-restart <target>` as a pre-step; Odoo
-  will reconnect to the debugger after the restart.
+  safe to keep
+  `uv run platform run --context <target> --instance local --workflow update`
+  as a pre-step; Odoo will reconnect to the debugger after the restart.
 - For “always up to date” local debugging, keep the upgrade‑restart pre-step
   enabled so modules are upgraded on every Debug run.
-- If you disable the upgrade‑restart pre-step for faster runs, use
-  `uv run ops local upgrade <target>` when you change module schema/data
+- If you disable the update pre-step for faster runs, use
+  `uv run platform run --context <target> --instance local --workflow update`
+  when you change module schema/data
   (new fields, views, migrations).

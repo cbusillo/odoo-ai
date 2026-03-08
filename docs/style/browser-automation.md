@@ -13,7 +13,7 @@ When
 
 Sources of Truth
 
-- `docs/tooling/codex-cli.md` — Codex CLI usage and browser tool notes.
+- @docs/tooling/codex-cli.md — Codex CLI usage and browser tool notes.
 
 Guardrails
 

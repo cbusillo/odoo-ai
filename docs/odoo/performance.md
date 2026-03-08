@@ -1,5 +1,5 @@
 ---
-title: Odoo ORM Performance Sources of Truth (18)
+title: Odoo ORM Performance Sources of Truth
 ---
 
 
@@ -13,8 +13,8 @@ When
 
 Sources of Truth
 
-- `docs/odoo/orm.md` — batching, recordsets, computed fields.
-- `docs/TESTING.md` — test guidance for perf regressions.
+- @docs/odoo/orm.md — batching, recordsets, computed fields.
+- @docs/TESTING.md — test guidance for perf regressions.
 
 Performance Review Workflow
 
@@ -26,10 +26,10 @@ Performance Review Workflow
 
 Related Tooling
 
-- `docs/tooling/db-tuning.md` — Postgres tuning for parallel test runs.
-- `docs/TESTING.md` — fast -> full test flow.
+- @docs/tooling/db-tuning.md — Postgres tuning for parallel test runs.
+- @docs/TESTING.md — fast -> full test flow.
 
 Related Guides
 
-- `docs/odoo/workflow.md` — module layout and paths.
-- `docs/roles.md` — review responsibilities and gate flow.
+- @docs/odoo/workflow.md — module layout and paths.
+- @docs/roles.md — review responsibilities and gate flow.

@@ -66,15 +66,8 @@ Frontend (Odoo 19)
 - Do not introduce AMD `odoo.define` modules.
 - Do not add `/** @odoo-module */` in new files.
 
-Version Guardrails
-
-- Views: `<list>` roots only (no new `<tree>` roots).
-- Views: use `invisible`/`readonly`/`required` and `column_invisible`; avoid
-  legacy `attrs`/`states`.
-- Frontend: native ESM only; no `odoo.define`.
-
 Related Guides
 
-- `docs/odoo/orm.md` — ORM sources of truth.
-- `docs/odoo/security.md` — access rules and controller security.
-- `docs/tooling/docker.md` — container usage.
+- @docs/odoo/orm.md — ORM sources of truth.
+- @docs/odoo/security.md — access rules and controller security.
+- @docs/tooling/docker.md — container usage.

@@ -32,7 +32,19 @@ Layer Model
     (`server`, `shell`, `db`, etc.); base wrappers must not force server-mode
     parsing for non-server subcommands
   - `/venv` + `uv` present
+  - downstream images must keep `/venv` as the only runtime environment and
+    must not recreate it
+  - downstream images use fixed project layout paths:
+    `/opt/project`, `/opt/project/addons`, `/opt/extra_addons`
+  - `odoo-python-sync.sh <prod|dev>` provides the supported additive install
+    path for root lockfile-backed dependencies and addon `pyproject.toml`
+    dependencies; legacy `requirements*.txt` support exists only for older
+    addons that have not been migrated yet
+  - `odoo-fetch-addons.sh` provides the supported external addon fetch path for
+    `ODOO_ADDON_REPOSITORIES`
   - PostgreSQL client tooling available
+  - `runtime-devtools` may add dev-only source/addon path shaping, but runtime
+    targets stay free of IDE-only `.pth` entries
 
 `odoo-enterprise-docker` contract
 
@@ -49,6 +61,8 @@ Layer Model
   - enterprise source at `/opt/enterprise`
   - `IMAGE_ODOO_ENTERPRISE_LOCATION=/opt/enterprise`
   - `ODOO_ADDONS_PATH` includes `/opt/enterprise`
+  - `runtime-devtools` appends `/opt/enterprise` to the inherited dev-only
+    addon path shaping from `odoo-docker`
   - inherits base `/odoo/odoo-bin` CLI behavior without overriding
     subcommand parsing semantics.
 
@@ -63,6 +77,14 @@ Layer Model
   - prefer mounting project addon code over rebuilding image for routine code
     changes
   - rebuild only when dependency/runtime layers change
+  - call the inherited `odoo-python-sync.sh` helper instead of owning local
+    dependency-install mechanics
+  - preserve the inherited `/venv`; do not recreate or destructively sync the
+    base environment
+  - do not own `.pth` addon-path shaping; that belongs in the upstream devtools
+    layers
+  - request external addons explicitly with `ODOO_ADDON_REPOSITORIES`; do not
+    auto-inject OpenUpgrade or other workflow-specific repos into every build
 
 Promotion Rule
 
@@ -76,6 +98,6 @@ Promotion Rule
 Operational Notes
 
 - Treat `19.0-*` as promotion tags, not moving dev targets.
-- Prefer digest references in `docker/config/base.env` for repeatable deploys.
+- Prefer digest references in `platform/config/base.env` for repeatable deploys.
 - Keep enterprise fetch/publish workflows on private infrastructure (for
   example the `chris-testing` self-hosted runner).

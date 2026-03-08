@@ -53,7 +53,7 @@ Tools to use
 
 References
 
-- Odoo: docs/odoo/orm.md, docs/odoo/security.md, docs/odoo/performance.md
-- Testing: docs/style/testing.md, docs/TESTING.md
-- Tooling: docs/tooling/inspection.md, docs/tooling/odoo-intelligence.md,
-  docs/tooling/testing-cli.md
+- Odoo: @docs/odoo/orm.md, @docs/odoo/security.md, @docs/odoo/performance.md
+- Testing: @docs/style/testing.md, @docs/TESTING.md
+- Tooling: @docs/tooling/inspection.md, @docs/tooling/odoo-intelligence.md,
+  @docs/tooling/testing-cli.md

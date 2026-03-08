@@ -1,4 +1,6 @@
-from types import SimpleNamespace
+from collections.abc import Sequence
+from datetime import datetime
+from typing import cast
 
 from odoo import fields
 
@@ -9,18 +11,66 @@ from ...models.repairshopr_importer import (
     RESOURCE_PRODUCT,
     RESOURCE_TICKET,
 )
-from ..common_imports import UNIT_TAGS, tagged
+from ...services import repairshopr_sync_models as repairshopr_models
+from ...services.repairshopr_sync_client import RepairshoprImportClient
+from ..common_imports import common
 from ..fixtures.base import UnitTestCase
 
 
-@tagged(*UNIT_TAGS)
+class MissingLineItemsClientStub:
+    @staticmethod
+    def fetch_line_items(*, estimate_id: int | None = None, invoice_id: int | None = None) -> list[dict[str, object]]:
+        _ = estimate_id
+        _ = invoice_id
+        # noinspection PyTypeChecker
+        # False positive: test exercises importer fallback when the client returns no payload.
+        return None
+
+
+class ProductImportClientStub:
+    def __init__(self, products: list[repairshopr_models.Product]) -> None:
+        self._products = products
+
+    def get_model(self, _model: type[object], *, updated_at: datetime | None = None) -> list[repairshopr_models.Product]:
+        _ = updated_at
+        return self._products
+
+
+class EstimateImportClientStub:
+    def __init__(self, estimates: list[repairshopr_models.Estimate]) -> None:
+        self._estimates = estimates
+
+    def get_model(self, _model: type[object], *, updated_at: datetime | None = None) -> list[repairshopr_models.Estimate]:
+        _ = updated_at
+        return self._estimates
+
+    @staticmethod
+    def prefetch_estimate_line_items(estimate_id_values: Sequence[int]) -> dict[int, list[dict[str, object]]]:
+        _ = estimate_id_values
+        return {}
+
+    @staticmethod
+    def prefetch_ticket_properties_by_ticket_ids(
+        ticket_id_values: Sequence[int],
+    ) -> dict[int, repairshopr_models.TicketProperties]:
+        _ = ticket_id_values
+        return {}
+
+    @staticmethod
+    def fetch_line_items(*, estimate_id: int | None = None, invoice_id: int | None = None) -> list[dict[str, object]]:
+        _ = estimate_id
+        _ = invoice_id
+        return []
+
+
+@common.tagged(*common.UNIT_TAGS)
 class TestRepairshoprMapping(UnitTestCase):
     def setUp(self) -> None:
         super().setUp()
         self.importer = self.RepairshoprImporter
 
     def test_build_partner_values_from_customer_company(self) -> None:
-        customer_record = SimpleNamespace(
+        customer_record = repairshopr_models.Customer(
             id=101,
             business_name="Shiny Computers",
             fullname=None,
@@ -50,7 +100,7 @@ class TestRepairshoprMapping(UnitTestCase):
 
     def test_build_partner_values_from_contact_uses_extension(self) -> None:
         parent_partner = self.Partner.create({"name": "Parent Partner"})
-        contact_record = SimpleNamespace(
+        contact_record = repairshopr_models.Contact(
             id=202,
             name="Sam Service",
             email="sam@example.com",
@@ -73,7 +123,7 @@ class TestRepairshoprMapping(UnitTestCase):
         self.assertEqual(values_payload["phone"], "555-2222 x44")
 
     def test_build_product_values(self) -> None:
-        product_record = SimpleNamespace(
+        product_record = repairshopr_models.Product(
             id=303,
             name=None,
             description="Widget",
@@ -139,18 +189,30 @@ class TestRepairshoprMapping(UnitTestCase):
         self.assertEqual(standard_price_value, 9.5)
 
     def test_compose_ticket_description(self) -> None:
-        properties = SimpleNamespace(id=1, rs_client="ignore", color="Red", size="Large")
+        properties = repairshopr_models.TicketProperties(id=1)
+        properties.rs_client = "ignore"
+        properties.color = "Red"
+        properties.size = "Large"
         comments = [
-            SimpleNamespace(
+            repairshopr_models.TicketComment(
+                id=1,
                 hidden=False,
-                created_at="2024-01-01",
+                created_at=datetime(2024, 1, 1),
                 tech="Alex",
                 subject="Inspection",
                 body="All good",
             ),
-            SimpleNamespace(hidden=True, created_at="2024-01-02", tech="Hidden", subject="", body=""),
+            repairshopr_models.TicketComment(
+                id=2,
+                hidden=True,
+                created_at=datetime(2024, 1, 2),
+                tech="Hidden",
+                subject="",
+                body="",
+            ),
         ]
-        ticket_record = SimpleNamespace(
+        ticket_record = repairshopr_models.Ticket(
+            id=1,
             problem_type="Battery",
             status="Open",
             priority="High",
@@ -170,19 +232,17 @@ class TestRepairshoprMapping(UnitTestCase):
         self.assertIn("All good", description)
 
     def test_fetch_line_items_handles_missing_payload(self) -> None:
-        class ClientStub:
-            @staticmethod
-            def fetch_line_items(*, estimate_id: int | None = None, invoice_id: int | None = None) -> list[dict[str, object]] | None:
-                _ = estimate_id
-                _ = invoice_id
-                return None
-
-        line_items = self.importer._fetch_line_items(ClientStub(), estimate_id=10)
+        raw_client: object = MissingLineItemsClientStub()
+        repairshopr_client = cast(RepairshoprImportClient, raw_client)
+        line_items = self.importer._fetch_line_items(
+            repairshopr_client,
+            estimate_id=10,
+        )
 
         self.assertEqual(line_items, [])
 
     def test_build_product_values_with_partial_payload(self) -> None:
-        product_record = SimpleNamespace(
+        product_record = repairshopr_models.Product(
             id=404,
             name=None,
             description=None,
@@ -206,15 +266,7 @@ class TestRepairshoprMapping(UnitTestCase):
         self.assertNotIn("barcode", values_payload)
 
     def test_import_products_is_idempotent(self) -> None:
-        class ClientStub:
-            def __init__(self, products: list[SimpleNamespace]) -> None:
-                self._products = products
-
-            def get_model(self, _model: object, *, updated_at: object = None) -> list[SimpleNamespace]:
-                _ = updated_at
-                return self._products
-
-        product_record = SimpleNamespace(
+        product_record = repairshopr_models.Product(
             id=505,
             name="Widget",
             description="Widget",
@@ -227,7 +279,8 @@ class TestRepairshoprMapping(UnitTestCase):
             product_category=None,
             category_path=None,
         )
-        client = ClientStub([product_record])
+        raw_client: object = ProductImportClientStub([product_record])
+        client = cast(RepairshoprImportClient, raw_client)
 
         system = self.importer._get_repairshopr_system()
         sync_started_at = fields.Datetime.now()
@@ -249,29 +302,7 @@ class TestRepairshoprMapping(UnitTestCase):
         self.assertEqual(self.ProductTemplate.search_count([("name", "=", "Widget")]), 1)
 
     def test_import_estimates_is_idempotent(self) -> None:
-        class ClientStub:
-            def __init__(self, estimates: list[SimpleNamespace]) -> None:
-                self._estimates = estimates
-
-            def get_model(self, _model: object, *, updated_at: object = None) -> list[SimpleNamespace]:
-                _ = updated_at
-                return self._estimates
-
-            @staticmethod
-            def prefetch_estimate_line_items(_estimate_id_values: list[int]) -> dict[int, list[dict[str, object]]]:
-                return {}
-
-            @staticmethod
-            def prefetch_ticket_properties_by_ticket_ids(_ticket_id_values: list[int]) -> dict[int, object]:
-                return {}
-
-            @staticmethod
-            def fetch_line_items(*, estimate_id: int | None = None, invoice_id: int | None = None) -> list[dict[str, object]]:
-                _ = estimate_id
-                _ = invoice_id
-                return []
-
-        estimate_record = SimpleNamespace(
+        estimate_record = repairshopr_models.Estimate(
             id=606,
             customer_id=707,
             customer_business_then_name="Test Customer",
@@ -282,7 +313,8 @@ class TestRepairshoprMapping(UnitTestCase):
             employee=None,
             ticket_id=909,
         )
-        client = ClientStub([estimate_record])
+        raw_client: object = EstimateImportClientStub([estimate_record])
+        client = cast(RepairshoprImportClient, raw_client)
 
         system = self.importer._get_repairshopr_system()
         partner = self.Partner.create({"name": "Test Customer"})

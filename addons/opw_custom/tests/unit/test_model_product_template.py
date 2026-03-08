@@ -1,13 +1,12 @@
 import psycopg2
 import secrets
 
-from ..common_imports import tagged, ValidationError, UNIT_TAGS
+from ..common_imports import common
 from ..fixtures.base import UnitTestCase
 from ..fixtures.factories import ProductFactory, MotorFactory
-from ..test_helpers import generate_unique_sku
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestProductTemplate(UnitTestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -15,7 +14,7 @@ class TestProductTemplate(UnitTestCase):
     def _assert_sku_validation_error(self, invalid_skus: list[str]) -> None:
         for sku in invalid_skus:
             with self.subTest(sku=sku):
-                with self.assertRaises(ValidationError) as context:
+                with self.assertRaises(common.ValidationError) as context:
                     self.env["product.template"].create({"name": f"Test Product {sku}", "default_code": sku, "type": "consu"})
                 self.assertIn("SKU must be 4-8 digits", str(context.exception))
 
@@ -54,6 +53,20 @@ class TestProductTemplate(UnitTestCase):
         invalid_sku = "INVALID-SKU"
         product = self.env["product.template"].create({"name": "Test Service", "default_code": invalid_sku, "type": "service"})
         self.assertEqual(product.default_code, invalid_sku)
+
+    def test_sku_validation_skips_shopify_products_unless_forced(self) -> None:
+        product = self.env["product.template"].create(
+            {
+                "name": "Shopify Product",
+                "default_code": "SHOP-ALPHA",
+                "type": "consu",
+                "source": "shopify",
+            }
+        )
+        self.assertEqual(product.default_code, "SHOP-ALPHA")
+
+        with self.assertRaises(common.ValidationError):
+            product.with_context(force_sku_check=True).write({"default_code": "SHOP-ALPHA-2"})
 
     def test_sku_validation_bypass_with_context(self) -> None:
         invalid_sku = "INVALID-SKU"
@@ -102,7 +115,7 @@ class TestProductTemplate(UnitTestCase):
         product.unlink()
 
         unique_sku_with_spaces = f"  {secrets.randbelow(9000) + 1000}  "
-        with self.assertRaises(ValidationError) as context:
+        with self.assertRaises(common.ValidationError) as context:
             self.env["product.template"].create(
                 {"name": "Test Whitespace SKU", "default_code": unique_sku_with_spaces, "type": "consu"}
             )
@@ -160,6 +173,6 @@ class TestProductTemplate(UnitTestCase):
         # Test that creating a product without a name raises an IntegrityError
         with self.assertRaises(psycopg2.IntegrityError) as context:
             # Use a unique SKU to avoid database collisions
-            test_sku = generate_unique_sku()
+            test_sku = common.generate_unique_sku()
             self.env["product.template"].create({"default_code": test_sku, "type": "consu"})
         self.assertIn("null value", str(context.exception).lower())

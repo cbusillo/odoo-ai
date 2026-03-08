@@ -1,8 +1,8 @@
-from ..common_imports import tagged, TOUR_TAGS
+from ..common_imports import common
 from ..fixtures.base import TourTestCase
 
 
-@tagged(*TOUR_TAGS, "shopify_sync")
+@common.tagged(*common.TOUR_TAGS, "shopify_sync")
 class TestShippingAnalyticsTour(TourTestCase):
     @classmethod
     def setUpClass(cls) -> None:

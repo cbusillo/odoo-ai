@@ -1,9 +1,9 @@
-from ..common_imports import tagged, ValidationError, UNIT_TAGS
+from ..common_imports import common
 from ..fixtures.base import UnitTestCase
-from ..fixtures.factories import ExternalSystemFactory, ExternalIdFactory
+from ..fixtures.factories import ExternalIdFactory, ExternalSystemFactory
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestExternalSystem(UnitTestCase):
     def test_create_external_system(self) -> None:
         system = ExternalSystemFactory.create(
@@ -25,13 +25,13 @@ class TestExternalSystem(UnitTestCase):
     def test_unique_code_constraint(self) -> None:
         ExternalSystemFactory.create(self.env, code="unique_code")
 
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(common.ValidationError):
             ExternalSystemFactory.create(self.env, code="unique_code")
 
     def test_unique_name_constraint(self) -> None:
         ExternalSystemFactory.create(self.env, name="Unique System")
 
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(common.ValidationError):
             ExternalSystemFactory.create(self.env, name="Unique System", code="different_code")
 
     def test_external_id_count(self) -> None:
@@ -72,7 +72,7 @@ class TestExternalSystem(UnitTestCase):
             external_id="RS-001",
         )
 
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(common.ValidationError):
             system.unlink()
 
     def test_ensure_system_creates_and_merges_models(self) -> None:

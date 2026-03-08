@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from odoo.exceptions import ValidationError
 
 from ...models.environment_overrides import _normalize_config_param_value, _parse_boolean
-from ..common_imports import UNIT_TAGS, tagged
+from ..common_imports import common
 from ..fixtures.base import UnitTestCase
 
 
@@ -27,7 +27,7 @@ def _set_env(values: Mapping[str, str | None]) -> Iterator[None]:
                 os.environ[key] = value
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestEnvironmentOverrides(UnitTestCase):
     def test_normalize_config_param_value(self) -> None:
         self.assertEqual(_normalize_config_param_value(" true "), "True")

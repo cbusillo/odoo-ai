@@ -1,12 +1,8 @@
-from odoo.tests import TransactionCase
+from test_support.tests.fixtures.unit_case import AdminContextUnitTestCase
 
-from ..common_imports import DEFAULT_TEST_CONTEXT, UNIT_TAGS, tagged
+from ..common_imports import common
 
 
-@tagged(*UNIT_TAGS)
-class UnitTestCase(TransactionCase):
-    @classmethod
-    def setUpClass(cls) -> None:
-        super().setUpClass()
-        cls.env = cls.env(user=cls.env.ref("base.user_admin"))
-        cls.env = cls.env(context=dict(cls.env.context, **DEFAULT_TEST_CONTEXT))
+@common.tagged(*common.UNIT_TAGS)
+class UnitTestCase(AdminContextUnitTestCase):
+    default_test_context = common.DEFAULT_TEST_CONTEXT

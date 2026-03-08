@@ -1,20 +1,25 @@
-from odoo.tests import TransactionCase
+from test_support.tests.fixtures.unit_case import AdminContextUnitTestCase
 
-from ..common_imports import DEFAULT_TEST_CONTEXT, UNIT_TAGS, tagged
+from ..common_imports import common
 
 
-@tagged(*UNIT_TAGS)
-class UnitTestCase(TransactionCase):
-    @classmethod
-    def setUpClass(cls) -> None:
-        super().setUpClass()
-        cls.env = cls.env(user=cls.env.ref("base.user_admin"))
-        cls.env = cls.env(
-            context=dict(
-                cls.env.context,
-                **DEFAULT_TEST_CONTEXT,
-            )
-        )
-        cls.RepairshoprImporter = cls.env["repairshopr.importer"]
-        cls.ProductTemplate = cls.env["product.template"]
-        cls.Partner = cls.env["res.partner"]
+@common.tagged(*common.UNIT_TAGS)
+class UnitTestCase(AdminContextUnitTestCase):
+    default_test_context = common.DEFAULT_TEST_CONTEXT
+    model_aliases = {
+        "RepairshoprImporter": "repairshopr.importer",
+        "ProductTemplate": "product.template",
+        "Partner": "res.partner",
+    }
+
+    @property
+    def RepairshoprImporter(self) -> "odoo.model.repairshopr_importer":
+        return self.env["repairshopr.importer"]
+
+    @property
+    def ProductTemplate(self) -> "odoo.model.product_template":
+        return self.env["product.template"]
+
+    @property
+    def Partner(self) -> "odoo.model.res_partner":
+        return self.env["res.partner"]

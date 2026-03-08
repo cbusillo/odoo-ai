@@ -1,14 +1,6 @@
-from odoo.tests import tagged
+# noinspection PyUnresolvedReferences
+from test_support.tests import build_common_imports
 
-__all__ = ["tagged", "DEFAULT_TEST_CONTEXT", "STANDARD_TAGS", "UNIT_TAGS"]
+common = build_common_imports(__package__)
 
-DEFAULT_TEST_CONTEXT = {
-    "tracking_disable": True,
-    "no_reset_password": True,
-    "mail_create_nosubscribe": True,
-    "mail_create_nolog": True,
-    "mail_notrack": True,
-}
-
-STANDARD_TAGS = ["post_install", "-at_install"]
-UNIT_TAGS = STANDARD_TAGS + ["unit_test", "environment_overrides"]
+__all__ = ["common"]

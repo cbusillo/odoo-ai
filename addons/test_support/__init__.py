@@ -1,0 +1,2 @@
+"""Shared test support addon."""
+

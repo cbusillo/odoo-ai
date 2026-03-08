@@ -1,8 +1,9 @@
-from .common_imports import TransactionCase, tagged, UNIT_TAGS, MODULE_TAG
+from .common_imports import common
 
 
-@tagged(*UNIT_TAGS, MODULE_TAG)
-class TestNameSettings(TransactionCase):
+@common.tagged(*common.UNIT_TAGS)
+class TestNameSettings(common.TransactionCase):
+    # noinspection PyPep8Naming
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()

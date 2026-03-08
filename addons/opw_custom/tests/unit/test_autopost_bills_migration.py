@@ -1,8 +1,8 @@
-from ..common_imports import tagged, UNIT_TAGS
+from ..common_imports import common
 from ..fixtures.base import UnitTestCase
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestAutopostBillsMigration(UnitTestCase):
     def test_base_partner_has_autopost_bills(self) -> None:
         base_partner = self.env["res.partner"].browse(1)
@@ -21,6 +21,7 @@ class TestAutopostBillsMigration(UnitTestCase):
         self.assertEqual(partner.autopost_bills, "ask", "New partners should get default autopost_bills='ask'")
 
     def test_no_null_autopost_bills(self) -> None:
+        # noinspection SqlConstantExpression
         self.env.cr.execute("SELECT COUNT(*) FROM res_partner WHERE autopost_bills IS NULL")
         null_count = self.env.cr.fetchone()[0]
 

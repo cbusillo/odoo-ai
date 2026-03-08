@@ -1,8 +1,8 @@
-from ..common_imports import tagged, TOUR_TAGS
+from ..common_imports import common
 from ..fixtures.base import TourTestCase
 
 
-@tagged(*TOUR_TAGS, "opw_custom")
+@common.tagged(*common.TOUR_TAGS, "opw_custom")
 class TestMultigraphTour(TourTestCase):
     @classmethod
     def setUpClass(cls) -> None:

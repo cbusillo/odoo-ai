@@ -1,8 +1,8 @@
-from ..common_imports import tagged, TOUR_TAGS
+from ..common_imports import common
 from ..fixtures.base import TourTestCase
 
 
-@tagged(*TOUR_TAGS, "opw_custom")
+@common.tagged(*common.TOUR_TAGS, "opw_custom")
 class TestBasicTour(TourTestCase):
     def test_basic_tour(self) -> None:
         """Test basic tour functionality with improved error handling."""

@@ -1,10 +1,10 @@
-from ..common_imports import tagged, INTEGRATION_TAGS
+from ..common_imports import common
 from ..fixtures.base import IntegrationTestCase
 from ..fixtures.factories import ProductFactory
 from odoo.exceptions import ValidationError
 
 
-@tagged(*INTEGRATION_TAGS)
+@common.tagged(*common.INTEGRATION_TAGS)
 class TestMultigraphFixVerification(IntegrationTestCase):
     @classmethod
     def setUpClass(cls) -> None:

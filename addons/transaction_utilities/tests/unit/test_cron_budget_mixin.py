@@ -1,18 +1,18 @@
 from odoo.addons.transaction_utilities.models import cron_budget_mixin
 
-from ..common_imports import UNIT_TAGS, patch, tagged
+from ..common_imports import common
 from ..fixtures.base import UnitTestCase
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestCronBudgetMixin(UnitTestCase):
     def setUp(self) -> None:
         super().setUp()
         self.cron_budget_model = self.env["transaction.cron_budget.mixin"]
 
     def test_with_cron_runtime_budget_sets_deadline_context(self) -> None:
-        with patch.object(cron_budget_mixin.config, "get", return_value=120):
-            with patch.object(cron_budget_mixin, "monotonic", return_value=100.0):
+        with common.patch.object(cron_budget_mixin.config, "get", return_value=120):
+            with common.patch.object(cron_budget_mixin, "monotonic", return_value=100.0):
                 model_with_budget = self.cron_budget_model._with_cron_runtime_budget(job_name="Sample Import")
 
         self.assertEqual(
@@ -29,7 +29,7 @@ class TestCronBudgetMixin(UnitTestCase):
         )
 
     def test_with_cron_runtime_budget_skips_deadline_for_unlimited_runtime(self) -> None:
-        with patch.object(cron_budget_mixin.config, "get", return_value=0):
+        with common.patch.object(cron_budget_mixin.config, "get", return_value=0):
             model_with_budget = self.cron_budget_model._with_cron_runtime_budget(job_name="Sample Import")
 
         self.assertEqual(model_with_budget, self.cron_budget_model)
@@ -39,9 +39,9 @@ class TestCronBudgetMixin(UnitTestCase):
         model_with_deadline = self.cron_budget_model.with_context(
             **{cron_budget_mixin.CRON_RUNTIME_DEADLINE_CONTEXT_KEY: 100.0}
         )
-        with patch.object(cron_budget_mixin, "monotonic", return_value=101.0):
+        with common.patch.object(cron_budget_mixin, "monotonic", return_value=101.0):
             self.assertTrue(model_with_deadline._is_cron_runtime_budget_exhausted())
-        with patch.object(cron_budget_mixin, "monotonic", return_value=99.0):
+        with common.patch.object(cron_budget_mixin, "monotonic", return_value=99.0):
             self.assertFalse(model_with_deadline._is_cron_runtime_budget_exhausted())
 
     def test_raise_if_cron_runtime_budget_exhausted(self) -> None:
@@ -52,7 +52,7 @@ class TestCronBudgetMixin(UnitTestCase):
             }
         )
 
-        with patch.object(cron_budget_mixin, "monotonic", return_value=101.0):
+        with common.patch.object(cron_budget_mixin, "monotonic", return_value=101.0):
             with self.assertRaises(cron_budget_mixin.CronRuntimeBudgetExceeded) as raised_error:
                 model_with_deadline._raise_if_cron_runtime_budget_exhausted(job_name="Sample Import")
 

@@ -6,6 +6,7 @@ function queryElement(selector) {
     return /** @type {HTMLElement | null} */ (document.querySelector(selector))
 }
 
+// noinspection JSUnusedGlobalSymbols
 registry.category("web_tour.tours").add("shipping_analytics_tour", {
     test: true,
     url: "/web#action=shopify_sync.action_sale_order_shipping_analytics",

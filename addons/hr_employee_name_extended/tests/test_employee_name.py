@@ -1,10 +1,11 @@
 from odoo.exceptions import ValidationError
-from odoo.tests import TransactionCase
-from .common_imports import tagged, UNIT_TAGS, MODULE_TAG
+
+from .common_imports import common
 
 
-@tagged(*UNIT_TAGS, MODULE_TAG)
-class TestEmployeeName(TransactionCase):
+@common.tagged(*common.UNIT_TAGS)
+class TestEmployeeName(common.TransactionCase):
+    # noinspection PyPep8Naming
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()

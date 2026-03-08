@@ -1,14 +1,14 @@
 """Minimal tour test to debug WebSocket issues"""
 
 import logging
-from odoo.tests import tagged
-from ..base_types import TOUR_TAGS
+
+from ..common_imports import common
 from ..fixtures.base import TourTestCase
 
 _logger = logging.getLogger(__name__)
 
 
-@tagged(*TOUR_TAGS)
+@common.tagged(*common.TOUR_TAGS)
 class TestMinimalTour(TourTestCase):
     """Minimal test to debug tour infrastructure"""
 

@@ -1,9 +1,10 @@
-from ..common_imports import tagged, UNIT_TAGS
-from ..fixtures.base import UnitTestCase
+from ..common_imports import common
+
 from ..fixtures.factories import MotorFactory
+from ..fixtures.base import UnitTestCase
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestMotorWorkflow(UnitTestCase):
     def setUp(self) -> None:
         super().setUp()

@@ -126,6 +126,7 @@ function pickFieldOption(fieldName) {
 }
 
 // Keep the original tour name; use robust selectors and waits.
+// noinspection JSUnusedGlobalSymbols
 registry.category("web_tour.tours").add("motor_workflow_to_enabled_product_tour", {
     test: true,
     url: "/web#action=marine_motors.action_motor_form",

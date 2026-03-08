@@ -2,7 +2,7 @@ import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from ..common_imports import UNIT_TAGS, tagged
+from ..common_imports import common
 from ..fixtures.base import UnitTestCase
 
 
@@ -22,7 +22,7 @@ def _set_env(key: str, value: str | None) -> Iterator[None]:
             os.environ[key] = previous
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestAuthentikSso(UnitTestCase):
     def test_normalize_authentik_validation_defaults(self) -> None:
         payload = {"sub": "user-1", "email": "user@example.com"}

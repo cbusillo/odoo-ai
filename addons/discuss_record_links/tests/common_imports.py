@@ -1,6 +1,6 @@
-from odoo.tests import tagged
+# noinspection PyUnresolvedReferences
+from test_support.tests import build_common_imports
 
-__all__ = ["STANDARD_TAGS", "UNIT_TAGS", "tagged"]
+common = build_common_imports(__package__)
 
-STANDARD_TAGS = ["post_install", "-at_install"]
-UNIT_TAGS = STANDARD_TAGS + ["unit_test", "discuss_record_links"]
+__all__ = ["common"]

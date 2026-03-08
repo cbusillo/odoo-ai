@@ -1,4 +1,4 @@
-from ..common_imports import logging, MagicMock, patch, tagged, INTEGRATION_TAGS
+from ..common_imports import common
 
 from ...services.shopify.gql import OrderFields
 from ...services.shopify.sync.importers.order_importer import OrderImporter
@@ -6,17 +6,17 @@ from ...services.shopify.sync.importers.customer_importer import CustomerImporte
 from ...services.shopify.helpers import ShopifyDataError
 from ..fixtures.base import IntegrationTestCase
 from ..fixtures.factories import ShopifySyncFactory, PartnerFactory
-from ..fixtures.shopify_responses import (
+from test_support.tests.fixtures.shopify_responses import (
     create_shopify_order_response,
     create_shopify_customer_response,
     create_shopify_shipping_line_response,
     create_shopify_order_line_item_response,
 )
 
-_logger = logging.getLogger(__name__)
+_logger = common.logging.getLogger(__name__)
 
 
-@tagged(*INTEGRATION_TAGS)
+@common.tagged(*common.INTEGRATION_TAGS)
 class TestOrderShippingImport(IntegrationTestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -161,8 +161,8 @@ class TestOrderShippingImport(IntegrationTestCase):
 
         create_service_map(carrier_insurance, "Shipping Insurance")
 
-    @patch.object(CustomerImporter, "import_customer")
-    def test_import_order_with_standard_shipping(self, mock_import_customer: MagicMock) -> None:
+    @common.patch.object(CustomerImporter, "import_customer")
+    def test_import_order_with_standard_shipping(self, mock_import_customer: common.MagicMock) -> None:
         mock_import_customer.return_value = True
 
         order_data = create_shopify_order_response(
@@ -189,8 +189,8 @@ class TestOrderShippingImport(IntegrationTestCase):
         carrier = self.env["delivery.carrier"].search([("name", "=", "Standard Shipping")])
         self.assertEqual(order.carrier_id.id, carrier.id)
 
-    @patch.object(CustomerImporter, "import_customer")
-    def test_import_order_with_multiple_shipping_lines(self, mock_import_customer: MagicMock) -> None:
+    @common.patch.object(CustomerImporter, "import_customer")
+    def test_import_order_with_multiple_shipping_lines(self, mock_import_customer: common.MagicMock) -> None:
         mock_import_customer.return_value = True
 
         order_data = create_shopify_order_response(
@@ -216,8 +216,8 @@ class TestOrderShippingImport(IntegrationTestCase):
         total_delivery = sum(line.price_unit for line in delivery_lines)
         self.assertEqual(total_delivery, 20.00)
 
-    @patch.object(CustomerImporter, "import_customer")
-    def test_import_order_with_shipping_variation(self, mock_import_customer: MagicMock) -> None:
+    @common.patch.object(CustomerImporter, "import_customer")
+    def test_import_order_with_shipping_variation(self, mock_import_customer: common.MagicMock) -> None:
         mock_import_customer.return_value = True
 
         variations_to_test = [
@@ -253,8 +253,8 @@ class TestOrderShippingImport(IntegrationTestCase):
             self.assertTrue(carrier, f"No carrier set for shipping: {shipping_title}")
             self.assertEqual(carrier.name, expected_carrier_name, f"Wrong carrier for {shipping_title}: got {carrier.name}")
 
-    @patch.object(CustomerImporter, "import_customer")
-    def test_import_order_with_unknown_shipping_method(self, mock_import_customer: MagicMock) -> None:
+    @common.patch.object(CustomerImporter, "import_customer")
+    def test_import_order_with_unknown_shipping_method(self, mock_import_customer: common.MagicMock) -> None:
         mock_import_customer.return_value = True
 
         order_data = create_shopify_order_response(
@@ -275,8 +275,8 @@ class TestOrderShippingImport(IntegrationTestCase):
             _logger.error(f"Unexpected exception type: {type(e).__name__}: {str(e)}")
             raise
 
-    @patch.object(CustomerImporter, "import_customer")
-    def test_import_order_with_free_shipping(self, mock_import_customer: MagicMock) -> None:
+    @common.patch.object(CustomerImporter, "import_customer")
+    def test_import_order_with_free_shipping(self, mock_import_customer: common.MagicMock) -> None:
         mock_import_customer.return_value = True
 
         order_data = create_shopify_order_response(
@@ -310,8 +310,8 @@ class TestOrderShippingImport(IntegrationTestCase):
         order = self.env["sale.order"].search([("shopify_order_id", "=", "123456789")])
         return order
 
-    @patch.object(CustomerImporter, "import_customer")
-    def test_shipping_charge_updates_on_reimport(self, mock_import_customer: MagicMock) -> None:
+    @common.patch.object(CustomerImporter, "import_customer")
+    def test_shipping_charge_updates_on_reimport(self, mock_import_customer: common.MagicMock) -> None:
         mock_import_customer.return_value = True
 
         order = self._create_and_import_order()
@@ -335,8 +335,8 @@ class TestOrderShippingImport(IntegrationTestCase):
         self.assertEqual(len(delivery_lines), 1)
         self.assertEqual(delivery_lines[0].price_unit, 20.00)
 
-    @patch.object(CustomerImporter, "import_customer")
-    def test_imported_orders_are_completed_without_stock_moves(self, mock_import_customer: MagicMock) -> None:
+    @common.patch.object(CustomerImporter, "import_customer")
+    def test_imported_orders_are_completed_without_stock_moves(self, mock_import_customer: common.MagicMock) -> None:
         mock_import_customer.return_value = True
 
         order = self._create_and_import_order()
@@ -347,8 +347,8 @@ class TestOrderShippingImport(IntegrationTestCase):
         pickings = self.env["stock.picking"].search([("sale_id", "=", order.id)])
         self.assertEqual(len(pickings), 0, "No delivery orders should be created for imported orders")
 
-    @patch.object(CustomerImporter, "import_customer")
-    def test_import_order_unknown_shipping_with_urls(self, mock_import_customer: MagicMock) -> None:
+    @common.patch.object(CustomerImporter, "import_customer")
+    def test_import_order_unknown_shipping_with_urls(self, mock_import_customer: common.MagicMock) -> None:
         mock_import_customer.return_value = True
 
         self.env["ir.config_parameter"].sudo().set_param("shopify.shop_url_key", "test-shop.myshopify.com")
@@ -378,8 +378,8 @@ class TestOrderShippingImport(IntegrationTestCase):
 
             self.assertIn("new express service", error_msg.lower())
 
-    @patch.object(CustomerImporter, "import_customer")
-    def test_import_ebay_order_from_shopify(self, mock_import_customer: MagicMock) -> None:
+    @common.patch.object(CustomerImporter, "import_customer")
+    def test_import_ebay_order_from_shopify(self, mock_import_customer: common.MagicMock) -> None:
         mock_import_customer.return_value = True
 
         ebay_note_attributes = """eBay Sales Record Number: 21478

@@ -1,7 +1,7 @@
-from ..common_imports import tagged, INTEGRATION_TAGS
+from ..common_imports import common
 from ..fixtures.base import IntegrationTestCase
 from ..fixtures.factories import ProductFactory, ShopifySyncFactory
-from ..fixtures.shopify_responses import (
+from test_support.tests.fixtures.shopify_responses import (
     create_shopify_order_response,
     create_shopify_customer_response,
     create_shopify_product_response,
@@ -15,7 +15,7 @@ from ...services.shopify.sync.importers.customer_importer import CustomerImporte
 from ...services.shopify.sync.importers.product_importer import ProductImporter
 
 
-@tagged(*INTEGRATION_TAGS)
+@common.tagged(*common.INTEGRATION_TAGS)
 class TestImportIdempotencyUnit(IntegrationTestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -259,8 +259,10 @@ class TestImportIdempotencyUnit(IntegrationTestCase):
             title="Timestamp Product",
             vendor="Test Manufacturer",
             product_type="Motors",
+            total_inventory=0,
             created_at="2023-01-01T00:00:00Z",
             updated_at="2023-01-01T00:00:00Z",
+            media=[],
             variants=[
                 create_shopify_variant_response(
                     gid="gid://shopify/ProductVariant/6002",

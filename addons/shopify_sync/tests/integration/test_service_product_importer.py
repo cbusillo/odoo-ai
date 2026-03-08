@@ -1,27 +1,26 @@
 import base64
 
-from ..common_imports import datetime, patch, tagged, INTEGRATION_TAGS
-from ..test_helpers import generate_unique_sku
+from ..common_imports import common
 
 from ...services.shopify.gql import MediaStatus, ProductStatus, ProductFields
 from ...services.shopify.helpers import ShopifyDataError
 from ...services.shopify.sync.importers.product_importer import ProductImporter
-from ..fixtures.shopify_responses import (
+from test_support.tests.fixtures.shopify_responses import (
     create_shopify_metafield,
     create_shopify_product_image,
     create_shopify_product_response,
     create_shopify_variant_response as create_shopify_product_variant,
 )
-from ..fixtures.test_service_utils import create_mock_simple_response
+from test_support.tests.fixtures.test_service_utils import create_mock_simple_response
 from ..fixtures.base import IntegrationTestCase
 from ..fixtures.factories import ProductFactory, ShopifySyncFactory
 
 
-@tagged(*INTEGRATION_TAGS)
+@common.tagged(*common.INTEGRATION_TAGS)
 class TestProductImporter(IntegrationTestCase):
     @classmethod
     def _get_unique_sku(cls) -> str:
-        return generate_unique_sku()
+        return common.generate_unique_sku()
 
     @staticmethod
     def _get_valid_image_base64() -> str:
@@ -118,11 +117,36 @@ class TestProductImporter(IntegrationTestCase):
         if not self.condition:
             self.condition = self.env["product.condition"].create({"name": "New", "code": "new"})
 
-    def _import_products_with_mock_data(self, product_data_list: list[dict]) -> int:
+    def _build_product_fields(self, product_data: dict) -> ProductFields:
         try:
-            product_fields_list = [ProductFields(**data) for data in product_data_list]
-        except Exception as e:
-            self.fail(f"Failed to create ProductFields from fixture data: {e}")
+            return ProductFields(**product_data)
+        except Exception as error:
+            self.fail(f"Failed to create ProductFields from fixture data: {error}")
+
+    def _build_product_fields_list(self, product_data_list: list[dict]) -> list[ProductFields]:
+        try:
+            return [ProductFields(**product_data) for product_data in product_data_list]
+        except Exception as error:
+            self.fail(f"Failed to create ProductFields from fixture data: {error}")
+
+    def _import_one_product(self, product_data: dict) -> bool:
+        return self.importer._import_one(self._build_product_fields(product_data))
+
+    def _import_since_last_import(self, product_data: dict) -> int:
+        with common.patch.object(self.importer, "_fetch_page") as mock_fetch:
+            mock_fetch.return_value = create_mock_simple_response([self._build_product_fields(product_data)])
+            return self.importer.import_products_since_last_import()
+
+    def _find_product_by_sku(self, sku: str, include_inactive: bool = False) -> "odoo.model.product_product":
+        search_domain = [("default_code", "=", sku)]
+        if include_inactive:
+            search_domain.append(("active", "in", [True, False]))
+        product = self.env["product.product"].search(search_domain)
+        self.assertTrue(product, f"Product with SKU {sku} not found")
+        return product
+
+    def _import_products_with_mock_data(self, product_data_list: list[dict]) -> int:
+        product_fields_list = self._build_product_fields_list(product_data_list)
 
         imported_count = 0
         for product_fields in product_fields_list:
@@ -147,12 +171,7 @@ class TestProductImporter(IntegrationTestCase):
         return product
 
     def _import_and_get_product(self, product_data: dict, expected_count: int = 1) -> "odoo.model.product_product":
-        try:
-            product_fields = ProductFields(**product_data)
-        except Exception as e:
-            self.fail(f"Failed to create ProductFields from fixture data: {e}")
-
-        result = self.importer._import_one(product_fields)
+        result = self._import_one_product(product_data)
         imported_count = 1 if result else 0
 
         self.assertEqual(imported_count, expected_count)
@@ -170,16 +189,13 @@ class TestProductImporter(IntegrationTestCase):
         return product
 
     def _import_product_and_verify(self, product_data: dict, sku: str) -> "odoo.model.product_product":
-        product_fields = ProductFields(**product_data)
-        result = self.importer._import_one(product_fields)
+        result = self._import_one_product(product_data)
         self.assertTrue(result)
 
-        product = self.env["product.product"].search([("default_code", "=", sku), ("active", "in", [True, False])])
-        self.assertTrue(product, f"Product with SKU {sku} not found")
-        return product
+        return self._find_product_by_sku(sku, include_inactive=True)
 
     def test_import_basic_product(self) -> None:
-        sku = generate_unique_sku()
+        sku = common.generate_unique_sku()
         product_data = create_shopify_product_response(
             title="Test Motor",
             vendor="Test Manufacturer",
@@ -195,12 +211,10 @@ class TestProductImporter(IntegrationTestCase):
             media=[],  # Explicitly set no media to avoid image processing issues
         )
 
-        product_fields = ProductFields(**product_data)
-        result = self.importer._import_one(product_fields)
+        result = self._import_one_product(product_data)
         self.assertTrue(result, "_import_one should return True for new product")
 
-        product = self.env["product.product"].search([("default_code", "=", sku)])
-        self.assertTrue(product, f"Product with SKU {sku} should have been created")
+        product = self._find_product_by_sku(sku)
         self.assertEqual(product.name, "Test Motor")
         self.assertEqual(product.list_price, 99.99)
         self.assertEqual(product.standard_price, 45.00)
@@ -224,7 +238,7 @@ class TestProductImporter(IntegrationTestCase):
         self.assertEqual(product.bin, "A1-B2")
 
     def test_import_product_with_metafields(self) -> None:
-        sku = generate_unique_sku()
+        sku = common.generate_unique_sku()
         product_data = create_shopify_product_response(
             product_type="Motors",
             metafields=[
@@ -247,7 +261,7 @@ class TestProductImporter(IntegrationTestCase):
 
     def test_import_product_with_images(self) -> None:
         encoded_image = self._get_valid_image_base64()
-        sku = generate_unique_sku()
+        sku = common.generate_unique_sku()
 
         product_data = create_shopify_product_response(
             media=[
@@ -269,16 +283,14 @@ class TestProductImporter(IntegrationTestCase):
             ],
         )
 
-        with patch.object(self.importer, "fetch_image_data") as mock_fetch_image:
+        with common.patch.object(self.importer, "fetch_image_data") as mock_fetch_image:
             mock_fetch_image.return_value = encoded_image
 
-            product_fields = ProductFields(**product_data)
-            result = self.importer._import_one(product_fields)
+            result = self._import_one_product(product_data)
 
         self.assertTrue(result)
 
-        product = self.env["product.product"].search([("default_code", "=", sku)])
-        self.assertTrue(product, f"Product with SKU {sku} not found")
+        product = self._find_product_by_sku(sku)
         images = product.images.sorted(key=lambda image: image.sequence)
         self.assertEqual(len(images), 2)
         self.assertEqual(images[0].name, "Front view")
@@ -294,9 +306,7 @@ class TestProductImporter(IntegrationTestCase):
             ],
         )
 
-        with patch.object(self.importer, "_fetch_page") as mock_fetch:
-            mock_fetch.return_value = create_mock_simple_response([ProductFields(**product_data)])
-            imported_count = self.importer.import_products_since_last_import()
+        imported_count = self._import_since_last_import(product_data)
 
         self.assertEqual(imported_count, 0)
 
@@ -326,10 +336,7 @@ class TestProductImporter(IntegrationTestCase):
             ],
         )
 
-        with patch.object(self.importer, "_fetch_page") as mock_fetch:
-            mock_fetch.return_value = create_mock_simple_response([ProductFields(**product_data)])
-
-            self.importer.import_products_since_last_import()
+        self._import_since_last_import(product_data)
 
         existing_product.invalidate_recordset()
         self.assertTrue(existing_product.shopify_next_export)
@@ -341,22 +348,17 @@ class TestProductImporter(IntegrationTestCase):
             ],
         )
 
-        with patch.object(self.importer, "_fetch_page") as mock_fetch:
-            mock_fetch.return_value = create_mock_simple_response([ProductFields(**product_data)])
-            imported_count = self.importer.import_products_since_last_import()
+        imported_count = self._import_since_last_import(product_data)
 
         self.assertEqual(imported_count, 0)
 
     def test_import_product_no_variants(self) -> None:
         product_data = create_shopify_product_response(variants=[])
 
-        with patch.object(self.importer, "_fetch_page") as mock_fetch:
-            mock_fetch.return_value = create_mock_simple_response([ProductFields(**product_data)])
+        with self.assertRaises(ShopifyDataError) as cm:
+            self._import_since_last_import(product_data)
 
-            with self.assertRaises(ShopifyDataError) as cm:
-                self.importer.import_products_since_last_import()
-
-            self.assertIn("No variants found", str(cm.exception))
+        self.assertIn("No variants found", str(cm.exception))
 
     def test_update_existing_product(self) -> None:
         existing_product = ProductFactory.create(
@@ -367,64 +369,129 @@ class TestProductImporter(IntegrationTestCase):
             list_price=50.00,
         ).product_variant_id
 
-        with patch(
-            "odoo.addons.shopify_sync.services.shopify.sync.importers.product_importer.determine_latest_odoo_product_modification_time"
-        ) as mock_date:
-            mock_date.return_value = datetime(2023, 1, 1)
-
-            product_data = create_shopify_product_response(
-                gid="gid://shopify/Product/777",
-                title="New Name",
-                updated_at=datetime(2023, 12, 31).isoformat(),
-                variants=[
-                    create_shopify_product_variant(
-                        sku=existing_product.default_code,
-                        price="75.00",
-                    ),
-                ],
-            )
-
-            product_fields = ProductFields(**product_data)
-            result = self.importer._import_one(product_fields)
-
-            self.assertTrue(result)
-
-            existing_product.invalidate_recordset()
-            self.assertEqual(existing_product.name, "New Name")
-            self.assertEqual(existing_product.list_price, 75.00)
-
-    def test_skip_up_to_date_product(self) -> None:
-        sku = generate_unique_sku()
-        ProductFactory.create(
-            self.env,
-            name="Current Product",
-            default_code=sku,
-            shopify_product_id="666",
+        product_data = create_shopify_product_response(
+            gid="gid://shopify/Product/777",
+            title="New Name",
+            updated_at=common.datetime(2023, 12, 31).isoformat(),
+            variants=[
+                create_shopify_product_variant(
+                    sku=existing_product.default_code,
+                    price="75.00",
+                ),
+            ],
         )
 
+        result = self._import_one_product(product_data)
+
+        self.assertTrue(result)
+
+        existing_product.invalidate_recordset()
+        self.assertEqual(existing_product.name, "New Name")
+        self.assertEqual(existing_product.list_price, 75.00)
+
+    def test_skip_up_to_date_product(self) -> None:
+        sku = common.generate_unique_sku()
         product_data = create_shopify_product_response(
             gid="gid://shopify/Product/666",
-            updated_at=datetime(2020, 1, 1).isoformat(),
+            title="Current Product",
+            description="Test product description",
+            vendor="",
+            product_type="",
+            total_inventory=0,
+            created_at=common.datetime(2020, 1, 1).isoformat(),
+            updated_at=common.datetime(2020, 1, 1).isoformat(),
             media=[],  # Explicitly set empty media
             variants=[
                 create_shopify_product_variant(sku=sku),
             ],
         )
 
-        with (
-            patch.object(self.importer, "_fetch_page") as mock_fetch,
-            patch(
-                "odoo.addons.shopify_sync.services.shopify.sync.importers.product_importer.determine_latest_odoo_product_modification_time"
-            ) as mock_date,
-        ):
-            mock_fetch.return_value = create_mock_simple_response([ProductFields(**product_data)])
-            mock_date.return_value = datetime(2023, 1, 1)
-            imported_count = self.importer.import_products_since_last_import()
+        self.assertTrue(self._import_one_product(product_data))
+        self.assertFalse(self._import_one_product(product_data))
 
-        self.assertEqual(imported_count, 0)
+    def test_link_missing_external_ids_for_up_to_date_sku_match(self) -> None:
+        sku = common.generate_unique_sku()
+        shopify_created_at = common.datetime(2020, 1, 1)
+        existing_product = ProductFactory.create(
+            self.env,
+            name="Current Product",
+            default_code=sku,
+            list_price=99.99,
+            standard_price=50.00,
+            mpn="123456789012",
+            weight=1.5,
+            is_published=True,
+            is_ready_for_sale=True,
+            source="shopify",
+            is_storable=True,
+        ).product_variant_id
+        existing_product.shopify_created_at = shopify_created_at
+
+        product_data = create_shopify_product_response(
+            gid="gid://shopify/Product/666",
+            title="Current Product",
+            description="Test product description",
+            vendor="",
+            product_type="",
+            total_inventory=0,
+            created_at=shopify_created_at.isoformat(),
+            updated_at=common.datetime(2020, 1, 1).isoformat(),
+            media=[],
+            variants=[
+                create_shopify_product_variant(
+                    gid="gid://shopify/ProductVariant/667",
+                    sku=sku,
+                ),
+            ],
+        )
+
+        imported = self._import_one_product(product_data)
+
+        existing_product.invalidate_recordset()
+        self.assertTrue(imported)
+        self.assertEqual(existing_product.get_external_system_id("shopify", "product"), "666")
+        self.assertEqual(existing_product.get_external_system_id("shopify", "variant"), "667")
+
+    def test_import_inventory_change_for_otherwise_matching_product(self) -> None:
+        sku = common.generate_unique_sku()
+        shopify_created_at = common.datetime(2020, 1, 1)
+        existing_product = ProductFactory.create(
+            self.env,
+            name="Test Product",
+            default_code=sku,
+            shopify_product_id="666",
+            shopify_variant_id="667",
+            list_price=99.99,
+            standard_price=50.00,
+            mpn="123456789012",
+            weight=1.5,
+            is_storable=True,
+            is_published=True,
+            is_ready_for_sale=True,
+            source="shopify",
+        ).product_variant_id
+        existing_product.shopify_created_at = shopify_created_at
+        existing_product.update_quantity(10)
+
+        product_data = create_shopify_product_response(gid="gid://shopify/Product/666",
+                                                       description="Test product description", vendor="",
+                                                       product_type="", created_at=shopify_created_at.isoformat(),
+                                                       updated_at=common.datetime(2020, 1, 1).isoformat(), total_inventory=25,
+                                                       media=[], variants=[
+                create_shopify_product_variant(
+                    gid="gid://shopify/ProductVariant/667",
+                    sku=sku,
+                ),
+            ])
+
+        imported = self._import_one_product(product_data)
+
+        existing_product.invalidate_recordset()
+        self.assertTrue(imported)
+        self.assertEqual(existing_product.qty_available, 25)
 
     def test_import_product_with_inventory(self) -> None:
-        sku = generate_unique_sku()
+        sku = common.generate_unique_sku()
         product_data = create_shopify_product_response(
             total_inventory=25,
             media=[],  # No media to avoid image processing issues
@@ -433,15 +500,10 @@ class TestProductImporter(IntegrationTestCase):
             ],
         )
 
-        product_fields = ProductFields(**product_data)
-        result = self.importer._import_one(product_fields)
-        self.assertTrue(result)
-
-        product = self.env["product.product"].search([("default_code", "=", sku)])
-        self.assertTrue(product, f"Product with SKU {sku} not found")
+        self._import_product_and_verify(product_data, sku)
 
     def test_import_inactive_product(self) -> None:
-        sku = generate_unique_sku()
+        sku = common.generate_unique_sku()
         product_data = create_shopify_product_response(
             status=ProductStatus.DRAFT,
             media=[],  # No media to avoid image processing issues
@@ -456,7 +518,7 @@ class TestProductImporter(IntegrationTestCase):
         self.assertTrue(product.is_published, "Products from Shopify should always be published")
 
     def test_create_manufacturer_if_not_exists(self) -> None:
-        sku = generate_unique_sku()
+        sku = common.generate_unique_sku()
         product_data = create_shopify_product_response(
             vendor="New Manufacturer",
             media=[],  # No media to avoid image fetching issues
@@ -465,19 +527,14 @@ class TestProductImporter(IntegrationTestCase):
             ],
         )
 
-        product_fields = ProductFields(**product_data)
-        result = self.importer._import_one(product_fields)
-        self.assertTrue(result)
+        product = self._import_product_and_verify(product_data, sku)
 
         manufacturer = self.env["product.manufacturer"].search([("name", "=", "New Manufacturer")])
         self.assertTrue(manufacturer)
-
-        product = self.env["product.product"].search([("default_code", "=", sku)])
-        self.assertTrue(product, f"Product with SKU {sku} not found")
         self.assertEqual(product.product_tmpl_id.manufacturer, manufacturer)
 
     def test_create_part_type_if_not_exists(self) -> None:
-        sku = generate_unique_sku()
+        sku = common.generate_unique_sku()
         product_data = create_shopify_product_response(
             product_type="New Part Type",
             media=[],  # No media to avoid image fetching issues
@@ -489,9 +546,7 @@ class TestProductImporter(IntegrationTestCase):
             ],
         )
 
-        product_fields = ProductFields(**product_data)
-        result = self.importer._import_one(product_fields)
-        self.assertTrue(result)
+        product = self._import_product_and_verify(product_data, sku)
 
         part_type = self.env["product.type"].search(
             [
@@ -501,8 +556,6 @@ class TestProductImporter(IntegrationTestCase):
         )
         self.assertTrue(part_type)
 
-        product = self.env["product.product"].search([("default_code", "=", sku)])
-        self.assertTrue(product, f"Product with SKU {sku} not found")
         self.assertEqual(product.product_tmpl_id.part_type, part_type)
 
     def test_invalid_ebay_category_id(self) -> None:
@@ -513,13 +566,10 @@ class TestProductImporter(IntegrationTestCase):
             ],
         )
 
-        with patch.object(self.importer, "_fetch_page") as mock_fetch:
-            mock_fetch.return_value = create_mock_simple_response([ProductFields(**product_data)])
+        with self.assertRaises(ShopifyDataError) as cm:
+            self._import_since_last_import(product_data)
 
-            with self.assertRaises(ShopifyDataError) as cm:
-                self.importer.import_products_since_last_import()
-
-            self.assertIn("Invalid ebay_category_id", str(cm.exception))
+        self.assertIn("Invalid ebay_category_id", str(cm.exception))
 
     def test_fetch_image_data_error(self) -> None:
         product_data = create_shopify_product_response(
@@ -531,21 +581,16 @@ class TestProductImporter(IntegrationTestCase):
             ],
         )
 
-        with (
-            patch.object(self.importer, "_fetch_page") as mock_fetch,
-            patch.object(self.mock_client.http_client, "stream") as mock_stream,
-        ):
-            mock_fetch.return_value = create_mock_simple_response([ProductFields(**product_data)])
-
+        with common.patch.object(self.mock_client.http_client, "stream") as mock_stream:
             mock_stream.side_effect = Exception("Network error")
 
             with self.assertRaises(ShopifyDataError) as cm:
-                self.importer.import_products_since_last_import()
+                self._import_since_last_import(product_data)
 
             self.assertIn("Network error", str(cm.exception))
 
     def test_images_already_in_sync(self) -> None:
-        sku = generate_unique_sku()
+        sku = common.generate_unique_sku()
         existing_product = ProductFactory.create(
             self.env,
             name="Product with Images",
@@ -572,7 +617,7 @@ class TestProductImporter(IntegrationTestCase):
 
         product_data = create_shopify_product_response(
             gid="gid://shopify/Product/555",
-            updated_at=datetime(2023, 12, 31).isoformat(),
+            updated_at=common.datetime(2023, 12, 31).isoformat(),
             variants=[
                 create_shopify_product_variant(sku=sku),
             ],
@@ -588,22 +633,14 @@ class TestProductImporter(IntegrationTestCase):
             ],
         )
 
-        with (
-            patch(
-                "odoo.addons.shopify_sync.services.shopify.sync.importers.product_importer.determine_latest_odoo_product_modification_time"
-            ) as mock_date,
-            patch.object(self.importer, "fetch_image_data") as mock_fetch_image,
-        ):
-            mock_date.return_value = datetime(2023, 1, 1)
-
-            product_fields = ProductFields(**product_data)
-            result = self.importer._import_one(product_fields)
+        with common.patch.object(self.importer, "fetch_image_data") as mock_fetch_image:
+            result = self._import_one_product(product_data)
 
             self.assertTrue(result)
             mock_fetch_image.assert_not_called()
 
     def test_product_with_zero_weight(self) -> None:
-        sku = generate_unique_sku()
+        sku = common.generate_unique_sku()
         product_data = create_shopify_product_response(
             media=[],  # No media to avoid image processing issues
             variants=[
@@ -623,14 +660,12 @@ class TestProductImporter(IntegrationTestCase):
             ],
         )
 
-        with patch.object(self.importer, "_fetch_page") as mock_fetch:
-            mock_fetch.return_value = create_mock_simple_response([ProductFields(**product_data)])
-            imported_count = self.importer.import_products_since_last_import()
+        imported_count = self._import_since_last_import(product_data)
 
         self.assertEqual(imported_count, 0)
 
     def test_import_product_with_extreme_prices(self) -> None:
-        sku = generate_unique_sku()
+        sku = common.generate_unique_sku()
         product_data = create_shopify_product_response(
             media=[],  # No media to avoid image processing issues
             variants=[
@@ -647,7 +682,7 @@ class TestProductImporter(IntegrationTestCase):
         self.assertEqual(product.standard_price, 0.01)
 
     def test_import_product_with_html_in_description(self) -> None:
-        sku = generate_unique_sku()
+        sku = common.generate_unique_sku()
         product_data = create_shopify_product_response(
             title="<b>Bold Product</b>",
             media=[],  # No media to avoid image processing issues,
@@ -726,10 +761,7 @@ class TestProductImporter(IntegrationTestCase):
             ],
         )
 
-        with patch.object(self.importer, "_fetch_page") as mock_fetch:
-            mock_fetch.return_value = create_mock_simple_response([ProductFields(**product_data)])
-
-            self.importer.import_products_since_last_import()
+        self._import_since_last_import(product_data)
 
         product2.invalidate_recordset()
         self.assertEqual(product2.name, "Updated Product")
@@ -744,14 +776,11 @@ class TestProductImporter(IntegrationTestCase):
             ],
         )
 
-        with patch.object(self.importer, "_fetch_page") as mock_fetch:
-            mock_fetch.return_value = create_mock_simple_response([ProductFields(**product_data)])
-
-            with self.assertRaises(ShopifyDataError):
-                self.importer.import_products_since_last_import()
+        with self.assertRaises(ShopifyDataError):
+            self._import_since_last_import(product_data)
 
     def test_import_product_with_massive_image_count(self) -> None:
-        sku = generate_unique_sku()
+        sku = common.generate_unique_sku()
         images = []
         for i in range(50):
             images.append(
@@ -770,7 +799,7 @@ class TestProductImporter(IntegrationTestCase):
             ],
         )
 
-        with patch.object(self.importer, "fetch_image_data") as mock_fetch_image:
+        with common.patch.object(self.importer, "fetch_image_data") as mock_fetch_image:
             mock_fetch_image.return_value = self._get_valid_image_base64()
 
             product_fields = ProductFields(**product_data)
@@ -789,18 +818,13 @@ class TestProductImporter(IntegrationTestCase):
             ],
         )
 
-        with (
-            patch.object(self.importer, "_fetch_page") as mock_fetch,
-            patch.object(self.mock_client.http_client, "stream") as mock_stream,
-        ):
-            mock_fetch.return_value = create_mock_simple_response([ProductFields(**product_data)])
-
+        with common.patch.object(self.mock_client.http_client, "stream") as mock_stream:
             mock_stream.side_effect = [
                 Exception("Connection reset"),
             ]
 
             with self.assertRaises(ShopifyDataError):
-                self.importer.import_products_since_last_import()
+                self._import_since_last_import(product_data)
 
     def test_import_product_inactive_then_active(self) -> None:
         sku = self._get_unique_sku()
@@ -822,10 +846,7 @@ class TestProductImporter(IntegrationTestCase):
             ],
         )
 
-        with patch.object(self.importer, "_fetch_page") as mock_fetch:
-            mock_fetch.return_value = create_mock_simple_response([ProductFields(**product_data)])
-
-            self.importer.import_products_since_last_import()
+        self._import_since_last_import(product_data)
 
         existing_template.invalidate_recordset()
         existing_product.invalidate_recordset()
@@ -834,7 +855,7 @@ class TestProductImporter(IntegrationTestCase):
         self.assertTrue(existing_template.is_published, "Product should be published after import")
 
     def test_import_product_with_null_inventory_fields(self) -> None:
-        sku = generate_unique_sku()
+        sku = common.generate_unique_sku()
         product_data = create_shopify_product_response(
             media=[],  # No media to avoid image processing issues
             variants=[
@@ -853,7 +874,7 @@ class TestProductImporter(IntegrationTestCase):
         self.assertEqual(product.weight, 0.0)
 
     def test_import_product_with_reordered_images(self) -> None:
-        sku = generate_unique_sku()
+        sku = common.generate_unique_sku()
         existing_product = ProductFactory.create(
             self.env,
             name="Product with Images",
@@ -882,7 +903,7 @@ class TestProductImporter(IntegrationTestCase):
 
         product_data = create_shopify_product_response(
             gid="gid://shopify/Product/444",
-            updated_at=datetime(2020, 1, 1).isoformat(),  # Old date
+            updated_at=common.datetime(2020, 1, 1).isoformat(),  # Old date
             variants=[
                 create_shopify_product_variant(sku=sku),
             ],
@@ -900,11 +921,10 @@ class TestProductImporter(IntegrationTestCase):
             ],
         )
 
-        with patch.object(self.importer, "fetch_image_data") as mock_fetch_image:
+        with common.patch.object(self.importer, "fetch_image_data") as mock_fetch_image:
             mock_fetch_image.return_value = self._get_valid_image_base64()
 
-            product_fields = ProductFields(**product_data)
-            result = self.importer._import_one(product_fields)
+            result = self._import_one_product(product_data)
 
             self.assertTrue(result, "Import should detect image order change")
 

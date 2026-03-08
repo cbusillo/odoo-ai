@@ -1,6 +1,7 @@
 from odoo import fields
+from test_support.tests.shared.sync_doubles import DummySyncRecord
 
-from ..common_imports import MagicMock, tagged, timedelta, INTEGRATION_TAGS
+from ..common_imports import common
 
 from ...services.shopify.sync.exporters.product_exporter import ProductExporter
 from ...services.shopify import helpers as _helpers_module
@@ -9,18 +10,6 @@ from ...services.shopify.gql import (
     ProductSetProductSetProductResourcePublicationsV2Nodes,
 )
 from ..fixtures.base import IntegrationTestCase
-
-
-class DummySync:
-    def __init__(self) -> None:
-        self.id = 1
-        self.hard_throttle_count = 0
-        self.total_count = 0
-        self.updated_count = 0
-
-    def ensure_not_canceled(self) -> None:
-        return
-
 
 class DummyPublication(ProductSetProductSetProductResourcePublicationsV2NodesPublication):
     def __init__(self, gid: str) -> None:
@@ -33,11 +22,11 @@ class DummyPublicationNode(ProductSetProductSetProductResourcePublicationsV2Node
         super().__init__(publication=publication)
 
 
-@tagged(*INTEGRATION_TAGS)
+@common.tagged(*common.INTEGRATION_TAGS)
 class TestProductExporter(IntegrationTestCase):
     def setUp(self) -> None:
         super().setUp()
-        self.exporter = ProductExporter(self.env, DummySync())
+        self.exporter = ProductExporter(self.env, DummySyncRecord())
 
         from ..fixtures.factories import ProductFactory
 
@@ -73,13 +62,13 @@ class TestProductExporter(IntegrationTestCase):
 
     def test_publish_product(self) -> None:
         self.env["ir.config_parameter"].sudo().set_param("shopify.test_store", "")
-        self.exporter.service._client = MagicMock()
+        self.exporter.service._client = common.MagicMock()
         self.exporter._publish_product("gid")
         self.exporter.service.client.update_publications.assert_called_once()
 
     def test_publish_product_skipped_on_test_store(self) -> None:
         self.env["ir.config_parameter"].sudo().set_param("shopify.test_store", "1")
-        self.exporter.service._client = MagicMock()
+        self.exporter.service._client = common.MagicMock()
         self.exporter._publish_product("gid")
         self.exporter.service.client.update_publications.assert_not_called()
 
@@ -101,7 +90,7 @@ class TestProductExporter(IntegrationTestCase):
         prod3 = self.test_products[2]  # This is a product.product
         prod3.is_ready_for_sale = True
         prod3.is_published = True
-        setattr(prod3, "shopify_last_exported_at", fields.Datetime.now() + timedelta(days=1))
+        setattr(prod3, "shopify_last_exported_at", fields.Datetime.now() + common.timedelta(days=1))
 
         result = self.exporter._find_products_to_export()
         self.assertIn(prod1, result)

@@ -4,11 +4,11 @@ This module demonstrates how to create a tour test for the OPW Custom module.
 Tour tests are browser-based tests that simulate user interactions.
 """
 
-from ..common_imports import tagged, TOUR_TAGS
+from ..common_imports import common
 from ..fixtures.base import TourTestCase
 
 
-@tagged(*TOUR_TAGS, "opw_custom")
+@common.tagged(*common.TOUR_TAGS, "opw_custom")
 class TestExampleProductTour(TourTestCase):
     """Test class for the example product tour.
 

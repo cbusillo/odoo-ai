@@ -3,14 +3,14 @@
 import logging
 import time
 import requests
-from odoo.tests import tagged
-from ..base_types import TOUR_TAGS
+
+from ..common_imports import common
 from ..fixtures.base import TourTestCase
 
 _logger = logging.getLogger(__name__)
 
 
-@tagged(*TOUR_TAGS)
+@common.tagged(*common.TOUR_TAGS)
 class TestSimpleFix(TourTestCase):
     """Test with proper server readiness check"""
 

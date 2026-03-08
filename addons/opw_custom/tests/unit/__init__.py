@@ -1,7 +1,4 @@
 # Import all unit test modules
-# Import JavaScript unit tests
-# noinspection PyUnusedImports
-from ..js import js_unit_tests
 from . import (
     test_autopost_bills_migration,
     test_basic,

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DataSourcePerFileMappings">
+    <file url="file://$PROJECT_DIR$/addons/openupgrade_scripts_custom/scripts/base/19.0.1.0/pre-migration.py" value="bf375885-e303-448c-8e37-09c285b2aaf8" />
+  </component>
+</project>

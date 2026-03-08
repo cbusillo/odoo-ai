@@ -1,10 +1,10 @@
 from lxml import etree
 
-from ..common_imports import tagged, UNIT_TAGS
+from ..common_imports import common
 from ..fixtures.base import UnitTestCase
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestViewsLoad(UnitTestCase):
     def _fields_in_form(self, model_name: str, view_xmlid: str) -> list[str]:
         view = self.env.ref(view_xmlid)

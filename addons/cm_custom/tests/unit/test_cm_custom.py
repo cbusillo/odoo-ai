@@ -3,11 +3,11 @@ from datetime import datetime, timedelta
 from odoo import fields
 from odoo.exceptions import ValidationError
 
-from ..common_imports import UNIT_TAGS, tagged
+from ..common_imports import common
 from ..fixtures.base import UnitTestCase
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestCmCustom(UnitTestCase):
     def _create_partner(self, name: str) -> "odoo.model.res_partner":
         return self.Partner.create({"name": name})

@@ -1,0 +1,21 @@
+{
+    "name": "Test Support",
+    "version": "19.0.1.0.0",
+    "summary": "Shared test fixtures, helpers, and recorded web tour support",
+    "author": "Chris Busillo (Shiny Computers)",
+    "maintainers": ["cbusillo"],
+    "depends": [
+        "base",
+        "web_tour",
+        "uom",
+        "product",
+        "sale",
+        "account",
+        "crm",
+        "delivery",
+        "stock",
+    ],
+    "installable": True,
+    "application": False,
+    "license": "LGPL-3",
+}

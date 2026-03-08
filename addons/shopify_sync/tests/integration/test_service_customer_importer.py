@@ -1,6 +1,6 @@
 import uuid
 
-from ..common_imports import tagged, logging, time, patch, INTEGRATION_TAGS
+from ..common_imports import common
 
 from ...services.shopify.gql import (
     CustomerFields,
@@ -9,17 +9,17 @@ from ...services.shopify.gql import (
 from ...services.shopify.helpers import parse_shopify_id_from_gid
 from ...services.shopify.sync.importers.customer_importer import CustomerImporter
 
-from ..fixtures.shopify_responses import (
+from test_support.tests.fixtures.shopify_responses import (
     create_shopify_customer_response,
     create_shopify_address_response,
 )
 from ..fixtures.base import IntegrationTestCase
 from ..fixtures.factories import ShopifySyncFactory, PartnerFactory
 
-_logger = logging.getLogger(__name__)
+_logger = common.logging.getLogger(__name__)
 
 
-@tagged(*INTEGRATION_TAGS)
+@common.tagged(*common.INTEGRATION_TAGS)
 class TestCustomerImporter(IntegrationTestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -486,7 +486,7 @@ class TestCustomerImporter(IntegrationTestCase):
     def test_import_customers_batch(self) -> None:
         unique_id = uuid.uuid4().hex[:8]
 
-        base_id = int(time.time() * 1000) % 1000000  # Unique base ID
+        base_id = int(common.time.common.time() * 1000) % 1000000  # Unique base ID
 
         customers_data = []
         for i in range(1, 4):
@@ -732,7 +732,7 @@ class TestCustomerImporter(IntegrationTestCase):
     def test_import_customer_api_rate_limit(self) -> None:
         from ...services.shopify.helpers import ShopifyApiError
 
-        with patch.object(self.importer, "_fetch_page") as mock_fetch:
+        with common.patch.object(self.importer, "_fetch_page") as mock_fetch:
             mock_fetch.side_effect = ShopifyApiError("Rate limit exceeded")
 
             with self.assertRaises(ShopifyApiError) as cm:

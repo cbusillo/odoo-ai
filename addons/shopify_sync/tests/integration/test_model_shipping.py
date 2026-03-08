@@ -1,4 +1,4 @@
-from ..common_imports import tagged, INTEGRATION_TAGS
+from ..common_imports import common
 from ..fixtures.base import IntegrationTestCase
 from ..fixtures.factories import (
     ShopifySyncFactory,
@@ -14,7 +14,7 @@ import logging
 _logger = logging.getLogger(__name__)
 
 
-@tagged(*INTEGRATION_TAGS)
+@common.tagged(*common.INTEGRATION_TAGS)
 class TestShipping(IntegrationTestCase):
     @classmethod
     def setUpClass(cls) -> None:

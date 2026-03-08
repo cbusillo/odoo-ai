@@ -1,43 +1,41 @@
-from typing import Any
-
-from psycopg2.errors import InFailedSqlTransaction
 from odoo.modules import module as odoo_module
+from psycopg2.errors import InFailedSqlTransaction
 
-from ..common_imports import tagged, patch, UNIT_TAGS
+from ..common_imports import common
 from ..fixtures.base import UnitTestCase
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestTransactionMixin(UnitTestCase):
     def setUp(self) -> None:
         super().setUp()
         self.test_model = self.env["transaction.mixin"]
 
     def test_safe_commit_in_test_mode(self) -> None:
-        with patch.object(self.test_model.env.cr, "commit") as mock_commit:
+        with common.patch.object(self.test_model.env.cr, "commit") as mock_commit:
             self.test_model._safe_commit()
             mock_commit.assert_not_called()
 
     def test_safe_rollback_in_test_mode(self) -> None:
-        with patch.object(self.test_model.env.cr, "rollback") as mock_rollback:
+        with common.patch.object(self.test_model.env.cr, "rollback") as mock_rollback:
             self.test_model._safe_rollback()
             mock_rollback.assert_not_called()
 
     def test_safe_commit_outside_test_mode(self) -> None:
         from odoo.tools import config
 
-        with patch.object(odoo_module, "current_test", False):
-            with patch.object(config, "get", return_value=False):
-                with patch.object(self.test_model.env.cr, "commit") as mock_commit:
+        with common.patch.object(odoo_module, "current_test", False):
+            with common.patch.object(config, "get", return_value=False):
+                with common.patch.object(self.test_model.env.cr, "commit") as mock_commit:
                     self.test_model._safe_commit()
                     mock_commit.assert_called_once()
 
     def test_safe_rollback_outside_test_mode(self) -> None:
         from odoo.tools import config
 
-        with patch.object(odoo_module, "current_test", False):
-            with patch.object(config, "get", return_value=False):
-                with patch.object(self.test_model.env.cr, "rollback") as mock_rollback:
+        with common.patch.object(odoo_module, "current_test", False):
+            with common.patch.object(config, "get", return_value=False):
+                with common.patch.object(self.test_model.env.cr, "rollback") as mock_rollback:
                     self.test_model._safe_rollback()
                     mock_rollback.assert_called_once()
 
@@ -78,7 +76,7 @@ class TestTransactionMixin(UnitTestCase):
         original_execute = self.env.cr.execute
         unlock_call_count = 0
 
-        def mock_execute(query: str, params: list | None = None) -> Any:
+        def mock_execute(query: str, params: list | None = None) -> object:
             nonlocal unlock_call_count
             if "pg_try_advisory_lock" in query:
                 return original_execute(query, params)
@@ -87,7 +85,7 @@ class TestTransactionMixin(UnitTestCase):
                 raise InFailedSqlTransaction("current transaction is aborted")
             return original_execute(query, params)
 
-        with patch.object(self.env.cr, "execute", side_effect=mock_execute):
+        with common.patch.object(self.env.cr, "execute", side_effect=mock_execute):
             with self.test_model._advisory_lock(12346) as acquired:
                 self.assertTrue(acquired, "Should acquire advisory lock")
 

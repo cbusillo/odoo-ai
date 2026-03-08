@@ -1,8 +1,8 @@
-from ..common_imports import tagged, UNIT_TAGS
+from ..common_imports import common
 from ..fixtures.base import UnitTestCase
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestMultigraphQuickIntegration(UnitTestCase):
     @classmethod
     def setUpClass(cls) -> None:

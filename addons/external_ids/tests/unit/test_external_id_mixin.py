@@ -1,9 +1,9 @@
-from ..common_imports import tagged, UNIT_TAGS
+from ..common_imports import common
 from ..fixtures.base import UnitTestCase
 from ..fixtures.factories import ExternalSystemFactory
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestExternalIdMixin(UnitTestCase):
     def setUp(self) -> None:
         super().setUp()

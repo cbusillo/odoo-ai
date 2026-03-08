@@ -1,9 +1,9 @@
-from ..common_imports import tagged, ValidationError, UNIT_TAGS
+from ..common_imports import common
 from ..fixtures.base import UnitTestCase
-from ..fixtures.factories import ExternalSystemFactory, ExternalIdFactory
+from ..fixtures.factories import ExternalIdFactory, ExternalSystemFactory
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestExternalId(UnitTestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -94,7 +94,7 @@ class TestExternalId(UnitTestCase):
     def test_id_format_validation(self) -> None:
         partner = self.Partner.create({"name": "Validation Test"})
 
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(common.ValidationError):
             ExternalIdFactory.create(
                 self.env,
                 res_model="res.partner",
@@ -115,7 +115,7 @@ class TestExternalId(UnitTestCase):
             external_id="333333333333333333",
         )
 
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(common.ValidationError):
             ExternalIdFactory.create(
                 self.env,
                 res_model="res.partner",
@@ -135,7 +135,7 @@ class TestExternalId(UnitTestCase):
             external_id="444444444444444444",
         )
 
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(common.ValidationError):
             ExternalIdFactory.create(
                 self.env,
                 res_model="res.partner",
@@ -190,7 +190,7 @@ class TestExternalId(UnitTestCase):
             external_id="888888888888888888",
         )
 
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(common.ValidationError):
             external_id.unlink()
 
         external_id.active = False

@@ -1,22 +1,11 @@
-from ..common_imports import timedelta, MagicMock, tagged, UNIT_TAGS
+from ..common_imports import common
 from odoo.api import Environment
+from test_support.tests.shared.sync_doubles import DummySyncRecord
 
 from ...services.shopify.sync.base import ShopifyBaseImporter, ShopifyBaseExporter, ShopifyBaseDeleter
 from ...services.shopify.helpers import format_datetime_for_shopify, parse_shopify_datetime_to_utc
 from ...services.shopify.gql import Client
 from ..fixtures.base import UnitTestCase
-
-
-class DummySync:
-    def __init__(self) -> None:
-        self.id = 1
-        self.hard_throttle_count = 0
-        self.total_count = 0
-        self.updated_count = 0
-
-    def ensure_not_canceled(self) -> None:
-        return
-
 
 class DummyPageInfo:
     def __init__(self, cursor: str | None = None, has_next: bool = False) -> None:
@@ -31,14 +20,14 @@ class DummyPage:
 
 
 class DummyImporter(ShopifyBaseImporter[int]):
-    def __init__(self, env: Environment, sync_record: DummySync, pages: list[DummyPage]) -> None:
+    def __init__(self, env: Environment, sync_record: DummySyncRecord, pages: list[DummyPage]) -> None:
         super().__init__(env, sync_record)
         self.pages = pages
         self.fetch_calls: list[tuple[str | None, str | None]] = []
         self.imported: list[int] = []
         self.run_query: str | None = None
-        self.service = MagicMock()
-        self.service.client = MagicMock()
+        self.service = common.MagicMock()
+        self.service.client = common.MagicMock()
 
     def _fetch_page(self, client: Client, query: str | None, cursor: str | None) -> DummyPage:
         index = len(self.fetch_calls)
@@ -55,22 +44,22 @@ class DummyImporter(ShopifyBaseImporter[int]):
 
 
 class DummyExporter(ShopifyBaseExporter[int]):
-    def __init__(self, env: Environment, sync_record: DummySync) -> None:
+    def __init__(self, env: Environment, sync_record: DummySyncRecord) -> None:
         super().__init__(env, sync_record)
         self.exported: list[int] = []
-        self.service = MagicMock()
-        self.service.client = MagicMock()
+        self.service = common.MagicMock()
+        self.service.client = common.MagicMock()
 
     def _export_one(self, record: int) -> None:
         self.exported.append(record)
 
 
 class DummyDeleter(ShopifyBaseDeleter[int]):
-    def __init__(self, env: Environment, sync_record: DummySync) -> None:
+    def __init__(self, env: Environment, sync_record: DummySyncRecord) -> None:
         super().__init__(env, sync_record)
         self.deleted: list[int] = []
-        self.service = MagicMock()
-        self.service.client = MagicMock()
+        self.service = common.MagicMock()
+        self.service.client = common.MagicMock()
 
     def _delete_one(self, record: int) -> None:
         self.deleted.append(record)
@@ -80,7 +69,7 @@ def make_pages() -> list[DummyPage]:
     return [DummyPage([1, 2], "c1", True), DummyPage([3, 4])]
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestShopifySyncItems(UnitTestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -89,8 +78,8 @@ class TestShopifySyncItems(UnitTestCase):
         config.set_param("shopify.api_token", "dummy_token")
 
     @staticmethod
-    def _sync() -> DummySync:
-        return DummySync()
+    def _sync() -> DummySyncRecord:
+        return DummySyncRecord()
 
     def test_importer_iterates_pages(self) -> None:
         sync = self._sync()
@@ -114,7 +103,7 @@ class TestShopifySyncItems(UnitTestCase):
         self.env["ir.config_parameter"].set_param(key, time_string)
         importer = DummyImporter(self.env, sync, make_pages())
         importer.run_since_last_import("order")
-        expected_time = parse_shopify_datetime_to_utc(time_string) - timedelta(seconds=2)
+        expected_time = parse_shopify_datetime_to_utc(time_string) - common.timedelta(seconds=2)
         expected_filter = f'updated_at:>"{format_datetime_for_shopify(expected_time)}"'
         self.assertEqual(importer.run_query, expected_filter)
 

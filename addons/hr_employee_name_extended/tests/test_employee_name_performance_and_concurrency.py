@@ -1,10 +1,11 @@
 import concurrent.futures
 
-from .common_imports import TransactionCase, tagged, UNIT_TAGS, MODULE_TAG
+from .common_imports import common
 
 
-@tagged(*UNIT_TAGS, MODULE_TAG)
-class TestEmployeePerfConcurrency(TransactionCase):
+@common.tagged(*common.UNIT_TAGS)
+class TestEmployeePerfConcurrency(common.TransactionCase):
+    # noinspection PyPep8Naming
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()

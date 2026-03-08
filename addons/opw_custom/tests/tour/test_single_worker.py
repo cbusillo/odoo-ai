@@ -1,12 +1,14 @@
 """Test tour with single worker to isolate multi-worker issues"""
 
 import logging
-from odoo.tests import tagged, HttpCase
+from odoo.tests import HttpCase
+
+from ..common_imports import common
 
 _logger = logging.getLogger(__name__)
 
 
-@tagged("tour_test", "post_install", "-at_install")
+@common.tagged("tour_test", "post_install", "-at_install")
 class TestSingleWorker(HttpCase):
     """Test with standard HttpCase to avoid multi-worker issues"""
 

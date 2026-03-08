@@ -1,6 +1,6 @@
-from typing import TypedDict, Any
+from typing import TypedDict
 
-from ..common_imports import patch, MagicMock, Mock, tagged, INTEGRATION_TAGS
+from ..common_imports import common
 from httpx import Request, Response
 
 from ...services.shopify.gql import (
@@ -35,7 +35,7 @@ class GraphQLCostResponse(TypedDict):
     extensions: Extensions
 
 
-@tagged(*INTEGRATION_TAGS)
+@common.tagged(*common.INTEGRATION_TAGS)
 class TestGraphQLClientIntegration(IntegrationTestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -48,8 +48,8 @@ class TestGraphQLClientIntegration(IntegrationTestCase):
         config.set_param("shopify.api_token", "test-token")
 
     @staticmethod
-    def _create_mock_http_response(json_response: dict) -> tuple[MagicMock, Mock]:
-        mock_http_client = MagicMock()
+    def _create_mock_http_response(json_response: dict) -> tuple[common.MagicMock, common.Mock]:
+        mock_http_client = common.MagicMock()
         mock_http_client.send.return_value = Response(
             200,
             json=json_response,
@@ -57,20 +57,20 @@ class TestGraphQLClientIntegration(IntegrationTestCase):
             headers={"content-type": "application/json"},
         )
 
-        mock_shopify_client = Mock(spec=Client)
+        mock_shopify_client = common.Mock(spec=Client)
         mock_shopify_client._http_client = mock_http_client
         return mock_http_client, mock_shopify_client
 
     def test_graphql_query_structure(self) -> None:
-        with patch.object(self.service, "_create_http_client") as mock_create_client:
-            mock_client = MagicMock()
-            mock_http_client = MagicMock()
+        with common.patch.object(self.service, "_create_http_client") as mock_create_client:
+            mock_client = common.MagicMock()
+            mock_http_client = common.MagicMock()
             mock_client._http_client = mock_http_client
             mock_create_client.return_value = mock_http_client
 
             sent_requests = []
 
-            def capture_request(request: Request, **_kwargs: Any) -> Response:
+            def capture_request(request: Request, **_kwargs: object) -> Response:
                 sent_requests.append(request)
                 return Response(
                     200,
@@ -88,17 +88,17 @@ class TestGraphQLClientIntegration(IntegrationTestCase):
 
             mock_http_client.send = capture_request
 
-            mock_shopify_client = Mock()
-            mock_shopify_client.get_products = Mock(
-                return_value=Mock(
-                    products=Mock(
+            mock_shopify_client = common.Mock()
+            mock_shopify_client.get_products = common.Mock(
+                return_value=common.Mock(
+                    products=common.Mock(
                         nodes=[],
-                        page_info=Mock(has_next_page=False),
+                        page_info=common.Mock(has_next_page=False),
                     )
                 )
             )
 
-            with patch.object(self.service, "_client", mock_shopify_client):
+            with common.patch.object(self.service, "_client", mock_shopify_client):
                 self.service.client.get_products(limit=10)
 
             mock_shopify_client.get_products.assert_called_once_with(limit=10)
@@ -140,8 +140,8 @@ class TestGraphQLClientIntegration(IntegrationTestCase):
         self.assertEqual(product.variants.nodes[0].sku, "008021")
 
     def test_graphql_error_handling(self) -> None:
-        with patch.object(self.service, "_create_http_client") as mock_create_client:
-            mock_http_client = MagicMock()
+        with common.patch.object(self.service, "_create_http_client") as mock_create_client:
+            mock_http_client = common.MagicMock()
             mock_create_client.return_value = mock_http_client
 
             mock_http_client.send.return_value = Response(
@@ -161,11 +161,11 @@ class TestGraphQLClientIntegration(IntegrationTestCase):
                 headers={"content-type": "application/json"},
             )
 
-            mock_shopify_client = Mock()
+            mock_shopify_client = common.Mock()
             mock_shopify_client._http_client = mock_http_client
-            mock_shopify_client.get_products = Mock(side_effect=ShopifyApiError("GraphQL parse failed"))
+            mock_shopify_client.get_products = common.Mock(side_effect=ShopifyApiError("GraphQL parse failed"))
 
-            with patch.object(self.service, "_client", mock_shopify_client):
+            with common.patch.object(self.service, "_client", mock_shopify_client):
                 with self.assertRaises(ShopifyApiError) as cm:
                     self.service.client.get_products(limit=10)
 
@@ -226,8 +226,8 @@ class TestGraphQLClientIntegration(IntegrationTestCase):
             }
         }
 
-        with patch.object(self.service, "_create_http_client") as mock_create_client:
-            mock_http_client = MagicMock()
+        with common.patch.object(self.service, "_create_http_client") as mock_create_client:
+            mock_http_client = common.MagicMock()
             mock_create_client.return_value = mock_http_client
 
             responses = [page1_response, page2_response]
@@ -241,20 +241,20 @@ class TestGraphQLClientIntegration(IntegrationTestCase):
                 for resp in responses
             ]
 
-            mock_page1 = Mock()
+            mock_page1 = common.Mock()
             mock_page1.products.nodes = [ProductFields(**page1_response["data"]["products"]["nodes"][0])]
             mock_page1.products.page_info.has_next_page = True
             mock_page1.products.page_info.end_cursor = "cursor123"
 
-            mock_page2 = Mock()
+            mock_page2 = common.Mock()
             mock_page2.products.nodes = [ProductFields(**page2_response["data"]["products"]["nodes"][0])]
             mock_page2.products.page_info.has_next_page = False
             mock_page2.products.page_info.end_cursor = None
 
-            mock_shopify_client = Mock()
-            mock_shopify_client.get_products = Mock(side_effect=[mock_page1, mock_page2])
+            mock_shopify_client = common.Mock()
+            mock_shopify_client.get_products = common.Mock(side_effect=[mock_page1, mock_page2])
 
-            with patch.object(self.service, "_client", mock_shopify_client):
+            with common.patch.object(self.service, "_client", mock_shopify_client):
                 all_products = []
                 cursor = None
                 while True:
@@ -292,18 +292,18 @@ class TestGraphQLClientIntegration(IntegrationTestCase):
             }
         }
 
-        with patch.object(self.service, "_create_http_client") as mock_create_client:
+        with common.patch.object(self.service, "_create_http_client") as mock_create_client:
             mock_http_client, mock_shopify_client = self._create_mock_http_response(mutation_response)
             mock_create_client.return_value = mock_http_client
 
-            mock_product_set = Mock(spec=ProductSetProductSet)
-            mock_product_set.product = Mock(spec=ProductSetProductSetProduct)
+            mock_product_set = common.Mock(spec=ProductSetProductSet)
+            mock_product_set.product = common.Mock(spec=ProductSetProductSetProduct)
             mock_product_set.product.id = "gid://shopify/Product/123"
             mock_product_set.user_errors = []
 
-            mock_shopify_client.product_set = Mock(return_value=mock_product_set)
+            mock_shopify_client.product_set = common.Mock(return_value=mock_product_set)
 
-            with patch.object(self.service, "_client", mock_shopify_client):
+            with common.patch.object(self.service, "_client", mock_shopify_client):
                 result = self.service.client.product_set(
                     input=ProductSetInput(title="Updated Product"),
                     identifier=ProductSetIdentifiers(id="gid://shopify/Product/123"),
@@ -333,26 +333,26 @@ class TestGraphQLClientIntegration(IntegrationTestCase):
             }
         }
 
-        with patch.object(self.service, "_create_http_client") as mock_create_client:
+        with common.patch.object(self.service, "_create_http_client") as mock_create_client:
             mock_http_client, mock_shopify_client = self._create_mock_http_response(user_error_response)
             mock_create_client.return_value = mock_http_client
 
-            mock_product_set = Mock(spec=ProductSetProductSet)
+            mock_product_set = common.Mock(spec=ProductSetProductSet)
             mock_product_set.product = None
 
-            mock_error1 = Mock(spec=ProductSetProductSetUserErrors)
+            mock_error1 = common.Mock(spec=ProductSetProductSetUserErrors)
             mock_error1.field = ["title"]
             mock_error1.message = "Title can't be blank"
 
-            mock_error2 = Mock(spec=ProductSetProductSetUserErrors)
+            mock_error2 = common.Mock(spec=ProductSetProductSetUserErrors)
             mock_error2.field = ["vendor"]
             mock_error2.message = "Vendor is required"
 
             mock_product_set.user_errors = [mock_error1, mock_error2]
 
-            mock_shopify_client.product_set = Mock(return_value=mock_product_set)
+            mock_shopify_client.product_set = common.Mock(return_value=mock_product_set)
 
-            with patch.object(self.service, "_client", mock_shopify_client):
+            with common.patch.object(self.service, "_client", mock_shopify_client):
                 result = self.service.client.product_set(input=ProductSetInput(title="", vendor=""))
 
                 self.assertIsNone(result.product)
@@ -401,13 +401,13 @@ class TestGraphQLClientIntegration(IntegrationTestCase):
         }
         """
 
-        with patch.object(self.service, "_create_http_client") as mock_create_client:
-            mock_http_client = MagicMock()
+        with common.patch.object(self.service, "_create_http_client") as mock_create_client:
+            mock_http_client = common.MagicMock()
             mock_create_client.return_value = mock_http_client
 
             sent_requests = []
 
-            def capture_request(request: Request, **_kwargs: Any) -> Response:
+            def capture_request(request: Request, **_kwargs: object) -> Response:
                 sent_requests.append(request)
                 return Response(
                     200,
@@ -577,8 +577,8 @@ class TestGraphQLClientIntegration(IntegrationTestCase):
             },
         }
 
-        with patch.object(self.service, "_create_http_client") as mock_create_client:
-            mock_http_client = MagicMock()
+        with common.patch.object(self.service, "_create_http_client") as mock_create_client:
+            mock_http_client = common.MagicMock()
             mock_create_client.return_value = mock_http_client
 
             mock_http_client.send.return_value = Response(

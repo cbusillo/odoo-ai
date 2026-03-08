@@ -1,13 +1,16 @@
+from datetime import UTC, datetime
+
 from collections.abc import Callable
 
 from ...services.shopify import helpers
+from ...services.shopify.sync import change_detection
 from ...services.shopify.gql.base_model import BaseModel
-from ..common_imports import UNIT_TAGS, MagicMock, UserError, datetime, patch, tagged
+from ..common_imports import common
 from ..fixtures.base import UnitTestCase
 from ..fixtures.factories import PartnerFactory, ProductFactory
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestShopifyHelpers(UnitTestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -101,13 +104,11 @@ class TestShopifyHelpers(UnitTestCase):
     def test_parse_shopify_datetime_to_utc(self) -> None:
         self.assertEqual(
             helpers.parse_shopify_datetime_to_utc("2024-05-20T12:34:56Z"),
-            datetime(2024, 5, 20, 12, 34, 56),
+            common.datetime(2024, 5, 20, 12, 34, 56),
         )
 
     def test_format_datetime_for_shopify(self) -> None:
-        from datetime import UTC
-
-        dt = datetime(2024, 5, 20, 12, 34, 56, tzinfo=UTC)
+        dt = common.datetime(2024, 5, 20, 12, 34, 56, tzinfo=UTC)
         self.assertEqual(helpers.format_datetime_for_shopify(dt), "2024-05-20T12:34:56Z")
 
     def test_parse_format_sku_bin(self) -> None:
@@ -128,46 +129,73 @@ class TestShopifyHelpers(UnitTestCase):
     def test_write_if_changed_branches(self) -> None:
         partner = self.env["res.partner"].create({"name": "old", "autopost_bills": "ask"})
 
-        with patch.object(self.env["res.partner"].__class__, "write", wraps=partner.write) as mock_write:
-            self.assertFalse(helpers.write_if_changed(partner, {"name": "old"}))
+        with common.patch.object(self.env["res.partner"].__class__, "write", wraps=partner.write) as mock_write:
+            self.assertFalse(change_detection.write_if_changed(partner, {"name": "old"}))
             mock_write.assert_not_called()
 
-        with patch.object(self.env["res.partner"].__class__, "write", wraps=partner.write) as mock_write:
-            self.assertTrue(helpers.write_if_changed(partner, {"name": "new"}))
+        with common.patch.object(self.env["res.partner"].__class__, "write", wraps=partner.write) as mock_write:
+            self.assertTrue(change_detection.write_if_changed(partner, {"name": "new"}))
             mock_write.assert_called_once_with({"name": "new"})
             self.assertEqual(partner.name, "new")
+
+    def test_changed_values_treats_false_and_empty_text_as_equal(self) -> None:
+        product_template = ProductFactory.create(self.env, website_description=False)
+
+        self.assertEqual(
+            change_detection.changed_values(product_template, {"website_description": ""}),
+            {},
+        )
+
+    def test_changed_values_treats_equivalent_html_as_equal(self) -> None:
+        product_template = ProductFactory.create(self.env, website_description="<p>Test product description</p>")
+
+        self.assertEqual(
+            change_detection.changed_values(product_template, {"website_description": "Test product description"}),
+            {},
+        )
+
+    def test_changed_values_preserves_meaningful_html_markup_changes(self) -> None:
+        product_template = ProductFactory.create(self.env, website_description="<p>Test product description</p>")
+
+        self.assertEqual(
+            change_detection.changed_values(
+                product_template,
+                {"website_description": "<p><strong>Test product description</strong></p>"},
+            ),
+            {"website_description": "<p><strong>Test product description</strong></p>"},
+        )
 
     def test_write_if_changed_float(self) -> None:
         product = ProductFactory.create(self.env, list_price=1.23)
 
-        with patch.object(self.env["product.template"].__class__, "write", wraps=product.write) as mock_write:
-            self.assertFalse(helpers.write_if_changed(product, {"list_price": 1.23}))
+        with common.patch.object(self.env["product.template"].__class__, "write", wraps=product.write) as mock_write:
+            self.assertFalse(change_detection.write_if_changed(product, {"list_price": 1.23}))
             mock_write.assert_not_called()
 
-        with patch.object(self.env["product.template"].__class__, "write", wraps=product.write) as mock_write:
-            self.assertTrue(helpers.write_if_changed(product, {"list_price": 1.25}))
+        with common.patch.object(self.env["product.template"].__class__, "write", wraps=product.write) as mock_write:
+            self.assertTrue(change_detection.write_if_changed(product, {"list_price": 1.25}))
             mock_write.assert_called_once_with({"list_price": 1.25})
             self.assertEqual(product.list_price, 1.25)
 
-        with self.assertRaises(UserError):
-            helpers.write_if_changed(product, {"list_price": ["bad"]})
+        with self.assertRaises(common.UserError):
+            change_detection.write_if_changed(product, {"list_price": ["bad"]})
 
     def test_determine_latest_odoo_product_modification_time(self) -> None:
         class Tmpl:
-            def __init__(self, write_date: datetime) -> None:
+            def __init__(self, write_date: common.datetime) -> None:
                 self.write_date = write_date
 
         class Prod:
-            def __init__(self, w1: datetime, w2: datetime, w3: datetime) -> None:
+            def __init__(self, w1: common.datetime, w2: common.datetime, w3: common.datetime) -> None:
                 self.write_date = w1
                 self.product_tmpl_id = Tmpl(w2)
                 self.shopify_last_exported_at = w3
 
-        t1, t2, t3 = datetime(2024, 1, 1), datetime(2024, 1, 2), datetime(2024, 1, 3)
+        t1, t2, t3 = common.datetime(2024, 1, 1), common.datetime(2024, 1, 2), common.datetime(2024, 1, 3)
         self.assertEqual(helpers.determine_latest_odoo_product_modification_time(Prod(t1, t2, t3)), t3)
 
     def test_parse_datetime_and_gid_and_sku_errors(self) -> None:
-        naive_dt = datetime(2024, 5, 20, 12, 34, 56)
+        naive_dt = common.datetime(2024, 5, 20, 12, 34, 56)
         self.assertEqual(helpers.parse_shopify_datetime_to_utc(naive_dt), naive_dt)
         self.assertEqual(helpers.parse_shopify_id_from_gid("5"), "5")
         self.assertEqual(helpers.format_shopify_gid_from_id("product", 5), "gid://shopify/product/5")
@@ -184,12 +212,12 @@ class TestShopifyHelpers(UnitTestCase):
             ]
         )
 
-        mock_record = MagicMock()
-        mock_record._fields = {"partner_ids": MagicMock()}
+        mock_record = common.MagicMock()
+        mock_record._fields = {"partner_ids": common.MagicMock()}
         mock_record.__getitem__ = lambda _, key: partners if key == "partner_ids" else None
 
-        with self.assertRaises(UserError) as cm:
-            helpers.write_if_changed(mock_record, {"partner_ids": partners})
+        with self.assertRaises(common.UserError) as cm:
+            change_detection.write_if_changed(mock_record, {"partner_ids": partners})
 
         self.assertIn("multi‑record recordset", str(cm.exception))
 
@@ -218,8 +246,8 @@ class TestShopifyHelpers(UnitTestCase):
     def test_parse_datetime_and_format_with_naive(self) -> None:
         dt_str = "2024-05-20T07:34:56-05:00"
         parsed = helpers.parse_shopify_datetime_to_utc(dt_str)
-        self.assertEqual(parsed, datetime(2024, 5, 20, 12, 34, 56))
-        naive = datetime(2024, 5, 20, 12, 34, 56)
+        self.assertEqual(parsed, common.datetime(2024, 5, 20, 12, 34, 56))
+        naive = common.datetime(2024, 5, 20, 12, 34, 56)
         self.assertEqual(helpers.format_datetime_for_shopify(naive), "2024-05-20T12:34:56Z")
 
     def test_image_order_key_defaults(self) -> None:
@@ -261,8 +289,8 @@ class TestShopifyHelpers(UnitTestCase):
             }
         )
 
-        with patch.object(self.env["sale.order"].__class__, "write", wraps=sale_order.write) as mock_write:
-            changed = helpers.write_if_changed(
+        with common.patch.object(self.env["sale.order"].__class__, "write", wraps=sale_order.write) as mock_write:
+            changed = change_detection.write_if_changed(
                 sale_order,
                 {
                     "partner_id": self.test_partner.id,
@@ -285,8 +313,8 @@ class TestShopifyHelpers(UnitTestCase):
             name="New Partner",
         )
 
-        with patch.object(self.env["sale.order"].__class__, "write", wraps=sale_order.write) as mock_write:
-            changed = helpers.write_if_changed(
+        with common.patch.object(self.env["sale.order"].__class__, "write", wraps=sale_order.write) as mock_write:
+            changed = change_detection.write_if_changed(
                 sale_order,
                 {
                     "partner_id": new_partner.id,
@@ -304,8 +332,8 @@ class TestShopifyHelpers(UnitTestCase):
             standard_price=50.0,
         )
 
-        with patch.object(self.env["product.template"].__class__, "write", wraps=product.write) as mock_write:
-            changed = helpers.write_if_changed(
+        with common.patch.object(self.env["product.template"].__class__, "write", wraps=product.write) as mock_write:
+            changed = change_detection.write_if_changed(
                 product,
                 {
                     "list_price": 100.0,
@@ -315,8 +343,8 @@ class TestShopifyHelpers(UnitTestCase):
             self.assertFalse(changed)
             mock_write.assert_not_called()
 
-        with patch.object(self.env["product.template"].__class__, "write", wraps=product.write) as mock_write:
-            changed = helpers.write_if_changed(
+        with common.patch.object(self.env["product.template"].__class__, "write", wraps=product.write) as mock_write:
+            changed = change_detection.write_if_changed(
                 product,
                 {
                     "list_price": 150.0,
@@ -342,7 +370,7 @@ class TestShopifyHelpers(UnitTestCase):
             variants: list = []
 
         err = helpers.ShopifyApiError("msg", shopify_record=Prod())
-        with patch.object(helpers.OdooDataError, "__str__", lambda _exc: "err"):
+        with common.patch.object(helpers.OdooDataError, "__str__", lambda _exc: "err"):
             txt = str(err)
             self.assertIn("[foo]", txt)
 
@@ -357,7 +385,7 @@ class TestShopifyHelpers(UnitTestCase):
             variants: list = []
 
         err = helpers.ShopifyApiError("msg", shopify_record=Prod())
-        with patch.object(helpers.OdooDataError, "__str__", lambda _exc: "msg"):
+        with common.patch.object(helpers.OdooDataError, "__str__", lambda _exc: "msg"):
             txt = str(err)
             self.assertNotIn("Shopify ID", txt)
 

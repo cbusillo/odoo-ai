@@ -1,11 +1,12 @@
 import base64
 
-from ..common_imports import tagged, ValidationError, UNIT_TAGS
-from ..fixtures.base import UnitTestCase
+from ..common_imports import common
+
 from ..fixtures.factories import MotorFactory
+from ..fixtures.base import UnitTestCase
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestMotor(UnitTestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -43,7 +44,7 @@ class TestMotor(UnitTestCase):
 
     def test_unique_location(self) -> None:
         self._create_test_motor(location="A1")
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(common.ValidationError):
             self._create_test_motor(location="A1")
 
     def test_generate_qr_code(self) -> None:

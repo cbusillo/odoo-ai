@@ -1,10 +1,10 @@
 import re
 from pathlib import Path
-from ..common_imports import tagged, UNIT_TAGS
+from ..common_imports import common
 from ..fixtures.base import UnitTestCase
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestTourCoverage(UnitTestCase):
     def test_all_tours_have_runners(self) -> None:
         addon_path = Path(__file__).parent.parent

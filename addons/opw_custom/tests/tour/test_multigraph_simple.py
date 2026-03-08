@@ -1,9 +1,11 @@
-from ..common_imports import TOUR_TAGS, date, tagged
+from ..common_imports import common
 from ..fixtures.base import TourTestCase
 from ..fixtures.factories import ProductFactory
 
+from ..fixtures.multigraph_helpers import load_multigraph_action_context
 
-@tagged(*TOUR_TAGS, "opw_custom")
+
+@common.tagged(*common.TOUR_TAGS, "opw_custom")
 class TestMultigraphSimple(TourTestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -17,7 +19,7 @@ class TestMultigraphSimple(TourTestCase):
                 list_price=150 * i,
                 standard_price=90 * i,
                 is_ready_for_sale=True,
-                is_ready_for_sale_last_enabled_date=date(2025, 1, i),
+                is_ready_for_sale_last_enabled_date=common.date(2025, 1, i),
                 initial_quantity=20 * i,
                 initial_price_total=2000 * i,
                 initial_cost_total=1200 * i,
@@ -27,24 +29,7 @@ class TestMultigraphSimple(TourTestCase):
 
     def test_action_loads(self) -> None:
         """Test that action exists and has correct configuration"""
-        action = self.env.ref("opw_custom.action_product_processing_analytics")
-        self.assertTrue(action, "Action should exist")
-        self.assertEqual(action.res_model, "product.template")
-        self.assertIn("graph", action.view_mode)
-
-        # Test that the model can be accessed (basic permissions check)
-        model = self.env[action.res_model]
-        self.assertTrue(hasattr(model, "search"), "Should be able to access product.template model")
-
-        # Check that we can run a basic search with the domain from the action
-        domain = eval(action.domain) if action.domain else []
-        try:
-            # This should not raise an exception even if no records are found
-            model.search(domain, limit=1)
-            # The search succeeded (even if it returned no records)
-            self.assertTrue(True, "Domain search completed without error")
-        except Exception as e:
-            self.fail(f"Domain search failed: {e}")
+        _action, model, domain = load_multigraph_action_context(self, required_view_mode="graph")
 
         # Verify that our test data matches the action domain
         test_product_ids = set(p.id for p in self.test_products)

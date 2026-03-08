@@ -1,9 +1,9 @@
-from odoo.tests import TransactionCase
-from .common_imports import tagged, UNIT_TAGS, MODULE_TAG
+from .common_imports import common
 
 
-@tagged(*UNIT_TAGS, MODULE_TAG)
-class TestPerEmployeeFormat(TransactionCase):
+@common.tagged(*common.UNIT_TAGS)
+class TestPerEmployeeFormat(common.TransactionCase):
+    # noinspection PyPep8Naming
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()

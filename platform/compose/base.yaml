@@ -1,0 +1,18 @@
+# Shared compose fragments applied to every stack.
+# Sits between docker-compose.override.yml and project-specific overlays.
+
+services:
+  web:
+    command: >-
+      ${ODOO_WEB_COMMAND:-/odoo/odoo-bin}
+    env_file:
+      - .env
+      - platform/config/base.env
+  script-runner:
+    env_file:
+      - .env
+      - platform/config/base.env
+  database:
+    env_file:
+      - .env
+      - platform/config/base.env

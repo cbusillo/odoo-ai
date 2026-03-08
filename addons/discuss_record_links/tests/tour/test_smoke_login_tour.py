@@ -1,9 +1,8 @@
-from odoo.addons.opw_custom.tests.base_types import TOUR_TAGS
-from odoo.addons.opw_custom.tests.fixtures.base import TourTestCase
-from odoo.tests import tagged
+from ..common_imports import common
+from ..fixtures.base import TourTestCase
 
 
-@tagged(*TOUR_TAGS, "discuss_record_links")
+@common.tagged(*common.TOUR_TAGS)
 class TestDiscussRecordLinksSmokeTour(TourTestCase):
     def test_smoke_login_tour(self) -> None:
         self.start_tour("/web", "smoke_login_tour", login=self._get_test_login(), timeout=300)

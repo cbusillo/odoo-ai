@@ -1,8 +1,8 @@
-from ..common_imports import tagged, UNIT_TAGS
+from ..common_imports import common
 from ..fixtures import UnitTestCase, ProductFactory
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestProductFactory(UnitTestCase):
     def test_create_single_product(self) -> None:
         product = ProductFactory.create(self.env, name="Test Motor")

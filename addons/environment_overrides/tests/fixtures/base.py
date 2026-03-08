@@ -1,19 +1,20 @@
-from odoo.tests import TransactionCase
+from test_support.tests.fixtures.unit_case import AdminContextUnitTestCase
 
-from ..common_imports import DEFAULT_TEST_CONTEXT, UNIT_TAGS, tagged
+from ..common_imports import common
 
 
-@tagged(*UNIT_TAGS)
-class UnitTestCase(TransactionCase):
+@common.tagged(*common.UNIT_TAGS)
+class UnitTestCase(AdminContextUnitTestCase):
+    default_test_context = common.DEFAULT_TEST_CONTEXT
+    model_aliases = {
+        "Overrides": "environment.overrides",
+    }
+
+    @property
+    def Overrides(self) -> "odoo.model.environment_overrides":
+        return self.env["environment.overrides"]
+
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
-        cls.env = cls.env(user=cls.env.ref("base.user_admin"))
-        cls.env = cls.env(
-            context=dict(
-                cls.env.context,
-                **DEFAULT_TEST_CONTEXT,
-            )
-        )
-        cls.Overrides = cls.env["environment.overrides"]
         cls.ConfigParameter = cls.env["ir.config_parameter"].sudo()

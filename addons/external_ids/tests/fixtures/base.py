@@ -1,24 +1,35 @@
-from odoo.tests import TransactionCase
-from ..common_imports import DEFAULT_TEST_CONTEXT, UNIT_TAGS, tagged
+from test_support.tests.fixtures.unit_case import AdminContextUnitTestCase
+
+from ..common_imports import common
 
 
-@tagged(*UNIT_TAGS)
-class UnitTestCase(TransactionCase):
-    @classmethod
-    def setUpClass(cls) -> None:
-        super().setUpClass()
-        cls.env = cls.env(user=cls.env.ref("base.user_admin"))
-        cls.env = cls.env(
-            context=dict(
-                cls.env.context,
-                **DEFAULT_TEST_CONTEXT,
-            )
-        )
+@common.tagged(*common.UNIT_TAGS)
+class UnitTestCase(AdminContextUnitTestCase):
+    default_test_context = common.DEFAULT_TEST_CONTEXT
+    model_aliases = {
+        "ExternalSystem": "external.system",
+        "ExternalId": "external.id",
+        "Partner": "res.partner",
+        "Employee": "hr.employee",
+        "Product": "product.product",
+    }
 
-    def setUp(self) -> None:
-        super().setUp()
-        self.ExternalSystem = self.env["external.system"]
-        self.ExternalId = self.env["external.id"]
-        self.Partner = self.env["res.partner"]
-        self.Employee = self.env["hr.employee"]
-        self.Product = self.env["product.product"]
+    @property
+    def ExternalSystem(self) -> "odoo.model.external_system":
+        return self.env["external.system"]
+
+    @property
+    def ExternalId(self) -> "odoo.model.external_id":
+        return self.env["external.id"]
+
+    @property
+    def Partner(self) -> "odoo.model.res_partner":
+        return self.env["res.partner"]
+
+    @property
+    def Employee(self) -> "odoo.model.hr_employee":
+        return self.env["hr.employee"]
+
+    @property
+    def Product(self) -> "odoo.model.product_product":
+        return self.env["product.product"]

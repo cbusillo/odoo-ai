@@ -1,9 +1,9 @@
-from ..common_imports import tagged, UNIT_TAGS
+from ..common_imports import common
 from ..fixtures.base import UnitTestCase
 from ..fixtures.factories import ProductFactory
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestMultigraphPython(UnitTestCase):
     @classmethod
     def setUpClass(cls) -> None:

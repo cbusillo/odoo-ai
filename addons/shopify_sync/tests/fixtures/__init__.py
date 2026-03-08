@@ -1,19 +1,27 @@
 from .base import UnitTestCase, IntegrationTestCase, TourTestCase
 from .factories import (
-    ProductFactory,
+    CrmTagFactory,
+    CurrencyFactory,
+    DeliveryCarrierFactory,
     PartnerFactory,
-    MotorFactory,
-    ShopifyProductFactory,
+    ProductFactory,
     SaleOrderFactory,
+    SaleOrderLineFactory,
+    ShopifyProductFactory,
+    ShopifySyncFactory,
 )
 
 __all__ = [
     "UnitTestCase",
     "IntegrationTestCase",
     "TourTestCase",
-    "ProductFactory",
+    "CrmTagFactory",
+    "CurrencyFactory",
+    "DeliveryCarrierFactory",
     "PartnerFactory",
-    "MotorFactory",
-    "ShopifyProductFactory",
+    "ProductFactory",
     "SaleOrderFactory",
+    "SaleOrderLineFactory",
+    "ShopifyProductFactory",
+    "ShopifySyncFactory",
 ]

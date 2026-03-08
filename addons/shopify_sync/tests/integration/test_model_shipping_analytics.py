@@ -1,9 +1,9 @@
-from ..common_imports import tagged, datetime, timedelta, INTEGRATION_TAGS
+from ..common_imports import common
 from ..fixtures.base import IntegrationTestCase
 from ..fixtures.factories import PartnerFactory, ProductFactory
 
 
-@tagged(*INTEGRATION_TAGS)
+@common.tagged(*common.INTEGRATION_TAGS)
 class TestShippingAnalytics(IntegrationTestCase):
     """Comprehensive test suite for shipping analytics functionality
 
@@ -111,7 +111,7 @@ class TestShippingAnalytics(IntegrationTestCase):
                     "carrier_id": cls.carrier_ups.id,
                     "shipping_charge": 25.0,
                     "shipping_paid": 20.0 - i,  # Varying margins
-                    "date_order": datetime.now() - timedelta(days=i),
+                    "date_order": common.datetime.now() - common.timedelta(days=i),
                 }
             )
             cls._add_order_line(order)
@@ -127,7 +127,7 @@ class TestShippingAnalytics(IntegrationTestCase):
                     "carrier_id": cls.carrier_usps.id,
                     "shipping_charge": 15.0,
                     "shipping_paid": 20.0 - (i * 10),  # Some negative margins
-                    "date_order": datetime.now() - timedelta(days=i + 3),
+                    "date_order": common.datetime.now() - common.timedelta(days=i + 3),
                 }
             )
             cls._add_order_line(order)
@@ -141,7 +141,7 @@ class TestShippingAnalytics(IntegrationTestCase):
                 "carrier_id": cls.carrier_fedex.id,
                 "shipping_charge": 30.0,
                 "shipping_paid": 25.0,
-                "date_order": datetime.now() - timedelta(days=7),
+                "date_order": common.datetime.now() - common.timedelta(days=7),
             }
         )
         cls._add_order_line(order)
@@ -251,8 +251,8 @@ class TestShippingAnalytics(IntegrationTestCase):
         self.assertIn("ebay", by_platform, "Should have eBay orders")
         self.assertGreaterEqual(len(all_test_orders), 6, "Should have at least 6 test orders")
 
-        now = datetime.now()
-        three_days_ago = now - timedelta(days=3)
+        now = common.datetime.now()
+        three_days_ago = now - common.timedelta(days=3)
 
         recent_orders = all_test_orders.filtered(lambda o: o.date_order and o.date_order >= three_days_ago)
         older_orders = all_test_orders.filtered(lambda o: o.date_order and o.date_order < three_days_ago)

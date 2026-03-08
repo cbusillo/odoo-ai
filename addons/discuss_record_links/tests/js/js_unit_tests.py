@@ -1,19 +1,12 @@
-import time
-
-from odoo.addons.opw_custom.tests.common_imports import JS_TAGS, tagged  # reuse shared tags
-
-try:
-    import requests  # type: ignore
-except ImportError:  # pragma: no cover - optional dependency in some CI images
-    requests = None  # type: ignore
-from odoo.addons.opw_custom.tests.fixtures.base import TourTestCase  # stable base with test user
+from ..common_imports import common
+from ..fixtures.base import TourTestCase
 
 
 def _unit_test_error_checker(message: str) -> bool:
     return "[HOOT]" not in message
 
 
-@tagged(*JS_TAGS, "discuss_record_links")
+@common.tagged(*common.JS_TAGS, "discuss_record_links")
 class DiscussRecordLinksJSTests(TourTestCase):
     def _get_test_login(self) -> str:
         if hasattr(self, "test_user") and self.test_user and self.test_user.login:
@@ -22,29 +15,9 @@ class DiscussRecordLinksJSTests(TourTestCase):
 
     def test_hoot_desktop(self) -> None:
         url = "/web/tests?headless=1&loglevel=2&timeout=30000&filter=%40discuss_record_links&autorun=1"
-        # Pre-wait briefly to reduce flakiness on cold starts
-        port = self.http_port()
-        base = f"http://127.0.0.1:{port}"
-        full = base + url
-        if requests is not None:
-            deadline = time.time() + 60
-            while time.time() < deadline:
-                try:
-                    r = requests.get(full, timeout=3)
-                    if r.status_code < 500:
-                        break
-                except requests.RequestException:
-                    pass
-                time.sleep(0.5)
-
-        try:
-            self.browser_js(
-                url,
-                code="",
-                login=self._get_test_login(),
-                timeout=900,
-                success_signal="[HOOT] Test suite succeeded",
-                error_checker=_unit_test_error_checker,
-            )
-        except AssertionError as error:
-            self.skipTest(f"JS harness not stable in this environment: {error}")
+        self.run_browser_js_suite(
+            url,
+            success_signal="[HOOT] Test suite succeeded",
+            error_checker=_unit_test_error_checker,
+            recoverable_exceptions=(AssertionError,),
+        )

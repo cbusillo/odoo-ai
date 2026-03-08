@@ -2,11 +2,11 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from ...models import repairshopr_sales
-from ..common_imports import UNIT_TAGS, tagged
+from ..common_imports import common
 from ..fixtures.base import UnitTestCase
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestRepairshoprPricingCatalog(UnitTestCase):
     def setUp(self) -> None:
         super().setUp()

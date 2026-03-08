@@ -2,12 +2,11 @@ from unittest.mock import patch
 
 from odoo.tests import TransactionCase
 
-from ..common_imports import tagged, UNIT_TAGS
-
 from ...controllers.main import DiscussRecordLinks
+from ..common_imports import common
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestLabelsRoute(TransactionCase):
     def setUp(self) -> None:
         super().setUp()
@@ -60,7 +59,7 @@ class TestLabelsRoute(TransactionCase):
         self.assertEqual(rows[0]["label"], partner.display_name)
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestSearchRoute(TransactionCase):
     def setUp(self) -> None:
         super().setUp()

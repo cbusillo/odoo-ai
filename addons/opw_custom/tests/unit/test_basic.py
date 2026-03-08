@@ -1,9 +1,9 @@
-from ..common_imports import tagged, patch, MagicMock, ValidationError, UNIT_TAGS
+from ..common_imports import common
 from ..fixtures.base import UnitTestCase
 from ..fixtures.factories import ProductFactory, PartnerFactory
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestTemplate(UnitTestCase):
     def test_using_factories(self) -> None:
         product = ProductFactory.create(self.env, name="Test Product", type="consu")
@@ -78,7 +78,7 @@ class TestTemplate(UnitTestCase):
         self.assertIn(partner_with_context, context_partners)
 
     def test_validation_error(self) -> None:
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(common.ValidationError):
             self.env["product.product"].create(
                 {
                     "name": "Invalid Product",
@@ -90,21 +90,21 @@ class TestTemplate(UnitTestCase):
     def test_with_patch_object_context_manager(self) -> None:
         partner = PartnerFactory.create(self.env, name="Test Partner")
 
-        with patch.object(type(partner), "message_post") as mock_message_post:
+        with common.patch.object(type(partner), "message_post") as mock_message_post:
             mock_message_post.return_value = True
 
             partner.message_post(body="Test message", subject="Test")
 
             mock_message_post.assert_called_once_with(body="Test message", subject="Test")
 
-    @patch.object(ValidationError, "__init__", return_value=None)
-    def test_with_patch_object_decorator(self, mock_init: MagicMock) -> None:
+    @common.patch.object(common.ValidationError, "__init__", return_value=None)
+    def test_with_patch_object_decorator(self, mock_init: common.MagicMock) -> None:
         partner = PartnerFactory.create(self.env)
 
         try:
             if not partner.email:
-                raise ValidationError("Email required")
-        except ValidationError:
+                raise common.ValidationError("Email required")
+        except common.ValidationError:
             pass
 
         self.assertTrue(mock_init.called or not mock_init.called)

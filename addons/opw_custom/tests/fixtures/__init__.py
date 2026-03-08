@@ -3,7 +3,6 @@ from .factories import (
     ProductFactory,
     PartnerFactory,
     MotorFactory,
-    ShopifyProductFactory,
     SaleOrderFactory,
 )
 
@@ -14,6 +13,5 @@ __all__ = [
     "ProductFactory",
     "PartnerFactory",
     "MotorFactory",
-    "ShopifyProductFactory",
     "SaleOrderFactory",
 ]

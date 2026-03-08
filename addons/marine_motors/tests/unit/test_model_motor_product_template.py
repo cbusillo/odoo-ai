@@ -1,11 +1,11 @@
 from odoo import fields
 from odoo.exceptions import ValidationError
-from ..common_imports import tagged, UNIT_TAGS
+from ..common_imports import common
 
 from ..fixtures.base import UnitTestCase
 
 
-@tagged(*UNIT_TAGS)
+@common.tagged(*common.UNIT_TAGS)
 class TestMotorProductTemplate(UnitTestCase):
     def setUp(self) -> None:
         super().setUp()

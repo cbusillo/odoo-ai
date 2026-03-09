@@ -42,11 +42,11 @@ Operational Notes
 
 - Provisioning is skipped if `ODOO_KEY` is blank or unset.
 - To rotate credentials, update `ODOO_KEY` and rerun
-  `uv run platform run --context <target> --instance local --workflow restore`.
+  `uv run platform restore --context <target> --instance local`.
   The script regenerates both passwords and API keys.
 - Remove access by clearing `ODOO_KEY` and running the restore task again or
   deleting the users/keys in Odoo Settings.
 
 Related Commands
 
-- `uv run platform run --context <target> --instance local --workflow restore`
+- `uv run platform restore --context <target> --instance local`

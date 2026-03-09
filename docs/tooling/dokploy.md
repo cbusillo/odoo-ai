@@ -29,4 +29,6 @@ Notes
   `uv run platform select` and should not drift from Dokploy.
 - Primary automation commands are `uv run platform ship|rollback|gate|promote`
   and `uv run platform dokploy ...` helpers.
+- Use `uv run platform dokploy inventory` before destructive Dokploy cleanup to
+  snapshot the live project, server, and compose state into JSON artifacts.
 - Remote target metadata contract lives in `platform/dokploy.toml`.

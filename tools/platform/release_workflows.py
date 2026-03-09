@@ -21,7 +21,7 @@ class TargetDefinition(TargetGatePolicy, Protocol):
     git_branch: str
 
 
-PROD_DATA_MUTATION_WORKFLOWS = frozenset({"restore", "init", "restore-init", "restore-update", "restore-init-update"})
+PROD_DATA_MUTATION_WORKFLOWS = frozenset({"restore", "bootstrap"})
 PROMOTION_INSTANCE_PATHS = frozenset({("testing", "prod")})
 
 

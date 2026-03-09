@@ -50,22 +50,24 @@ Quick Start
 
 Local Workflow Patterns
 
-- Run restore and restore-chain workflows:
+- Run destructive data workflows:
 
   ```bash
-  uv run platform run --context cm --instance local --workflow restore --dry-run
-  uv run platform run --context cm --instance local --workflow restore-init-update
+  uv run platform restore --context cm --instance local --dry-run
+  uv run platform bootstrap --context cm --instance local --dry-run
+  uv run platform restore --context cm --instance testing --dry-run
   uv run platform openupgrade --context cm --instance local --dry-run
   ```
 
-- `platform run` blocks prod data-mutation workflows by default.
+- `platform restore` and `platform bootstrap` block prod data-mutation
+  workflows by default.
   Use `--allow-prod-data-workflow` only for explicit break-glass operations.
-- `platform run --workflow restore` now generates and uses
+- `platform restore` and `platform bootstrap` now generate and use
   `.platform/env/<context>.<instance>.env` by default. Pass `--env-file ...`
   only for explicit one-off overrides.
 - Restore performs a filestore capacity preflight before upstream copy.
-- Restore acquires a shared lock file (`ODOO_RESTORE_LOCK_FILE`, default
-  `/volumes/data/.restore_in_progress`) so bootstrap waits for restore
+- Restore acquires a shared lock file (`ODOO_DATA_WORKFLOW_LOCK_FILE`, default
+  `/volumes/data/.data_workflow_in_progress`) so bootstrap waits for restore
   completion.
 - Restore targets the DB-specific filestore directory and reconciles
   post-OpenUpgrade module state fail-closed.
@@ -160,8 +162,8 @@ Secrets and Runtime Artifacts
 - Platform runtime control files (for example generated `platform.odoo.conf`)
   are written under `.platform/state/`.
 - Dokploy targets pin `ODOO_WEB_COMMAND` to
-  `python3 /volumes/scripts/run_odoo_bootstrap.py -c /tmp/platform.odoo.conf`
-  so remote compose deploys use the same bootstrap/runtime contract as local.
+  `python3 /volumes/scripts/run_odoo_startup.py -c /tmp/platform.odoo.conf`
+  so remote compose deploys use the same startup/runtime contract as local.
 
 Operational Notes
 

@@ -80,6 +80,22 @@ class PlatformDokployHelpersTests(unittest.TestCase):
                     path="/api/health",
                 )
 
+    def test_collect_dokploy_deploy_servers_accepts_wrapped_payload(self) -> None:
+        wrapped_payload: JsonValue = {
+            "data": [
+                {"serverId": "deploy-1", "name": "docker-cm-prod", "serverType": "deploy"},
+                {"serverId": "build-1", "name": "builder-1", "serverType": "build"},
+            ]
+        }
+
+        with patch("tools.platform.dokploy.dokploy_request", return_value=wrapped_payload):
+            deploy_servers = dokploy.collect_dokploy_deploy_servers(
+                host="https://dokploy.example",
+                token="token",
+            )
+
+        self.assertEqual(deploy_servers, ({"serverId": "deploy-1", "name": "docker-cm-prod", "serverType": "deploy"},))
+
     def test_update_dokploy_target_env_preserves_application_build_fields_when_strings(self) -> None:
         with patch("tools.platform.dokploy.dokploy_request") as request_mock:
             dokploy.update_dokploy_target_env(

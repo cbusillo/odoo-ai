@@ -38,15 +38,19 @@ Generated Files
 
 Operator Contract Summary
 
-- `local` is the only mutation-capable runtime on this host.
-- Use `platform init`, `platform restore`, `platform update`, `platform run`,
-  `platform build`, `platform up`, `platform down`, `platform logs`,
-  `platform inspect`, and `platform odoo-shell` only with `--instance local`.
+- `local` is the only host runtime on this machine.
+- Use `platform init`, `platform update`, `platform run`, `platform build`,
+  `platform up`, `platform down`, `platform logs`, `platform inspect`, and
+  `platform odoo-shell` only with `--instance local`.
 - Treat `dev`, `testing`, and `prod` as Dokploy-managed remote targets.
-  Use `platform ship`, `platform rollback`, `platform gate`, and
-  `platform promote` there.
-- Remote targets bootstrap on deploy; they do not expose first-class remote
-  `platform init` or `platform restore` operator workflows today.
+  Use `platform ship`, `platform rollback`, `platform gate`,
+  `platform promote`, `platform restore`, and `platform bootstrap` there.
+- `platform ship` deploys and restarts remote code without replacing data.
+- `platform restore` replaces database and filestore state from upstream data.
+- `platform bootstrap` clears database and filestore state, then builds a
+  fresh runtime.
+- `platform init` remains a local-only module initialization pass against an
+  existing database.
 
 Secrets and Env Notes
 

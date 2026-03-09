@@ -26,12 +26,12 @@ Odoo-specific
 - Update module:
   `docker exec ${ODOO_PROJECT_NAME}-script-runner-1 /odoo/odoo-bin -u <module> --stop-after-init`
 - Restore data:
-  `uv run platform run --context <target> --instance local --workflow restore`
+  `uv run platform restore --context <target> --instance local`
   Targets: `opw`, `cm`.
-  Ensure `RESTORE_SSH_DIR` points at a host SSH directory so the base compose
+  Ensure `DATA_WORKFLOW_SSH_DIR` points at a host SSH directory so the base compose
   mounts it into the container for upstream access.
   When an upstream dump is unavailable, bootstrap with
-  `uv run platform run --context <target> --instance local --workflow init`.
+  `uv run platform bootstrap --context <target> --instance local`.
 
 Tips
 
@@ -39,7 +39,7 @@ Tips
 - Stream long logs with `-f`, then Ctrl+C
 - Prefer updates via script-runner; avoid mutating the web container
 - `docker/scripts/run_odoo_with_debug.sh` is a local debug launcher only.
-  It bypasses bootstrap safeguards (`run_odoo_bootstrap.py`) such as DB
+  It bypasses startup safeguards (`run_odoo_startup.py`) such as DB
   readiness checks, restore-lock waiting, and initialization gates.
 
 ## Environment Variable Quick Reference

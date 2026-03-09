@@ -37,8 +37,8 @@ Use explicit context/instance flags in command invocations (for example
 - `dev`, `testing`, and `prod` are Dokploy-managed remote instances and should
   be managed with Dokploy release flows (`ship`, `rollback`, `gate`,
   `promote`, and `platform dokploy ...` helpers).
-- Local stacks use platform-generated runtime env under `.platform/env/` on top
-  of `docker-compose.yml` + `platform/compose/base.yaml` +
+- Local stacks use platform-generated runtime env under `.platform/env/`
+  on top of `docker-compose.yml` + `platform/compose/base.yaml` +
   `docker-compose.override.yml`.
 - Dokploy manages remote compose/application targets from its control plane;
   local overlays are only for host-local runtime.
@@ -50,14 +50,14 @@ Use explicit context/instance flags in command invocations (for example
   chain. `odoo-ai` installs project dependencies additively from its lockfile
   instead of recreating or destructively re-syncing the base environment;
   operators do not call the install scripts directly.
-- Restore flows rely on `RESTORE_SSH_DIR` so the base compose mounts the SSH
-  directory for upstream access during
-  `uv run platform run --context <target> --instance local --workflow restore`.
+- Data workflows rely on `DATA_WORKFLOW_SSH_DIR` so the base compose mounts
+  the SSH directory for upstream access during
+  `uv run platform restore --context <target> --instance local`.
 
 ## Local deploy/restore
 
 - Deploy: `uv run platform up --context <target> --instance local --build`
-- Restore: `uv run platform run --context <target> --instance local --workflow restore`
+- Restore: `uv run platform restore --context <target> --instance local`
 
 ## Application layers
 
@@ -86,4 +86,4 @@ Use explicit context/instance flags in command invocations (for example
 - Local stack layering – `platform/config/README.md`
 - Multi-project local config – @docs/workflows/multi-project.md
 - Restore entry point –
-  `uv run platform run --context <target> --instance local --workflow restore`
+  `uv run platform restore --context <target> --instance local`

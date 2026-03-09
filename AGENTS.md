@@ -114,6 +114,8 @@ the linked docs, then keep prompts lean.
 - For long-running or high-output commands (for example imports, restore,
   upgrade, large tests), run detached/in the background and redirect output to
   a log file under `tmp/` instead of streaming full output in-session.
+  Streaming noisy output directly can destabilize Every Code, the TUI harness
+  used for Codex sessions in this repo.
 - Mirror the design style and patterns already established in
   `addons/opw_custom/`; align new modules and views with that reference
   before inventing new approaches.
@@ -162,7 +164,8 @@ the linked docs, then keep prompts lean.
 - Performance & bulk operations: `docs/odoo/performance.md`, `docs/odoo/orm.md`
 - Planning & estimation: `docs/workflows/codex-workflow.md`
 - Environment utilities: restore helpers in `tools/`
-  (use `uv run platform run --workflow restore --context <ctx> --instance <instance>`)
+  (use `uv run platform restore --context <ctx> --instance <instance>` or
+  `uv run platform bootstrap --context <ctx> --instance <instance>`)
 
 Keep AGENTS.md thin: route deeper guidance to the linked pages so we maintain a
 single, accurate source of truth.

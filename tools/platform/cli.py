@@ -103,16 +103,29 @@ PLATFORM_RUNTIME_ENV_KEYS = (
     "OPENUPGRADE_TARGET_VERSION",
     "OPENUPGRADE_SKIP_UPDATE_ADDONS",
     "GITHUB_TOKEN",
+    "DOKPLOY_HOST",
+    "DOKPLOY_TOKEN",
+    "DOKPLOY_SSH_HOST",
+    "DOKPLOY_SSH_USER",
+    "DOKPLOY_SSH_PORT",
 )
 
 PLATFORM_RUNTIME_PASSTHROUGH_PREFIXES = (
     "ENV_OVERRIDE_",
     "ODOO_UPSTREAM_",
+    "DOKPLOY_REMOTE_STACK_PATH_",
+    "DOKPLOY_COMPOSE_PROJECT_",
+    "DOKPLOY_COMPOSE_ID_",
 )
 
 PLATFORM_RUNTIME_PASSTHROUGH_KEYS = (
     "ODOO_KEY",
     "DATA_WORKFLOW_SSH_KEY",
+    "DOKPLOY_HOST",
+    "DOKPLOY_TOKEN",
+    "DOKPLOY_SSH_HOST",
+    "DOKPLOY_SSH_USER",
+    "DOKPLOY_SSH_PORT",
 )
 
 ENV_COLLISION_MODE_ENV_KEY = platform_environment.ENV_COLLISION_MODE_ENV_KEY
@@ -1823,6 +1836,31 @@ def dokploy_logs(
         dokploy_request_fn=_dokploy_request,
         extract_deployments_fn=_extract_deployments,
         summarize_deployment_fn=_summarize_deployment,
+        emit_payload_fn=_emit_payload,
+    )
+
+
+@dokploy_group.command("inventory")
+@click.option("--env-file", type=click.Path(path_type=Path), default=None)
+@click.option("--output-file", type=click.Path(path_type=Path), default=None)
+@click.option("--snapshot-dir", type=click.Path(path_type=Path), default=None)
+@click.option("--json-output", is_flag=True, default=False)
+def dokploy_inventory(
+    env_file: Path | None,
+    output_file: Path | None,
+    snapshot_dir: Path | None,
+    json_output: bool,
+) -> None:
+    platform_commands_dokploy.execute_inventory(
+        env_file=env_file,
+        output_file=output_file,
+        snapshot_dir=snapshot_dir,
+        json_output=json_output,
+        discover_repo_root_fn=_discover_repo_root,
+        load_environment_fn=_load_environment,
+        read_dokploy_config_fn=_read_dokploy_config,
+        dokploy_request_fn=_dokploy_request,
+        fetch_dokploy_target_payload_fn=_fetch_dokploy_target_payload,
         emit_payload_fn=_emit_payload,
     )
 

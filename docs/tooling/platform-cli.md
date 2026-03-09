@@ -25,23 +25,29 @@ Sources of Truth
 
 Operator Contract
 
-- `local` is the only mutation-capable runtime on this host.
-- Use `platform init`, `platform restore`, `platform update`, `platform run`,
-  `platform build`, `platform up`, `platform down`, `platform logs`,
-  `platform inspect`, and `platform odoo-shell` only with `--instance local`.
+- `local` is the only host runtime on this machine.
+- Use `platform init`, `platform update`, `platform build`, `platform up`,
+  `platform down`, `platform logs`, `platform inspect`, and
+  `platform odoo-shell` only with `--instance local`.
 - Treat `dev`, `testing`, and `prod` as Dokploy-managed remote targets.
-  Use `platform ship`, `platform rollback`, `platform gate`, and
-  `platform promote` there.
-- Remote targets bootstrap on deploy. They do not expose first-class remote
-  `platform init` or `platform restore` workflows.
+  Use `platform ship`, `platform rollback`, `platform gate`,
+  `platform promote`, `platform restore`, and `platform bootstrap` there.
+- `platform ship` is the non-destructive remote deploy/restart path.
+- `platform restore` is the destructive upstream-data replacement path.
+- `platform bootstrap` is the destructive fresh-start rebuild path.
+- `platform init` remains a local-only module initialization pass for an
+  existing database.
 
 Command Families
 
 - Local lifecycle: `select`, `info`, `status`, `doctor`, `build`, `up`,
   `down`, `logs`, `inspect`, `odoo-shell`.
-- Local workflows: `run`, `init`, `update`, `openupgrade`.
+- Data workflows: `restore`, `bootstrap`.
+- Runtime workflows: `run`, `init`, `update`, `openupgrade`.
 - Remote release: `ship`, `rollback`, `gate`, `promote`, and
   `platform dokploy ...` helpers.
+- Dokploy inventory: `platform dokploy inventory` for project/server/target
+  snapshots before teardown, recreation, or reconciliation work.
 - Secrets/env introspection: `platform secrets explain`.
 - Interactive launcher: `platform tui`.
 
@@ -51,11 +57,23 @@ Behavior Highlights
   Dokploy target diagnostics.
 - `platform ship` fails closed on dirty tracked files. Prefer a clean worktree
   plus `--source-ref HEAD` for surgical remote testing.
+- Remote web startup uses `run_odoo_startup.py` to initialize missing modules
+  when needed before launching the long-running server.
 - Release-sensitive commands resolve env layers with collision mode `error`.
-- `platform run --workflow restore` uses the same generated runtime env
+- `platform restore` and `platform bootstrap` use the same generated runtime env
   contract as `platform select`.
 - `platform select` writes both `.platform/env/<context>.<instance>.env` and
   `.platform/ide/<context>.<instance>.odoo.conf`.
+- Remote `restore`/`bootstrap` for Dokploy-managed targets (`dev`, `testing`,
+  `prod`) SSH directly into the Dokploy server host. The SSH hostname is
+  derived from `DOKPLOY_HOST`; override with `DOKPLOY_SSH_HOST`,
+  `DOKPLOY_SSH_USER` (default `root`), `DOKPLOY_SSH_PORT`. The remote compose
+  project name and stack path are resolved from the Dokploy API
+  (`appName`); override per-target with
+  `DOKPLOY_REMOTE_STACK_PATH_<CONTEXT_INSTANCE>` and
+  `DOKPLOY_COMPOSE_PROJECT_<CONTEXT_INSTANCE>` (e.g.
+  `DOKPLOY_COMPOSE_PROJECT_CM_DEV`). The remote `.env` is temporarily
+  overwritten during the workflow and restored by the next `platform ship`.
 - `platform tui` allows wildcard or comma-separated fan-out only for read-only
   `status` and `info` workflows.
 
@@ -64,6 +82,9 @@ Command Patterns
 - Use [@docs/tooling/platform-command-patterns.md](platform-command-patterns.md)
   for concrete examples, TUI usage, restore patterns, Dokploy helpers, and
   release workflow recipes.
+- `platform dokploy inventory --output-file tmp/dokploy-inventory.json
+  --snapshot-dir tmp/dokploy-snapshots` captures a reusable live baseline of
+  Dokploy projects, servers, and compose targets before destructive changes.
 
 Related Docs
 

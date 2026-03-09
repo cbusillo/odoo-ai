@@ -6,7 +6,7 @@ from enum import IntEnum
 from pathlib import Path
 
 from pydantic import ValidationError
-from restore_from_upstream import LocalServerSettings, OdooRestorerError, OdooUpstreamRestorer
+from run_odoo_data_workflows import LocalServerSettings, OdooDataWorkflowRunner, OdooRestorerError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -61,15 +61,15 @@ def main(argument_values: Sequence[str] | None = None) -> int:
         logger.error("OpenUpgrade disabled. Set OPENUPGRADE_ENABLED=1 or pass --force.")
         return int(ExitCode.INVALID_ARGS)
 
-    restorer = OdooUpstreamRestorer(local_settings, None, env_file)
+    workflow_runner = OdooDataWorkflowRunner(local_settings, None, env_file)
     if arguments.reset_versions:
         try:
-            restorer.reset_openupgrade_versions()
+            workflow_runner.reset_openupgrade_versions()
         except OdooRestorerError as reset_error:
             logger.error("OpenUpgrade reset failed: %s", reset_error)
             return int(ExitCode.OPENUPGRADE_FAILED)
     try:
-        restorer.run_openupgrade()
+        workflow_runner.run_openupgrade()
     except OdooRestorerError as openupgrade_error:
         logger.error("OpenUpgrade failed: %s", openupgrade_error)
         return int(ExitCode.OPENUPGRADE_FAILED)

@@ -22,6 +22,7 @@ from tools.platform import (
     commands_workflow,
     release_workflows,
 )
+from tools.platform import dokploy as platform_dokploy
 from tools.platform.models import (
     ContextDefinition,
     DokploySourceOfTruth,
@@ -29,6 +30,7 @@ from tools.platform.models import (
     EnvironmentCollision,
     InstanceDefinition,
     JsonObject,
+    JsonValue,
     LoadedEnvironment,
     LoadedStack,
     RuntimeSelection,
@@ -254,7 +256,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
                     env_file=None,
                     dry_run=False,
                     no_cache=False,
-                    bootstrap_only=False,
                     no_sanitize=False,
                     force=False,
                     reset_versions=False,
@@ -290,7 +291,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
                     env_file=None,
                     dry_run=False,
                     no_cache=False,
-                    bootstrap_only=False,
                     no_sanitize=False,
                     force=False,
                     reset_versions=False,
@@ -327,7 +327,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
                     env_file=None,
                     dry_run=False,
                     no_cache=False,
-                    bootstrap_only=False,
                     no_sanitize=False,
                     force=False,
                     reset_versions=False,
@@ -363,7 +362,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
                     env_file=None,
                     dry_run=False,
                     no_cache=False,
-                    bootstrap_only=False,
                     no_sanitize=False,
                     force=False,
                     reset_versions=False,
@@ -393,7 +391,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
                     env_file=None,
                     dry_run=False,
                     no_cache=False,
-                    bootstrap_only=False,
                     no_sanitize=False,
                     force=False,
                     reset_versions=False,
@@ -427,7 +424,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
                     env_file=None,
                     dry_run=False,
                     no_cache=False,
-                    bootstrap_only=False,
                     no_sanitize=False,
                     force=False,
                     reset_versions=False,
@@ -460,7 +456,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
                     env_file=None,
                     dry_run=False,
                     no_cache=False,
-                    bootstrap_only=False,
                     no_sanitize=False,
                     force=False,
                     reset_versions=False,
@@ -494,7 +489,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
                 env_file=None,
                 dry_run=False,
                 no_cache=False,
-                bootstrap_only=False,
                 no_sanitize=False,
                 force=False,
                 reset_versions=False,
@@ -537,7 +531,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
                     env_file=None,
                     dry_run=False,
                     no_cache=False,
-                    bootstrap_only=False,
                     no_sanitize=False,
                     force=False,
                     reset_versions=False,
@@ -574,7 +567,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
                     env_file=None,
                     dry_run=False,
                     no_cache=False,
-                    bootstrap_only=False,
                     no_sanitize=False,
                     force=False,
                     reset_versions=False,
@@ -605,7 +597,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
                     env_file=None,
                     dry_run=False,
                     no_cache=False,
-                    bootstrap_only=False,
                     no_sanitize=False,
                     force=False,
                     reset_versions=False,
@@ -636,7 +627,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
                     env_file=None,
                     dry_run=False,
                     no_cache=False,
-                    bootstrap_only=False,
                     no_sanitize=False,
                     force=False,
                     reset_versions=False,
@@ -668,7 +658,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
                     env_file=None,
                     dry_run=False,
                     no_cache=False,
-                    bootstrap_only=False,
                     no_sanitize=False,
                     force=False,
                     reset_versions=False,
@@ -697,7 +686,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
                     env_file=None,
                     dry_run=False,
                     no_cache=False,
-                    bootstrap_only=False,
                     no_sanitize=False,
                     force=False,
                     reset_versions=False,
@@ -726,7 +714,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
                     env_file=None,
                     dry_run=False,
                     no_cache=False,
-                    bootstrap_only=False,
                     no_sanitize=False,
                     force=False,
                     reset_versions=False,
@@ -763,17 +750,56 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
         self.assertIn("guard", captured_calls[0])
         self.assertIn("run", captured_calls[1])
 
-    def test_execute_run_workflow_command_requires_local_instance(self) -> None:
+    def test_execute_restore_command_allows_remote_instance(self) -> None:
+        captured_kwargs: dict[str, object] = {}
+
+        def runner(**kwargs: object) -> None:
+            captured_kwargs.update(kwargs)
+
+        commands_workflow.execute_restore_command(
+            stack_file=Path("platform/stack.toml"),
+            context_name="cm",
+            instance_name="testing",
+            env_file=None,
+            dry_run=True,
+            no_sanitize=False,
+            allow_prod_data_workflow=False,
+            run_workflow_fn=runner,
+        )
+
+        self.assertEqual(captured_kwargs["workflow"], "restore")
+        self.assertEqual(captured_kwargs["instance_name"], "testing")
+
+    def test_execute_bootstrap_command_allows_remote_instance(self) -> None:
+        captured_kwargs: dict[str, object] = {}
+
+        def runner(**kwargs: object) -> None:
+            captured_kwargs.update(kwargs)
+
+        commands_workflow.execute_bootstrap_command(
+            stack_file=Path("platform/stack.toml"),
+            context_name="cm",
+            instance_name="testing",
+            env_file=None,
+            dry_run=True,
+            no_sanitize=False,
+            allow_prod_data_workflow=False,
+            run_workflow_fn=runner,
+        )
+
+        self.assertEqual(captured_kwargs["workflow"], "bootstrap")
+        self.assertEqual(captured_kwargs["instance_name"], "testing")
+
+    def test_execute_run_workflow_command_rejects_remote_local_only_workflow(self) -> None:
         with self.assertRaises(click.ClickException) as captured_error:
             commands_workflow.execute_run_workflow_command(
                 stack_file=Path("platform/stack.toml"),
                 context_name="cm",
                 instance_name="testing",
                 env_file=None,
-                workflow="restore",
+                workflow="init",
                 dry_run=True,
                 no_cache=False,
-                bootstrap_only=False,
                 no_sanitize=False,
                 force=False,
                 reset_versions=False,
@@ -793,7 +819,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
                 workflow="up",
                 dry_run=False,
                 no_cache=False,
-                bootstrap_only=False,
                 no_sanitize=False,
                 force=False,
                 reset_versions=False,
@@ -824,7 +849,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
             workflow="status",
             dry_run=False,
             no_cache=False,
-            bootstrap_only=False,
             no_sanitize=False,
             force=False,
             reset_versions=False,
@@ -860,7 +884,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
                 workflow="status",
                 dry_run=False,
                 no_cache=False,
-                bootstrap_only=False,
                 no_sanitize=False,
                 force=False,
                 reset_versions=False,
@@ -886,7 +909,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
             workflow="status",
             dry_run=False,
             no_cache=False,
-            bootstrap_only=False,
             no_sanitize=False,
             force=False,
             reset_versions=False,
@@ -934,7 +956,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
                 workflow="status",
                 dry_run=False,
                 no_cache=False,
-                bootstrap_only=False,
                 no_sanitize=False,
                 force=False,
                 reset_versions=False,
@@ -962,7 +983,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
             workflow="status",
             dry_run=False,
             no_cache=False,
-            bootstrap_only=False,
             no_sanitize=False,
             force=False,
             reset_versions=False,
@@ -1178,6 +1198,63 @@ class PlatformCommandsLifecycleTests(unittest.TestCase):
 
 
 class PlatformCommandsDokployTests(unittest.TestCase):
+    def test_resolve_dokploy_compose_remote_config_rejects_ambiguous_matches(self) -> None:
+        project_all_payload = {
+            "projects": [
+                {
+                    "services": [
+                        {"composeId": "compose-id-1", "name": "cm-dev", "appName": "odoo-cm-dev-a"},
+                        {"composeId": "compose-id-2", "name": "cm-dev", "appName": "odoo-cm-dev-b"},
+                    ]
+                }
+            ]
+        }
+
+        with patch.object(platform_dokploy, "dokploy_request", return_value=project_all_payload):
+            with self.assertRaises(click.ClickException) as raised_error:
+                platform_dokploy.resolve_dokploy_compose_remote_config(
+                    host="https://dokploy.example",
+                    token="token",
+                    compose_name="cm-dev",
+                    environment_values={},
+                )
+
+        self.assertIn("ambiguous", str(raised_error.exception))
+        self.assertIn("DOKPLOY_COMPOSE_ID_CM_DEV", str(raised_error.exception))
+
+    def test_resolve_dokploy_compose_remote_config_accepts_compose_id_override(self) -> None:
+        recorded_paths: list[str] = []
+
+        def dokploy_request(**kwargs: object) -> object:
+            path = str(kwargs.get("path"))
+            recorded_paths.append(path)
+            if path == "/api/project.all":
+                return {
+                    "projects": [
+                        {
+                            "services": [
+                                {"composeId": "compose-id-1", "name": "cm-dev", "appName": "odoo-cm-dev-a"},
+                                {"composeId": "compose-id-2", "name": "cm-dev", "appName": "odoo-cm-dev-b"},
+                            ]
+                        }
+                    ]
+                }
+            if path == "/api/compose.one":
+                return {"composeId": "compose-id-2", "appName": "odoo-cm-dev-b"}
+            raise AssertionError(f"Unexpected Dokploy path: {path}")
+
+        with patch.object(platform_dokploy, "dokploy_request", side_effect=dokploy_request):
+            remote_stack_path, compose_project = platform_dokploy.resolve_dokploy_compose_remote_config(
+                host="https://dokploy.example",
+                token="token",
+                compose_name="cm-dev",
+                environment_values={"DOKPLOY_COMPOSE_ID_CM_DEV": "compose-id-2"},
+            )
+
+        self.assertEqual(remote_stack_path, Path("/etc/dokploy/applications/odoo-cm-dev-b"))
+        self.assertEqual(compose_project, "odoo-cm-dev-b")
+        self.assertEqual(recorded_paths, ["/api/project.all", "/api/compose.one"])
+
     def test_execute_reconcile_fails_when_target_missing_from_stack(self) -> None:
         with TemporaryDirectory() as temporary_directory_name:
             repo_root = Path(temporary_directory_name)
@@ -1307,7 +1384,7 @@ class PlatformCommandsDokployTests(unittest.TestCase):
                     DokployTargetDefinition(context="cm", instance="local", target_id="cm-local-compose-id",
                                             target_name="cm-local", env={
                             "ENV_OVERRIDE_KEEP": "desired",
-                            "ODOO_WEB_COMMAND": "python3 /volumes/scripts/run_odoo_bootstrap.py",
+                            "ODOO_WEB_COMMAND": "python3 /volumes/scripts/run_odoo_startup.py",
                         }),
                 ),
             )
@@ -1364,7 +1441,7 @@ class PlatformCommandsDokployTests(unittest.TestCase):
             self.assertEqual(len(target_updates), 1)
             rendered_env_text = str(target_updates[0].get("env_text"))
             self.assertIn("ENV_OVERRIDE_KEEP=desired", rendered_env_text)
-            self.assertIn("ODOO_WEB_COMMAND=python3 /volumes/scripts/run_odoo_bootstrap.py", rendered_env_text)
+            self.assertIn("ODOO_WEB_COMMAND=python3 /volumes/scripts/run_odoo_startup.py", rendered_env_text)
             self.assertIn("UNMANAGED_KEY=preserve", rendered_env_text)
             self.assertNotIn("ENV_OVERRIDE_REMOVE=1", rendered_env_text)
 
@@ -1410,8 +1487,8 @@ class PlatformCommandsDokployTests(unittest.TestCase):
             def update_target_env(**kwargs: object) -> None:
                 target_updates.append(kwargs)
 
-            def emit_payload(payload: dict[str, object], **_kwargs: object) -> None:
-                captured_payloads.append(payload)
+            def emit_payload(payload_data: dict[str, object], **_kwargs: object) -> None:
+                captured_payloads.append(payload_data)
 
             commands_dokploy.execute_env_set(
                 context_name="cm",
@@ -1442,6 +1519,176 @@ class PlatformCommandsDokployTests(unittest.TestCase):
             self.assertEqual(captured_payloads[0]["changed_keys"], ["A"])
             self.assertEqual(captured_payloads[0]["unchanged_keys"], ["B"])
 
+    def test_execute_inventory_writes_summary_and_snapshots(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            repo_root = Path(temporary_directory_name)
+            captured_payloads: list[dict[str, object]] = []
+
+            project_payload: JsonObject = {
+                "projects": [
+                    {
+                        "name": "odoo-ai",
+                        "projectId": "project-1",
+                        "environments": [
+                            {
+                                "name": "production",
+                                "environmentId": "environment-1",
+                                "compose": [{"composeId": "compose-1", "name": "cm-dev"}],
+                                "applications": [{"applicationId": "application-1", "name": "ops-dashboard"}],
+                            }
+                        ],
+                    }
+                ]
+            }
+            server_payload: JsonObject = {
+                "data": [
+                    {
+                        "serverId": "server-1",
+                        "name": "docker-cm-dev",
+                        "serverType": "deploy",
+                        "serverStatus": "active",
+                        "ipAddress": "10.0.0.5",
+                        "username": "root",
+                        "port": 22,
+                        "description": "CM dev host",
+                    }
+                ]
+            }
+            compose_target_payload: JsonObject = {
+                "name": "cm-dev",
+                "appName": "odoo-cm-dev",
+                "serverId": "server-1",
+                "server": {"name": "docker-cm-dev", "ipAddress": "10.0.0.5"},
+                "domains": [{"host": "cm-dev.shinycomputers.com"}],
+                "customGitBranch": "cm-dev",
+                "customGitUrl": "git@github.com:cbusillo/odoo-ai.git",
+                "composePath": "./docker-compose.yml",
+                "sourceType": "git",
+                "autoDeploy": True,
+                "composeStatus": "done",
+            }
+
+            def dokploy_request(**kwargs: object) -> JsonValue:
+                path = kwargs.get("path")
+                if path == "/api/project.all":
+                    return project_payload
+                if path == "/api/server.all":
+                    return server_payload
+                raise AssertionError(f"Unexpected Dokploy path: {path}")
+
+            def fetch_target_payload(**kwargs: object) -> JsonObject:
+                self.assertEqual(kwargs.get("target_type"), "compose")
+                self.assertEqual(kwargs.get("target_id"), "compose-1")
+                return dict(compose_target_payload)
+
+            def emit_payload(payload_data: dict[str, object], **_kwargs: object) -> None:
+                captured_payloads.append(payload_data)
+
+            commands_dokploy.execute_inventory(
+                env_file=None,
+                output_file=Path("tmp/dokploy-inventory.json"),
+                snapshot_dir=Path("tmp/dokploy-snapshots"),
+                json_output=False,
+                discover_repo_root_fn=lambda _path: repo_root,
+                load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (
+                    repo_root / ".env",
+                    {"DOKPLOY_HOST": "https://dokploy.example", "DOKPLOY_TOKEN": "token"},
+                ),
+                read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+                dokploy_request_fn=dokploy_request,
+                fetch_dokploy_target_payload_fn=fetch_target_payload,
+                emit_payload_fn=emit_payload,
+            )
+
+            self.assertEqual(len(captured_payloads), 1)
+            payload = captured_payloads[0]
+            self.assertEqual(payload.get("project_count"), 1)
+            self.assertEqual(payload.get("compose_target_count"), 1)
+            self.assertEqual(payload.get("application_target_count"), 1)
+            self.assertEqual(payload.get("server_count"), 1)
+
+            compose_targets = payload.get("compose_targets")
+            self.assertIsInstance(compose_targets, list)
+            assert isinstance(compose_targets, list)
+            self.assertEqual(compose_targets[0]["target_name"], "cm-dev")
+            self.assertEqual(compose_targets[0]["domains"], ["cm-dev.shinycomputers.com"])
+            self.assertEqual(compose_targets[0]["server_name"], "docker-cm-dev")
+
+            output_file = repo_root / "tmp" / "dokploy-inventory.json"
+            snapshot_file = repo_root / "tmp" / "dokploy-snapshots" / "compose" / "cm-dev--compose-1.json"
+            self.assertTrue(output_file.exists())
+            self.assertTrue(snapshot_file.exists())
+
+            rendered_output = json.loads(output_file.read_text(encoding="utf-8"))
+            self.assertEqual(rendered_output["compose_target_count"], 1)
+            self.assertEqual(json.loads(snapshot_file.read_text(encoding="utf-8"))["appName"], "odoo-cm-dev")
+
+    def test_execute_inventory_snapshot_names_remain_unique_for_duplicate_target_names(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            repo_root = Path(temporary_directory_name)
+            project_payload: JsonObject = {
+                "projects": [
+                    {
+                        "name": "odoo-ai",
+                        "projectId": "project-1",
+                        "environments": [
+                            {
+                                "name": "production",
+                                "environmentId": "environment-1",
+                                "compose": [
+                                    {"composeId": "compose-1", "name": "cm-dev"},
+                                    {"composeId": "compose-2", "name": "cm-dev"},
+                                ],
+                                "applications": [],
+                            }
+                        ],
+                    }
+                ]
+            }
+            server_payload: JsonObject = {"data": []}
+
+            def dokploy_request(**kwargs: object) -> JsonValue:
+                path = kwargs.get("path")
+                if path == "/api/project.all":
+                    return project_payload
+                if path == "/api/server.all":
+                    return server_payload
+                raise AssertionError(f"Unexpected Dokploy path: {path}")
+
+            def fetch_target_payload(**kwargs: object) -> JsonObject:
+                target_id = str(kwargs.get("target_id"))
+                return {
+                    "name": "cm-dev",
+                    "appName": f"odoo-{target_id}",
+                    "serverId": None,
+                    "domains": [],
+                    "customGitBranch": "cm-dev",
+                    "customGitUrl": "git@github.com:cbusillo/odoo-ai.git",
+                    "composePath": "./docker-compose.yml",
+                    "sourceType": "git",
+                    "autoDeploy": True,
+                    "composeStatus": "done",
+                }
+
+            commands_dokploy.execute_inventory(
+                env_file=None,
+                output_file=None,
+                snapshot_dir=Path("tmp/dokploy-snapshots"),
+                json_output=False,
+                discover_repo_root_fn=lambda _path: repo_root,
+                load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (
+                    repo_root / ".env",
+                    {"DOKPLOY_HOST": "https://dokploy.example", "DOKPLOY_TOKEN": "token"},
+                ),
+                read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+                dokploy_request_fn=dokploy_request,
+                fetch_dokploy_target_payload_fn=fetch_target_payload,
+                emit_payload_fn=lambda _payload, **_kwargs: None,
+            )
+
+            snapshot_dir = repo_root / "tmp" / "dokploy-snapshots" / "compose"
+            self.assertTrue((snapshot_dir / "cm-dev--compose-1.json").exists())
+            self.assertTrue((snapshot_dir / "cm-dev--compose-2.json").exists())
 
 class PlatformCommandsReleaseTests(unittest.TestCase):
     @staticmethod

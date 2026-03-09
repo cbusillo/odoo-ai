@@ -58,7 +58,6 @@ docker-compose.yml
   `env_file` entries, so later values in `base.env` win in that path.
 - Create a local `docker-compose.override.yml` to expose ports and mount the
   repo for live-editing (see `docs/workflows/multi-project.md`).
-- Restore runs
-  (`uv run platform run --context <target> --instance local --workflow restore`)
-  rely on `RESTORE_SSH_DIR` being set so the base compose mounts the SSH
+- Restore runs (`uv run platform restore --context <target> --instance local`)
+  rely on `DATA_WORKFLOW_SSH_DIR` being set so the base compose mounts the SSH
   directory for upstream access.

@@ -160,6 +160,31 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
             "/volumes/data/.data_workflow_in_progress",
         )
 
+    def test_runtime_env_includes_dokploy_connection_keys_for_remote_data_workflows(self) -> None:
+        remote_runtime_selection = replace(
+            _sample_runtime_selection(),
+            instance_name="testing",
+        )
+
+        runtime_values = _build_runtime_env_values(
+            runtime_env_file=Path("/tmp/opw.testing.env"),
+            stack_definition=_sample_stack_definition(),
+            runtime_selection=remote_runtime_selection,
+            source_environment={
+                "ODOO_DB_USER": "odoo",
+                "ODOO_DB_PASSWORD": "database-password",
+                "DOKPLOY_HOST": "https://dokploy.example",
+                "DOKPLOY_TOKEN": "token",
+                "DOKPLOY_SSH_HOST": "dokploy.internal",
+                "DOKPLOY_COMPOSE_ID_OPW_TESTING": "compose-id-1",
+            },
+        )
+
+        self.assertEqual(runtime_values.get("DOKPLOY_HOST"), "https://dokploy.example")
+        self.assertEqual(runtime_values.get("DOKPLOY_TOKEN"), "token")
+        self.assertEqual(runtime_values.get("DOKPLOY_SSH_HOST"), "dokploy.internal")
+        self.assertEqual(runtime_values.get("DOKPLOY_COMPOSE_ID_OPW_TESTING"), "compose-id-1")
+
     def test_runtime_env_sets_restore_defaults(self) -> None:
         runtime_values = self._build_runtime_values(runtime_env_file="/tmp/cm.local.env")
 

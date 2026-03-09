@@ -108,11 +108,11 @@ def _raise_missing_upstream(
     _stack_name: str,
     *,
     env_file: Path | None,
-    bootstrap_only: bool,
+    bootstrap: bool,
     no_sanitize: bool,
 ) -> int:
     _ = env_file
-    _ = bootstrap_only
+    _ = bootstrap
     _ = no_sanitize
     raise ValueError("missing upstream")
 
@@ -121,11 +121,11 @@ def _raise_restore_command_error(
     _stack_name: str,
     *,
     env_file: Path | None,
-    bootstrap_only: bool,
+    bootstrap: bool,
     no_sanitize: bool,
 ) -> int:
     _ = env_file
-    _ = bootstrap_only
+    _ = bootstrap
     _ = no_sanitize
     raise CommandError(["restore-from-upstream"], 1, None, "restore failed")
 
@@ -133,7 +133,7 @@ def _raise_restore_command_error(
 def _assert_restore_workflow_raises_click_exception(
     test_case: unittest.TestCase,
     *,
-    restore_stack_fn: Callable[..., int],
+    run_stack_data_workflow_fn: Callable[..., int],
     expected_message_fragment: str,
 ) -> None:
     with tempfile.TemporaryDirectory() as temporary_directory:
@@ -146,7 +146,6 @@ def _assert_restore_workflow_raises_click_exception(
                 context_name="opw",
                 instance_name="local",
                 env_file=env_file,
-                bootstrap_only=False,
                 no_sanitize=False,
                 dry_run=False,
                 load_stack_fn=_load_sample_stack,
@@ -154,7 +153,7 @@ def _assert_restore_workflow_raises_click_exception(
                 load_environment_fn=lambda *_args, **_kwargs: (Path("/tmp/.env"), {}),
                 write_runtime_odoo_conf_file_fn=_write_sample_runtime_odoo_conf_file,
                 write_runtime_env_file_fn=_write_sample_runtime_env_file,
-                restore_stack_fn=restore_stack_fn,
+                run_stack_data_workflow_fn=run_stack_data_workflow_fn,
                 echo_fn=lambda _message: None,
             )
 
@@ -313,14 +312,14 @@ class PlatformWorkflowRuntimeTests(unittest.TestCase):
     def test_run_restore_workflow_wraps_value_errors_as_click_exception(self) -> None:
         _assert_restore_workflow_raises_click_exception(
             self,
-            restore_stack_fn=_raise_missing_upstream,
+            run_stack_data_workflow_fn=_raise_missing_upstream,
             expected_message_fragment="missing upstream",
         )
 
     def test_run_restore_workflow_wraps_command_errors_as_click_exception(self) -> None:
         _assert_restore_workflow_raises_click_exception(
             self,
-            restore_stack_fn=_raise_restore_command_error,
+            run_stack_data_workflow_fn=_raise_restore_command_error,
             expected_message_fragment="command failed",
         )
 
@@ -347,7 +346,6 @@ class PlatformWorkflowRuntimeTests(unittest.TestCase):
                 context_name="opw",
                 instance_name="local",
                 env_file=None,
-                bootstrap_only=False,
                 no_sanitize=False,
                 dry_run=True,
                 load_stack_fn=_load_sample_stack,
@@ -355,11 +353,83 @@ class PlatformWorkflowRuntimeTests(unittest.TestCase):
                 load_environment_fn=load_environment_with_capture,
                 write_runtime_odoo_conf_file_fn=_write_sample_runtime_odoo_conf_file,
                 write_runtime_env_file_fn=_write_sample_runtime_env_file,
-                restore_stack_fn=lambda *_args, **_kwargs: 0,
+                run_stack_data_workflow_fn=lambda *_args, **_kwargs: 0,
                 echo_fn=lambda _message: None,
             )
 
         self.assertEqual(captured_collision_mode.get("value"), "error")
+
+    def test_run_bootstrap_workflow_passes_bootstrap_flag(self) -> None:
+        captured_kwargs: dict[str, object] = {}
+
+        def run_stack_data_workflow_with_capture(_stack_name: str, **kwargs: object) -> int:
+            captured_kwargs.update(kwargs)
+            return 0
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            repo_root = Path(temporary_directory)
+            env_file = repo_root / "opw.testing.env"
+            env_file.write_text("KEY=value\n", encoding="utf-8")
+
+            workflow_runtime.run_bootstrap_workflow(
+                repo_root=repo_root,
+                stack_file=Path("platform/stack.toml"),
+                context_name="opw",
+                instance_name="testing",
+                env_file=env_file,
+                no_sanitize=False,
+                dry_run=False,
+                load_stack_fn=_load_sample_stack,
+                resolve_runtime_selection_fn=_resolve_sample_runtime_selection,
+                load_environment_fn=lambda *_args, **_kwargs: (Path("/tmp/.env"), {}),
+                write_runtime_odoo_conf_file_fn=_write_sample_runtime_odoo_conf_file,
+                write_runtime_env_file_fn=_write_sample_runtime_env_file,
+                run_stack_data_workflow_fn=run_stack_data_workflow_with_capture,
+                echo_fn=lambda _message: None,
+            )
+
+        self.assertEqual(captured_kwargs["bootstrap"], True)
+
+    def test_run_workflow_bootstrap_routes_to_data_workflow_with_bootstrap_flag(self) -> None:
+        captured_kwargs: dict[str, object] = {}
+
+        def run_stack_data_workflow_with_capture(_stack_name: str, **kwargs: object) -> int:
+            captured_kwargs.update(kwargs)
+            return 0
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            env_file = Path(temporary_directory) / "cm.testing.env"
+            env_file.write_text("KEY=value\n", encoding="utf-8")
+
+            workflow_runtime.run_workflow(
+                stack_file=Path("platform/stack.toml"),
+                context_name="cm",
+                instance_name="testing",
+                env_file=env_file,
+                workflow="bootstrap",
+                dry_run=False,
+                no_cache=False,
+                no_sanitize=False,
+                force=False,
+                reset_versions=False,
+                allow_prod_data_workflow=False,
+                assert_prod_data_workflow_allowed_fn=lambda **_kwargs: None,
+                discover_repo_root_fn=lambda _path: Path("/tmp"),
+                load_stack_fn=_load_sample_stack,
+                resolve_runtime_selection_fn=_resolve_sample_runtime_selection,
+                load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+                write_runtime_odoo_conf_file_fn=_write_sample_runtime_odoo_conf_file,
+                write_runtime_env_file_fn=_write_sample_runtime_env_file,
+                run_stack_data_workflow_fn=run_stack_data_workflow_with_capture,
+                compose_base_command_fn=_compose_base_command,
+                run_command_fn=lambda _command: None,
+                run_command_best_effort_fn=lambda _command: 0,
+                run_command_with_input_fn=lambda _command, _input_text: None,
+                invoke_platform_command_fn=lambda *_args, **_kwargs: None,
+                echo_fn=lambda _message: None,
+            )
+
+        self.assertEqual(captured_kwargs["bootstrap"], True)
 
     def test_run_workflow_select_invokes_platform_select_with_dry_run_false(self) -> None:
         captured_invocations: list[tuple[str, dict[str, object]]] = []
@@ -375,7 +445,6 @@ class PlatformWorkflowRuntimeTests(unittest.TestCase):
             workflow="select",
             dry_run=False,
             no_cache=False,
-            bootstrap_only=False,
             no_sanitize=False,
             force=False,
             reset_versions=False,
@@ -387,7 +456,7 @@ class PlatformWorkflowRuntimeTests(unittest.TestCase):
             load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
             write_runtime_odoo_conf_file_fn=_write_sample_runtime_odoo_conf_file,
             write_runtime_env_file_fn=_write_sample_runtime_env_file,
-            restore_stack_fn=lambda *_args, **_kwargs: 0,
+            run_stack_data_workflow_fn=lambda *_args, **_kwargs: 0,
             compose_base_command_fn=_compose_base_command,
             run_command_fn=lambda _command: None,
             run_command_best_effort_fn=lambda _command: 0,
@@ -415,7 +484,6 @@ class PlatformWorkflowRuntimeTests(unittest.TestCase):
             workflow="up",
             dry_run=False,
             no_cache=True,
-            bootstrap_only=False,
             no_sanitize=False,
             force=False,
             reset_versions=False,
@@ -427,7 +495,7 @@ class PlatformWorkflowRuntimeTests(unittest.TestCase):
             load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
             write_runtime_odoo_conf_file_fn=_write_sample_runtime_odoo_conf_file,
             write_runtime_env_file_fn=_write_sample_runtime_env_file,
-            restore_stack_fn=lambda *_args, **_kwargs: 0,
+            run_stack_data_workflow_fn=lambda *_args, **_kwargs: 0,
             compose_base_command_fn=_compose_base_command,
             run_command_fn=lambda _command: None,
             run_command_best_effort_fn=lambda _command: 0,

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import json
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 import click
 
-from .models import DokploySourceOfTruth, JsonObject, LoadedStack
+from .models import DokploySourceOfTruth, JsonObject, JsonValue, LoadedStack
 
 RECONCILE_PRUNABLE_ENV_PREFIXES = ("ENV_OVERRIDE_",)
 RECONCILE_PRUNABLE_ENV_KEYS = frozenset({"ODOO_WEB_COMMAND"})
@@ -321,7 +323,7 @@ def execute_logs(
                 deployment_summary[output_key] = value
         rendered_deployments.append(deployment_summary)
 
-    payload: JsonObject = {
+    payload: dict[str, object] = {
         "context": context_name,
         "instance": instance_name,
         "target_type": target_runtime.target_type,
@@ -332,6 +334,238 @@ def execute_logs(
         "note": "Deployment metadata includes log_path for each run. Direct streaming requires authenticated Dokploy websocket sessions.",
     }
     emit_payload_fn(payload, json_output=json_output)
+
+
+def _as_object_list(raw_items: object) -> list[JsonObject]:
+    object_items: list[JsonObject] = []
+    if isinstance(raw_items, dict):
+        for key_name in (
+            "data",
+            "items",
+            "result",
+            "projects",
+            "servers",
+            "environments",
+            "compose",
+            "applications",
+        ):
+            nested_items = raw_items.get(key_name)
+            if isinstance(nested_items, list):
+                raw_items = nested_items
+                break
+    if not isinstance(raw_items, list):
+        return object_items
+    for raw_item in raw_items:
+        if isinstance(raw_item, dict) and all(isinstance(key, str) for key in raw_item):
+            object_items.append(raw_item)
+    return object_items
+
+
+def _compose_snapshot_file_name(target_name: str, target_id: str) -> str:
+    normalized_target_name = re.sub(r"[^A-Za-z0-9._-]+", "-", target_name.strip()).strip("-") or "compose"
+    normalized_target_id = re.sub(r"[^A-Za-z0-9._-]+", "-", target_id.strip()).strip("-") or "unknown"
+    return f"{normalized_target_name}--{normalized_target_id}.json"
+
+
+def execute_inventory(
+    *,
+    env_file: Path | None,
+    output_file: Path | None,
+    snapshot_dir: Path | None,
+    json_output: bool,
+    discover_repo_root_fn: Callable[[Path], Path],
+    load_environment_fn: Callable[..., tuple[Path, dict[str, str]]],
+    read_dokploy_config_fn: Callable[[dict[str, str]], tuple[str, str]],
+    dokploy_request_fn: Callable[..., JsonValue],
+    fetch_dokploy_target_payload_fn: Callable[..., JsonObject],
+    emit_payload_fn: Callable[..., None],
+) -> None:
+    repo_root = discover_repo_root_fn(Path.cwd())
+    _env_file_path, environment_values = load_environment_fn(repo_root, env_file, collision_mode="error")
+    host, token = read_dokploy_config_fn(environment_values)
+
+    raw_project_payload = dokploy_request_fn(host=host, token=token, path="/api/project.all")
+    raw_server_payload = dokploy_request_fn(host=host, token=token, path="/api/server.all")
+
+    project_items = _as_object_list(raw_project_payload)
+    server_items = _as_object_list(raw_server_payload)
+
+    project_summaries: list[dict[str, object]] = []
+    compose_target_summaries: list[dict[str, object]] = []
+    application_target_summaries: list[dict[str, object]] = []
+
+    for project_item in project_items:
+        project_name = str(project_item.get("name") or "")
+        project_id = str(project_item.get("projectId") or "")
+        environment_summaries: list[dict[str, object]] = []
+
+        for environment_item in _as_object_list(project_item.get("environments")):
+            environment_name = str(environment_item.get("name") or "")
+            environment_id = str(environment_item.get("environmentId") or "")
+
+            environment_compose_names: list[str] = []
+            for compose_item in _as_object_list(environment_item.get("compose")):
+                compose_id = str(compose_item.get("composeId") or compose_item.get("compose_id") or "").strip()
+                compose_name = str(compose_item.get("name") or "").strip()
+                if not compose_id:
+                    continue
+
+                target_payload = fetch_dokploy_target_payload_fn(
+                    host=host,
+                    token=token,
+                    target_type="compose",
+                    target_id=compose_id,
+                )
+                raw_domains = target_payload.get("domains")
+                domains: list[str] = []
+                for domain_item in _as_object_list(raw_domains):
+                    domain_host = str(domain_item.get("host") or "").strip()
+                    if domain_host:
+                        domains.append(domain_host)
+
+                server_object = target_payload.get("server")
+                if isinstance(server_object, dict) and all(isinstance(key, str) for key in server_object):
+                    server_name = str(server_object.get("name") or "") or None
+                    server_ip_address = str(server_object.get("ipAddress") or "") or None
+                else:
+                    server_name = None
+                    server_ip_address = None
+
+                environment_compose_names.append(compose_name or compose_id)
+                compose_target_summaries.append(
+                    {
+                        "project_name": project_name,
+                        "project_id": project_id,
+                        "environment_name": environment_name,
+                        "environment_id": environment_id,
+                        "target_type": "compose",
+                        "target_id": compose_id,
+                        "target_name": compose_name or str(target_payload.get("name") or ""),
+                        "app_name": target_payload.get("appName"),
+                        "server_id": target_payload.get("serverId"),
+                        "server_name": server_name,
+                        "server_ip_address": server_ip_address,
+                        "domains": sorted(domains),
+                        "custom_git_branch": target_payload.get("customGitBranch"),
+                        "custom_git_url": target_payload.get("customGitUrl"),
+                        "compose_path": target_payload.get("composePath"),
+                        "source_type": target_payload.get("sourceType"),
+                        "auto_deploy": target_payload.get("autoDeploy"),
+                        "compose_status": target_payload.get("composeStatus"),
+                    }
+                )
+
+            environment_application_names: list[str] = []
+            for application_item in _as_object_list(environment_item.get("applications")):
+                application_id = str(application_item.get("applicationId") or application_item.get("application_id") or "").strip()
+                application_name = str(application_item.get("name") or "").strip()
+                if not application_id:
+                    continue
+                environment_application_names.append(application_name or application_id)
+                application_target_summaries.append(
+                    {
+                        "project_name": project_name,
+                        "project_id": project_id,
+                        "environment_name": environment_name,
+                        "environment_id": environment_id,
+                        "target_type": "application",
+                        "target_id": application_id,
+                        "target_name": application_name,
+                    }
+                )
+
+            environment_summaries.append(
+                {
+                    "environment_name": environment_name,
+                    "environment_id": environment_id,
+                    "compose_targets": sorted(environment_compose_names),
+                    "application_targets": sorted(environment_application_names),
+                }
+            )
+
+        project_summaries.append(
+            {
+                "project_name": project_name,
+                "project_id": project_id,
+                "environment_count": len(environment_summaries),
+                "environments": environment_summaries,
+            }
+        )
+
+    server_summaries: list[dict[str, object]] = []
+    for server_item in server_items:
+        server_summaries.append(
+            {
+                "server_id": server_item.get("serverId"),
+                "server_name": server_item.get("name"),
+                "server_type": server_item.get("serverType"),
+                "server_status": server_item.get("serverStatus"),
+                "ip_address": server_item.get("ipAddress"),
+                "username": server_item.get("username"),
+                "port": server_item.get("port"),
+                "description": server_item.get("description"),
+            }
+        )
+
+    payload: dict[str, object] = {
+        "project_count": len(project_summaries),
+        "projects": project_summaries,
+        "compose_target_count": len(compose_target_summaries),
+        "compose_targets": compose_target_summaries,
+        "application_target_count": len(application_target_summaries),
+        "application_targets": application_target_summaries,
+        "server_count": len(server_summaries),
+        "servers": server_summaries,
+    }
+
+    if snapshot_dir is not None:
+        resolved_snapshot_dir = snapshot_dir if snapshot_dir.is_absolute() else (repo_root / snapshot_dir)
+        resolved_snapshot_dir.mkdir(parents=True, exist_ok=True)
+        compose_snapshot_dir = resolved_snapshot_dir / "compose"
+        compose_snapshot_dir.mkdir(parents=True, exist_ok=True)
+        (resolved_snapshot_dir / "project.all.json").write_text(
+            json.dumps(raw_project_payload, indent=2, sort_keys=True), encoding="utf-8"
+        )
+        (resolved_snapshot_dir / "server.all.json").write_text(
+            json.dumps(raw_server_payload, indent=2, sort_keys=True), encoding="utf-8"
+        )
+        for compose_target in compose_target_summaries:
+            compose_target_id = str(compose_target.get("target_id") or "")
+            compose_target_name = str(compose_target.get("target_name") or compose_target_id or "compose")
+            target_payload = fetch_dokploy_target_payload_fn(
+                host=host,
+                token=token,
+                target_type="compose",
+                target_id=compose_target_id,
+            )
+            snapshot_file_name = _compose_snapshot_file_name(compose_target_name, compose_target_id)
+            (compose_snapshot_dir / snapshot_file_name).write_text(
+                json.dumps(target_payload, indent=2, sort_keys=True), encoding="utf-8"
+            )
+        payload["snapshot_dir"] = str(resolved_snapshot_dir)
+
+    _write_payload_file(repo_root=repo_root, output_file=output_file, payload=payload)
+
+    emit_payload_fn(payload, json_output=json_output)
+
+
+def _read_json_object(file_path: Path, *, label: str) -> JsonObject:
+    try:
+        payload = json.loads(file_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise click.ClickException(f"Invalid {label} file {file_path}: {exc}") from exc
+    if not isinstance(payload, dict) or not all(isinstance(key, str) for key in payload):
+        raise click.ClickException(f"Invalid {label} file {file_path}: expected a JSON object payload.")
+    return payload
+
+
+def _write_payload_file(*, repo_root: Path, output_file: Path | None, payload: dict[str, object]) -> None:
+    if output_file is None:
+        return
+    resolved_output_file = output_file if output_file.is_absolute() else (repo_root / output_file)
+    resolved_output_file.parent.mkdir(parents=True, exist_ok=True)
+    resolved_output_file.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    payload["output_file"] = str(resolved_output_file)
 
 
 def execute_reconcile(
@@ -370,7 +604,7 @@ def execute_reconcile(
     source_file_path = resolve_dokploy_source_file_fn(repo_root, source_file)
     source_of_truth = load_dokploy_source_of_truth_fn(source_file_path)
 
-    results: list[JsonObject] = []
+    results: list[dict[str, object]] = []
     matched_targets = [
         target
         for target in source_of_truth.targets
@@ -535,7 +769,7 @@ def execute_reconcile(
             }
         )
 
-    payload: JsonObject = {
+    payload: dict[str, object] = {
         "source_file": str(source_file_path),
         "apply": apply,
         "matched_targets": len(results),

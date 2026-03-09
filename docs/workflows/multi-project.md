@@ -42,7 +42,7 @@ Quick flow
 4. (Optional) Restore upstream data:
 
    ```bash
-   uv run platform run --context opw --instance local --workflow restore
+   uv run platform restore --context opw --instance local
    ```
 
 Notes

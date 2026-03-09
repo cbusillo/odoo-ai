@@ -877,3 +877,137 @@ def find_dokploy_target_definition(
         if target.context == context_name and target.instance == instance_name:
             return target
     return None
+
+
+def collect_dokploy_deploy_servers(*, host: str, token: str) -> tuple[JsonObject, ...]:
+    payload = dokploy_request(host=host, token=token, path="/api/server.all")
+    server_items: list[JsonValue]
+    if isinstance(payload, list):
+        server_items = payload
+    elif isinstance(payload, dict):
+        for key_name in ("data", "items", "result", "servers"):
+            nested_items = payload.get(key_name)
+            if isinstance(nested_items, list):
+                server_items = nested_items
+                break
+        else:
+            raise click.ClickException("Dokploy server.all returned an invalid response payload.")
+    else:
+        raise click.ClickException("Dokploy server.all returned an invalid response payload.")
+
+    deploy_servers: list[JsonObject] = []
+    for entry in server_items:
+        server_entry = as_json_object(entry)
+        if server_entry is None:
+            continue
+        if str(server_entry.get("serverType") or "").strip().lower() != "deploy":
+            continue
+        deploy_servers.append(server_entry)
+    return tuple(deploy_servers)
+
+
+def resolve_dokploy_compose_remote_config(
+    *,
+    host: str,
+    token: str,
+    compose_name: str,
+    environment_values: dict[str, str],
+) -> tuple[Path, str]:
+    """Resolve (remote_stack_path, compose_project_name) for a Dokploy compose target.
+
+    The remote stack path is /etc/dokploy/applications/<appName> by default.
+    The compose project name is the Dokploy appName (what Dokploy passes via -p).
+
+    Override either value with env vars:
+      DOKPLOY_REMOTE_STACK_PATH_<COMPOSE_NAME_UPPER>  e.g. DOKPLOY_REMOTE_STACK_PATH_CM_DEV
+      DOKPLOY_COMPOSE_PROJECT_<COMPOSE_NAME_UPPER>    e.g. DOKPLOY_COMPOSE_PROJECT_CM_DEV
+    """
+    safe_name = compose_name.upper().replace("-", "_")
+    path_override_key = f"DOKPLOY_REMOTE_STACK_PATH_{safe_name}"
+    project_override_key = f"DOKPLOY_COMPOSE_PROJECT_{safe_name}"
+    compose_id_override_key = f"DOKPLOY_COMPOSE_ID_{safe_name}"
+
+    path_override = environment_values.get(path_override_key, "").strip()
+    project_override = environment_values.get(project_override_key, "").strip()
+    compose_id_override = environment_values.get(compose_id_override_key, "").strip()
+
+    if path_override and project_override and compose_id_override:
+        return Path(path_override), project_override
+
+    projects_payload = dokploy_request(host=host, token=token, path="/api/project.all")
+    records = collect_compose_records(projects_payload)
+    matches = [record for record in records if record.get("compose_name") == compose_name]
+    if not matches:
+        known_names = sorted(
+            {
+                record_name
+                for record in records
+                for record_name in (record.get("compose_name"),)
+                if isinstance(record_name, str) and record_name
+            }
+        )
+        preview = ", ".join(known_names[:20])
+        raise click.ClickException(
+            f"Dokploy compose '{compose_name}' not found for remote path resolution. "
+            f"Known: {preview}. "
+            f"Set {compose_id_override_key}=<compose-id>, {path_override_key}=<path>, and "
+            f"{project_override_key}=<project> to provide overrides."
+        )
+
+    match_ids = {
+        record_compose_id
+        for record in matches
+        for record_compose_id in (record.get("compose_id"),)
+        if isinstance(record_compose_id, str) and record_compose_id
+    }
+    if compose_id_override:
+        if compose_id_override not in match_ids:
+            known_match_ids = ", ".join(sorted(match_ids)) or "<none>"
+            raise click.ClickException(
+                f"Dokploy compose override {compose_id_override_key}={compose_id_override!r} does not match "
+                f"compose '{compose_name}'. Matching ids: {known_match_ids}."
+            )
+        matches = [record for record in matches if record.get("compose_id") == compose_id_override]
+        match_ids = {compose_id_override}
+
+    if len(match_ids) > 1:
+        known_match_ids = ", ".join(sorted(match_ids))
+        raise click.ClickException(
+            f"Dokploy compose name '{compose_name}' is ambiguous across multiple targets: {known_match_ids}. "
+            f"Set {compose_id_override_key}=<compose-id> to disambiguate, plus {path_override_key} / "
+            f"{project_override_key} if needed."
+        )
+
+    compose_id = matches[0].get("compose_id")
+    if not isinstance(compose_id, str) or not compose_id:
+        raise click.ClickException(
+            f"Dokploy compose '{compose_name}' has no valid compose_id. "
+            f"Set {compose_id_override_key}=<compose-id>, {path_override_key}=<path>, and "
+            f"{project_override_key}=<project> to provide overrides."
+        )
+
+    compose_payload = dokploy_request(
+        host=host,
+        token=token,
+        path="/api/compose.one",
+        query={"composeId": compose_id},
+    )
+    compose_as_object = as_json_object(compose_payload)
+    if compose_as_object is None:
+        raise click.ClickException(
+            f"Dokploy compose.one returned an invalid response for {compose_id}. "
+            f"Set {compose_id_override_key}=<compose-id>, {path_override_key}=<path>, and "
+            f"{project_override_key}=<project> to provide overrides."
+        )
+
+    app_name = compose_as_object.get("appName")
+    if not isinstance(app_name, str) or not app_name:
+        raise click.ClickException(
+            f"Dokploy compose {compose_id} has no appName in API response. "
+            f"Set {compose_id_override_key}=<compose-id>, {path_override_key}=<path>, and "
+            f"{project_override_key}=<project> to provide overrides."
+        )
+
+    resolved_path = Path(path_override) if path_override else Path("/etc/dokploy/applications") / app_name
+    resolved_project = project_override if project_override else app_name
+    return resolved_path, resolved_project

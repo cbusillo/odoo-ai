@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import json
 import io
+import json
 import sys
-from contextlib import redirect_stderr, redirect_stdout
 from collections.abc import Callable
+from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,13 +24,9 @@ SHIP_WORKFLOW_NAME = "ship"
 SHIP_INSTANCE_NAMES = frozenset({"dev", "testing", "prod"})
 LOCAL_RUNTIME_WORKFLOWS = frozenset(
     {
-        "restore",
         "init",
         "update",
         "openupgrade",
-        "restore-init",
-        "restore-update",
-        "restore-init-update",
         "select",
         "up",
         "build",
@@ -102,7 +98,6 @@ def _run_workflow_for_targets(
     workflow: str,
     dry_run: bool,
     no_cache: bool,
-    bootstrap_only: bool,
     no_sanitize: bool,
     force: bool,
     reset_versions: bool,
@@ -133,7 +128,6 @@ def _run_workflow_for_targets(
                         workflow=workflow,
                         dry_run=dry_run,
                         no_cache=no_cache,
-                        bootstrap_only=bootstrap_only,
                         no_sanitize=no_sanitize,
                         force=force,
                         reset_versions=reset_versions,
@@ -149,7 +143,6 @@ def _run_workflow_for_targets(
                     workflow=workflow,
                     dry_run=dry_run,
                     no_cache=no_cache,
-                    bootstrap_only=bootstrap_only,
                     no_sanitize=no_sanitize,
                     force=force,
                     reset_versions=reset_versions,
@@ -284,14 +277,13 @@ def execute_run_workflow_command(
     workflow: str,
     dry_run: bool,
     no_cache: bool,
-    bootstrap_only: bool,
     no_sanitize: bool,
     force: bool,
     reset_versions: bool,
     allow_prod_data_workflow: bool,
     run_workflow_fn: Callable[..., None],
 ) -> None:
-    assert_local_instance_for_local_runtime(instance_name=instance_name, operation_name="platform run")
+    _assert_workflow_target_allowed(workflow_name=workflow, instance_name=instance_name)
     run_workflow_fn(
         stack_file=stack_file,
         context_name=context_name,
@@ -300,10 +292,37 @@ def execute_run_workflow_command(
         workflow=workflow,
         dry_run=dry_run,
         no_cache=no_cache,
-        bootstrap_only=bootstrap_only,
         no_sanitize=no_sanitize,
         force=force,
         reset_versions=reset_versions,
+        allow_prod_data_workflow=allow_prod_data_workflow,
+    )
+
+
+def _execute_destructive_data_workflow_command(
+    *,
+    stack_file: Path,
+    context_name: str,
+    instance_name: str,
+    env_file: Path | None,
+    workflow_name: str,
+    dry_run: bool,
+    no_sanitize: bool,
+    allow_prod_data_workflow: bool,
+    run_workflow_fn: Callable[..., None],
+) -> None:
+    _assert_workflow_target_allowed(workflow_name=workflow_name, instance_name=instance_name)
+    run_workflow_fn(
+        stack_file=stack_file,
+        context_name=context_name,
+        instance_name=instance_name,
+        env_file=env_file,
+        workflow=workflow_name,
+        dry_run=dry_run,
+        no_cache=False,
+        no_sanitize=no_sanitize,
+        force=False,
+        reset_versions=False,
         allow_prod_data_workflow=allow_prod_data_workflow,
     )
 
@@ -317,7 +336,6 @@ def execute_tui_command(
     env_file: Path | None,
     dry_run: bool,
     no_cache: bool,
-    bootstrap_only: bool,
     no_sanitize: bool,
     force: bool,
     reset_versions: bool,
@@ -557,7 +575,6 @@ def execute_tui_command(
         workflow=selected_workflow,
         dry_run=dry_run,
         no_cache=no_cache,
-        bootstrap_only=bootstrap_only,
         no_sanitize=no_sanitize,
         force=force,
         reset_versions=reset_versions,
@@ -592,6 +609,54 @@ def execute_init_command(
         instance_name=instance_name,
         env_file=env_file,
         dry_run=dry_run,
+    )
+
+
+def execute_restore_command(
+    *,
+    stack_file: Path,
+    context_name: str,
+    instance_name: str,
+    env_file: Path | None,
+    dry_run: bool,
+    no_sanitize: bool,
+    allow_prod_data_workflow: bool,
+    run_workflow_fn: Callable[..., None],
+) -> None:
+    _execute_destructive_data_workflow_command(
+        stack_file=stack_file,
+        context_name=context_name,
+        instance_name=instance_name,
+        env_file=env_file,
+        workflow_name="restore",
+        dry_run=dry_run,
+        no_sanitize=no_sanitize,
+        allow_prod_data_workflow=allow_prod_data_workflow,
+        run_workflow_fn=run_workflow_fn,
+    )
+
+
+def execute_bootstrap_command(
+    *,
+    stack_file: Path,
+    context_name: str,
+    instance_name: str,
+    env_file: Path | None,
+    dry_run: bool,
+    no_sanitize: bool,
+    allow_prod_data_workflow: bool,
+    run_workflow_fn: Callable[..., None],
+) -> None:
+    _execute_destructive_data_workflow_command(
+        stack_file=stack_file,
+        context_name=context_name,
+        instance_name=instance_name,
+        env_file=env_file,
+        workflow_name="bootstrap",
+        dry_run=dry_run,
+        no_sanitize=no_sanitize,
+        allow_prod_data_workflow=allow_prod_data_workflow,
+        run_workflow_fn=run_workflow_fn,
     )
 
 

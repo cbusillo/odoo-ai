@@ -25,11 +25,20 @@ Commands
 - `uv run test wait --json` — poll detached runs and return a single JSON
   payload.
 - `uv run test doctor-session --json` — summarize the latest session (slowest
-  shards, timeouts, failures). Requires `llm.json` (created by the runner).
+  shards, timeouts, failures). Requires `llm.json` (created by the runner) and
+  now includes phase outcome kinds, top failure reasons, and host resource
+  budgets.
 - `uv run test plan --phase all` — inspect sharding/phase allocations before a
   large run.
+- `uv run test run` writes `tmp/test-logs/<session>/run-plan.json` before shard
+  execution starts so phase groups, worker limits, and shard allocations are
+  explicit before side effects begin.
+- `run-plan.json` also records host-level resource budgets under
+  `host_resources` so browser-heavy and production-clone-heavy concurrency is
+  explicit before execution begins.
 - `uv run test validate --json` — verify all tests executed + summarize
-  failures.
+  failures. Validation output now also includes phase outcome kinds and the
+  host resource budget recorded in the run plan.
 - `--stack opw|cm` (or `--env-file .platform/env/<context>.<instance>.env`) —
   load the matching local stack env before running.
 - Test runs require a resolved stack context. Stack-based runs fail closed when
@@ -65,6 +74,10 @@ Environment Flags
 - `TESTKIT_PROFILE=gate` applies deterministic gate defaults for local code
   gate runs with the reproducible shard/process/memory defaults from
   `tools/testkit/cli.py`. Use it for gate behavior, not interactive loops.
+- `TESTKIT_BROWSER_SLOTS=1` — host-level cap for concurrent JS/tour shard
+  execution.
+- `TESTKIT_PRODUCTION_CLONE_SLOTS=2` — host-level cap for concurrent
+  production-clone shard execution.
 - `TOUR_STEP_DELAY_SECONDS=0` is the fixture default for tour tests. Set a
   non-zero value only for local debugging when you need slower visual stepping.
 - Named-volume controls for DB/data/logs live under the `TESTKIT_*_VOLUME_*`
@@ -75,10 +88,21 @@ Environment Flags
 - Template reuse defaults can be set in `pyproject.toml` under
   `[tool.odoo-test.template]` (`reuse`, `ttl_sec`). Env vars
   `REUSE_TEMPLATE` and `TEMPLATE_TTL_SEC` override the defaults.
+- Unit/JS templates and production-clone templates are prepared eagerly per
+  phase before shard fanout so resource failures happen earlier and are easier
+  to classify.
+- Browser-heavy and production-clone-heavy shard execution now respects shared
+  host budgets across concurrent phases so overlap mode cannot overrun the
+  machine just because separate phases each looked safe in isolation.
 
 Artifacts
 
 - `tmp/test-logs/<session>/llm.json` — LLM-friendly rollup (flat failures with
   `module`/`class`/`test_name` when available, grouped failures, per-phase
-  counters, shard summaries with timeouts/container names, repro commands, and
-  key artifact paths).
+  counters, phase `outcome_kinds`, shard summaries with `outcome_kind` /
+  `failure_reasons`, timeouts/container names, repro commands, and key artifact
+  paths).
+- Per-shard `*.summary.json` files now classify failures explicitly with
+  `outcome_kind` (`success`, `test_failure`, `infra_failure`,
+  `harness_failure`) plus `failure_reasons` so harness/runtime issues stop
+  blending into addon test failures.

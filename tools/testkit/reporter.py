@@ -63,6 +63,12 @@ def write_manifest(session_dir: Path) -> None:
     (session_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
 
 
+def write_run_plan(session_dir: Path, run_plan: dict[str, Any]) -> Path:
+    run_plan_path = session_dir / "run-plan.json"
+    run_plan_path.write_text(json.dumps(run_plan, indent=2))
+    return run_plan_path
+
+
 def write_session_index(session_dir: Path, aggregate: dict) -> None:
     is_success = bool(aggregate.get("success", False))
     lines = [
@@ -208,6 +214,8 @@ def write_llm_report(session_dir: Path, aggregate: dict) -> Path:
                     "elapsed_seconds": shard_payload.get("elapsed_seconds"),
                     "timeout": shard_payload.get("timeout"),
                     "timed_out": bool(shard_payload.get("timed_out", False)),
+                    "outcome_kind": shard_payload.get("outcome_kind"),
+                    "failure_reasons": shard_payload.get("failure_reasons") or [],
                     "container_name": shard_payload.get("container_name"),
                     "log_file": log_path,
                     "summary_file": str(summary_path.resolve()),
@@ -223,6 +231,7 @@ def write_llm_report(session_dir: Path, aggregate: dict) -> Path:
             "success": bool(summary.get("success", False)),
             "counters": summary.get("counters") or {},
             "shards": summary.get("shards"),
+            "outcome_kinds": summary.get("outcome_kinds") or {},
             "failure_count": len(entries),
             "sample_failures": normalized_entries[:10],
             "shard_summaries": shard_summaries,
@@ -235,12 +244,7 @@ def write_llm_report(session_dir: Path, aggregate: dict) -> Path:
     for failure in normalized_failures:
         phase_name = failure.get("phase")
         module_name = failure.get("module")
-        if (
-            isinstance(phase_name, str)
-            and phase_name in modules_by_phase
-            and isinstance(module_name, str)
-            and module_name
-        ):
+        if isinstance(phase_name, str) and phase_name in modules_by_phase and isinstance(module_name, str) and module_name:
             modules_by_phase[phase_name].add(module_name)
     for phase_name, module_names in modules_by_phase.items():
         if module_names:
@@ -296,6 +300,7 @@ def aggregate_phase(session_dir: Path, phase: str) -> dict | None:
     counter_totals = {"tests_run": 0, "failures": 0, "errors": 0, "skips": 0}
     all_successful = True
     merged_failure_entries: list[dict] = []
+    outcome_kinds: dict[str, int] = {}
     for summary_file in summary_files:
         summary_data = load_json(summary_file)
         if summary_data is None:
@@ -308,6 +313,9 @@ def aggregate_phase(session_dir: Path, phase: str) -> dict | None:
                 continue
         summary_success = bool(summary_data.get("success", False))
         all_successful = all_successful and summary_success
+        outcome_kind = summary_data.get("outcome_kind")
+        if isinstance(outcome_kind, str) and outcome_kind:
+            outcome_kinds[outcome_kind] = outcome_kinds.get(outcome_kind, 0) + 1
         # parse failures from corresponding log
         log_file = summary_data.get("log_file")
         failure_count = 0
@@ -324,6 +332,7 @@ def aggregate_phase(session_dir: Path, phase: str) -> dict | None:
         "success": all_successful,
         "counters": counter_totals,
         "shards": len(summary_files),
+        "outcome_kinds": outcome_kinds,
     }
     (phase_dir / "all.summary.json").write_text(json.dumps(aggregate_data, indent=2))
     (phase_dir / "all.failures.json").write_text(json.dumps({"entries": merged_failure_entries}, indent=2))
@@ -346,9 +355,7 @@ def _int_from_counter(counters: dict[str, Any], key: str) -> int:
 
 def _junit_counts(counters: dict[str, Any], entries: list[dict[str, Any]]) -> tuple[int, int, int, int]:
     tests_count = _int_from_counter(counters, "tests_run")
-    failure_count = sum(
-        1 for entry in entries if _map_failure_type_to_junit(str(entry.get("type", ""))) == "failure"
-    )
+    failure_count = sum(1 for entry in entries if _map_failure_type_to_junit(str(entry.get("type", ""))) == "failure")
     error_count = sum(1 for entry in entries if _map_failure_type_to_junit(str(entry.get("type", ""))) == "error")
     if tests_count == 0:
         tests_count = failure_count + error_count
@@ -511,8 +518,7 @@ def update_weight_cache_from_session(session_dir: Path, cache_path: Path | None 
 def prune_old_sessions(log_root: Path, keep: int) -> None:
     try:
         session_dirs = [
-            session_dir for session_dir in log_root.iterdir() if
-            session_dir.is_dir() and session_dir.name.startswith("test-")
+            session_dir for session_dir in log_root.iterdir() if session_dir.is_dir() and session_dir.name.startswith("test-")
         ]
     except OSError:
         return

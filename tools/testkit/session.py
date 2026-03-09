@@ -5,9 +5,10 @@ import os
 import re
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Literal, TypeVar
+from typing import TypeVar
 
 from tools.environment_files import discover_repo_root
 
@@ -26,8 +27,10 @@ from .docker_api import (
     get_database_service,
     get_script_runner_service,
 )
+from .executor import OdooExecutor, ShardExecutionRequest
 from .filestore import cleanup_filestores
 from .phases import PhaseOutcome
+from .plan import ClassShardItem, PhaseExecutionPlan, PhaseName, RunExecutionPlan, TemplateStrategy
 from .reporter import (
     aggregate_phase,
     begin_session_dir,
@@ -37,6 +40,7 @@ from .reporter import (
     write_junit_for_phase,
     write_latest_json,
     write_manifest,
+    write_run_plan,
     write_session_index,
 )
 from .settings import SUMMARY_SCHEMA_VERSION, TestSettings
@@ -44,7 +48,6 @@ from .sharding import discover_modules_with, greedy_shards, plan_shards_for_phas
 
 _logger = logging.getLogger(__name__)
 _T = TypeVar("_T")
-PhaseName = Literal["unit", "js", "integration", "tour"]
 
 
 class PreflightError(RuntimeError):
@@ -124,6 +127,17 @@ class TestSession:
         self._preflight_steps: list[dict[str, object]] = []
         self._preflight_report: dict[str, object] = {}
         self._shard_plans: dict[str, dict[str, object]] = {}
+        self._host_resource_semaphores: dict[str, threading.BoundedSemaphore] = {}
+        browser_slots = max(1, int(self.settings.browser_slots))
+        production_clone_slots = max(1, int(self.settings.production_clone_slots))
+        self._host_resource_limits = {
+            "browser": browser_slots,
+            "production_clone": production_clone_slots,
+        }
+        self._host_resource_semaphores = {
+            "browser": threading.BoundedSemaphore(browser_slots),
+            "production_clone": threading.BoundedSemaphore(production_clone_slots),
+        }
 
     def start(self) -> None:
         self._begin()
@@ -144,87 +158,189 @@ class TestSession:
         return discover()
 
     def plan_phase(self, phase: PhaseName, shard_override: int | None = None) -> dict[str, object]:
-        modules = self.discover_modules(phase)
-        if not modules:
-            return {
-                "phase": phase,
-                "strategy": "empty",
-                "shards": [],
-                "shards_count": 0,
-                "modules": 0,
-            }
+        timeout = self._phase_timeout(phase)
+        phase_plan = self.build_phase_plan(phase, timeout=timeout, shard_override=shard_override)
+        return phase_plan.to_payload()
+
+    def build_phase_plan(
+        self,
+        phase: PhaseName,
+        *,
+        timeout: int,
+        shard_override: int | None = None,
+        modules: list[str] | None = None,
+    ) -> PhaseExecutionPlan:
+        phase_modules = list(modules) if modules is not None else self.discover_modules(phase)
+        if not phase_modules:
+            return PhaseExecutionPlan(
+                phase=phase,
+                modules=(),
+                timeout=timeout,
+                strategy="empty",
+                requested_shards=shard_override,
+                effective_shards=0,
+                max_workers=0,
+                template_strategy=self._template_strategy_for_phase(phase),
+                uses_browser=self._phase_uses_browser(phase),
+                uses_production_clone=self._phase_uses_production_clone(phase),
+            )
 
         default_auto = 4 if phase == "unit" else 2
-        if phase == "unit":
-            env_value = shard_override if shard_override is not None else self.settings.unit_shards
-            within = int(self.settings.unit_within_shards)
-        elif phase == "integration":
-            env_value = shard_override if shard_override is not None else self.settings.integration_shards
-            within = int(self.settings.integration_within_shards)
-        elif phase == "tour":
-            env_value = shard_override if shard_override is not None else self.settings.tour_shards
-            within = int(self.settings.tour_within_shards)
-        else:
-            env_value = shard_override if shard_override is not None else self.settings.js_shards
-            within = 0
+        requested_shards, within_shards = self._phase_shard_inputs_from_settings(
+            phase,
+            shard_override,
+            self.settings,
+        )
+        template_strategy = self._template_strategy_for_phase(phase)
+        uses_browser = self._phase_uses_browser(phase)
+        uses_production_clone = self._phase_uses_production_clone(phase)
 
-        if within and within > 0 and phase in {"unit", "integration", "tour"}:
-            class_shards = self._compute_within_shards(modules, within, phase=phase)
-            if not class_shards or len(class_shards) < within:
-                slice_count = self._cap_by_db_guardrail(max(1, int(within)))
-                return {
-                    "phase": phase,
-                    "strategy": "method_slicing",
-                    "requested": within,
-                    "effective": slice_count,
-                    "modules": len(modules),
-                    "slice_count": slice_count,
-                    "shards": [],
-                    "shards_count": slice_count,
-                }
-            return {
-                "phase": phase,
-                "strategy": "class_sharding",
-                "requested": within,
-                "effective": len(class_shards),
-                "modules": len(modules),
-                "shards": class_shards,
-                "shards_count": len(class_shards),
-            }
+        if within_shards and phase in {"unit", "integration", "tour"}:
+            class_shards = self._compute_within_shards(phase_modules, within_shards, phase=phase)
+            if class_shards and len(class_shards) >= within_shards:
+                effective_shards = len(class_shards)
+                return PhaseExecutionPlan(
+                    phase=phase,
+                    modules=tuple(phase_modules),
+                    timeout=timeout,
+                    strategy="class_sharding",
+                    requested_shards=within_shards,
+                    effective_shards=effective_shards,
+                    max_workers=self._resolve_phase_max_workers(phase, effective_shards),
+                    template_strategy=template_strategy,
+                    uses_browser=uses_browser,
+                    uses_production_clone=uses_production_clone,
+                    class_shards=tuple(
+                        tuple(
+                            ClassShardItem(
+                                module=class_item["module"],
+                                class_name=class_item["class"],
+                                weight=int(class_item["weight"]),
+                            )
+                            for class_item in shard
+                        )
+                        for shard in class_shards
+                    ),
+                )
 
-        _ = self._compute_shards(modules, default_auto=default_auto, env_value=int(env_value), phase=phase)
+            slice_count = self._cap_by_db_guardrail(max(1, int(within_shards)))
+            return PhaseExecutionPlan(
+                phase=phase,
+                modules=tuple(phase_modules),
+                timeout=timeout,
+                strategy="method_slicing",
+                requested_shards=within_shards,
+                effective_shards=slice_count,
+                max_workers=self._resolve_phase_max_workers(phase, slice_count),
+                template_strategy=template_strategy,
+                uses_browser=uses_browser,
+                uses_production_clone=uses_production_clone,
+                slice_count=slice_count,
+            )
+
+        computed_shards = self._compute_shards(
+            phase_modules,
+            default_auto=default_auto,
+            env_value=int(requested_shards),
+            phase=phase,
+        )
         plan = self._shard_plans.get(phase) or {}
-        plan_shards = plan.get("shards")
-        plan_shards_list = plan_shards if isinstance(plan_shards, list) else []
-        return {
-            "phase": phase,
-            "requested": plan.get("requested"),
-            "auto_selected": plan.get("auto_selected"),
-            "module_cap": plan.get("module_cap"),
-            "db_guarded": plan.get("db_guarded"),
-            "effective": plan.get("effective"),
-            "modules": plan.get("modules", len(modules)),
-            "total_weight": plan.get("total_weight"),
-            "strategy": plan.get("strategy"),
-            "shards": plan_shards_list,
-            "shards_count": plan.get("shards_count", len(plan_shards_list)),
+        effective_shards = len(computed_shards)
+        requested_value = plan.get("requested")
+        auto_selected = plan.get("auto_selected")
+        module_cap = plan.get("module_cap")
+        db_guarded = plan.get("db_guarded")
+        total_weight = plan.get("total_weight")
+        return PhaseExecutionPlan(
+            phase=phase,
+            modules=tuple(phase_modules),
+            timeout=timeout,
+            strategy=str(plan.get("strategy") or "module_sharding"),
+            requested_shards=requested_value if isinstance(requested_value, int) else requested_shards,
+            effective_shards=effective_shards,
+            max_workers=self._resolve_phase_max_workers(phase, effective_shards),
+            template_strategy=template_strategy,
+            uses_browser=uses_browser,
+            uses_production_clone=uses_production_clone,
+            auto_selected=auto_selected if isinstance(auto_selected, int) else None,
+            module_cap=module_cap if isinstance(module_cap, int) else None,
+            db_guarded=db_guarded if isinstance(db_guarded, int) else None,
+            total_weight=total_weight if isinstance(total_weight, int) else None,
+            module_shards=tuple(tuple(shard_modules) for shard_modules in computed_shards),
+        )
+
+    def build_run_plan(self) -> RunExecutionPlan:
+        phase_names: tuple[PhaseName, ...] = ("unit", "js", "integration", "tour")
+        phase_plans = tuple(self.build_phase_plan(phase, timeout=self._phase_timeout(phase)) for phase in phase_names)
+        if self.settings.phases_overlap:
+            phase_groups: tuple[tuple[PhaseName, ...], ...] = (("unit", "js"), ("integration", "tour"))
+        else:
+            phase_groups = (("unit",), ("js",), ("integration",), ("tour",))
+        return RunExecutionPlan(
+            phases=phase_plans,
+            phase_groups=phase_groups,
+            overlap_enabled=bool(self.settings.phases_overlap),
+            browser_slots=max(1, int(self.settings.browser_slots)),
+            production_clone_slots=max(1, int(self.settings.production_clone_slots)),
+        )
+
+    @staticmethod
+    def _phase_timeout(phase: PhaseName) -> int:
+        defaults = {
+            "unit": 600,
+            "js": 1200,
+            "integration": 900,
+            "tour": 1800,
         }
+        configured_timeouts = _load_timeouts()
+        raw_timeout = configured_timeouts.get(phase, defaults[phase])
+        try:
+            return int(raw_timeout)
+        except (TypeError, ValueError):
+            return defaults[phase]
+
+    @staticmethod
+    def _phase_shard_inputs_from_settings(
+        phase: PhaseName,
+        shard_override: int | None,
+        settings: TestSettings,
+    ) -> tuple[int, int]:
+        if phase == "unit":
+            return shard_override if shard_override is not None else int(settings.unit_shards), int(settings.unit_within_shards)
+        if phase == "integration":
+            return (
+                shard_override if shard_override is not None else int(settings.integration_shards),
+                int(settings.integration_within_shards),
+            )
+        if phase == "tour":
+            return shard_override if shard_override is not None else int(settings.tour_shards), int(settings.tour_within_shards)
+        return shard_override if shard_override is not None else int(settings.js_shards), 0
+
+    @staticmethod
+    def _template_strategy_for_phase(phase: PhaseName) -> TemplateStrategy:
+        if phase in {"unit", "js"}:
+            return "phase"
+        if phase in {"integration", "tour"}:
+            return "production"
+        return "none"
+
+    @staticmethod
+    def _phase_uses_browser(phase: PhaseName) -> bool:
+        return phase in {"js", "tour"}
+
+    @staticmethod
+    def _phase_uses_production_clone(phase: PhaseName) -> bool:
+        return phase in {"integration", "tour"}
 
     def run_phase(self, phase: PhaseName, modules: list[str], timeout: int) -> PhaseOutcome:
         try:
-            self._preflight(need_template=phase in {"integration", "tour"} and bool(modules))
+            self._preflight(need_template=False)
         except RuntimeError as error:
             self._emit_event("preflight_failed", phase=phase, error=str(error))
             return PhaseOutcome(phase, 1, None, None)
-        if phase == "unit":
-            return self._run_unit_sharded(modules, timeout)
-        if phase == "js":
-            return self._run_js_sharded(modules, timeout)
-        if phase == "integration":
-            return self._run_integration_sharded(modules, timeout)
-        if phase == "tour":
-            return self._run_tour_sharded(modules, timeout)
-        raise ValueError(f"Unknown phase {phase}")
+        phase_plan = self.build_phase_plan(phase, modules=modules, timeout=timeout)
+        self._prepare_phase_resources(phase_plan)
+        return self._execute_phase_plan(phase_plan)
 
     def _begin(self) -> None:
         self.session_dir, self.session_name, self.session_started = begin_session_dir()
@@ -314,6 +430,7 @@ class TestSession:
 
         try:
             if not self._preflight_state.get("services"):
+
                 def _validate_structure() -> dict[str, object]:
                     from .validate import check_test_structure
 
@@ -343,6 +460,7 @@ class TestSession:
                 self._preflight_state["services"] = True
 
             if need_template and not self._preflight_state.get("template"):
+
                 def _ensure_template() -> dict[str, object]:
                     template_name = self._ensure_template_db()
                     return {"template_db": template_name}
@@ -561,128 +679,39 @@ class TestSession:
             cleanup_filestores(root)
         except (OSError, RuntimeError, ValueError) as exc:
             _log_suppressed("pre-run cleanup", exc)
-        self._require_session_dir()
-        timeouts = _load_timeouts()
-
-        def _timeout(key: str, default: int) -> int:
-            raw = timeouts.get(key, default)
-            try:
-                return int(raw)
-            except (TypeError, ValueError):
-                return default
-
-        # Discover modules per category
-        unit_modules = self._discover_unit_modules()
-        js_modules = self._discover_js_modules()
-        integration_modules = self._discover_integration_modules()
-        tour_modules = self._discover_tour_modules()
+        session_dir = self._require_session_dir()
+        run_plan = self.build_run_plan()
+        write_run_plan(session_dir, run_plan.to_payload())
+        self._emit_event(
+            "plan_committed",
+            overlap_enabled=run_plan.overlap_enabled,
+            phase_groups=[list(phase_group) for phase_group in run_plan.phase_groups],
+        )
 
         try:
             self._preflight(need_template=False)
         except RuntimeError as error:
             self._emit_event("preflight_failed", error=str(error))
-            preflight_outcomes = {
-                name: PhaseOutcome(name, None, None, None) for name in ("unit", "js", "integration", "tour")
-            }
+            preflight_outcomes = {name: PhaseOutcome(name, None, None, None) for name in ("unit", "js", "integration", "tour")}
             preflight_outcomes["unit"] = PhaseOutcome("unit", 1, None, None)
             return self._finish(preflight_outcomes)
-
-        # Prefetch heavy assets (template DB, first filestore snapshots) in background
-        self._prefetch_heavy_assets(integration_modules, tour_modules)
 
         outcomes: dict[str, PhaseOutcome] = {}
 
         try:
-            if self.settings.phases_overlap:
-                from concurrent.futures import ThreadPoolExecutor
-
-                # Unit + JS in parallel
-                with ThreadPoolExecutor(max_workers=2) as pool:
-                    self._emit_event("phase_start", phase="unit")
-                    self._emit_event("phase_start", phase="js")
-                    unit_future = pool.submit(self._run_unit_sharded, unit_modules, _timeout("unit", 600))
-                    js_future = pool.submit(self._run_js_sharded, js_modules, _timeout("js", 1200))
-                    outcomes["unit"] = unit_future.result()
-                    outcomes["js"] = js_future.result()
-                try:
-                    if self.session_dir:
-                        aggregate_phase(self.session_dir, "unit")
-                        aggregate_phase(self.session_dir, "js")
-                except (OSError, RuntimeError, ValueError) as exc:
-                    _log_suppressed("aggregate unit/js", exc)
-                # Proceed or stop based on keep_going
-                if not self.keep_going and (not outcomes["unit"].ok or not outcomes["js"].ok):
-                    outcomes.setdefault("integration", PhaseOutcome("integration", None, None, None))
-                    outcomes.setdefault("tour", PhaseOutcome("tour", None, None, None))
+            for phase_group in run_plan.phase_groups:
+                group_plans = [run_plan.phase(phase_name) for phase_name in phase_group]
+                self._prepare_phase_group_resources(group_plans)
+                if len(group_plans) == 1:
+                    phase_plan = group_plans[0]
+                    outcomes[phase_plan.phase] = self._execute_planned_phase(phase_plan)
+                else:
+                    outcomes.update(self._execute_phase_group(group_plans))
+                if not self.keep_going and any(outcomes[phase_name].ok is False for phase_name in phase_group):
+                    for remaining_phase in ("unit", "js", "integration", "tour"):
+                        outcomes.setdefault(remaining_phase, PhaseOutcome(remaining_phase, None, None, None))
                     return self._finish(outcomes)
-                # Integration + Tour in parallel
-                try:
-                    self._preflight(need_template=bool(integration_modules or tour_modules))
-                except RuntimeError as error:
-                    self._emit_event("preflight_failed", phase="integration/tour", error=str(error))
-                    outcomes["integration"] = PhaseOutcome("integration", 1, None, None)
-                    outcomes["tour"] = PhaseOutcome("tour", 1, None, None)
-                    return self._finish(outcomes)
-                with ThreadPoolExecutor(max_workers=2) as secondary_pool:
-                    self._emit_event("phase_start", phase="integration")
-                    self._emit_event("phase_start", phase="tour")
-                    integration_future = secondary_pool.submit(
-                        self._run_integration_sharded,
-                        integration_modules,
-                        _timeout("integration", 900),
-                    )
-                    tour_future = secondary_pool.submit(self._run_tour_sharded, tour_modules, _timeout("tour", 1800))
-                    outcomes["integration"] = integration_future.result()
-                    outcomes["tour"] = tour_future.result()
-                try:
-                    if self.session_dir:
-                        aggregate_phase(self.session_dir, "integration")
-                        aggregate_phase(self.session_dir, "tour")
-                except (OSError, RuntimeError, ValueError) as exc:
-                    _log_suppressed("aggregate integration/tour", exc)
-                return self._finish(outcomes)
-            else:
-                # Sequential path
-                self._emit_event("phase_start", phase="unit")
-                outcomes["unit"] = self._run_unit_sharded(unit_modules, _timeout("unit", 600))
-                if self.keep_going or outcomes["unit"].ok:
-                    self._emit_event("phase_start", phase="js")
-                    outcomes["js"] = self._run_js_sharded(js_modules, _timeout("js", 1200))
-                else:
-                    outcomes["js"] = PhaseOutcome("js", None, None, None)
-                    print("   Skipping JS tests due to unit failures")
-                try:
-                    if self.session_dir:
-                        aggregate_phase(self.session_dir, "unit")
-                        aggregate_phase(self.session_dir, "js")
-                except (OSError, RuntimeError, ValueError) as exc:
-                    _log_suppressed("aggregate unit/js", exc)
-                if self.keep_going or (outcomes["js"].ok if outcomes["js"].ok is not None else True):
-                    try:
-                        self._preflight(need_template=bool(integration_modules or tour_modules))
-                    except RuntimeError as error:
-                        self._emit_event("preflight_failed", phase="integration", error=str(error))
-                        outcomes["integration"] = PhaseOutcome("integration", 1, None, None)
-                        outcomes["tour"] = PhaseOutcome("tour", None, None, None)
-                        return self._finish(outcomes)
-                    self._emit_event("phase_start", phase="integration")
-                    outcomes["integration"] = self._run_integration_sharded(integration_modules, _timeout("integration", 900))
-                else:
-                    outcomes["integration"] = PhaseOutcome("integration", None, None, None)
-                    print("   Skipping integration due to earlier failures")
-                if self.keep_going or (outcomes["integration"].ok if outcomes["integration"].ok is not None else True):
-                    self._emit_event("phase_start", phase="tour")
-                    outcomes["tour"] = self._run_tour_sharded(tour_modules, _timeout("tour", 1800))
-                else:
-                    outcomes["tour"] = PhaseOutcome("tour", None, None, None)
-                    print("   Skipping tour due to earlier failures")
-                try:
-                    if self.session_dir:
-                        aggregate_phase(self.session_dir, "integration")
-                        aggregate_phase(self.session_dir, "tour")
-                except (OSError, RuntimeError, ValueError) as exc:
-                    _log_suppressed("aggregate integration/tour", exc)
-                return self._finish(outcomes)
+            return self._finish(outcomes)
         finally:
             # Post-run cleanup (success or cancellation): remove all test DBs/filestores
             try:
@@ -692,7 +721,70 @@ class TestSession:
             except (OSError, RuntimeError, ValueError) as exc:
                 _log_suppressed("post-run cleanup", exc)
 
-        raise RuntimeError("test session finished without a return code")
+    def _prepare_phase_group_resources(self, phase_plans: list[PhaseExecutionPlan]) -> None:
+        for phase_plan in phase_plans:
+            self._prepare_phase_resources(phase_plan)
+
+    def _prepare_phase_resources(self, phase_plan: PhaseExecutionPlan) -> None:
+        if phase_plan.is_empty:
+            return
+        if phase_plan.template_strategy == "production":
+            template_name = self._ensure_template_db()
+            self._emit_event("phase_resources_ready", phase=phase_plan.phase, template_db=template_name)
+            return
+        if phase_plan.template_strategy == "phase":
+            template_name = self._ensure_phase_template_db(
+                phase_plan.phase,
+                list(phase_plan.modules),
+                phase_plan.timeout,
+            )
+            self._emit_event("phase_resources_ready", phase=phase_plan.phase, template_db=template_name)
+
+    def _execute_phase_group(self, phase_plans: list[PhaseExecutionPlan]) -> dict[str, PhaseOutcome]:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        outcomes: dict[str, PhaseOutcome] = {}
+        with ThreadPoolExecutor(max_workers=len(phase_plans)) as pool:
+            futures = {pool.submit(self._execute_planned_phase, phase_plan): phase_plan.phase for phase_plan in phase_plans}
+            for future in as_completed(futures):
+                outcomes[futures[future]] = future.result()
+        return outcomes
+
+    def _execute_planned_phase(self, phase_plan: PhaseExecutionPlan) -> PhaseOutcome:
+        self._emit_event("phase_start", phase=phase_plan.phase)
+        outcome = self._execute_phase_plan(phase_plan)
+        try:
+            if self.session_dir:
+                aggregate_phase(self.session_dir, phase_plan.phase)
+        except (OSError, RuntimeError, ValueError) as exc:
+            _log_suppressed(f"aggregate {phase_plan.phase}", exc)
+        return outcome
+
+    def _execute_phase_plan(self, phase_plan: PhaseExecutionPlan) -> PhaseOutcome:
+        if phase_plan.is_empty:
+            return PhaseOutcome(phase_plan.phase, 0, self._require_session_dir() / phase_plan.phase, None)
+        if phase_plan.strategy == "class_sharding":
+            return self._execute_shard_requests(
+                phase_plan.phase,
+                self._build_class_shard_requests(phase_plan),
+                label="class-shard",
+                max_workers=phase_plan.max_workers,
+            )
+        if phase_plan.strategy == "method_slicing":
+            return self._execute_shard_requests(
+                phase_plan.phase,
+                self._build_method_slice_requests(phase_plan),
+                label="method-slice shard",
+                max_workers=phase_plan.max_workers,
+            )
+        if phase_plan.module_shards:
+            return self._execute_shard_requests(
+                phase_plan.phase,
+                self._build_module_shard_requests(phase_plan),
+                label="shard",
+                max_workers=phase_plan.max_workers,
+            )
+        raise ValueError(f"Unsupported phase plan strategy: {phase_plan.strategy}")
 
     def _ensure_template_db(self) -> str | None:
         if self._template_failed:
@@ -769,38 +861,6 @@ class TestSession:
             self._phase_templates[phase] = template_name
             return template_name
 
-    def _prefetch_heavy_assets(self, integration_modules: list[str], tour_modules: list[str]) -> None:
-        # Run first filestore snapshot in background while unit/js may be running
-        import threading
-
-        # Optionally pre-snapshot first integration/tour filestores when not skipped
-        from .filestore import snapshot_filestore
-        settings = self.settings
-
-        def _maybe_snapshot_first(phase: str, modules: list[str], skip_flag: bool) -> None:
-            try:
-                if skip_flag or not modules:
-                    return
-                shards = self._compute_shards(
-                    modules,
-                    default_auto=2,
-                    env_value=(settings.integration_shards if phase == "integration" else settings.tour_shards),
-                    phase=phase,
-                )
-                if not shards or not shards[0]:
-                    return
-                first_mods = shards[0]
-                base = f"{settings.db_name}_test_{phase}"
-                db = base if len(shards) == 1 else f"{base}_{_stable_hash_suffix('-'.join(first_mods))}"
-                snapshot_filestore(db, get_production_db_name())
-            except (OSError, RuntimeError, ValueError) as exc:
-                _log_suppressed("prefetch filestore", exc)
-
-        if integration_modules and not settings.skip_filestore_integration:
-            threading.Thread(target=_maybe_snapshot_first, args=("integration", integration_modules, False), daemon=True).start()
-        if tour_modules and not settings.skip_filestore_tour:
-            threading.Thread(target=_maybe_snapshot_first, args=("tour", tour_modules, False), daemon=True).start()
-
     # ————— Discovery helpers —————
     def _discover_unit_modules(self) -> list[str]:
         modules = self._manifest_modules(patterns=["**/tests/unit/**/*.py"]) or self._all_modules()
@@ -848,13 +908,9 @@ class TestSession:
             phase_include = self._p_include.get(phase) or set()
             phase_exclude = self._p_exclude.get(phase) or set()
             if phase_include:
-                filtered_modules = [
-                    module_name for module_name in filtered_modules if module_name in phase_include
-                ]
+                filtered_modules = [module_name for module_name in filtered_modules if module_name in phase_include]
             if phase_exclude:
-                filtered_modules = [
-                    module_name for module_name in filtered_modules if module_name not in phase_exclude
-                ]
+                filtered_modules = [module_name for module_name in filtered_modules if module_name not in phase_exclude]
         # Keep original order but de-dup just in case
         seen: set[str] = set()
         deduped: list[str] = []
@@ -867,39 +923,24 @@ class TestSession:
 
     # ————— Sharded runners —————
     def _run_unit_sharded(self, modules: list[str], timeout: int) -> PhaseOutcome:
-        within = int(self.settings.unit_within_shards)
-        if within and within > 0:
-            class_shards = self._compute_within_shards(modules, within, phase="unit")
-            if not class_shards or len(class_shards) < within:
-                return self._fanout_method("unit", modules, timeout, within)
-            return self._fanout_class("unit", class_shards, timeout)
-        shards = self._compute_shards(modules, default_auto=4, env_value=self.settings.unit_shards, phase="unit")
-        return self._fanout("unit", shards, timeout)
+        phase_plan = self.build_phase_plan("unit", modules=modules, timeout=timeout)
+        self._prepare_phase_resources(phase_plan)
+        return self._execute_phase_plan(phase_plan)
 
     def _run_js_sharded(self, modules: list[str], timeout: int) -> PhaseOutcome:
-        shards = self._compute_shards(modules, default_auto=4, env_value=self.settings.js_shards, phase="js")
-        return self._fanout("js", shards, timeout)
+        phase_plan = self.build_phase_plan("js", modules=modules, timeout=timeout)
+        self._prepare_phase_resources(phase_plan)
+        return self._execute_phase_plan(phase_plan)
 
     def _run_integration_sharded(self, modules: list[str], timeout: int) -> PhaseOutcome:
-        within = int(self.settings.integration_within_shards)
-        if within and within > 0:
-            class_shards = self._compute_within_shards(modules, within, phase="integration")
-            # If class-level sharding yields fewer shards than requested, fall back to method-level slicing
-            if not class_shards or len(class_shards) < within:
-                return self._fanout_method("integration", modules, timeout, within)
-            return self._fanout_class("integration", class_shards, timeout)
-        shards = self._compute_shards(modules, default_auto=2, env_value=self.settings.integration_shards, phase="integration")
-        return self._fanout("integration", shards, timeout)
+        phase_plan = self.build_phase_plan("integration", modules=modules, timeout=timeout)
+        self._prepare_phase_resources(phase_plan)
+        return self._execute_phase_plan(phase_plan)
 
     def _run_tour_sharded(self, modules: list[str], timeout: int) -> PhaseOutcome:
-        within = int(self.settings.tour_within_shards)
-        if within and within > 0:
-            class_shards = self._compute_within_shards(modules, within, phase="tour")
-            if not class_shards or len(class_shards) < within:
-                return self._fanout_method("tour", modules, timeout, within)
-            return self._fanout_class("tour", class_shards, timeout)
-        shards = self._compute_shards(modules, default_auto=2, env_value=self.settings.tour_shards, phase="tour")
-        return self._fanout("tour", shards, timeout)
+        phase_plan = self.build_phase_plan("tour", modules=modules, timeout=timeout)
+        self._prepare_phase_resources(phase_plan)
+        return self._execute_phase_plan(phase_plan)
 
     def _compute_shards(self, modules: list[str], default_auto: int, env_value: int, phase: str | None = None) -> list[list[str]]:
         if not modules:
@@ -952,9 +993,7 @@ class TestSession:
                 "strategy": plan.strategy,
                 "shards": plan.shards,
             }
-            return [
-                [module_entry["name"] for module_entry in shard["modules"]] for shard in plan.shards
-            ]
+            return [[module_entry["name"] for module_entry in shard["modules"]] for shard in plan.shards]
         return greedy_shards(modules, shard_count)
 
     @staticmethod
@@ -964,9 +1003,7 @@ class TestSession:
         shards = plan_within_module_shards(modules, phase, max(1, within))
         out: list[list[dict]] = []
         for shard in shards:
-            out.append([
-                {"module": item.module, "class": item.cls, "weight": item.weight} for item in shard
-            ])
+            out.append([{"module": item.module, "class": item.cls, "weight": item.weight} for item in shard])
         return out
 
     def _cap_by_db_guardrail(self, shard_count: int) -> int:
@@ -1017,149 +1054,227 @@ class TestSession:
             None,
         )
 
-    def _fanout_shards(self, phase: str, shards: list[_T], runner: Callable[[_T], int]) -> PhaseOutcome:
-        session_dir = self._require_session_dir()
-        max_workers = self._resolve_phase_max_workers(phase, len(shards))
-        return self._run_fanout(session_dir, phase, shards, max_workers, runner)
-
-    def _resolve_phase_max_workers(self, phase: str, shard_count: int) -> int:
-        if phase == "tour" and int(self.settings.tour_max_procs) > 0:
-            return max(1, min(int(self.settings.tour_max_procs), shard_count))
-        if self.settings.max_procs:
-            return max(1, min(int(self.settings.max_procs), shard_count))
-        return min(8, shard_count)
-
-    def _fanout_method(
-        self, phase: str, modules: list[str], timeout: int, slice_count: int, *, extra_env: dict[str, str] | None = None
+    def _fanout_shards(
+        self,
+        phase: str,
+        shards: list[_T],
+        runner: Callable[[_T], int],
+        *,
+        max_workers: int | None = None,
     ) -> PhaseOutcome:
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-
-        from .executor import OdooExecutor
-
         session_dir = self._require_session_dir()
-        slice_count = self._cap_by_db_guardrail(max(1, int(slice_count)))
-        print(f"▶️  Phase {phase} with {slice_count} method-slice shard(s)")
-        phase_template = self._ensure_phase_template_db(phase, modules, timeout)
+        effective_workers = max_workers if max_workers is not None else self._resolve_phase_max_workers(phase, len(shards))
+        return self._run_fanout(session_dir, phase, shards, effective_workers, runner)
 
-        def _run(slice_index: int) -> int:
-            executor = OdooExecutor(session_dir, phase)
-            is_js = phase == "js"
-            is_tour = phase == "tour"
-            use_prod = phase in {"integration", "tour"}
-            base_tag = "js_test" if is_js else ("tour_test" if is_tour else ("integration_test" if use_prod else "unit_test"))
-            tag_expr = base_tag
-            db_base = f"{self.settings.db_name}_test_{phase}"
-            db_name = f"{db_base}_m{slice_index:03d}"
-            template_db = self._ensure_template_db() if use_prod else phase_template
+    @staticmethod
+    def _phase_base_tag(phase: str) -> str:
+        if phase == "js":
+            return "js_test"
+        if phase == "tour":
+            return "tour_test"
+        if phase == "integration":
+            return "integration_test"
+        return "unit_test"
+
+    def _phase_db_base(self, phase: str) -> str:
+        return f"{self.settings.db_name}_test_{phase}"
+
+    @staticmethod
+    def _phase_uses_prod_template(phase: str) -> bool:
+        return phase in {"integration", "tour"}
+
+    def _template_db_for_phase(self, phase: str, modules: list[str], timeout: int) -> str | None:
+        if self._phase_uses_prod_template(phase):
+            return self._ensure_template_db()
+        return self._ensure_phase_template_db(phase, modules, timeout)
+
+    def _make_shard_request(
+        self,
+        phase: str,
+        *,
+        modules: list[str],
+        timeout: int,
+        test_tags: str,
+        db_name: str,
+        template_db: str | None,
+        use_module_prefix: bool = False,
+        extra_env: dict[str, str] | None = None,
+        shard_label: str | None = None,
+    ) -> ShardExecutionRequest:
+        return ShardExecutionRequest(
+            test_tags=test_tags,
+            db_name=db_name,
+            modules_to_install=tuple(modules),
+            timeout=timeout,
+            is_tour_test=phase == "tour",
+            is_js_test=phase == "js",
+            use_production_clone=self._phase_uses_prod_template(phase),
+            template_db=template_db,
+            use_module_prefix=use_module_prefix,
+            extra_env=extra_env,
+            shard_label=shard_label,
+        )
+
+    def _build_method_slice_requests(self, phase_plan: PhaseExecutionPlan) -> list[ShardExecutionRequest]:
+        modules = list(phase_plan.modules)
+        slice_count = self._cap_by_db_guardrail(max(1, int(phase_plan.slice_count)))
+        template_db = self._template_db_for_phase(phase_plan.phase, modules, phase_plan.timeout)
+        db_base = self._phase_db_base(phase_plan.phase)
+        requests: list[ShardExecutionRequest] = []
+        for slice_index in range(slice_count):
             shard_env = {
                 "OAI_TEST_SLICER": "1",
                 "TEST_SLICE_TOTAL": str(slice_count),
                 "TEST_SLICE_INDEX": str(slice_index),
-                "TEST_SLICE_PHASE": phase,
+                "TEST_SLICE_PHASE": phase_plan.phase,
                 "TEST_SLICE_MODULES": ",".join(modules),
             }
-            if extra_env:
-                shard_env.update(extra_env)
-            return executor.run(
-                test_tags=tag_expr,
-                db_name=db_name,
-                modules_to_install=modules,
-                timeout=timeout,
-                is_tour_test=is_tour,
-                is_js_test=is_js,
-                use_production_clone=use_prod,
-                template_db=template_db,
-                extra_env=shard_env,
-                shard_label=f"ms{slice_index:03d}",
-            ).returncode
+            requests.append(
+                self._make_shard_request(
+                    phase_plan.phase,
+                    modules=modules,
+                    timeout=phase_plan.timeout,
+                    test_tags=self._phase_base_tag(phase_plan.phase),
+                    db_name=f"{db_base}_m{slice_index:03d}",
+                    template_db=template_db,
+                    extra_env=shard_env,
+                    shard_label=f"ms{slice_index:03d}",
+                )
+            )
+        return requests
 
-        max_workers = self._resolve_phase_max_workers(phase, slice_count)
-        aggregate_return_code = 0
-        with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            futures = {pool.submit(_run, slice_index): slice_index for slice_index in range(slice_count)}
-            for future in as_completed(futures):
-                return_code = future.result()
-                if return_code != 0:
-                    aggregate_return_code = aggregate_return_code or return_code
-        return PhaseOutcome(
-            phase,
-            0 if aggregate_return_code == 0 else aggregate_return_code,
-            session_dir / phase,
-            None,
-        )
-
-    def _fanout(
-        self, phase: str, shards: list[list[str]], timeout: int, *, extra_env: dict[str, str] | None = None
-    ) -> PhaseOutcome:
-        from .executor import OdooExecutor
-
-        session_dir = self._require_session_dir()
-        print(f"▶️  Phase {phase} with {len(shards)} shard(s)")
+    def _build_module_shard_requests(self, phase_plan: PhaseExecutionPlan) -> list[ShardExecutionRequest]:
+        shards = [list(shard_modules) for shard_modules in phase_plan.module_shards]
         phase_modules = sorted({module_name for shard in shards for module_name in shard})
-        phase_template = self._ensure_phase_template_db(phase, phase_modules, timeout)
-
-        def _run(shard_modules: list[str]) -> int:
+        template_db = self._template_db_for_phase(phase_plan.phase, phase_modules, phase_plan.timeout)
+        test_tags = self._phase_base_tag(phase_plan.phase)
+        if phase_plan.phase == "tour":
+            test_tags = "tour_test,-js_test"
+        db_base = self._phase_db_base(phase_plan.phase)
+        requests: list[ShardExecutionRequest] = []
+        for shard_modules in shards:
             if not shard_modules:
-                return 0
-            executor = OdooExecutor(session_dir, phase)
-            # Use per-module prefix to create separate log files when shard is single module
-            use_prefix = len(shard_modules) == 1
-            is_js = phase == "js"
-            is_tour = phase == "tour"
-            use_prod = phase in {"integration", "tour"}
-            tags = "js_test" if is_js else ("tour_test,-js_test" if is_tour else ("integration_test" if use_prod else "unit_test"))
-            db = f"{self.settings.db_name}_test_{phase}"
-            template_db = self._ensure_template_db() if use_prod else phase_template
-            return executor.run(
-                test_tags=tags,
-                db_name=db if len(shards) == 1 else f"{db}_{_stable_hash_suffix('-'.join(shard_modules))}",
-                modules_to_install=shard_modules,
-                timeout=timeout,
-                is_tour_test=is_tour,
-                is_js_test=is_js,
-                use_production_clone=use_prod,
-                template_db=template_db,
-                use_module_prefix=use_prefix,
-                extra_env=extra_env,
-            ).returncode
+                continue
+            db_name = db_base if len(shards) == 1 else f"{db_base}_{_stable_hash_suffix('-'.join(shard_modules))}"
+            requests.append(
+                self._make_shard_request(
+                    phase_plan.phase,
+                    modules=shard_modules,
+                    timeout=phase_plan.timeout,
+                    test_tags=test_tags,
+                    db_name=db_name,
+                    template_db=template_db,
+                    use_module_prefix=len(shard_modules) == 1,
+                )
+            )
+        return requests
 
-        return self._fanout_shards(phase, shards, _run)
-
-    def _fanout_class(
-        self, phase: str, shards: list[list[dict]], timeout: int, *, extra_env: dict[str, str] | None = None
-    ) -> PhaseOutcome:
-        from .executor import OdooExecutor
-
-        session_dir = self._require_session_dir()
-        print(f"▶️  Phase {phase} with {len(shards)} class-shard(s)")
-        phase_modules = sorted({item["module"] for shard in shards for item in shard})
-        phase_template = self._ensure_phase_template_db(phase, phase_modules, timeout)
-
-        def _run(class_items: list[dict]) -> int:
-            if not class_items:
-                return 0
-            is_js = phase == "js"
-            is_tour = phase == "tour"
-            use_prod = phase in {"integration", "tour"}
-            base_tag = "js_test" if is_js else ("tour_test" if is_tour else ("integration_test" if use_prod else "unit_test"))
-            modules = sorted({item["module"] for item in class_items})
-            parts = [f"{base_tag}/{item['module']}:{item['class']}" for item in class_items]
-            if is_tour:
+    def _build_class_shard_requests(self, phase_plan: PhaseExecutionPlan) -> list[ShardExecutionRequest]:
+        template_db = self._template_db_for_phase(phase_plan.phase, list(phase_plan.modules), phase_plan.timeout)
+        base_tag = self._phase_base_tag(phase_plan.phase)
+        db_base = self._phase_db_base(phase_plan.phase)
+        requests: list[ShardExecutionRequest] = []
+        for shard in phase_plan.class_shards:
+            modules = sorted({class_item.module for class_item in shard})
+            parts = [f"{base_tag}/{class_item.module}:{class_item.class_name}" for class_item in shard]
+            if phase_plan.phase == "tour":
                 parts.append("-js_test")
-            tag_expr = ",".join(parts)
-            executor = OdooExecutor(session_dir, phase)
-            db = f"{self.settings.db_name}_test_{phase}"
-            template_db = self._ensure_template_db() if use_prod else phase_template
-            return executor.run(
-                test_tags=tag_expr,
-                db_name=f"{db}_{_stable_hash_suffix('::'.join(parts))}",
-                modules_to_install=modules,
-                timeout=timeout,
-                is_tour_test=is_tour,
-                is_js_test=is_js,
-                use_production_clone=use_prod,
-                template_db=template_db,
-                extra_env=extra_env,
-            ).returncode
+            requests.append(
+                self._make_shard_request(
+                    phase_plan.phase,
+                    modules=modules,
+                    timeout=phase_plan.timeout,
+                    test_tags=",".join(parts),
+                    db_name=f"{db_base}_{_stable_hash_suffix('::'.join(parts))}",
+                    template_db=template_db,
+                )
+            )
+        return requests
 
-        return self._fanout_shards(phase, shards, _run)
+    def _execute_shard_requests(
+        self,
+        phase: str,
+        requests: list[ShardExecutionRequest],
+        *,
+        label: str,
+        max_workers: int | None = None,
+    ) -> PhaseOutcome:
+        session_dir = self._require_session_dir()
+        effective_workers = self._effective_workers_for_requests(phase, requests, max_workers=max_workers)
+        print(f"▶️  Phase {phase} with {len(requests)} {label}(s)")
+
+        def _run(request: ShardExecutionRequest) -> int:
+            with self._acquire_host_resources_for_request(request):
+                return OdooExecutor(session_dir, phase).run_request(request).returncode
+
+        return self._fanout_shards(phase, requests, _run, max_workers=effective_workers)
+
+    @staticmethod
+    def _request_resource_names(request: ShardExecutionRequest) -> tuple[str, ...]:
+        resource_names: list[str] = []
+        if request.use_production_clone:
+            resource_names.append("production_clone")
+        if request.is_js_test or request.is_tour_test:
+            resource_names.append("browser")
+        return tuple(resource_names)
+
+    def _host_resource_limit_for_requests(self, requests: list[ShardExecutionRequest]) -> int | None:
+        if not requests:
+            return None
+        shared_resources = set(self._request_resource_names(requests[0]))
+        if not shared_resources:
+            return None
+        for request in requests[1:]:
+            shared_resources &= set(self._request_resource_names(request))
+        if not shared_resources:
+            return None
+        return min(self._host_resource_limits[resource_name] for resource_name in shared_resources)
+
+    def _effective_workers_for_requests(
+        self,
+        phase: str,
+        requests: list[ShardExecutionRequest],
+        *,
+        max_workers: int | None,
+    ) -> int:
+        configured_workers = max_workers if max_workers is not None else self._resolve_phase_max_workers(phase, len(requests))
+        resource_limit = self._host_resource_limit_for_requests(requests)
+        if resource_limit is None:
+            return configured_workers
+        return max(1, min(configured_workers, resource_limit))
+
+    @contextmanager
+    def _acquire_host_resources_for_request(self, request: ShardExecutionRequest) -> Iterator[None]:
+        semaphores = [self._host_resource_semaphores[resource_name] for resource_name in self._request_resource_names(request)]
+        acquired: list[threading.BoundedSemaphore] = []
+        try:
+            for semaphore in semaphores:
+                semaphore.acquire()
+                acquired.append(semaphore)
+            yield
+        finally:
+            for semaphore in reversed(acquired):
+                semaphore.release()
+
+    def _resolve_phase_max_workers(self, phase: str, shard_count: int) -> int:
+        if shard_count <= 0:
+            return 0
+        if phase == "tour" and int(self.settings.tour_max_procs) > 0:
+            return max(1, min(int(self.settings.tour_max_procs), shard_count))
+        if self.settings.max_procs:
+            return max(1, min(int(self.settings.max_procs), shard_count))
+        cpu_count = self._detect_cpu_count()
+        if phase == "unit":
+            return max(1, min(shard_count, cpu_count))
+        if phase == "integration":
+            return max(1, min(shard_count, max(1, cpu_count // 2)))
+        if phase == "js":
+            return max(1, min(shard_count, max(1, min(2, cpu_count // 4 or 1))))
+        return 1
+
+    @staticmethod
+    def _detect_cpu_count() -> int:
+        try:
+            return max(1, len(os.sched_getaffinity(0)))  # type: ignore[attr-defined]
+        except (AttributeError, OSError, ValueError):
+            return max(1, os.cpu_count() or 4)

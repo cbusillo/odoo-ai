@@ -14,6 +14,7 @@ from .phases import PhaseOutcome
 from .reporter import load_json
 from .session import PhaseName, TestSession, _load_timeouts
 from .settings import TestSettings
+from .summary_helpers import host_resources_from_run_plan, outcome_kinds_from_results
 
 GATE_PROFILE_NAME = "gate"
 DEFAULT_PROFILE_NAME = "default"
@@ -26,10 +27,53 @@ GATE_PROFILE_ENVIRONMENT: dict[str, str] = {
     "TOUR_MAX_PROCS": "1",
     "PHASES_OVERLAP": "0",
     "TEST_MAX_PROCS": "4",
+    "TESTKIT_BROWSER_SLOTS": "1",
+    "TESTKIT_PRODUCTION_CLONE_SLOTS": "2",
     "TESTKIT_DISABLE_DEV_MODE": "0",
     "ODOO_LIMIT_MEMORY_SOFT": "2147483648",
     "ODOO_LIMIT_MEMORY_HARD": "3221225472",
 }
+
+
+def _format_counts(mapping: dict[str, int]) -> str:
+    if not mapping:
+        return "none"
+    return ",".join(f"{key}:{value}" for key, value in sorted(mapping.items()))
+
+
+def _load_run_plan_payload(session_dir: Path) -> dict[str, object]:
+    return load_json(session_dir / "run-plan.json") or {}
+
+
+def _host_resources_from_run_plan(run_plan: dict[str, object]) -> dict[str, int]:
+    return host_resources_from_run_plan(run_plan)
+
+
+def _outcome_kinds_from_summary(summary_data: dict[str, object]) -> dict[str, int]:
+    results = summary_data.get("results")
+    if not isinstance(results, dict):
+        return {}
+    return outcome_kinds_from_results(results)
+
+
+def _top_failure_reasons(phases: dict[str, object]) -> dict[str, int]:
+    failure_reasons: dict[str, int] = {}
+    for phase_payload in phases.values():
+        if not isinstance(phase_payload, dict):
+            continue
+        shard_summaries = phase_payload.get("shard_summaries")
+        if not isinstance(shard_summaries, list):
+            continue
+        for shard_summary in shard_summaries:
+            if not isinstance(shard_summary, dict):
+                continue
+            reasons = shard_summary.get("failure_reasons")
+            if not isinstance(reasons, list):
+                continue
+            for reason in reasons:
+                if isinstance(reason, str) and reason:
+                    failure_reasons[reason] = failure_reasons.get(reason, 0) + 1
+    return dict(sorted(failure_reasons.items(), key=lambda item: (-item[1], item[0]))[:5])
 
 
 def _emit_bottom_line(latest: Path, as_json: bool) -> int:
@@ -50,6 +94,7 @@ def _emit_bottom_line(latest: Path, as_json: bool) -> int:
     is_success = bool(data.get("success"))
     total = data.get("counters_total") or {}
     return_codes = data.get("return_codes") or {}
+    run_plan = _load_run_plan_payload(latest)
     payload = {
         "success": is_success,
         "tests_run": total.get("tests_run"),
@@ -57,6 +102,8 @@ def _emit_bottom_line(latest: Path, as_json: bool) -> int:
         "errors": total.get("errors"),
         "skips": total.get("skips"),
         "return_codes": return_codes,
+        "outcome_kinds": _outcome_kinds_from_summary(data),
+        "host_resources": _host_resources_from_run_plan(run_plan),
         "session": data.get("session"),
         "summary": str(summary_path.resolve()),
     }
@@ -64,7 +111,10 @@ def _emit_bottom_line(latest: Path, as_json: bool) -> int:
         print(json.dumps(payload))
     else:
         click.echo(
-            "success={success} tests_run={tests_run} failures={failures} errors={errors} skips={skips} session={session}".format(
+            "success={success} tests_run={tests_run} failures={failures} errors={errors} skips={skips} "
+            "outcome_kinds={outcome_kinds} host_resources={host_resources} session={session}".format(
+                outcome_kinds=_format_counts(payload["outcome_kinds"]),
+                host_resources=_format_counts(payload["host_resources"]),
                 **payload
             )
         )
@@ -97,8 +147,7 @@ def _normalize_stack_name(stack: str | None, env_file: Path | None) -> str | Non
         if len(stack_segments) == 2 and stack_segments[1] in {"local", "dev", "testing", "prod"}:
             return normalized
         raise click.ClickException(
-            "Invalid --stack value. Use '<context>' or '<context>-<instance>' "
-            "where instance is one of: local, dev, testing, prod."
+            "Invalid --stack value. Use '<context>' or '<context>-<instance>' where instance is one of: local, dev, testing, prod."
         )
     if env_file:
         if env_file.parent.name == "env" and env_file.parent.parent.name == ".platform":
@@ -106,9 +155,7 @@ def _normalize_stack_name(stack: str | None, env_file: Path | None) -> str | Non
             if len(filename_segments) == 3 and filename_segments[2] == "env" and all(filename_segments[:2]):
                 context_name, instance_name, _suffix = filename_segments
                 return f"{context_name}-{instance_name}"
-            raise click.ClickException(
-                "Invalid runtime env file name. Expected '.platform/env/<context>.<instance>.env'."
-            )
+            raise click.ClickException("Invalid runtime env file name. Expected '.platform/env/<context>.<instance>.env'.")
         return env_file.stem
     return None
 
@@ -119,8 +166,7 @@ def _apply_test_profile_defaults() -> None:
         return
     if profile_name != GATE_PROFILE_NAME:
         raise click.ClickException(
-            f"Unsupported TESTKIT_PROFILE '{profile_name}'. "
-            f"Supported values: {DEFAULT_PROFILE_NAME}, {GATE_PROFILE_NAME}."
+            f"Unsupported TESTKIT_PROFILE '{profile_name}'. Supported values: {DEFAULT_PROFILE_NAME}, {GATE_PROFILE_NAME}."
         )
     for environment_key, environment_value in GATE_PROFILE_ENVIRONMENT.items():
         os.environ[environment_key] = environment_value
@@ -657,22 +703,21 @@ def plan_cmd(
         tour_exclude=tour_exclude,
     )
 
+    run_plan = test_session.build_run_plan()
     if phase == "all":
-        phases: list[PhaseName] = list(_PHASES)
+        selected_phases: list[PhaseName] = list(_PHASES)
     else:
         phase_name: PhaseName = next(value for value in _PHASES if value == phase)
-        phases = [phase_name]
-    payload = {"schema": "plan.v1", "phases": {}}
-    for phase_name in phases:
-        if phase_name == "unit":
-            phase_shards = unit_shards
-        elif phase_name == "js":
-            phase_shards = js_shards
-        elif phase_name == "integration":
-            phase_shards = integration_shards
-        else:
-            phase_shards = tour_shards
-        payload["phases"][phase_name] = test_session.plan_phase(phase_name, phase_shards)
+        selected_phases = [phase_name]
+
+    payload = run_plan.to_payload()
+    payload["schema"] = "plan.v1"
+    payload["phases"] = {phase_name: run_plan.phase(phase_name).to_payload() for phase_name in selected_phases}
+    payload["phase_groups"] = [
+        list(phase_group)
+        for phase_group in run_plan.phase_groups
+        if any(phase_name in selected_phases for phase_name in phase_group)
+    ]
 
     output = json.dumps(payload, indent=2)
     if json_out:
@@ -949,6 +994,7 @@ def doctor_session_cmd(session: str | None, json_out: bool) -> None:
         raise SystemExit(3)
     phases_data = llm_data.get("phases")
     phases: dict[str, object] = phases_data if isinstance(phases_data, dict) else {}
+    run_plan = _load_run_plan_payload(session_dir)
     shard_rows: list[dict[str, object]] = []
     for phase_name, phase_payload in phases.items():
         if not isinstance(phase_payload, dict):
@@ -979,8 +1025,16 @@ def doctor_session_cmd(session: str | None, json_out: bool) -> None:
     slowest = sorted(shard_rows, key=_elapsed_seconds, reverse=True)[:5]
     timeouts = [shard_entry for shard_entry in shard_rows if shard_entry.get("timed_out")]
     failures = llm_data.get("failures") or []
+    phase_outcomes = {
+        phase_name: phase_payload.get("outcome_kinds") or {}
+        for phase_name, phase_payload in phases.items()
+        if isinstance(phase_payload, dict) and phase_payload.get("outcome_kinds")
+    }
     payload = {
         "session": str(session_dir),
+        "host_resources": _host_resources_from_run_plan(run_plan),
+        "phase_outcomes": phase_outcomes,
+        "top_failure_reasons": _top_failure_reasons(phases),
         "slowest_shards": slowest,
         "timeouts": timeouts,
         "failure_count": len(failures),
@@ -990,11 +1044,18 @@ def doctor_session_cmd(session: str | None, json_out: bool) -> None:
         raise SystemExit(0)
 
     click.echo(f"Session: {session_dir}")
+    click.echo(f"Host resources: {_format_counts(payload['host_resources'])}")
+    if phase_outcomes:
+        click.echo("Phase outcomes:")
+        for phase_name, counts in phase_outcomes.items():
+            click.echo(f"- {phase_name}: {_format_counts(counts)}")
     if timeouts:
         click.echo(f"Timeouts: {len(timeouts)}")
     else:
         click.echo("Timeouts: none")
     click.echo(f"Failures: {len(failures)}")
+    if payload["top_failure_reasons"]:
+        click.echo(f"Top failure reasons: {_format_counts(payload['top_failure_reasons'])}")
     click.echo("Slowest shards:")
     for shard_entry in slowest:
         click.echo(f"- {shard_entry.get('phase')} {shard_entry.get('shard')} {shard_entry.get('elapsed_seconds')}s")

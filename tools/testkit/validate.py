@@ -6,6 +6,7 @@ from tools.environment_files import discover_repo_root
 
 from .counts import count_js_tests, count_py_tests
 from .sharding import discover_modules_with
+from .summary_helpers import host_resources_from_run_plan, phase_outcome_kinds_from_results
 
 
 def _read_json(path: Path) -> dict | None:
@@ -121,6 +122,19 @@ def _failures_summary(session_dir: Path) -> dict[str, dict[str, int]]:
     return phase_failures
 
 
+def _run_plan_host_resources(session_dir: Path) -> dict[str, int]:
+    run_plan = _read_json(session_dir / "run-plan.json") or {}
+    return host_resources_from_run_plan(run_plan)
+
+
+def _outcome_kinds_summary(session_dir: Path) -> dict[str, dict[str, int]]:
+    summary = _read_json(session_dir / "summary.json") or {}
+    results = summary.get("results") if isinstance(summary, dict) else {}
+    if not isinstance(results, dict):
+        return {}
+    return phase_outcome_kinds_from_results(results)
+
+
 def validate(session: str | None = None, json_out: bool = False) -> int:
     repo_root = discover_repo_root(Path.cwd())
     base_dir = repo_root / "tmp" / "test-logs"
@@ -150,6 +164,7 @@ def validate(session: str | None = None, json_out: bool = False) -> int:
 
     payload = {
         "session": session_dir.name,
+        "host_resources": _run_plan_host_resources(session_dir),
         "source_counts": source_counts,
         "executed_counts": executed_counts,
         "counts_ok": ok_counts,
@@ -160,12 +175,21 @@ def validate(session: str | None = None, json_out: bool = False) -> int:
         "missing_init": missing_inits,
         "init_ok": init_ok,
         "failures": failures,
+        "outcome_kinds": _outcome_kinds_summary(session_dir),
         "summary": str((session_dir / "summary.json").resolve()),
     }
     if json_out:
         print(json.dumps(payload, indent=2))
     else:
+        host_resources = payload["host_resources"]
+        outcome_kinds = payload["outcome_kinds"]
         print(f"Session: {payload['session']}")
+        if isinstance(host_resources, dict) and host_resources:
+            print(
+                "Host resources: "
+                f"browser_slots={host_resources.get('browser_slots')} "
+                f"production_clone_slots={host_resources.get('production_clone_slots')}"
+            )
         print("Counts (source vs executed):")
         for phase in ("unit", "js", "integration", "tour"):
             print(f"  {phase:<12} {source_counts[phase]:>5} → {executed_counts[phase]:>5}")
@@ -184,6 +208,13 @@ def validate(session: str | None = None, json_out: bool = False) -> int:
                 f"  {phase:<12}: {failure_counts.get('fail', 0)}/"
                 f"{failure_counts.get('error', 0)}/{failure_counts.get('js_fail', 0)}"
             )
+        if isinstance(outcome_kinds, dict) and outcome_kinds:
+            print("Outcome kinds by phase:")
+            for phase, counts in outcome_kinds.items():
+                if not isinstance(counts, dict):
+                    continue
+                formatted = ", ".join(f"{name}:{count}" for name, count in sorted(counts.items()))
+                print(f"  {phase:<12}: {formatted}")
         if not tags_ok:
             print("Files missing expected phase tags:")
             for phase, files in missing_tags.items():

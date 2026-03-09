@@ -79,6 +79,8 @@ class TestSettings(BaseSettings):
     tour_shards: int = Field(0, alias="TOUR_SHARDS")
     max_procs: int = Field(0, alias="TEST_MAX_PROCS")  # 0 -> auto
     tour_max_procs: int = Field(0, alias="TOUR_MAX_PROCS")  # 0 -> inherit TEST_MAX_PROCS/auto
+    browser_slots: int = Field(1, alias="TESTKIT_BROWSER_SLOTS")
+    production_clone_slots: int = Field(2, alias="TESTKIT_PRODUCTION_CLONE_SLOTS")
     shard_timeout: int = Field(0, alias="TESTKIT_SHARD_TIMEOUT")
     # Within-module sharding (split heavy modules by class/file)
     unit_within_shards: int = Field(0, alias="UNIT_WITHIN_SHARDS")

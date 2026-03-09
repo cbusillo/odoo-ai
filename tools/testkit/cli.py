@@ -121,6 +121,15 @@ def _emit_bottom_line(latest: Path, as_json: bool) -> int:
     return 0 if is_success else 1
 
 
+def _active_session_dir(base_dir: Path, session: str | None) -> Path:
+    if session:
+        return base_dir / session
+    current_pointer = base_dir / "current"
+    if current_pointer.exists():
+        return current_pointer
+    return base_dir / "latest"
+
+
 @click.group(help="Unified test runner with parallel sharding")
 def test() -> None:  # pragma: no cover - CLI entry
     pass
@@ -807,14 +816,7 @@ def main() -> None:  # pragma: no cover
 @click.option("--json", "json_out", is_flag=True, help="Emit JSON output")
 def status_cmd(session: str | None, json_out: bool) -> None:
     base_dir = Path("tmp/test-logs")
-    if session:
-        latest = base_dir / session
-    else:
-        current_pointer = base_dir / "current"
-        if current_pointer.exists():
-            latest = current_pointer
-        else:
-            latest = base_dir / "latest"
+    latest = _active_session_dir(base_dir, session)
     summary_path = latest / "summary.json"
     if not summary_path.exists():
         payload = {"status": "running"}
@@ -841,13 +843,9 @@ def wait_cmd(session: str | None, timeout: int, interval: int, json_out: bool) -
     import time as time_module
 
     base_dir = Path("tmp/test-logs")
-    if session:
-        latest = base_dir / session
-    else:
-        current_pointer = base_dir / "current"
-        latest = current_pointer if current_pointer.exists() else base_dir / "latest"
     start_time = time_module.time()
     while True:
+        latest = _active_session_dir(base_dir, session)
         summary_path = latest / "summary.json"
         if summary_path.exists():
             data = load_json(summary_path)

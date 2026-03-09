@@ -5,11 +5,22 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from contextlib import chdir
 from pathlib import Path
+from unittest.mock import patch
+
+import click
+from click.testing import CliRunner
 
 from tools.testkit.cli import _host_resources_from_run_plan, _outcome_kinds_from_summary, _top_failure_reasons
+from tools.testkit.cli import test as test_command_group
 from tools.testkit.summary_helpers import host_resources_from_run_plan, outcome_kinds_from_results, phase_outcome_kinds_from_results
 from tools.testkit.validate import _outcome_kinds_summary, _run_plan_host_resources
+
+
+def _as_click_command(command: object) -> click.Command:
+    assert isinstance(command, click.Command)
+    return command
 
 
 class TestkitCliSummaryTests(unittest.TestCase):
@@ -86,6 +97,42 @@ class TestkitCliSummaryTests(unittest.TestCase):
         self.assertEqual(
             host_resources_from_run_plan({"host_resources": {"browser_slots": 1, "production_clone_slots": 2}}),
             {"browser_slots": 1, "production_clone_slots": 2},
+        )
+
+    def test_wait_falls_back_to_latest_when_current_pointer_clears(self) -> None:
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            with chdir(temp_path):
+                base_dir = Path("tmp") / "test-logs"
+                finished_session = base_dir / "test-20260309_181054"
+                finished_session.mkdir(parents=True, exist_ok=True)
+                (finished_session / "summary.json").write_text(json.dumps({"success": True}), encoding="utf-8")
+
+                pending_session = base_dir / "pending-session"
+                pending_session.mkdir(parents=True, exist_ok=True)
+                current_pointer = base_dir / "current"
+                latest_pointer = base_dir / "latest"
+                current_pointer.symlink_to(pending_session.name)
+                latest_pointer.symlink_to(finished_session.name)
+
+                def _clear_current(_seconds: int) -> None:
+                    current_pointer.unlink()
+
+                with patch("time.sleep", side_effect=_clear_current):
+                    result = runner.invoke(
+                        _as_click_command(test_command_group),
+                        ["wait", "--timeout", "2", "--interval", "1", "--json"],
+                        catch_exceptions=False,
+                    )
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(
+            json.loads(result.output),
+            {
+                "success": True,
+                "summary": str((temp_path / finished_session / "summary.json").resolve()),
+            },
         )
 
 

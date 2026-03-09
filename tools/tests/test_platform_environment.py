@@ -196,6 +196,64 @@ class PlatformEnvironmentTests(unittest.TestCase):
                     instance_name="local",
                 )
 
+    def test_load_dokploy_source_of_truth_resolves_profiles_projects_and_env_inheritance(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            source_file_path = Path(temporary_directory_name) / "dokploy.toml"
+            source_file_path.write_text(
+                "\n".join(
+                    (
+                        "schema_version = 2",
+                        "",
+                        "[defaults]",
+                        'source_git_ref = "origin/main"',
+                        "",
+                        "[projects.primary]",
+                        'project_name = "odoo-ai"',
+                        "",
+                        "[profiles.odoo]",
+                        'project = "primary"',
+                        'healthcheck_path = "/web/health"',
+                        "",
+                        "[profiles.odoo.env]",
+                        'ODOO_WEB_COMMAND = "startup"',
+                        "",
+                        "[profiles.opw]",
+                        'extends = "odoo"',
+                        "deploy_timeout_seconds = 7200",
+                        "",
+                        "[profiles.opw.env]",
+                        'OPENUPGRADE_ENABLED = "True"',
+                        "",
+                        "[[targets]]",
+                        'profile = "opw"',
+                        'context = "opw"',
+                        'instance = "testing"',
+                        'git_branch = "opw-testing"',
+                        'domains = ["opw-testing.example.com"]',
+                        "",
+                        "[targets.env]",
+                        'ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://opw-testing.example.com"',
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            source_of_truth = environment.load_dokploy_source_of_truth(source_file_path)
+
+            self.assertEqual(len(source_of_truth.targets), 1)
+            target = source_of_truth.targets[0]
+            self.assertEqual(target.project_name, "odoo-ai")
+            self.assertEqual(target.source_git_ref, "origin/main")
+            self.assertEqual(target.deploy_timeout_seconds, 7200)
+            self.assertEqual(target.healthcheck_path, "/web/health")
+            self.assertEqual(target.env["ODOO_WEB_COMMAND"], "startup")
+            self.assertEqual(target.env["OPENUPGRADE_ENABLED"], "True")
+            self.assertEqual(
+                target.env["ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL"],
+                "https://opw-testing.example.com",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

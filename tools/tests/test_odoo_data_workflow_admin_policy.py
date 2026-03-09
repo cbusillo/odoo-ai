@@ -100,6 +100,18 @@ class DataWorkflowAdminPolicyTests(unittest.TestCase):
 
         self.assertEqual(settings.admin_login, "admin")
 
+    def test_local_server_settings_accepts_blank_admin_login(self) -> None:
+        settings = odoo_data_workflow.LocalServerSettings(
+            ODOO_DB_HOST="database",
+            ODOO_DB_USER="odoo",
+            ODOO_DB_PASSWORD="database-password",
+            ODOO_DB_NAME="cm",
+            ODOO_FILESTORE_PATH="/tmp/filestore",
+            ODOO_ADMIN_LOGIN="",
+        )
+
+        self.assertEqual(settings.admin_login, "")
+
     def test_ensure_admin_user_validates_default_admin_password_without_password_override(self) -> None:
         command_labels: list[str] = []
         workflow_runner = odoo_data_workflow.OdooDataWorkflowRunner.__new__(odoo_data_workflow.OdooDataWorkflowRunner)

@@ -310,7 +310,6 @@ class LocalServerSettings(BaseSettings):
         "update_modules",
         "local_addons_dirs",
         "openupgrade_target_version",
-        "admin_login",
         mode="before",
     )
     @classmethod

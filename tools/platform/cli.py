@@ -274,7 +274,12 @@ def _build_runtime_env_values(
         "ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS": source_environment.get(
             "ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS", "7200"
         ),
-        "DATA_WORKFLOW_SSH_DIR": source_environment.get("DATA_WORKFLOW_SSH_DIR", str(Path.home() / ".ssh")),
+        "DATA_WORKFLOW_SSH_DIR": source_environment.get(
+            "DATA_WORKFLOW_SSH_DIR",
+            str(Path.home() / ".ssh")
+            if runtime_selection.instance_name == "local"
+            else "/root/.ssh",
+        ),
         "OPENUPGRADE_ENABLED": source_environment.get("OPENUPGRADE_ENABLED", "False"),
         "OPENUPGRADE_SCRIPTS_PATH": source_environment.get("OPENUPGRADE_SCRIPTS_PATH", ""),
         "OPENUPGRADE_TARGET_VERSION": source_environment.get("OPENUPGRADE_TARGET_VERSION", ""),

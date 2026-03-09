@@ -17,6 +17,9 @@
         "web.assets_backend": [
             "environment_overrides/static/src/js/notification_permission_patch.js",
         ],
+        "web.assets_unit_tests": [
+            "environment_overrides/static/tests/*.test.js",
+        ],
     },
     "installable": True,
     "application": False,

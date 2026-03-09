@@ -28,6 +28,8 @@ x-odoo-env: &odoo-env
   ODOO_DB_NAME: ${ODOO_DB_NAME:?missing}
   ODOO_DB_USER: ${ODOO_DB_USER:?missing}
   ODOO_DB_PASSWORD: ${ODOO_DB_PASSWORD:?missing}
+  ODOO_ADMIN_LOGIN: ${ODOO_ADMIN_LOGIN:-}
+  ODOO_ADMIN_PASSWORD: ${ODOO_ADMIN_PASSWORD:-}
   ODOO_DB_MAXCONN: ${ODOO_DB_MAXCONN:-44}
   ODOO_MAX_CRON_THREADS: ${ODOO_MAX_CRON_THREADS:-2}
   ODOO_WORKERS: ${ODOO_WORKERS:-6}
@@ -40,8 +42,8 @@ x-odoo-env: &odoo-env
   ODOO_INSTALL_MODULES: ${ODOO_INSTALL_MODULES:-}
   ODOO_UPDATE_MODULES: ${ODOO_UPDATE_MODULES:-AUTO}
   ODOO_ADDONS_PATH: ${ODOO_ADDONS_PATH:-/opt/project/addons,/opt/extra_addons,/opt/enterprise,/odoo/addons}
-  ODOO_RESTORE_LOCK_FILE: ${ODOO_RESTORE_LOCK_FILE:-/volumes/data/.restore_in_progress}
-  ODOO_RESTORE_LOCK_TIMEOUT_SECONDS: ${ODOO_RESTORE_LOCK_TIMEOUT_SECONDS:-7200}
+  ODOO_DATA_WORKFLOW_LOCK_FILE: ${ODOO_DATA_WORKFLOW_LOCK_FILE:-/volumes/data/.data_workflow_in_progress}
+  ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS: ${ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS:-7200}
   IMAGE_ODOO_ENTERPRISE_LOCATION: /volumes/enterprise_disabled
   IMAGE_EXTRA_ADDONS_LOCATION: /opt/extra_addons
 
@@ -113,15 +115,15 @@ services:
     volumes:
       - odoo_data:/volumes/data
       - odoo_logs:/volumes/logs
-      - ${RESTORE_SSH_DIR:-/home/ubuntu/.ssh}:/home/ubuntu/.ssh:ro
-      - ${RESTORE_SSH_DIR:-/home/ubuntu/.ssh}:/root/.ssh:ro
+      - ${DATA_WORKFLOW_SSH_DIR:-/home/ubuntu/.ssh}:/home/ubuntu/.ssh:ro
+      - ${DATA_WORKFLOW_SSH_DIR:-/home/ubuntu/.ssh}:/root/.ssh:ro
     command: tail -f /dev/null
     working_dir: /opt/project
     shm_size: "2gb"
     healthcheck:
       <<: *healthcheck-defaults
       test: >-
-        test -x /odoo/odoo-bin && test -f /volumes/scripts/restore_from_upstream.py
+        test -x /odoo/odoo-bin && test -f /volumes/scripts/run_odoo_data_workflows.py
       retries: 3
       start_period: 10s
     environment:

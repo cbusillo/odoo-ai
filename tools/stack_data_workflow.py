@@ -6,9 +6,7 @@ from pathlib import Path
 
 from tools.deployer.command import CommandError, run_process
 from tools.deployer.compose_ops import local_compose_command, local_compose_env, remote_compose_command
-from tools.deployer.helpers import get_git_commit, get_git_remote_url
-from tools.deployer.remote import run_remote
-from tools.deployer.restore_support import (
+from tools.deployer.data_workflow_support import (
     build_updated_environment,
     ensure_local_bind_mounts,
     prepare_remote_stack,
@@ -16,13 +14,15 @@ from tools.deployer.restore_support import (
     wait_for_local_service,
     write_env_file,
 )
+from tools.deployer.helpers import get_git_commit, get_git_remote_url
+from tools.deployer.remote import run_remote
 from tools.deployer.settings import StackSettings, load_stack_settings
 
 _logger = logging.getLogger(__name__)
 
-RESTORE_SCRIPT = "/volumes/scripts/restore_from_upstream.py"
+DATA_WORKFLOW_SCRIPT = "/volumes/scripts/run_odoo_data_workflows.py"
 
-RESTORE_SCRIPT_ENV_KEYS = {
+DATA_WORKFLOW_SCRIPT_ENV_KEYS = {
     "ODOO_DB_HOST",
     "ODOO_DB_PORT",
     "ODOO_DB_USER",
@@ -30,8 +30,8 @@ RESTORE_SCRIPT_ENV_KEYS = {
     "ODOO_DB_NAME",
     "ODOO_FILESTORE_PATH",
     "ODOO_FILESTORE_OWNER",
-    "RESTORE_SSH_DIR",
-    "RESTORE_SSH_KEY",
+    "DATA_WORKFLOW_SSH_DIR",
+    "DATA_WORKFLOW_SSH_KEY",
     "ODOO_PROJECT_NAME",
     "ODOO_VERSION",
     "ODOO_ADDONS_PATH",
@@ -44,18 +44,19 @@ RESTORE_SCRIPT_ENV_KEYS = {
     "OPENUPGRADE_TARGET_VERSION",
     "OPENUPGRADE_SKIP_UPDATE_ADDONS",
     "ODOO_KEY",
+    "ODOO_ADMIN_LOGIN",
     "ODOO_ADMIN_PASSWORD",
-    "ODOO_RESTORE_LOCK_FILE",
+    "ODOO_DATA_WORKFLOW_LOCK_FILE",
     "ODOO_UPSTREAM_HOST",
     "ODOO_UPSTREAM_USER",
     "ODOO_UPSTREAM_DB_NAME",
     "ODOO_UPSTREAM_DB_USER",
     "ODOO_UPSTREAM_FILESTORE_PATH",
-    "BOOTSTRAP_ONLY",
+    "BOOTSTRAP",
     "NO_SANITIZE",
 }
 
-RESTORE_SCRIPT_ENV_PREFIXES = (
+DATA_WORKFLOW_SCRIPT_ENV_PREFIXES = (
     "ENV_OVERRIDE_",
     "OPENUPGRADE_",
 )
@@ -69,13 +70,13 @@ REQUIRED_UPSTREAM_ENV_KEYS = (
 )
 
 
-def _restore_script_environment(env_values: dict[str, str]) -> dict[str, str]:
+def _data_workflow_script_environment(env_values: dict[str, str]) -> dict[str, str]:
     filtered_values: dict[str, str] = {}
     for env_key, env_value in env_values.items():
-        if env_key in RESTORE_SCRIPT_ENV_KEYS:
+        if env_key in DATA_WORKFLOW_SCRIPT_ENV_KEYS:
             filtered_values[env_key] = env_value
             continue
-        if any(env_key.startswith(prefix) for prefix in RESTORE_SCRIPT_ENV_PREFIXES):
+        if any(env_key.startswith(prefix) for prefix in DATA_WORKFLOW_SCRIPT_ENV_PREFIXES):
             filtered_values[env_key] = env_value
     return filtered_values
 
@@ -85,7 +86,7 @@ def _add_exec_env_names(command: list[str], env_names: Iterable[str]) -> None:
         command.extend(["-e", env_name])
 
 
-def _missing_upstream_restore_keys(env_values: dict[str, str]) -> tuple[str, ...]:
+def _missing_upstream_source_keys(env_values: dict[str, str]) -> tuple[str, ...]:
     missing_keys: list[str] = []
     for environment_key in REQUIRED_UPSTREAM_ENV_KEYS:
         if env_values.get(environment_key, "").strip():
@@ -101,9 +102,9 @@ def _ensure_stack_env(settings: StackSettings, stack_name: str) -> None:
     raise FileNotFoundError(f"No environment file found for stack '{stack_name}'. Expected {env_path}.")
 
 
-def _handle_restore_exit(error: CommandError) -> None:
+def _handle_data_workflow_exit(error: CommandError) -> None:
     if error.returncode == 10:
-        _logger.warning("restore_from_upstream exited with code 10; continuing because bootstrap completed successfully")
+        _logger.warning("run_odoo_data_workflows exited with code 10; continuing because bootstrap completed successfully")
         return
     raise error
 
@@ -124,21 +125,21 @@ def _current_image_reference(settings: StackSettings) -> str:
     return settings.environment.get(settings.image_variable_name) or settings.registry_image
 
 
-def _add_toggle_env_flags(command: list[str], *, bootstrap_only: bool, no_sanitize: bool) -> None:
-    if bootstrap_only:
-        command.extend(["-e", "BOOTSTRAP_ONLY=1"])
+def _add_toggle_env_flags(command: list[str], *, bootstrap: bool, no_sanitize: bool) -> None:
+    if bootstrap:
+        command.extend(["-e", "BOOTSTRAP=1"])
     if no_sanitize:
         command.extend(["-e", "NO_SANITIZE=1"])
 
 
-def _add_toggle_args(command: list[str], *, bootstrap_only: bool, no_sanitize: bool) -> None:
-    if bootstrap_only:
-        command.append("--bootstrap-only")
+def _add_toggle_args(command: list[str], *, bootstrap: bool, no_sanitize: bool) -> None:
+    if bootstrap:
+        command.append("--bootstrap")
     if no_sanitize:
         command.append("--no-sanitize")
 
 
-def _resolve_restore_environment(raw_values: dict[str, str]) -> dict[str, str]:
+def _resolve_data_workflow_environment(raw_values: dict[str, str]) -> dict[str, str]:
     def _strip_quotes(raw: str) -> str:
         if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in {'"', "'"}:
             return raw[1:-1]
@@ -188,40 +189,40 @@ def _resolve_restore_environment(raw_values: dict[str, str]) -> dict[str, str]:
     return {env_var_name: _resolve_value(env_var_name, set()) for env_var_name in raw_values}
 
 
-def restore_stack(
+def run_stack_data_workflow(
     stack_name: str,
     *,
     env_file: Path | None = None,
-    bootstrap_only: bool = False,
+    bootstrap: bool = False,
     no_sanitize: bool = False,
 ) -> int:
     settings = load_stack_settings(stack_name, env_file)
     _ensure_stack_env(settings, stack_name)
-    restore_settings = settings
-    image_reference = _current_image_reference(restore_settings)
-    env_values_raw = build_updated_environment(restore_settings, image_reference)
-    env_values = _resolve_restore_environment(env_values_raw)
-    if not bootstrap_only:
-        missing_upstream_keys = _missing_upstream_restore_keys(env_values)
+    stack_settings = settings
+    image_reference = _current_image_reference(stack_settings)
+    env_values_raw = build_updated_environment(stack_settings, image_reference)
+    env_values = _resolve_data_workflow_environment(env_values_raw)
+    if not bootstrap:
+        missing_upstream_keys = _missing_upstream_source_keys(env_values)
         if missing_upstream_keys:
             missing_joined = ", ".join(missing_upstream_keys)
             raise ValueError(
                 "Restore requires upstream settings; missing: "
                 f"{missing_joined}. Configure these in `.env` or `platform/secrets.toml`, "
-                "or pass --bootstrap-only intentionally."
+                "or run bootstrap intentionally."
             )
 
-    if restore_settings.remote_host:
-        repository_url = get_git_remote_url(restore_settings.repo_root)
-        commit = get_git_commit(restore_settings.repo_root)
-        prepare_remote_stack(restore_settings, repository_url, commit)
-        push_env_to_remote(restore_settings, env_values)
+    if stack_settings.remote_host:
+        repository_url = get_git_remote_url(stack_settings.repo_root)
+        commit = get_git_commit(stack_settings.repo_root)
+        prepare_remote_stack(stack_settings, repository_url, commit)
+        push_env_to_remote(stack_settings, env_values)
 
-        if "database" in restore_settings.services:
-            _run_remote_compose(restore_settings, ["up", "-d", "--remove-orphans", "database"])
+        if "database" in stack_settings.services:
+            _run_remote_compose(stack_settings, ["up", "-d", "--remove-orphans", "database"])
 
-        _run_remote_compose(restore_settings, ["up", "-d", "--remove-orphans", restore_settings.script_runner_service])
-        _run_remote_compose(restore_settings, ["stop", "web"])
+        _run_remote_compose(stack_settings, ["up", "-d", "--remove-orphans", stack_settings.script_runner_service])
+        _run_remote_compose(stack_settings, ["stop", "web"])
 
         remote_exec: list[str] = [
             "exec",
@@ -229,26 +230,26 @@ def restore_stack(
             "--user",
             "root",
         ]
-        _add_toggle_env_flags(remote_exec, bootstrap_only=bootstrap_only, no_sanitize=no_sanitize)
+        _add_toggle_env_flags(remote_exec, bootstrap=bootstrap, no_sanitize=no_sanitize)
 
         remote_exec.extend(
             [
-                restore_settings.script_runner_service,
+                stack_settings.script_runner_service,
                 "python3",
                 "-u",
-                RESTORE_SCRIPT,
+                DATA_WORKFLOW_SCRIPT,
             ]
         )
-        _add_toggle_args(remote_exec, bootstrap_only=bootstrap_only, no_sanitize=no_sanitize)
+        _add_toggle_args(remote_exec, bootstrap=bootstrap, no_sanitize=no_sanitize)
 
         try:
-            _run_remote_compose(restore_settings, remote_exec)
+            _run_remote_compose(stack_settings, remote_exec)
         except CommandError as error:
-            _handle_restore_exit(error)
-        _run_remote_compose(restore_settings, ["up", "-d", "--remove-orphans", "web"])
+            _handle_data_workflow_exit(error)
+        _run_remote_compose(stack_settings, ["up", "-d", "--remove-orphans", "web"])
     else:
-        ensure_local_bind_mounts(restore_settings)
-        write_env_file(restore_settings.env_file, env_values)
+        ensure_local_bind_mounts(stack_settings)
+        write_env_file(stack_settings.env_file, env_values)
 
         stack_started = False
 
@@ -257,37 +258,37 @@ def restore_stack(
             if stack_started:
                 return
             _run_local_compose(
-                restore_settings,
-                ["up", "-d", "--remove-orphans", *restore_settings.services],
+                stack_settings,
+                ["up", "-d", "--remove-orphans", *stack_settings.services],
                 check=False,
             )
             stack_started = True
 
-        if "database" in restore_settings.services:
-            _run_local_compose(restore_settings, ["up", "-d", "--remove-orphans", "database"], check=False)
+        if "database" in stack_settings.services:
+            _run_local_compose(stack_settings, ["up", "-d", "--remove-orphans", "database"], check=False)
             try:
-                wait_for_local_service(restore_settings, "database")
+                wait_for_local_service(stack_settings, "database")
             except ValueError:
                 _ensure_stack_running()
-                wait_for_local_service(restore_settings, "database")
+                wait_for_local_service(stack_settings, "database")
 
         _run_local_compose(
-            restore_settings,
-            ["up", "-d", "--remove-orphans", restore_settings.script_runner_service],
+            stack_settings,
+            ["up", "-d", "--remove-orphans", stack_settings.script_runner_service],
             check=False,
         )
         try:
-            wait_for_local_service(restore_settings, restore_settings.script_runner_service)
+            wait_for_local_service(stack_settings, stack_settings.script_runner_service)
         except ValueError:
             _ensure_stack_running()
-            wait_for_local_service(restore_settings, restore_settings.script_runner_service)
-        _run_local_compose(restore_settings, ["stop", "web"], check=False)
+            wait_for_local_service(stack_settings, stack_settings.script_runner_service)
+        _run_local_compose(stack_settings, ["stop", "web"], check=False)
 
-        restore_env_values = _restore_script_environment(env_values)
-        # Pass restore settings via process environment + name-only `-e KEY`
+        data_workflow_env_values = _data_workflow_script_environment(env_values)
+        # Pass data workflow settings via process environment + name-only `-e KEY`
         # flags so secrets do not appear in the docker compose command line.
-        exec_environment = dict(local_compose_env(restore_settings))
-        exec_environment.update(restore_env_values)
+        exec_environment = dict(local_compose_env(stack_settings))
+        exec_environment.update(data_workflow_env_values)
 
         exec_extra = [
             "exec",
@@ -295,27 +296,27 @@ def restore_stack(
             "--user",
             "root",
         ]
-        _add_exec_env_names(exec_extra, restore_env_values.keys())
-        _add_toggle_env_flags(exec_extra, bootstrap_only=bootstrap_only, no_sanitize=no_sanitize)
+        _add_exec_env_names(exec_extra, data_workflow_env_values.keys())
+        _add_toggle_env_flags(exec_extra, bootstrap=bootstrap, no_sanitize=no_sanitize)
         exec_extra.extend(
             [
-                restore_settings.script_runner_service,
+                stack_settings.script_runner_service,
                 "python3",
                 "-u",
-                RESTORE_SCRIPT,
+                DATA_WORKFLOW_SCRIPT,
             ]
         )
-        _add_toggle_args(exec_extra, bootstrap_only=bootstrap_only, no_sanitize=no_sanitize)
+        _add_toggle_args(exec_extra, bootstrap=bootstrap, no_sanitize=no_sanitize)
 
         try:
             run_process(
-                local_compose_command(restore_settings, exec_extra),
-                cwd=restore_settings.repo_root,
+                local_compose_command(stack_settings, exec_extra),
+                cwd=stack_settings.repo_root,
                 env=exec_environment,
             )
         except CommandError as error:
-            _handle_restore_exit(error)
-        _run_local_compose(restore_settings, ["up", "-d", "--remove-orphans", "web"], check=False)
+            _handle_data_workflow_exit(error)
+        _run_local_compose(stack_settings, ["up", "-d", "--remove-orphans", "web"], check=False)
 
-    _logger.info("Restore completed for stack %s", stack_name)
+    _logger.info("Data workflow completed for stack %s", stack_name)
     return 0

@@ -35,7 +35,7 @@ from tools.platform.models import (
     ShipBranchSyncPlan,
     StackDefinition,
 )
-from tools.stack_restore import restore_stack
+from tools.stack_data_workflow import run_stack_data_workflow
 
 PLATFORM_RUNTIME_ENV_KEYS = (
     "PLATFORM_CONTEXT",
@@ -67,8 +67,8 @@ PLATFORM_RUNTIME_ENV_KEYS = (
     "ODOO_DB_HOST_PORT",
     "ODOO_LIST_DB",
     "ODOO_WEB_COMMAND",
-    "ODOO_RESTORE_LOCK_FILE",
-    "ODOO_RESTORE_LOCK_TIMEOUT_SECONDS",
+    "ODOO_DATA_WORKFLOW_LOCK_FILE",
+    "ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS",
     "ODOO_DB_MAXCONN",
     "ODOO_DB_MAXCONN_GEVENT",
     "ODOO_WORKERS",
@@ -91,8 +91,8 @@ PLATFORM_RUNTIME_ENV_KEYS = (
     "POSTGRES_CHECKPOINT_TIMEOUT",
     "POSTGRES_RANDOM_PAGE_COST",
     "POSTGRES_EFFECTIVE_IO_CONCURRENCY",
-    "RESTORE_SSH_DIR",
-    "RESTORE_SSH_KEY",
+    "DATA_WORKFLOW_SSH_DIR",
+    "DATA_WORKFLOW_SSH_KEY",
     "ODOO_UPSTREAM_HOST",
     "ODOO_UPSTREAM_USER",
     "ODOO_UPSTREAM_DB_NAME",
@@ -112,7 +112,7 @@ PLATFORM_RUNTIME_PASSTHROUGH_PREFIXES = (
 
 PLATFORM_RUNTIME_PASSTHROUGH_KEYS = (
     "ODOO_KEY",
-    "RESTORE_SSH_KEY",
+    "DATA_WORKFLOW_SSH_KEY",
 )
 
 ENV_COLLISION_MODE_ENV_KEY = platform_environment.ENV_COLLISION_MODE_ENV_KEY
@@ -120,12 +120,10 @@ VALID_ENV_COLLISION_MODES = platform_environment.VALID_ENV_COLLISION_MODES
 
 PLATFORM_RUN_WORKFLOWS = (
     "restore",
+    "bootstrap",
     "init",
     "update",
     "openupgrade",
-    "restore-init",
-    "restore-update",
-    "restore-init-update",
 )
 
 PLATFORM_TUI_WORKFLOWS = (
@@ -259,6 +257,8 @@ def _build_runtime_env_values(
         "ODOO_DB_PASSWORD": source_environment.get("ODOO_DB_PASSWORD", ""),
         "ODOO_FILESTORE_PATH": source_environment.get("ODOO_FILESTORE_PATH", "/volumes/data/filestore"),
         "ODOO_MASTER_PASSWORD": source_environment.get("ODOO_MASTER_PASSWORD", ""),
+        "ODOO_ADMIN_LOGIN": source_environment.get("ODOO_ADMIN_LOGIN", ""),
+        "ODOO_ADMIN_PASSWORD": source_environment.get("ODOO_ADMIN_PASSWORD", ""),
         "ODOO_INSTALL_MODULES": ",".join(runtime_selection.effective_install_modules),
         "ODOO_ADDON_REPOSITORIES": ",".join(effective_addon_repositories),
         "ODOO_UPDATE_MODULES": runtime_selection.context_definition.update_modules,
@@ -267,10 +267,14 @@ def _build_runtime_env_values(
         "ODOO_LONGPOLL_HOST_PORT": str(runtime_selection.longpoll_host_port),
         "ODOO_DB_HOST_PORT": str(runtime_selection.db_host_port),
         "ODOO_LIST_DB": "False",
-        "ODOO_WEB_COMMAND": f"python3 /volumes/scripts/run_odoo_bootstrap.py -c {runtime_selection.runtime_odoo_conf_path}",
-        "ODOO_RESTORE_LOCK_FILE": source_environment.get("ODOO_RESTORE_LOCK_FILE", "/volumes/data/.restore_in_progress"),
-        "ODOO_RESTORE_LOCK_TIMEOUT_SECONDS": source_environment.get("ODOO_RESTORE_LOCK_TIMEOUT_SECONDS", "7200"),
-        "RESTORE_SSH_DIR": source_environment.get("RESTORE_SSH_DIR", str(Path.home() / ".ssh")),
+        "ODOO_WEB_COMMAND": f"python3 /volumes/scripts/run_odoo_startup.py -c {runtime_selection.runtime_odoo_conf_path}",
+        "ODOO_DATA_WORKFLOW_LOCK_FILE": source_environment.get(
+            "ODOO_DATA_WORKFLOW_LOCK_FILE", "/volumes/data/.data_workflow_in_progress"
+        ),
+        "ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS": source_environment.get(
+            "ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS", "7200"
+        ),
+        "DATA_WORKFLOW_SSH_DIR": source_environment.get("DATA_WORKFLOW_SSH_DIR", str(Path.home() / ".ssh")),
         "OPENUPGRADE_ENABLED": source_environment.get("OPENUPGRADE_ENABLED", "False"),
         "OPENUPGRADE_SCRIPTS_PATH": source_environment.get("OPENUPGRADE_SCRIPTS_PATH", ""),
         "OPENUPGRADE_TARGET_VERSION": source_environment.get("OPENUPGRADE_TARGET_VERSION", ""),
@@ -856,7 +860,6 @@ def _run_workflow(
     workflow: str,
     dry_run: bool,
     no_cache: bool,
-    bootstrap_only: bool,
     no_sanitize: bool,
     force: bool,
     reset_versions: bool,
@@ -871,7 +874,6 @@ def _run_workflow(
         workflow=workflow,
         dry_run=dry_run,
         no_cache=no_cache,
-        bootstrap_only=bootstrap_only,
         no_sanitize=no_sanitize,
         force=force,
         reset_versions=reset_versions,
@@ -883,7 +885,7 @@ def _run_workflow(
         load_environment_fn=_load_environment,
         write_runtime_odoo_conf_file_fn=_write_runtime_odoo_conf_file,
         write_runtime_env_file_fn=_write_runtime_env_file,
-        restore_stack_fn=restore_stack,
+        run_stack_data_workflow_fn=run_stack_data_workflow,
         compose_base_command_fn=_compose_base_command,
         run_command_fn=_run_command,
         run_command_best_effort_fn=_run_command_best_effort,
@@ -1168,18 +1170,22 @@ def _render_odoo_config(
 
 LOCAL_RUNTIME_CONTRACT_HELP = (
     "Local host runtime only. Requires --instance local. "
-    "Remote dev/testing/prod instances use ship/rollback/gate/promote instead."
+    "Remote dev/testing/prod instances use ship/rollback/gate/promote, plus separate restore and bootstrap data workflows."
 )
 REMOTE_RUNTIME_CONTRACT_HELP = (
     "Dokploy-managed remote workflow for dev/testing/prod. "
-    "Remote targets bootstrap on ship; init/restore/update remain local-only."
+    "Use ship for non-destructive deploy/restart. Restore and bootstrap are explicit data workflows; init/update remain local-only."
+)
+DESTRUCTIVE_DATA_WORKFLOW_HELP = (
+    "Destructive data workflow. Supports local runtime plus remote dev/testing/prod targets. "
+    "Use --allow-prod-data-workflow only for explicit prod break-glass operations."
 )
 
 
 @click.group(
     help=(
         "Platform operator CLI. Local runtime mutations use --instance local; "
-        "Dokploy-managed remote targets use ship/rollback/gate/promote."
+        "Dokploy-managed remote targets use ship/rollback/gate/promote, plus separate restore and bootstrap data workflows."
     )
 )
 def main() -> None:
@@ -1497,8 +1503,8 @@ def gate(
 @main.command(
     "run",
     help=(
-        "Run local runtime workflows such as restore/init/update chains. "
-        f"{LOCAL_RUNTIME_CONTRACT_HELP}"
+        "Run platform workflows such as restore, bootstrap, init, update, or openupgrade. "
+        "Restore and bootstrap support remote targets; init/update/openupgrade remain local-only."
     ),
 )
 @click.option(
@@ -1513,7 +1519,6 @@ def gate(
 @click.option("--workflow", required=True, type=click.Choice(PLATFORM_RUN_WORKFLOWS, case_sensitive=False))
 @click.option("--dry-run", is_flag=True, default=False)
 @click.option("--no-cache", is_flag=True, default=False)
-@click.option("--bootstrap-only", is_flag=True, default=False)
 @click.option("--no-sanitize", is_flag=True, default=False)
 @click.option("--force", is_flag=True, default=False)
 @click.option("--reset-versions", is_flag=True, default=False)
@@ -1521,7 +1526,7 @@ def gate(
     "--allow-prod-data-workflow",
     is_flag=True,
     default=False,
-    help="Allow restore/init workflows on prod instances (break-glass only).",
+    help="Allow destructive restore or bootstrap workflows on prod instances (break-glass only).",
 )
 def run_workflow(
     stack_file: Path,
@@ -1531,7 +1536,6 @@ def run_workflow(
     workflow: str,
     dry_run: bool,
     no_cache: bool,
-    bootstrap_only: bool,
     no_sanitize: bool,
     force: bool,
     reset_versions: bool,
@@ -1545,7 +1549,6 @@ def run_workflow(
         workflow=workflow,
         dry_run=dry_run,
         no_cache=no_cache,
-        bootstrap_only=bootstrap_only,
         no_sanitize=no_sanitize,
         force=force,
         reset_versions=reset_versions,
@@ -1589,7 +1592,6 @@ def run_workflow(
 @click.option("--env-file", type=click.Path(path_type=Path), default=None)
 @click.option("--dry-run", is_flag=True, default=False)
 @click.option("--no-cache", is_flag=True, default=False)
-@click.option("--bootstrap-only", is_flag=True, default=False)
 @click.option("--no-sanitize", is_flag=True, default=False)
 @click.option("--force", is_flag=True, default=False)
 @click.option("--reset-versions", is_flag=True, default=False)
@@ -1605,7 +1607,7 @@ def run_workflow(
     "--allow-prod-data-workflow",
     is_flag=True,
     default=False,
-    help="Allow restore/init workflows on prod instances (break-glass only).",
+    help="Allow destructive restore or bootstrap workflows on prod instances (break-glass only).",
 )
 def tui(
     stack_file: Path,
@@ -1615,7 +1617,6 @@ def tui(
     env_file: Path | None,
     dry_run: bool,
     no_cache: bool,
-    bootstrap_only: bool,
     no_sanitize: bool,
     force: bool,
     reset_versions: bool,
@@ -1630,7 +1631,6 @@ def tui(
         env_file=env_file,
         dry_run=dry_run,
         no_cache=no_cache,
-        bootstrap_only=bootstrap_only,
         no_sanitize=no_sanitize,
         force=force,
         reset_versions=reset_versions,
@@ -2391,9 +2391,99 @@ def rollback(
 
 
 @main.command(
+    "restore",
+    help=(
+        "Restore database and filestore state from the configured upstream source. "
+        f"{DESTRUCTIVE_DATA_WORKFLOW_HELP}"
+    ),
+)
+@click.option(
+    "--stack-file",
+    type=click.Path(path_type=Path),
+    default=Path("platform/stack.toml"),
+    show_default=True,
+)
+@click.option("--context", "context_name", required=True)
+@click.option("--instance", "instance_name", default="local", show_default=True)
+@click.option("--env-file", type=click.Path(path_type=Path), default=None)
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--no-sanitize", is_flag=True, default=False)
+@click.option(
+    "--allow-prod-data-workflow",
+    is_flag=True,
+    default=False,
+    help="Allow destructive restore or bootstrap workflows on prod instances (break-glass only).",
+)
+def restore(
+    stack_file: Path,
+    context_name: str,
+    instance_name: str,
+    env_file: Path | None,
+    dry_run: bool,
+    no_sanitize: bool,
+    allow_prod_data_workflow: bool,
+) -> None:
+    platform_commands_workflow.execute_restore_command(
+        stack_file=stack_file,
+        context_name=context_name,
+        instance_name=instance_name,
+        env_file=env_file,
+        dry_run=dry_run,
+        no_sanitize=no_sanitize,
+        allow_prod_data_workflow=allow_prod_data_workflow,
+        run_workflow_fn=_run_workflow,
+    )
+
+
+@main.command(
+    "bootstrap",
+    help=(
+        "Reset database and filestore state, then initialize a fresh runtime. "
+        f"{DESTRUCTIVE_DATA_WORKFLOW_HELP}"
+    ),
+)
+@click.option(
+    "--stack-file",
+    type=click.Path(path_type=Path),
+    default=Path("platform/stack.toml"),
+    show_default=True,
+)
+@click.option("--context", "context_name", required=True)
+@click.option("--instance", "instance_name", default="local", show_default=True)
+@click.option("--env-file", type=click.Path(path_type=Path), default=None)
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--no-sanitize", is_flag=True, default=False)
+@click.option(
+    "--allow-prod-data-workflow",
+    is_flag=True,
+    default=False,
+    help="Allow destructive restore or bootstrap workflows on prod instances (break-glass only).",
+)
+def bootstrap(
+    stack_file: Path,
+    context_name: str,
+    instance_name: str,
+    env_file: Path | None,
+    dry_run: bool,
+    no_sanitize: bool,
+    allow_prod_data_workflow: bool,
+) -> None:
+    platform_commands_workflow.execute_bootstrap_command(
+        stack_file=stack_file,
+        context_name=context_name,
+        instance_name=instance_name,
+        env_file=env_file,
+        dry_run=dry_run,
+        no_sanitize=no_sanitize,
+        allow_prod_data_workflow=allow_prod_data_workflow,
+        run_workflow_fn=_run_workflow,
+    )
+
+
+@main.command(
     "init",
     help=(
-        "Initialize the local runtime database and modules. "
+        "Initialize modules in the existing local runtime database. "
         f"{LOCAL_RUNTIME_CONTRACT_HELP}"
     ),
 )

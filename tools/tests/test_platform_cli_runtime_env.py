@@ -128,7 +128,7 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
 
         self.assertEqual(dirty_lines, ("M platform/dokploy.toml", "M tools/platform/cli.py"))
 
-    def test_runtime_env_excludes_admin_credential_keys(self) -> None:
+    def test_runtime_env_includes_admin_credential_keys_when_configured(self) -> None:
         runtime_values = _build_runtime_env_values(
             runtime_env_file=Path("/tmp/opw.local.env"),
             stack_definition=_sample_stack_definition(),
@@ -144,20 +144,20 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
                 "ODOO_UPSTREAM_DB_NAME": "opw",
                 "ODOO_UPSTREAM_DB_USER": "odoo",
                 "ODOO_UPSTREAM_FILESTORE_PATH": "/opt/odoo/local_data/filestore",
-                "RESTORE_SSH_KEY": "/root/.ssh/id_rsa",
-                "ODOO_RESTORE_LOCK_FILE": "/volumes/data/.restore_in_progress",
-                "ODOO_RESTORE_LOCK_TIMEOUT_SECONDS": "7200",
+                "DATA_WORKFLOW_SSH_KEY": "/root/.ssh/id_rsa",
+                "ODOO_DATA_WORKFLOW_LOCK_FILE": "/volumes/data/.data_workflow_in_progress",
+                "ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS": "7200",
             },
         )
 
-        self.assertNotIn("ODOO_ADMIN_LOGIN", runtime_values)
-        self.assertNotIn("ODOO_ADMIN_PASSWORD", runtime_values)
+        self.assertEqual(runtime_values.get("ODOO_ADMIN_LOGIN"), "admin")
+        self.assertEqual(runtime_values.get("ODOO_ADMIN_PASSWORD"), "secure-password")
         self.assertEqual(runtime_values.get("ODOO_KEY"), "key-from-source")
         self.assertEqual(runtime_values.get("ODOO_UPSTREAM_HOST"), "opw-prod.shiny")
-        self.assertEqual(runtime_values.get("RESTORE_SSH_KEY"), "/root/.ssh/id_rsa")
+        self.assertEqual(runtime_values.get("DATA_WORKFLOW_SSH_KEY"), "/root/.ssh/id_rsa")
         self.assertEqual(
-            runtime_values.get("ODOO_RESTORE_LOCK_FILE"),
-            "/volumes/data/.restore_in_progress",
+            runtime_values.get("ODOO_DATA_WORKFLOW_LOCK_FILE"),
+            "/volumes/data/.data_workflow_in_progress",
         )
 
     def test_runtime_env_sets_restore_defaults(self) -> None:
@@ -165,10 +165,10 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
 
         self.assertEqual(runtime_values.get("ODOO_FILESTORE_PATH"), "/volumes/data/filestore")
         self.assertEqual(
-            runtime_values.get("ODOO_RESTORE_LOCK_FILE"),
-            "/volumes/data/.restore_in_progress",
+            runtime_values.get("ODOO_DATA_WORKFLOW_LOCK_FILE"),
+            "/volumes/data/.data_workflow_in_progress",
         )
-        self.assertEqual(runtime_values.get("ODOO_RESTORE_LOCK_TIMEOUT_SECONDS"), "7200")
+        self.assertEqual(runtime_values.get("ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS"), "7200")
 
     def test_runtime_env_adds_openupgrade_repo_when_enabled(self) -> None:
         runtime_values = self._build_runtime_values(

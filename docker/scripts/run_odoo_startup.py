@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bootstrap Odoo databases before launching the long-running web server.
+"""Initialize Odoo state if needed before launching the long-running web server.
 
 This wrapper keeps first-start behavior deterministic:
 - Wait for PostgreSQL connectivity
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import json
 import os
 import subprocess
 import sys
@@ -36,7 +37,7 @@ RUNTIME_OPTION_MAP: tuple[tuple[str, str], ...] = (
 
 
 @dataclass(frozen=True)
-class BootstrapSettings:
+class StartupSettings:
     config_path: str
     base_config_path: str
     database_name: str
@@ -45,12 +46,14 @@ class BootstrapSettings:
     database_user: str
     database_password: str
     master_password: str
+    admin_login: str
+    admin_password: str
     addons_path: str
     data_dir: str
     list_db: str
     install_modules: tuple[str, ...]
-    restore_lock_file: str
-    restore_lock_timeout_seconds: int
+    data_workflow_lock_file: str
+    data_workflow_lock_timeout_seconds: int
     ready_timeout_seconds: int
     poll_interval_seconds: float
 
@@ -73,19 +76,19 @@ def _parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _load_settings(argument_namespace: argparse.Namespace) -> BootstrapSettings:
+def _load_settings(argument_namespace: argparse.Namespace) -> StartupSettings:
     database_name = os.environ.get("ODOO_DB_NAME", "").strip()
     if not database_name:
-        raise RuntimeError("ODOO_DB_NAME must be set for bootstrap startup.")
+        raise RuntimeError("ODOO_DB_NAME must be set for startup.")
 
     database_port_raw = os.environ.get("ODOO_DB_PORT", "5432").strip() or "5432"
     database_port = int(database_port_raw)
     install_modules = _split_modules(os.environ.get("ODOO_INSTALL_MODULES", ""))
     master_password = os.environ.get("ODOO_MASTER_PASSWORD", "").strip()
     if not master_password:
-        raise RuntimeError("ODOO_MASTER_PASSWORD must be set for bootstrap startup.")
+        raise RuntimeError("ODOO_MASTER_PASSWORD must be set for startup.")
 
-    return BootstrapSettings(
+    return StartupSettings(
         config_path=argument_namespace.config_path,
         base_config_path=os.environ.get("ODOO_CONFIG", "/volumes/config/_generated.conf").strip()
         or "/volumes/config/_generated.conf",
@@ -95,21 +98,27 @@ def _load_settings(argument_namespace: argparse.Namespace) -> BootstrapSettings:
         database_user=os.environ.get("ODOO_DB_USER", "odoo").strip() or "odoo",
         database_password=os.environ.get("ODOO_DB_PASSWORD", ""),
         master_password=master_password,
+        admin_login=os.environ.get("ODOO_ADMIN_LOGIN", "").strip() or "admin",
+        admin_password=os.environ.get("ODOO_ADMIN_PASSWORD", "").strip(),
         addons_path=os.environ.get("ODOO_ADDONS_PATH", "").strip(),
         data_dir=os.environ.get("ODOO_DATA_DIR", "/volumes/data").strip() or "/volumes/data",
         list_db=os.environ.get("ODOO_LIST_DB", "False").strip() or "False",
         install_modules=install_modules,
-        restore_lock_file=os.environ.get("ODOO_RESTORE_LOCK_FILE", "/volumes/data/.restore_in_progress").strip()
-        or "/volumes/data/.restore_in_progress",
-        restore_lock_timeout_seconds=int(
-            os.environ.get("ODOO_RESTORE_LOCK_TIMEOUT_SECONDS", "7200").strip() or "7200"
+        data_workflow_lock_file=os.environ.get(
+            "ODOO_DATA_WORKFLOW_LOCK_FILE",
+            "/volumes/data/.data_workflow_in_progress",
+        ).strip()
+        or "/volumes/data/.data_workflow_in_progress",
+        data_workflow_lock_timeout_seconds=int(
+            os.environ.get("ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS", "7200").strip()
+            or "7200"
         ),
         ready_timeout_seconds=180,
         poll_interval_seconds=2.0,
     )
 
 
-def _write_runtime_config(settings: BootstrapSettings) -> None:
+def _write_runtime_config(settings: StartupSettings) -> None:
     config_parser = configparser.ConfigParser(interpolation=None)
     if settings.base_config_path and os.path.exists(settings.base_config_path):
         config_parser.read(settings.base_config_path, encoding="utf-8")
@@ -149,7 +158,7 @@ def _write_runtime_config(settings: BootstrapSettings) -> None:
         config_parser.write(config_file)
 
 
-def _wait_for_database(settings: BootstrapSettings) -> None:
+def _wait_for_database(settings: StartupSettings) -> None:
     deadline = time.monotonic() + settings.ready_timeout_seconds
     while time.monotonic() < deadline:
         try:
@@ -169,7 +178,7 @@ def _wait_for_database(settings: BootstrapSettings) -> None:
     )
 
 
-def _database_exists(settings: BootstrapSettings) -> bool:
+def _database_exists(settings: StartupSettings) -> bool:
     with psycopg2.connect(
         host=settings.database_host,
         port=settings.database_port,
@@ -182,7 +191,7 @@ def _database_exists(settings: BootstrapSettings) -> bool:
             return cursor.fetchone() is not None
 
 
-def _installed_module_names(settings: BootstrapSettings) -> set[str]:
+def _installed_module_names(settings: StartupSettings) -> set[str]:
     with psycopg2.connect(
         host=settings.database_host,
         port=settings.database_port,
@@ -195,7 +204,7 @@ def _installed_module_names(settings: BootstrapSettings) -> set[str]:
             return {str(row[0]) for row in cursor.fetchall()}
 
 
-def _missing_required_modules(settings: BootstrapSettings) -> tuple[str, ...]:
+def _missing_required_modules(settings: StartupSettings) -> tuple[str, ...]:
     if not _database_exists(settings):
         return settings.install_modules
 
@@ -212,7 +221,7 @@ def _missing_required_modules(settings: BootstrapSettings) -> tuple[str, ...]:
 
 
 def _build_odoo_command(
-    settings: BootstrapSettings,
+    settings: StartupSettings,
     *,
     initialize_modules: tuple[str, ...] | None = None,
     stop_after_init: bool,
@@ -243,14 +252,99 @@ def _build_odoo_command(
     return command
 
 
-def _run_initialization_if_needed(settings: BootstrapSettings) -> None:
+def _build_odoo_shell_command(settings: StartupSettings) -> list[str]:
+    return [
+        "/odoo/odoo-bin",
+        "shell",
+        "-c",
+        settings.config_path,
+        "-d",
+        settings.database_name,
+        f"--db_host={settings.database_host}",
+        f"--db_port={settings.database_port}",
+        f"--db_user={settings.database_user}",
+        f"--db_password={settings.database_password}",
+        "--no-http",
+    ]
+
+
+def _run_odoo_shell(settings: StartupSettings, script_text: str, *, label: str) -> None:
+    print(f"[platform-startup] running {label}", flush=True)
+    subprocess.run(_build_odoo_shell_command(settings), input=script_text.encode(), check=True)
+
+
+def _apply_admin_password_if_configured(settings: StartupSettings) -> None:
+    if not settings.admin_password:
+        return
+
+    payload = {
+        "login": settings.admin_login,
+        "password": settings.admin_password,
+    }
+    script = """
+import json
+
+payload = json.loads('__PAYLOAD__')
+admin_user = env['res.users'].sudo().with_context(active_test=False).search(
+    [('login', '=', payload['login'])],
+    limit=1,
+)
+if not admin_user:
+    raise ValueError(f"Configured admin user not found: {payload['login']}")
+
+admin_user.with_context(no_reset_password=True).sudo().write({'password': payload['password']})
+env.cr.commit()
+print('admin_password_updated=true')
+""".replace("__PAYLOAD__", json.dumps(payload))
+    _run_odoo_shell(settings, script, label="admin hardening")
+
+
+def _assert_active_admin_password_is_not_default(settings: StartupSettings) -> None:
+    login_names_to_check = ["admin"]
+    if settings.admin_login not in login_names_to_check:
+        login_names_to_check.append(settings.admin_login)
+
+    payload = {"logins": login_names_to_check}
+    script = """
+import json
+from odoo.exceptions import AccessDenied
+
+payload = json.loads('__PAYLOAD__')
+
+for login_name in payload['logins']:
+    target_user = env['res.users'].sudo().with_context(active_test=False).search(
+        [('login', '=', login_name)],
+        limit=1,
+    )
+    if not target_user:
+        continue
+
+    authenticated = False
+    try:
+        auth_info = env['res.users'].sudo().authenticate(
+            {'type': 'password', 'login': login_name, 'password': 'admin'},
+            {'interactive': False},
+        )
+        authenticated = bool(auth_info)
+    except AccessDenied:
+        authenticated = False
+
+    if authenticated:
+        raise ValueError(f"Insecure configuration: active password for {login_name} is 'admin'.")
+
+print('admin_default_password_active=false')
+""".replace("__PAYLOAD__", json.dumps(payload))
+    _run_odoo_shell(settings, script, label="admin password policy")
+
+
+def _run_initialization_if_needed(settings: StartupSettings) -> None:
     missing_modules = _missing_required_modules(settings)
     if not missing_modules and _database_exists(settings):
-        print("[platform-bootstrap] database already initialized; skipping init", flush=True)
+        print("[platform-startup] database already initialized; skipping init", flush=True)
         return
 
     print(
-        "[platform-bootstrap] running database bootstrap for modules: "
+        "[platform-startup] running database initialization for modules: "
         f"{','.join(['base', *missing_modules])}",
         flush=True,
     )
@@ -258,31 +352,30 @@ def _run_initialization_if_needed(settings: BootstrapSettings) -> None:
     subprocess.run(initialize_command, check=True)
 
 
-def _wait_for_restore_lock(settings: BootstrapSettings) -> None:
-    if not settings.restore_lock_file:
+def _wait_for_data_workflow_lock(settings: StartupSettings) -> None:
+    if not settings.data_workflow_lock_file:
         return
 
-    lock_path = settings.restore_lock_file
+    lock_path = settings.data_workflow_lock_file
     if not os.path.exists(lock_path):
         return
 
-    deadline = time.monotonic() + settings.restore_lock_timeout_seconds
+    deadline = time.monotonic() + settings.data_workflow_lock_timeout_seconds
     wait_seconds = 0
     while os.path.exists(lock_path):
         if time.monotonic() >= deadline:
             raise RuntimeError(
-                f"Restore lock {lock_path} still present after {settings.restore_lock_timeout_seconds} seconds."
+                f"Data workflow lock {lock_path} still present after {settings.data_workflow_lock_timeout_seconds} seconds."
             )
         if wait_seconds % 10 == 0:
             print(
-                "[platform-bootstrap] waiting for restore lock release: "
-                f"{lock_path}",
+                f"[platform-startup] waiting for data workflow lock release: {lock_path}",
                 flush=True,
             )
         time.sleep(settings.poll_interval_seconds)
         wait_seconds += 1
 
-    print("[platform-bootstrap] restore lock cleared; continuing startup", flush=True)
+    print("[platform-startup] data workflow lock cleared; continuing startup", flush=True)
 
 
 def main() -> None:
@@ -290,10 +383,13 @@ def main() -> None:
     settings = _load_settings(arguments)
     _write_runtime_config(settings)
     _wait_for_database(settings)
-    _wait_for_restore_lock(settings)
+    _wait_for_data_workflow_lock(settings)
     _run_initialization_if_needed(settings)
+    _apply_admin_password_if_configured(settings)
+    if settings.admin_password:
+        _assert_active_admin_password_is_not_default(settings)
 
-    print("[platform-bootstrap] starting Odoo web server", flush=True)
+    print("[platform-startup] starting Odoo web server", flush=True)
     server_command = _build_odoo_command(settings, stop_after_init=False)
     os.execv(server_command[0], server_command)
 
@@ -302,5 +398,5 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as error:  # pragma: no cover - startup guard
-        print(f"[platform-bootstrap] fatal: {error}", file=sys.stderr, flush=True)
+        print(f"[platform-startup] fatal: {error}", file=sys.stderr, flush=True)
         raise

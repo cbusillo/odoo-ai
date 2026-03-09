@@ -21,7 +21,7 @@ def ordered_instance_names(context_definition: ContextDefinition) -> list[str]:
     return ordered_names
 
 
-def _resolve_restore_explicit_env_file(*, repo_root: Path, env_file: Path | None) -> Path | None:
+def _resolve_data_workflow_explicit_env_file(*, repo_root: Path, env_file: Path | None) -> Path | None:
     if env_file is None:
         return None
 
@@ -184,7 +184,7 @@ admin_user = env['res.users'].sudo().with_context(active_test=False).search(
 if not admin_user:
     raise ValueError(f"Configured admin user not found: {payload['login']}")
 else:
-    admin_user.with_context(no_reset_password=True).sudo().password = payload['password']
+    admin_user.with_context(no_reset_password=True).sudo().write({'password': payload['password']})
     print("admin_password_updated=true")
 env.cr.commit()
 """).replace("__PAYLOAD__", json.dumps(script_payload))
@@ -269,14 +269,15 @@ print("admin_default_password_active=false")
     )
 
 
-def run_restore_workflow(
+def _run_data_reset_workflow(
     *,
     repo_root: Path,
     stack_file: Path,
     context_name: str,
     instance_name: str,
     env_file: Path | None,
-    bootstrap_only: bool,
+    workflow_name: str,
+    bootstrap: bool,
     no_sanitize: bool,
     dry_run: bool,
     load_stack_fn: Callable[[Path], LoadedStack],
@@ -284,15 +285,15 @@ def run_restore_workflow(
     load_environment_fn: Callable[..., tuple[Path, dict[str, str]]],
     write_runtime_odoo_conf_file_fn: Callable[[RuntimeSelection, StackDefinition, dict[str, str]], Path],
     write_runtime_env_file_fn: Callable[[Path, StackDefinition, RuntimeSelection, dict[str, str]], Path],
-    restore_stack_fn: Callable[..., int],
+    run_stack_data_workflow_fn: Callable[..., int],
     echo_fn: Callable[[str], None],
 ) -> None:
     if context_name not in {"cm", "opw"}:
-        raise click.ClickException("Restore workflow is currently supported only for cm/opw contexts.")
+        raise click.ClickException(f"{workflow_name.title()} workflow is currently supported only for cm/opw contexts.")
 
-    restore_stack_name = context_name if instance_name == "local" else f"{context_name}-{instance_name}"
-    restore_env_file = _resolve_restore_explicit_env_file(repo_root=repo_root, env_file=env_file)
-    if restore_env_file is None:
+    target_stack_name = context_name if instance_name == "local" else f"{context_name}-{instance_name}"
+    workflow_env_file = _resolve_data_workflow_explicit_env_file(repo_root=repo_root, env_file=env_file)
+    if workflow_env_file is None:
         stack_file_path = stack_file if stack_file.is_absolute() else (repo_root / stack_file)
         if not stack_file_path.exists():
             raise click.ClickException(f"Stack file not found: {stack_file_path}")
@@ -307,7 +308,7 @@ def run_restore_workflow(
             collision_mode="error",
         )
         write_runtime_odoo_conf_file_fn(runtime_selection, stack_definition, loaded_environment)
-        restore_env_file = write_runtime_env_file_fn(
+        workflow_env_file = write_runtime_env_file_fn(
             repo_root,
             stack_definition,
             runtime_selection,
@@ -315,26 +316,99 @@ def run_restore_workflow(
         )
 
     if dry_run:
-        restore_env_label = str(restore_env_file) if restore_env_file is not None else "<default stack env>"
-        echo_fn(f"restore_context={context_name}")
-        echo_fn(f"restore_instance={instance_name}")
-        echo_fn(f"restore_stack={restore_stack_name}")
-        echo_fn(f"restore_env_file={restore_env_label}")
-        echo_fn(f"restore_bootstrap_only={str(bootstrap_only).lower()}")
-        echo_fn(f"restore_no_sanitize={str(no_sanitize).lower()}")
+        workflow_env_label = str(workflow_env_file) if workflow_env_file is not None else "<default stack env>"
+        echo_fn(f"{workflow_name}_context={context_name}")
+        echo_fn(f"{workflow_name}_instance={instance_name}")
+        echo_fn(f"{workflow_name}_stack={target_stack_name}")
+        echo_fn(f"{workflow_name}_env_file={workflow_env_label}")
+        echo_fn(f"{workflow_name}_no_sanitize={str(no_sanitize).lower()}")
         return
 
     try:
-        restore_exit_code = restore_stack_fn(
-            restore_stack_name,
-            env_file=restore_env_file,
-            bootstrap_only=bootstrap_only,
+        workflow_exit_code = run_stack_data_workflow_fn(
+            target_stack_name,
+            env_file=workflow_env_file,
+            bootstrap=bootstrap,
             no_sanitize=no_sanitize,
         )
     except (CommandError, ValueError) as error:
         raise click.ClickException(str(error)) from error
-    if restore_exit_code != 0:
-        raise click.ClickException(f"Restore failed with exit code {restore_exit_code}.")
+    if workflow_exit_code != 0:
+        raise click.ClickException(f"{workflow_name.title()} failed with exit code {workflow_exit_code}.")
+
+
+def run_restore_workflow(
+    *,
+    repo_root: Path,
+    stack_file: Path,
+    context_name: str,
+    instance_name: str,
+    env_file: Path | None,
+    no_sanitize: bool,
+    dry_run: bool,
+    load_stack_fn: Callable[[Path], LoadedStack],
+    resolve_runtime_selection_fn: Callable[[StackDefinition, str, str], RuntimeSelection],
+    load_environment_fn: Callable[..., tuple[Path, dict[str, str]]],
+    write_runtime_odoo_conf_file_fn: Callable[[RuntimeSelection, StackDefinition, dict[str, str]], Path],
+    write_runtime_env_file_fn: Callable[[Path, StackDefinition, RuntimeSelection, dict[str, str]], Path],
+    run_stack_data_workflow_fn: Callable[..., int],
+    echo_fn: Callable[[str], None],
+) -> None:
+    _run_data_reset_workflow(
+        repo_root=repo_root,
+        stack_file=stack_file,
+        context_name=context_name,
+        instance_name=instance_name,
+        env_file=env_file,
+        workflow_name="restore",
+        bootstrap=False,
+        no_sanitize=no_sanitize,
+        dry_run=dry_run,
+        load_stack_fn=load_stack_fn,
+        resolve_runtime_selection_fn=resolve_runtime_selection_fn,
+        load_environment_fn=load_environment_fn,
+        write_runtime_odoo_conf_file_fn=write_runtime_odoo_conf_file_fn,
+        write_runtime_env_file_fn=write_runtime_env_file_fn,
+        run_stack_data_workflow_fn=run_stack_data_workflow_fn,
+        echo_fn=echo_fn,
+    )
+
+
+def run_bootstrap_workflow(
+    *,
+    repo_root: Path,
+    stack_file: Path,
+    context_name: str,
+    instance_name: str,
+    env_file: Path | None,
+    no_sanitize: bool,
+    dry_run: bool,
+    load_stack_fn: Callable[[Path], LoadedStack],
+    resolve_runtime_selection_fn: Callable[[StackDefinition, str, str], RuntimeSelection],
+    load_environment_fn: Callable[..., tuple[Path, dict[str, str]]],
+    write_runtime_odoo_conf_file_fn: Callable[[RuntimeSelection, StackDefinition, dict[str, str]], Path],
+    write_runtime_env_file_fn: Callable[[Path, StackDefinition, RuntimeSelection, dict[str, str]], Path],
+    run_stack_data_workflow_fn: Callable[..., int],
+    echo_fn: Callable[[str], None],
+) -> None:
+    _run_data_reset_workflow(
+        repo_root=repo_root,
+        stack_file=stack_file,
+        context_name=context_name,
+        instance_name=instance_name,
+        env_file=env_file,
+        workflow_name="bootstrap",
+        bootstrap=True,
+        no_sanitize=no_sanitize,
+        dry_run=dry_run,
+        load_stack_fn=load_stack_fn,
+        resolve_runtime_selection_fn=resolve_runtime_selection_fn,
+        load_environment_fn=load_environment_fn,
+        write_runtime_odoo_conf_file_fn=write_runtime_odoo_conf_file_fn,
+        write_runtime_env_file_fn=write_runtime_env_file_fn,
+        run_stack_data_workflow_fn=run_stack_data_workflow_fn,
+        echo_fn=echo_fn,
+    )
 
 
 def _run_openupgrade_workflow(
@@ -642,7 +716,6 @@ def run_workflow(
     workflow: str,
     dry_run: bool,
     no_cache: bool,
-    bootstrap_only: bool,
     no_sanitize: bool,
     force: bool,
     reset_versions: bool,
@@ -654,7 +727,7 @@ def run_workflow(
     load_environment_fn: Callable[..., tuple[Path, dict[str, str]]],
     write_runtime_odoo_conf_file_fn: Callable[[RuntimeSelection, StackDefinition, dict[str, str]], Path],
     write_runtime_env_file_fn: Callable[[Path, StackDefinition, RuntimeSelection, dict[str, str]], Path],
-    restore_stack_fn: Callable[..., int],
+    run_stack_data_workflow_fn: Callable[..., int],
     compose_base_command_fn: Callable[[Path], list[str]],
     run_command_fn: Callable[[list[str]], None],
     run_command_best_effort_fn: Callable[[list[str]], int],
@@ -662,38 +735,6 @@ def run_workflow(
     invoke_platform_command_fn: Callable[..., None],
     echo_fn: Callable[[str], None],
 ) -> None:
-    def run_workflow_phase(phase_name: str) -> None:
-        echo_fn(f"workflow_phase_start={phase_name}")
-        run_workflow(
-            stack_file=stack_file,
-            context_name=context_name,
-            instance_name=instance_name,
-            env_file=env_file,
-            workflow=phase_name,
-            dry_run=dry_run,
-            no_cache=no_cache,
-            bootstrap_only=bootstrap_only,
-            no_sanitize=no_sanitize,
-            force=force,
-            reset_versions=reset_versions,
-            allow_prod_data_workflow=allow_prod_data_workflow,
-            assert_prod_data_workflow_allowed_fn=assert_prod_data_workflow_allowed_fn,
-            discover_repo_root_fn=discover_repo_root_fn,
-            load_stack_fn=load_stack_fn,
-            resolve_runtime_selection_fn=resolve_runtime_selection_fn,
-            load_environment_fn=load_environment_fn,
-            write_runtime_odoo_conf_file_fn=write_runtime_odoo_conf_file_fn,
-            write_runtime_env_file_fn=write_runtime_env_file_fn,
-            restore_stack_fn=restore_stack_fn,
-            compose_base_command_fn=compose_base_command_fn,
-            run_command_fn=run_command_fn,
-            run_command_best_effort_fn=run_command_best_effort_fn,
-            run_command_with_input_fn=run_command_with_input_fn,
-            invoke_platform_command_fn=invoke_platform_command_fn,
-            echo_fn=echo_fn,
-        )
-        echo_fn(f"workflow_phase_end={phase_name}")
-
     assert_prod_data_workflow_allowed_fn(
         instance_name=instance_name,
         workflow=workflow,
@@ -708,7 +749,6 @@ def run_workflow(
             context_name=context_name,
             instance_name=instance_name,
             env_file=env_file,
-            bootstrap_only=bootstrap_only,
             no_sanitize=no_sanitize,
             dry_run=dry_run,
             load_stack_fn=load_stack_fn,
@@ -716,7 +756,28 @@ def run_workflow(
             load_environment_fn=load_environment_fn,
             write_runtime_odoo_conf_file_fn=write_runtime_odoo_conf_file_fn,
             write_runtime_env_file_fn=write_runtime_env_file_fn,
-            restore_stack_fn=restore_stack_fn,
+            run_stack_data_workflow_fn=run_stack_data_workflow_fn,
+            echo_fn=echo_fn,
+        )
+        echo_fn(f"workflow={normalized_workflow}")
+        return
+
+    if normalized_workflow == "bootstrap":
+        repo_root = discover_repo_root_fn(Path.cwd())
+        run_bootstrap_workflow(
+            repo_root=repo_root,
+            stack_file=stack_file,
+            context_name=context_name,
+            instance_name=instance_name,
+            env_file=env_file,
+            no_sanitize=no_sanitize,
+            dry_run=dry_run,
+            load_stack_fn=load_stack_fn,
+            resolve_runtime_selection_fn=resolve_runtime_selection_fn,
+            load_environment_fn=load_environment_fn,
+            write_runtime_odoo_conf_file_fn=write_runtime_odoo_conf_file_fn,
+            write_runtime_env_file_fn=write_runtime_env_file_fn,
+            run_stack_data_workflow_fn=run_stack_data_workflow_fn,
             echo_fn=echo_fn,
         )
         echo_fn(f"workflow={normalized_workflow}")
@@ -779,24 +840,6 @@ def run_workflow(
             run_command_best_effort_fn=run_command_best_effort_fn,
             echo_fn=echo_fn,
         )
-        echo_fn(f"workflow={normalized_workflow}")
-        return
-
-    if normalized_workflow == "restore-init":
-        run_workflow_phase("restore")
-        run_workflow_phase("init")
-        echo_fn(f"workflow={normalized_workflow}")
-        return
-
-    if normalized_workflow == "restore-update":
-        run_workflow_phase("restore")
-        run_workflow_phase("update")
-        echo_fn(f"workflow={normalized_workflow}")
-        return
-
-    if normalized_workflow == "restore-init-update":
-        run_workflow_phase("restore-init")
-        run_workflow_phase("update")
         echo_fn(f"workflow={normalized_workflow}")
         return
 

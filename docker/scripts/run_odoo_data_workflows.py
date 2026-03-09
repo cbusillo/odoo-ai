@@ -67,7 +67,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Restore or bootstrap an Odoo database/filestore")
     parser.add_argument("--env-file", type=Path, default=None, help="Optional env file to load settings from")
     parser.add_argument(
-        "--bootstrap-only",
+        "--bootstrap",
         action="store_true",
         help="Force bootstrap mode (skip upstream restore)",
     )
@@ -106,7 +106,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         _logger.error("Invalid local configuration: %s", exc)
         return ExitCode.INVALID_ARGS
 
-    bootstrap_only = args.bootstrap_only or local_settings.bootstrap_only
+    bootstrap = args.bootstrap or local_settings.bootstrap
     no_sanitize = args.no_sanitize or local_settings.no_sanitize
     update_only = bool(args.update_only)
 
@@ -118,19 +118,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         upstream_settings_error = exc
         _logger.info("Upstream settings incomplete: %s", exc)
 
-    restorer = OdooUpstreamRestorer(local_settings, upstream_settings, env_file)
+    workflow_runner = OdooDataWorkflowRunner(local_settings, upstream_settings, env_file)
     lock_acquired = False
 
     try:
-        restorer.acquire_restore_lock()
+        workflow_runner.acquire_data_workflow_lock()
         lock_acquired = True
         if update_only:
-            restorer.update_addons(reason="post-deploy upgrade")
+            workflow_runner.update_addons(reason="post-deploy upgrade")
             _logger.info("Addon update completed successfully.")
             return ExitCode.SUCCESS
 
-        if bootstrap_only:
-            restorer.bootstrap_database(do_sanitize=not no_sanitize)
+        if bootstrap:
+            workflow_runner.run_bootstrap(do_sanitize=not no_sanitize)
             return ExitCode.SUCCESS
 
         if upstream_settings is None:
@@ -138,11 +138,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 _logger.error("Upstream restore settings missing/invalid: %s", upstream_settings_error)
             else:
                 _logger.error("Upstream restore settings missing/invalid")
-            _logger.error("Refusing bootstrap fallback; pass --bootstrap-only to run bootstrap intentionally.")
+            _logger.error("Refusing bootstrap fallback; pass --bootstrap to run bootstrap intentionally.")
             return ExitCode.INVALID_ARGS
 
         try:
-            restorer.restore_from_upstream(do_sanitize=not no_sanitize)
+            workflow_runner.run_restore(do_sanitize=not no_sanitize)
             return ExitCode.SUCCESS
         except (OdooRestorerError, OdooDatabaseUpdateError) as restore_error:
             _logger.error(
@@ -155,10 +155,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return ExitCode.BOOTSTRAP_FAILED
     finally:
         if lock_acquired:
-            restorer.release_restore_lock()
+            workflow_runner.release_data_workflow_lock()
 
 
-def restore_from_upstream() -> int:  # Entry point for pyproject scripts
+def run_odoo_data_workflows() -> int:  # Entry point for pyproject scripts
     return main()
 
 
@@ -270,9 +270,18 @@ class LocalServerSettings(BaseSettings):
     db_conn: connection | None = None
     filestore_path: Path = Field(..., alias="ODOO_FILESTORE_PATH")
     filestore_owner: str | None = Field(None, alias="ODOO_FILESTORE_OWNER")
-    restore_ssh_dir: Path | None = Field(None, alias="RESTORE_SSH_DIR")
-    restore_ssh_key: Path | None = Field(None, alias="RESTORE_SSH_KEY")
-    restore_lock_file: Path = Field(Path("/volumes/data/.restore_in_progress"), alias="ODOO_RESTORE_LOCK_FILE")
+    data_workflow_ssh_dir: Path | None = Field(
+        None,
+        alias="DATA_WORKFLOW_SSH_DIR",
+    )
+    data_workflow_ssh_key: Path | None = Field(
+        None,
+        alias="DATA_WORKFLOW_SSH_KEY",
+    )
+    data_workflow_lock_file: Path = Field(
+        Path("/volumes/data/.data_workflow_in_progress"),
+        alias="ODOO_DATA_WORKFLOW_LOCK_FILE",
+    )
     # Script/runtime toggles
     disable_cron: bool = Field(True, alias="ENV_OVERRIDE_DISABLE_CRON")
     project_name: str = Field("odoo", alias="ODOO_PROJECT_NAME")
@@ -287,7 +296,7 @@ class LocalServerSettings(BaseSettings):
     openupgrade_target_version: str | None = Field(None, alias="OPENUPGRADE_TARGET_VERSION")
     openupgrade_skip_update_addons: bool = Field(True, alias="OPENUPGRADE_SKIP_UPDATE_ADDONS")
     odoo_key: SecretStr | None = Field(None, alias="ODOO_KEY")
-    bootstrap_only: bool = Field(False, alias="BOOTSTRAP_ONLY")
+    bootstrap: bool = Field(False, alias="BOOTSTRAP")
     no_sanitize: bool = Field(False, alias="NO_SANITIZE")
     admin_login: str = Field("admin", alias="ODOO_ADMIN_LOGIN")
     admin_password: SecretStr | None = Field(None, alias="ODOO_ADMIN_PASSWORD")
@@ -313,9 +322,9 @@ class LocalServerSettings(BaseSettings):
     def _normalize_openupgrade_scripts_path(cls, value: object) -> object:
         return _normalize_path(value)
 
-    @field_validator("restore_ssh_dir", "restore_ssh_key", "restore_lock_file", mode="before")
+    @field_validator("data_workflow_ssh_dir", "data_workflow_ssh_key", "data_workflow_lock_file", mode="before")
     @classmethod
-    def _normalize_restore_paths(cls, value: object) -> object:
+    def _normalize_data_workflow_paths(cls, value: object) -> object:
         return _normalize_path(value)
 
     @field_validator("filestore_path", mode="before")
@@ -342,7 +351,7 @@ class UpstreamServerSettings(BaseSettings):
     filestore_path: Path = Field(..., alias="ODOO_UPSTREAM_FILESTORE_PATH")
 
 
-class OdooUpstreamRestorer:
+class OdooDataWorkflowRunner:
     def __init__(
         self,
         local: LocalServerSettings,
@@ -354,27 +363,27 @@ class OdooUpstreamRestorer:
         self.env_file = env_file
         self.os_env = os.environ.copy()
         self.os_env["PGPASSWORD"] = self.local.db_password.get_secret_value()
-        if self.local.restore_ssh_dir:
-            self.os_env["RESTORE_SSH_DIR"] = str(self.local.restore_ssh_dir)
+        if self.local.data_workflow_ssh_dir:
+            self.os_env["DATA_WORKFLOW_SSH_DIR"] = str(self.local.data_workflow_ssh_dir)
         self._ssh_identity: Path | None = None
         if self.upstream:
-            resolved_key = self._resolve_restore_ssh_key()
+            resolved_key = self._resolve_data_workflow_ssh_key()
             self._ssh_identity = resolved_key
             if resolved_key is not None:
-                self.os_env["RESTORE_SSH_KEY"] = str(resolved_key)
+                self.os_env["DATA_WORKFLOW_SSH_KEY"] = str(resolved_key)
                 _logger.info("Using SSH identity %s", resolved_key)
-            elif self.local.restore_ssh_key:
+            elif self.local.data_workflow_ssh_key:
                 _logger.info(
                     "SSH identity %s not found inside container; relying on default ssh-agent/keys.",
-                    self.local.restore_ssh_key,
+                    self.local.data_workflow_ssh_key,
                 )
         self._auto_addon_dirs: list[Path] = []
         self._pre_openupgrade_module_states: dict[str, str] = {}
         self._odoo_shell_preflight_checked = False
-        self._restore_lock_path: Path | None = None
+        self._data_workflow_lock_path: Path | None = None
 
-    def acquire_restore_lock(self) -> None:
-        lock_path = self.local.restore_lock_file
+    def acquire_data_workflow_lock(self) -> None:
+        lock_path = self.local.data_workflow_lock_file
         lock_parent = lock_path.parent
         lock_parent.mkdir(parents=True, exist_ok=True)
 
@@ -382,21 +391,21 @@ class OdooUpstreamRestorer:
             lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
         except FileExistsError as error:
             raise OdooRestorerError(
-                f"Restore lock already exists at {lock_path}; another restore/bootstrap may still be running."
+                f"Data workflow lock already exists at {lock_path}; another restore/bootstrap may still be running."
             ) from error
 
         with os.fdopen(lock_fd, "w", encoding="utf-8") as lock_file:
             lock_file.write(f"pid={os.getpid()}\n")
             lock_file.write(f"started_at={int(time.time())}\n")
 
-        self._restore_lock_path = lock_path
-        _logger.info("Acquired restore lock: %s", lock_path)
+        self._data_workflow_lock_path = lock_path
+        _logger.info("Acquired data workflow lock: %s", lock_path)
 
-    def release_restore_lock(self) -> None:
-        lock_path = self._restore_lock_path or self.local.restore_lock_file
+    def release_data_workflow_lock(self) -> None:
+        lock_path = self._data_workflow_lock_path or self.local.data_workflow_lock_file
         try:
             lock_path.unlink()
-            _logger.info("Released restore lock: %s", lock_path)
+            _logger.info("Released data workflow lock: %s", lock_path)
         except FileNotFoundError:
             pass
 
@@ -429,15 +438,15 @@ class OdooUpstreamRestorer:
             return f"{owner_stats.st_uid}:{owner_stats.st_gid}"
         return None
 
-    def _resolve_restore_ssh_key(self) -> Path | None:
-        key = self.local.restore_ssh_key
+    def _resolve_data_workflow_ssh_key(self) -> Path | None:
+        key = self.local.data_workflow_ssh_key
         if not key:
             return None
 
         base_path = Path(str(key))
         candidates: list[Path] = [base_path]
 
-        env_dir = self.local.restore_ssh_dir
+        env_dir = self.local.data_workflow_ssh_dir
         if env_dir:
             candidates.append(Path(env_dir) / base_path.name)
 
@@ -463,10 +472,10 @@ class OdooUpstreamRestorer:
         parts = ["ssh", "-o", "StrictHostKeyChecking=yes"]
         if self._ssh_identity:
             parts.extend(["-i", str(self._ssh_identity)])
-        elif self.local.restore_ssh_key:
+        elif self.local.data_workflow_ssh_key:
             _logger.warning(
-                "RESTORE_SSH_KEY=%s not found inside container; continuing without explicit identity file.",
-                self.local.restore_ssh_key,
+                "DATA_WORKFLOW_SSH_KEY=%s not found inside container; continuing without explicit identity file.",
+                self.local.data_workflow_ssh_key,
             )
         return parts
 
@@ -1320,7 +1329,7 @@ with registry.cursor() as cr:
     admin = env['res.users'].sudo().search([('login', '=', payload['login'])], limit=1)
     if admin:
         if payload['set_password']:
-            admin.with_context(no_reset_password=True).sudo().password = payload['password']
+            admin.with_context(no_reset_password=True).sudo().write({'password': payload['password']})
         if payload['set_email'] and admin.partner_id:
             admin.partner_id.sudo().write({'email': payload['email']})
     cr.commit()
@@ -1372,7 +1381,7 @@ with registry.cursor() as cr:
         self._run_odoo_shell(policy_script, "admin password policy")
         self._reset_db_connection()
 
-    def bootstrap_database(self, *, do_sanitize: bool) -> None:
+    def run_bootstrap(self, *, do_sanitize: bool) -> None:
         _logger.info("Starting bootstrap for database '%s'", self.local.db_name)
         target_owner = self._resolve_filestore_owner()
         if target_owner:
@@ -1985,7 +1994,7 @@ with registry.cursor() as cr:
         self._reset_db_connection()
         _logger.info("Reset website.snippets inherit_id to base view before upgrade.")
 
-    def restore_from_upstream(self, do_sanitize: bool = True) -> None:
+    def run_restore(self, do_sanitize: bool = True) -> None:
         self._require_upstream()
         self._assert_filestore_capacity()
         target_owner = self._resolve_filestore_owner()

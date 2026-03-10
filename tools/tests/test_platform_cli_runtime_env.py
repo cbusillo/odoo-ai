@@ -299,6 +299,38 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
             self.assertIsNone(opw_environment.get("ODOO_ADMIN_LOGIN"))
             self.assertIsNone(opw_environment.get("ODOO_ADMIN_PASSWORD"))
 
+    def test_load_environment_projects_pinned_dokploy_compose_id_from_source_of_truth(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            temporary_directory = Path(temporary_directory_name)
+            (temporary_directory / ".env").write_text("ODOO_DB_USER=odoo\n", encoding="utf-8")
+
+            platform_directory = temporary_directory / "platform"
+            platform_directory.mkdir(parents=True, exist_ok=True)
+            (platform_directory / "dokploy.toml").write_text(
+                "\n".join(
+                    [
+                        "schema_version = 2",
+                        "",
+                        "[[targets]]",
+                        'context = "opw"',
+                        'instance = "testing"',
+                        'target_type = "compose"',
+                        'target_id = "compose-id-1"',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            _env_file_path, environment_values = _load_environment(
+                temporary_directory,
+                None,
+                context_name="opw",
+                instance_name="testing",
+            )
+
+            self.assertEqual(environment_values.get("DOKPLOY_COMPOSE_ID_OPW_TESTING"), "compose-id-1")
+
 
 class PlatformWebPauseTests(unittest.TestCase):
     def test_web_pause_wraps_operation_and_restarts(self) -> None:

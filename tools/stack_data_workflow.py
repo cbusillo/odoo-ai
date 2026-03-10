@@ -239,6 +239,8 @@ def _run_dokploy_managed_remote_data_workflow(
         dokploy_host=dokploy_host,
         dokploy_token=dokploy_token,
         compose_name=compose_name,
+        context_name=context_name,
+        instance_name=instance_name,
         env_values=env_values,
     )
 
@@ -311,6 +313,8 @@ def _resolve_dokploy_remote_runtime(
     dokploy_host: str,
     dokploy_token: str,
     compose_name: str,
+    context_name: str,
+    instance_name: str,
     env_values: dict[str, str],
 ) -> tuple[str, str | None, int | None, Path, str]:
     safe_name = compose_name.upper().replace("-", "_")
@@ -360,7 +364,6 @@ def _resolve_dokploy_remote_runtime(
         ssh_user = ssh_user_override or "root"
         return ssh_host_override, ssh_user, ssh_port, remote_stack_path, compose_project
 
-    context_name, instance_name = compose_name.split("-", 1)
     compose_id, _resolved_compose_name = resolve_dokploy_compose_id(
         host=dokploy_host,
         token=dokploy_token,

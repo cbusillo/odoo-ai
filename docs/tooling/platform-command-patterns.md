@@ -65,6 +65,9 @@ Local Workflow Patterns
 - `platform restore` and `platform bootstrap` now generate and use
   `.platform/env/<context>.<instance>.env` by default. Pass `--env-file ...`
   only for explicit one-off overrides.
+- When `platform/dokploy.toml` pins a remote target `target_id`, the generated
+  runtime env projects that id into the matching Dokploy id env key so restore
+  and bootstrap do not need to rediscover the target by name.
 - Restore performs a filestore capacity preflight before upstream copy.
 - Restore acquires a shared lock file (`ODOO_DATA_WORKFLOW_LOCK_FILE`, default
   `/volumes/data/.data_workflow_in_progress`) so bootstrap waits for restore

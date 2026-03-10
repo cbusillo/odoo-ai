@@ -237,6 +237,8 @@ class StackDataWorkflowTests(unittest.TestCase):
                 dokploy_host="https://dokploy.example",
                 dokploy_token="token",
                 compose_name="opw-prod",
+                context_name="opw",
+                instance_name="prod",
                 env_values={},
             )
 
@@ -284,6 +286,8 @@ class StackDataWorkflowTests(unittest.TestCase):
                     dokploy_host="https://dokploy.example",
                     dokploy_token="token",
                     compose_name="cm-testing",
+                    context_name="cm",
+                    instance_name="testing",
                     env_values={},
                 )
 
@@ -310,6 +314,8 @@ class StackDataWorkflowTests(unittest.TestCase):
                 dokploy_host="https://dokploy.example",
                 dokploy_token="token",
                 compose_name="opw-testing",
+                context_name="opw",
+                instance_name="testing",
                 env_values={
                     "DOKPLOY_REMOTE_STACK_PATH_OPW_TESTING": "/etc/dokploy/applications/opw-testing",
                     "DOKPLOY_COMPOSE_PROJECT_OPW_TESTING": "opw-testing",
@@ -325,6 +331,45 @@ class StackDataWorkflowTests(unittest.TestCase):
                 2222,
                 Path("/etc/dokploy/applications/opw-testing"),
                 "opw-testing",
+            ),
+        )
+
+    def test_resolve_dokploy_remote_runtime_allows_non_hyphenated_compose_name_with_overrides(self) -> None:
+        deploy_servers = (
+            {
+                "serverId": "server-1",
+                "name": "dokploy-host-1",
+                "ipAddress": "10.0.0.1",
+                "username": "root",
+                "port": 22,
+            },
+        )
+
+        with (
+            patch.object(stack_data_workflow, "collect_dokploy_deploy_servers", return_value=deploy_servers),
+            patch.object(stack_data_workflow, "resolve_dokploy_compose_id", return_value=("compose-1", "opsingle")),
+            patch.object(stack_data_workflow, "dokploy_request", return_value={"serverId": "server-1"}),
+        ):
+            resolved = stack_data_workflow._resolve_dokploy_remote_runtime(
+                dokploy_host="https://dokploy.example",
+                dokploy_token="token",
+                compose_name="opsingle",
+                context_name="opw",
+                instance_name="prod",
+                env_values={
+                    "DOKPLOY_REMOTE_STACK_PATH_OPSINGLE": "/etc/dokploy/applications/opsingle",
+                    "DOKPLOY_COMPOSE_PROJECT_OPSINGLE": "opsingle",
+                },
+            )
+
+        self.assertEqual(
+            resolved,
+            (
+                "dokploy-host-1",
+                "root",
+                22,
+                Path("/etc/dokploy/applications/opsingle"),
+                "opsingle",
             ),
         )
 

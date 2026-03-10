@@ -82,6 +82,10 @@ Behavior Highlights
   `target_id` / `target_name`
   from `platform/dokploy.toml` when present. Name-based Dokploy API discovery
   is now the fallback path for targets that have not been pinned yet.
+- Generated remote runtime envs also project pinned `target_id` values into the
+  corresponding `DOKPLOY_COMPOSE_ID_<CONTEXT_INSTANCE>` or
+  `DOKPLOY_APPLICATION_ID_<CONTEXT_INSTANCE>` key so `platform restore` /
+  `platform bootstrap` reuse the same source-of-truth ids.
 - `platform tui` allows wildcard or comma-separated fan-out only for read-only
   `status` and `info` workflows.
 

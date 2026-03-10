@@ -31,9 +31,7 @@ def _validate_base_env_defaults(
     resolved_environment: dict[str, str],
 ) -> None:
     conflicting_keys = sorted(
-        key
-        for key, base_value in base_env_values.items()
-        if key in resolved_environment and resolved_environment[key] != base_value
+        key for key, base_value in base_env_values.items() if key in resolved_environment and resolved_environment[key] != base_value
     )
     if not conflicting_keys:
         return
@@ -62,14 +60,10 @@ def security_environment_issues(environment: dict[str, str]) -> tuple[str, ...]:
     issues: list[str] = []
     master_password = (environment.get("ODOO_MASTER_PASSWORD") or "").strip()
     if not master_password:
-        issues.append(
-            "Missing ODOO_MASTER_PASSWORD (set a non-empty value in .env or the deployment environment)."
-        )
+        issues.append("Missing ODOO_MASTER_PASSWORD (set a non-empty value in .env or the deployment environment).")
     list_db_value = environment.get("ODOO_LIST_DB")
     if not _is_false_setting(list_db_value):
-        issues.append(
-            "ODOO_LIST_DB must be false to disable the database manager (set ODOO_LIST_DB=False)."
-        )
+        issues.append("ODOO_LIST_DB must be false to disable the database manager (set ODOO_LIST_DB=False).")
     return tuple(issues)
 
 
@@ -121,11 +115,6 @@ class StackConfig(BaseModel):
     script_runner_raw: str | None = Field(None, alias="DEPLOY_SCRIPT_RUNNER_SERVICE")
     odoo_bin_raw: str | None = Field(None, alias="DEPLOY_ODOO_BIN")
     docker_context_raw: str | None = Field(None, alias="DEPLOY_DOCKER_CONTEXT")
-    remote_host_raw: str | None = Field(None, alias="DEPLOY_REMOTE_HOST")
-    remote_user_raw: str | None = Field(None, alias="DEPLOY_REMOTE_USER")
-    remote_port: int | None = Field(None, alias="DEPLOY_REMOTE_PORT")
-    remote_stack_path_raw: str | None = Field(None, alias="DEPLOY_REMOTE_STACK_PATH")
-    remote_env_path_raw: str | None = Field(None, alias="DEPLOY_REMOTE_ENV_PATH")
     image_variable_raw: str | None = Field(None, alias="DEPLOY_IMAGE_VARIABLE")
     project_name: str | None = Field(None, alias="ODOO_PROJECT_NAME")
     docker_image: str | None = Field(None, alias="DOCKER_IMAGE")
@@ -256,36 +245,6 @@ def compute_docker_context(repo_root: Path, config: StackConfig) -> Path:
     return repo_root
 
 
-def compute_remote_host(config: StackConfig) -> str | None:
-    if config.remote_host_raw:
-        if config.remote_host_raw.lower() == "local":
-            return None
-        return config.remote_host_raw
-    return None
-
-
-def compute_remote_user(config: StackConfig, remote_host: str | None) -> str | None:
-    if config.remote_user_raw:
-        return config.remote_user_raw
-    if remote_host:
-        return "root"
-    return None
-
-
-def compute_remote_stack_path(_stack_name: str, config: StackConfig, _remote_host: str | None) -> Path | None:
-    if config.remote_stack_path_raw:
-        return Path(config.remote_stack_path_raw)
-    return None
-
-
-def compute_remote_env_path(config: StackConfig, remote_stack_path: Path | None) -> Path | None:
-    if config.remote_env_path_raw:
-        return Path(config.remote_env_path_raw)
-    if remote_stack_path is not None:
-        return remote_stack_path / ".env"
-    return None
-
-
 def compute_image_variable(config: StackConfig) -> str:
     if config.image_variable_raw:
         return config.image_variable_raw
@@ -319,11 +278,6 @@ class StackSettings:
     script_runner_service: str
     odoo_bin_path: str
     image_variable_name: str
-    remote_host: str | None
-    remote_user: str | None
-    remote_port: int | None
-    remote_stack_path: Path | None
-    remote_env_path: Path | None
     github_token: str | None
 
     def compose_arguments(self) -> list[str]:
@@ -395,11 +349,6 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
     script_runner_service = compute_script_runner(config)
     odoo_bin_path = compute_odoo_bin(config)
     image_variable_name = compute_image_variable(config)
-    remote_host = compute_remote_host(config)
-    remote_user = compute_remote_user(config, remote_host)
-    remote_port = config.remote_port
-    remote_stack_path = compute_remote_stack_path(name, config, remote_host)
-    remote_env_path = compute_remote_env_path(config, remote_stack_path)
     github_token = config.github_token
     # Persist bind-mount paths back into the environment so downstream compose calls pick up overrides.
     final_environment = raw_environment.copy()
@@ -421,8 +370,7 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
     _logger.debug(
         "Env layering: %s -> merged at %s",
         " -> ".join(chain_pretty) if chain_pretty else "<none>",
-        str(merged_env_path.relative_to(repo_root)) if merged_env_path.is_relative_to(repo_root) else str(
-            merged_env_path),
+        str(merged_env_path.relative_to(repo_root)) if merged_env_path.is_relative_to(repo_root) else str(merged_env_path),
     )
     return StackSettings(
         name=name,
@@ -445,11 +393,6 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
         script_runner_service=script_runner_service,
         odoo_bin_path=odoo_bin_path,
         image_variable_name=image_variable_name,
-        remote_host=remote_host,
-        remote_user=remote_user,
-        remote_port=remote_port,
-        remote_stack_path=remote_stack_path,
-        remote_env_path=remote_env_path,
         github_token=github_token,
     )
 

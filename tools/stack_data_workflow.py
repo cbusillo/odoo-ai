@@ -1,37 +1,40 @@
 import logging
 import os
 import re
+import shlex
 from collections.abc import Iterable, Sequence
-from dataclasses import replace as _dataclass_replace
 from pathlib import Path
-from urllib.parse import urlparse
 
 from tools.deployer.command import CommandError, run_process
-from tools.deployer.compose_ops import local_compose_command, local_compose_env, remote_compose_command
+from tools.deployer.compose_ops import local_compose_command, local_compose_env
 from tools.deployer.data_workflow_support import (
     build_updated_environment,
     ensure_local_bind_mounts,
-    prepare_remote_stack,
-    push_env_to_remote,
     wait_for_local_service,
     write_env_file,
 )
-from tools.deployer.helpers import get_git_commit, get_git_remote_url
-from tools.deployer.remote import run_remote
 from tools.deployer.settings import StackSettings, load_stack_settings
 from tools.platform.dokploy import (
-    JsonObject,
-    collect_dokploy_deploy_servers,
+    DEFAULT_DOKPLOY_DEPLOY_TIMEOUT_SECONDS,
+    deployment_key,
+    deployment_status,
     dokploy_request,
     find_dokploy_target_definition,
+    latest_deployment_for_schedule,
     load_dokploy_source_of_truth_if_present,
-    resolve_dokploy_compose_remote_config,
+    resolve_dokploy_user_id,
+    schedule_key,
+    upsert_dokploy_schedule,
+    wait_for_dokploy_schedule_deployment,
 )
 from tools.platform.environment import load_dokploy_source_of_truth, resolve_stack_runtime_scope
+from tools.platform.models import DokployTargetDefinition
 
 _logger = logging.getLogger(__name__)
 
 DATA_WORKFLOW_SCRIPT = "/volumes/scripts/run_odoo_data_workflows.py"
+DOKPLOY_DATA_WORKFLOW_SCHEDULE_NAME = "platform-data-workflow"
+DOKPLOY_MANUAL_ONLY_CRON_EXPRESSION = "0 0 31 2 *"
 
 DATA_WORKFLOW_SCRIPT_ENV_KEYS = {
     "ODOO_DB_HOST",
@@ -81,17 +84,15 @@ REQUIRED_UPSTREAM_ENV_KEYS = (
 )
 
 
-def _resolve_required_dokploy_compose_target(
+def _resolve_required_dokploy_compose_target_definition(
     settings: StackSettings,
     *,
     context_name: str,
     instance_name: str,
-) -> tuple[str, str]:
+) -> DokployTargetDefinition:
     source_of_truth = load_dokploy_source_of_truth_if_present(settings.repo_root, load_dokploy_source_of_truth)
     if source_of_truth is None:
-        raise ValueError(
-            "Dokploy-managed remote workflows require platform/dokploy.toml with pinned target metadata."
-        )
+        raise ValueError("Dokploy-managed remote workflows require platform/dokploy.toml with pinned target metadata.")
 
     target_definition = find_dokploy_target_definition(
         source_of_truth,
@@ -115,9 +116,7 @@ def _resolve_required_dokploy_compose_target(
             "Dokploy-managed remote workflow requires a pinned target_id in platform/dokploy.toml for "
             f"{context_name}/{instance_name}."
         )
-
-    compose_name = target_definition.target_name.strip() or f"{context_name}-{instance_name}"
-    return compose_id, compose_name
+    return target_definition
 
 
 def _data_workflow_script_environment(env_values: dict[str, str]) -> dict[str, str]:
@@ -164,53 +163,6 @@ def _run_local_compose(settings: StackSettings, extra: Sequence[str], *, check: 
     run_process(command, cwd=settings.repo_root, check=check, env=local_compose_env(settings))
 
 
-def _run_remote_compose(settings: StackSettings, extra: Sequence[str]) -> None:
-    if settings.remote_host is None or settings.remote_stack_path is None:
-        raise ValueError("remote compose requested without remote host configuration")
-    command = remote_compose_command(settings, extra)
-    run_remote(settings.remote_host, settings.remote_user, settings.remote_port, command, settings.remote_stack_path)
-
-
-def _run_remote_data_workflow_compose_sequence(
-    settings: StackSettings,
-    *,
-    bootstrap: bool,
-    no_sanitize: bool,
-) -> None:
-    if "database" in settings.services:
-        _run_remote_compose(settings, ["up", "-d", "--remove-orphans", "database"])
-
-    _run_remote_compose(
-        settings,
-        ["up", "-d", "--remove-orphans", settings.script_runner_service],
-    )
-    _run_remote_compose(settings, ["stop", "web"])
-
-    remote_exec: list[str] = [
-        "exec",
-        "-T",
-        "--user",
-        "root",
-    ]
-    _add_toggle_env_flags(remote_exec, bootstrap=bootstrap, no_sanitize=no_sanitize)
-    remote_exec.extend(
-        [
-            settings.script_runner_service,
-            "python3",
-            "-u",
-            DATA_WORKFLOW_SCRIPT,
-        ]
-    )
-    _add_toggle_args(remote_exec, bootstrap=bootstrap, no_sanitize=no_sanitize)
-
-    try:
-        _run_remote_compose(settings, remote_exec)
-    except CommandError as error:
-        _handle_data_workflow_exit(error)
-
-    _run_remote_compose(settings, ["up", "-d", "--remove-orphans", "web"])
-
-
 def _current_image_reference(settings: StackSettings) -> str:
     return settings.environment.get(settings.image_variable_name) or settings.registry_image
 
@@ -227,30 +179,6 @@ def _add_toggle_args(command: list[str], *, bootstrap: bool, no_sanitize: bool) 
         command.append("--bootstrap")
     if no_sanitize:
         command.append("--no-sanitize")
-
-
-def _resolve_ssh_user_and_port(
-    *,
-    deploy_server: JsonObject | None,
-    ssh_user_override: str,
-    ssh_port_override: int | None,
-) -> tuple[str, int]:
-    if ssh_user_override:
-        ssh_user = ssh_user_override
-    elif deploy_server is not None:
-        ssh_user = str(deploy_server.get("username") or "").strip() or "root"
-    else:
-        ssh_user = "root"
-
-    if ssh_port_override is not None:
-        ssh_port = ssh_port_override
-    elif deploy_server is not None:
-        raw_server_port = deploy_server.get("port")
-        ssh_port = raw_server_port if isinstance(raw_server_port, int) else 22
-    else:
-        ssh_port = 22
-
-    return ssh_user, ssh_port
 
 
 def _resolve_data_workflow_environment(raw_values: dict[str, str]) -> dict[str, str]:
@@ -303,6 +231,118 @@ def _resolve_data_workflow_environment(raw_values: dict[str, str]) -> dict[str, 
     return {env_var_name: _resolve_value(env_var_name, set()) for env_var_name in raw_values}
 
 
+def _build_dokploy_data_workflow_schedule_app_name(*, context_name: str, instance_name: str) -> str:
+    return f"platform-{context_name}-{instance_name}-data-workflow"
+
+
+def _resolve_dokploy_schedule_runtime(
+    *,
+    dokploy_host: str,
+    dokploy_token: str,
+    compose_id: str,
+    compose_name: str,
+) -> tuple[str, str, str, str | None]:
+    compose_payload = dokploy_request(
+        host=dokploy_host,
+        token=dokploy_token,
+        path="/api/compose.one",
+        query={"composeId": compose_id},
+    )
+    if not isinstance(compose_payload, dict):
+        raise ValueError(f"Dokploy compose.one returned an invalid response for compose {compose_name!r}.")
+
+    compose_app_name = str(compose_payload.get("appName") or "").strip()
+    if not compose_app_name:
+        raise ValueError(f"Dokploy compose {compose_name!r} ({compose_id}) has no appName in API response.")
+
+    compose_server_id = str(compose_payload.get("serverId") or "").strip()
+    if compose_server_id:
+        return "server", compose_server_id, compose_app_name, compose_server_id
+
+    user_id = resolve_dokploy_user_id(host=dokploy_host, token=dokploy_token)
+    return "dokploy-server", user_id, compose_app_name, None
+
+
+def _build_dokploy_data_workflow_script(
+    *,
+    compose_app_name: str,
+    bootstrap: bool,
+    no_sanitize: bool,
+) -> str:
+    workflow_arguments: list[str] = []
+    if bootstrap:
+        workflow_arguments.append("--bootstrap")
+    if no_sanitize:
+        workflow_arguments.append("--no-sanitize")
+
+    quoted_workflow_arguments = " ".join(shlex.quote(argument) for argument in workflow_arguments)
+    workflow_argument_line = (
+        f"workflow_arguments=({quoted_workflow_arguments})" if quoted_workflow_arguments else "workflow_arguments=()"
+    )
+
+    return f"""#!/usr/bin/env bash
+set -euo pipefail
+
+compose_project={shlex.quote(compose_app_name)}
+{workflow_argument_line}
+
+resolve_container_id() {{
+    local service_name="$1"
+    local container_id
+    container_id=$(docker ps -aq \
+        --filter "label=com.docker.compose.project=${{compose_project}}" \
+        --filter "label=com.docker.compose.service=${{service_name}}" | head -n 1)
+    if [ -z "${{container_id}}" ]; then
+        echo "Missing container for service '${{service_name}}' in project '${{compose_project}}'." >&2
+        exit 1
+    fi
+    printf '%s' "${{container_id}}"
+}}
+
+ensure_running() {{
+    local container_id="$1"
+    local service_name="$2"
+    local current_status
+    current_status=$(docker inspect -f '{{{{.State.Status}}}}' "${{container_id}}")
+    if [ "${{current_status}}" != "running" ]; then
+        echo "Starting ${{service_name}} container ${{container_id}}"
+        docker start "${{container_id}}" >/dev/null
+    fi
+}}
+
+start_web_container() {{
+    local current_status
+    current_status=$(docker inspect -f '{{{{.State.Status}}}}' "${{web_container_id}}" 2>/dev/null || true)
+    if [ "${{current_status}}" != "running" ]; then
+        echo "Starting web container ${{web_container_id}}"
+        docker start "${{web_container_id}}" >/dev/null || true
+    fi
+}}
+
+database_container_id=$(resolve_container_id "database")
+script_runner_container_id=$(resolve_container_id "script-runner")
+web_container_id=$(resolve_container_id "web")
+
+ensure_running "${{database_container_id}}" "database"
+ensure_running "${{script_runner_container_id}}" "script-runner"
+
+trap start_web_container EXIT
+
+web_status=$(docker inspect -f '{{{{.State.Status}}}}' "${{web_container_id}}")
+if [ "${{web_status}}" = "running" ]; then
+    echo "Stopping web container ${{web_container_id}}"
+    docker stop "${{web_container_id}}" >/dev/null
+fi
+
+echo "Running platform data workflow in container ${{script_runner_container_id}}"
+docker exec -u root "${{script_runner_container_id}}" \
+    python3 -u {shlex.quote(DATA_WORKFLOW_SCRIPT)} "${{workflow_arguments[@]}}"
+
+start_web_container
+trap - EXIT
+"""
+
+
 def _run_dokploy_managed_remote_data_workflow(
     settings: StackSettings,
     env_values: dict[str, str],
@@ -310,25 +350,7 @@ def _run_dokploy_managed_remote_data_workflow(
     bootstrap: bool,
     no_sanitize: bool,
 ) -> int:
-    """Run the data workflow on a Dokploy-managed compose target via SSH.
-
-    Reuses the existing SSH remote machinery but skips prepare_remote_stack because
-    Dokploy has already deployed the compose files to the remote host.
-
-    The remote .env is temporarily overwritten for the duration of the workflow.
-    The next Dokploy deploy (platform ship) will restore the Dokploy-managed environment.
-
-    Compose project name and remote stack path are derived from Dokploy compose metadata.
-    When a compose target has no deploy-server linkage, the workflow SSHes to the
-    Dokploy host itself.
-    Break-glass overrides are limited to SSH host/user/port and explicit
-    path/project layout when a Dokploy target uses a non-standard remote layout:
-      DOKPLOY_REMOTE_STACK_PATH_<STACK_NAME_UPPER>   e.g. DOKPLOY_REMOTE_STACK_PATH_CM_DEV
-      DOKPLOY_COMPOSE_PROJECT_<STACK_NAME_UPPER>     e.g. DOKPLOY_COMPOSE_PROJECT_CM_DEV
-      DOKPLOY_SSH_HOST                              explicit SSH hostname override
-      DOKPLOY_SSH_USER                              SSH user (default: root)
-      DOKPLOY_SSH_PORT                              SSH port (default: 22)
-    """
+    """Run the data workflow on a Dokploy-managed target via Dokploy schedule jobs."""
     dokploy_host = env_values.get("DOKPLOY_HOST", "").strip()
     dokploy_token = env_values.get("DOKPLOY_TOKEN", "").strip()
     if not dokploy_host or not dokploy_token:
@@ -341,151 +363,96 @@ def _run_dokploy_managed_remote_data_workflow(
     if runtime_scope is None:
         raise ValueError(f"Unable to derive runtime scope from stack name {settings.name!r}.")
     context_name, instance_name = runtime_scope
-    compose_id, compose_name = _resolve_required_dokploy_compose_target(
+    target_definition = _resolve_required_dokploy_compose_target_definition(
         settings,
         context_name=context_name,
         instance_name=instance_name,
     )
 
-    ssh_host, ssh_user, ssh_port, remote_stack_path, compose_project = _resolve_dokploy_remote_runtime(
+    compose_id = target_definition.target_id.strip()
+    compose_name = target_definition.target_name.strip() or f"{context_name}-{instance_name}"
+    schedule_type, schedule_lookup_id, compose_app_name, schedule_server_id = _resolve_dokploy_schedule_runtime(
         dokploy_host=dokploy_host,
         dokploy_token=dokploy_token,
         compose_id=compose_id,
         compose_name=compose_name,
-        env_values=env_values,
     )
-
-    _logger.info(
-        "Dokploy remote data workflow: stack=%s ssh=%s@%s path=%s compose_project=%s",
-        settings.name,
-        ssh_user,
-        ssh_host,
-        remote_stack_path,
-        compose_project,
+    schedule_name = DOKPLOY_DATA_WORKFLOW_SCHEDULE_NAME
+    schedule_app_name = _build_dokploy_data_workflow_schedule_app_name(
+        context_name=context_name,
+        instance_name=instance_name,
     )
-
-    remote_settings = _dataclass_replace(
-        settings,
-        remote_host=ssh_host,
-        remote_user=ssh_user,
-        remote_port=ssh_port,
-        remote_stack_path=remote_stack_path,
-        remote_env_path=remote_stack_path / ".env",
-        compose_project=compose_project,
-    )
-
-    # Temporarily write the merged workflow env to the remote .env.
-    # This is necessary so docker compose can resolve image references and service config.
-    # The next `platform ship` (Dokploy deploy) will restore the Dokploy-managed environment.
-    push_env_to_remote(remote_settings, env_values)
-
-    _run_remote_data_workflow_compose_sequence(
-        remote_settings,
+    schedule_timeout_seconds = target_definition.deploy_timeout_seconds or DEFAULT_DOKPLOY_DEPLOY_TIMEOUT_SECONDS
+    schedule_script = _build_dokploy_data_workflow_script(
+        compose_app_name=compose_app_name,
         bootstrap=bootstrap,
         no_sanitize=no_sanitize,
     )
+    schedule_payload = {
+        "name": schedule_name,
+        "cronExpression": DOKPLOY_MANUAL_ONLY_CRON_EXPRESSION,
+        "appName": schedule_app_name,
+        "shellType": "bash",
+        "scheduleType": schedule_type,
+        "command": "platform data workflow",
+        "script": schedule_script,
+        "serverId": schedule_server_id,
+        "userId": schedule_lookup_id if schedule_type == "dokploy-server" else None,
+        "enabled": False,
+        "timezone": "UTC",
+    }
+    schedule = upsert_dokploy_schedule(
+        host=dokploy_host,
+        token=dokploy_token,
+        target_id=schedule_lookup_id,
+        schedule_type=schedule_type,
+        schedule_name=schedule_name,
+        app_name=schedule_app_name,
+        schedule_payload=schedule_payload,
+    )
+    schedule_id = schedule_key(schedule)
+    if not schedule_id:
+        raise ValueError(f"Dokploy schedule {schedule_name!r} for {context_name}/{instance_name} did not expose a schedule id.")
+
+    latest_schedule_deployment = latest_deployment_for_schedule(dokploy_host, dokploy_token, schedule_id)
+    previous_deployment_key = deployment_key(latest_schedule_deployment or {})
+
     _logger.info(
-        "Dokploy compose data workflow completed for stack %s on %s",
+        "Dokploy remote data workflow: stack=%s schedule=%s schedule_type=%s compose_project=%s",
         settings.name,
-        ssh_host,
+        schedule_id,
+        schedule_type,
+        compose_app_name,
+    )
+
+    dokploy_request(
+        host=dokploy_host,
+        token=dokploy_token,
+        path="/api/schedule.runManually",
+        method="POST",
+        payload={"scheduleId": schedule_id},
+        timeout_seconds=schedule_timeout_seconds,
+    )
+
+    deployment_result = wait_for_dokploy_schedule_deployment(
+        host=dokploy_host,
+        token=dokploy_token,
+        schedule_id=schedule_id,
+        before_key=previous_deployment_key,
+        timeout_seconds=30,
+    )
+    _logger.info("Dokploy schedule workflow deployment completed: %s", deployment_result)
+
+    latest_schedule_deployment = latest_deployment_for_schedule(dokploy_host, dokploy_token, schedule_id)
+    latest_schedule_status = deployment_status(latest_schedule_deployment or {})
+    if latest_schedule_status and latest_schedule_status not in {"success", "succeeded", "done", "completed", "healthy", "finished"}:
+        raise ValueError(f"Dokploy schedule {schedule_id!r} completed with non-success status {latest_schedule_status!r}.")
+    _logger.info(
+        "Dokploy-managed data workflow completed for stack %s via schedule %s",
+        settings.name,
+        schedule_id,
     )
     return 0
-
-
-def _resolve_dokploy_remote_runtime(
-    *,
-    dokploy_host: str,
-    dokploy_token: str,
-    compose_id: str,
-    compose_name: str,
-    env_values: dict[str, str],
-) -> tuple[str, str | None, int | None, Path, str]:
-    ssh_user_override = env_values.get("DOKPLOY_SSH_USER", "").strip()
-    ssh_port_raw = env_values.get("DOKPLOY_SSH_PORT", "").strip()
-    ssh_port_override = int(ssh_port_raw) if ssh_port_raw.isdigit() else None
-
-    ssh_host_override = env_values.get("DOKPLOY_SSH_HOST", "").strip()
-    remote_stack_path, compose_project = resolve_dokploy_compose_remote_config(
-        host=dokploy_host,
-        token=dokploy_token,
-        compose_id=compose_id,
-        compose_name=compose_name,
-        environment_values=env_values,
-    )
-
-    if ssh_host_override:
-        deploy_servers = collect_dokploy_deploy_servers(host=dokploy_host, token=dokploy_token)
-        for deploy_server in deploy_servers:
-            server_name = str(deploy_server.get("name") or "").strip()
-            server_ip = str(deploy_server.get("ipAddress") or "").strip()
-            if ssh_host_override not in {server_name, server_ip}:
-                continue
-            ssh_user, ssh_port = _resolve_ssh_user_and_port(
-                deploy_server=deploy_server,
-                ssh_user_override=ssh_user_override,
-                ssh_port_override=ssh_port_override,
-            )
-            return ssh_host_override, ssh_user, ssh_port, remote_stack_path, compose_project
-
-        ssh_user, ssh_port = _resolve_ssh_user_and_port(
-            deploy_server=None,
-            ssh_user_override=ssh_user_override,
-            ssh_port_override=ssh_port_override,
-        )
-        return ssh_host_override, ssh_user, ssh_port, remote_stack_path, compose_project
-
-    compose_payload = dokploy_request(
-        host=dokploy_host,
-        token=dokploy_token,
-        path="/api/compose.one",
-        query={"composeId": compose_id},
-    )
-    if not isinstance(compose_payload, dict):
-        raise ValueError(f"Dokploy compose.one returned an invalid response for compose {compose_name!r}.")
-
-    compose_server_id = str(compose_payload.get("serverId") or "").strip()
-    if compose_server_id:
-        deploy_servers = collect_dokploy_deploy_servers(host=dokploy_host, token=dokploy_token)
-        if not deploy_servers:
-            raise ValueError("Dokploy reported no deploy servers for remote data workflow discovery.")
-        for deploy_server in deploy_servers:
-            server_id = str(
-                deploy_server.get("serverId")
-                or deploy_server.get("id")
-                or deploy_server.get("_id")
-                or ""
-            ).strip()
-            if server_id != compose_server_id:
-                continue
-            ssh_host = str(deploy_server.get("name") or "").strip() or str(deploy_server.get("ipAddress") or "").strip()
-            if not ssh_host:
-                raise ValueError(
-                    f"Dokploy compose {compose_name!r} resolved to server {compose_server_id!r}, "
-                    "but that deploy server has no hostname or IP address."
-                )
-            ssh_user, ssh_port = _resolve_ssh_user_and_port(
-                deploy_server=deploy_server,
-                ssh_user_override=ssh_user_override,
-                ssh_port_override=ssh_port_override,
-            )
-            return ssh_host, ssh_user, ssh_port, remote_stack_path, compose_project
-        raise ValueError(
-            f"Dokploy compose {compose_name!r} resolved to unknown deploy server id {compose_server_id!r}."
-        )
-
-    parsed_dokploy_host = urlparse(dokploy_host.strip())
-    ssh_host = (parsed_dokploy_host.hostname or parsed_dokploy_host.path or "").strip()
-    if not ssh_host:
-        raise ValueError(
-            f"Dokploy compose {compose_name!r} does not expose deploy server linkage, and DOKPLOY_HOST {dokploy_host!r} has no SSH hostname."
-        )
-
-    ssh_user, ssh_port = _resolve_ssh_user_and_port(
-        deploy_server=None,
-        ssh_user_override=ssh_user_override,
-        ssh_port_override=ssh_port_override,
-    )
-    return ssh_host, ssh_user, ssh_port, remote_stack_path, compose_project
 
 
 def run_stack_data_workflow(
@@ -512,98 +479,78 @@ def run_stack_data_workflow(
                 "or run bootstrap intentionally."
             )
 
-    if stack_settings.remote_host:
-        repository_url = get_git_remote_url(stack_settings.repo_root)
-        commit = get_git_commit(stack_settings.repo_root)
-        prepare_remote_stack(stack_settings, repository_url, commit)
-        push_env_to_remote(stack_settings, env_values)
+    if runtime_scope is not None and runtime_scope[1] in {"dev", "testing", "prod"} and env_values.get("DOKPLOY_HOST", "").strip():
+        return _run_dokploy_managed_remote_data_workflow(stack_settings, env_values, bootstrap=bootstrap, no_sanitize=no_sanitize)
 
-        _run_remote_data_workflow_compose_sequence(
-            stack_settings,
-            bootstrap=bootstrap,
-            no_sanitize=no_sanitize,
-        )
-    elif (
-        runtime_scope is not None
-        and runtime_scope[1] in {"dev", "testing", "prod"}
-        and env_values.get("DOKPLOY_HOST", "").strip()
-    ):
-        # Dokploy-managed remote compose target: SSH to the Dokploy server.
-        # The compose files are already deployed by Dokploy; we skip prepare_remote_stack
-        # and derive the remote path + compose project from the Dokploy API.
-        return _run_dokploy_managed_remote_data_workflow(
-            stack_settings, env_values, bootstrap=bootstrap, no_sanitize=no_sanitize
-        )
-    else:
-        ensure_local_bind_mounts(stack_settings)
-        write_env_file(stack_settings.env_file, env_values)
+    ensure_local_bind_mounts(stack_settings)
+    write_env_file(stack_settings.env_file, env_values)
 
-        stack_started = False
+    stack_started = False
 
-        def _ensure_stack_running() -> None:
-            nonlocal stack_started
-            if stack_started:
-                return
-            _run_local_compose(
-                stack_settings,
-                ["up", "-d", "--remove-orphans", *stack_settings.services],
-                check=False,
-            )
-            stack_started = True
-
-        if "database" in stack_settings.services:
-            _run_local_compose(stack_settings, ["up", "-d", "--remove-orphans", "database"], check=False)
-            try:
-                wait_for_local_service(stack_settings, "database")
-            except ValueError:
-                _ensure_stack_running()
-                wait_for_local_service(stack_settings, "database")
-
+    def _ensure_stack_running() -> None:
+        nonlocal stack_started
+        if stack_started:
+            return
         _run_local_compose(
             stack_settings,
-            ["up", "-d", "--remove-orphans", stack_settings.script_runner_service],
+            ["up", "-d", "--remove-orphans", *stack_settings.services],
             check=False,
         )
+        stack_started = True
+
+    if "database" in stack_settings.services:
+        _run_local_compose(stack_settings, ["up", "-d", "--remove-orphans", "database"], check=False)
         try:
-            wait_for_local_service(stack_settings, stack_settings.script_runner_service)
+            wait_for_local_service(stack_settings, "database")
         except ValueError:
             _ensure_stack_running()
-            wait_for_local_service(stack_settings, stack_settings.script_runner_service)
-        _run_local_compose(stack_settings, ["stop", "web"], check=False)
+            wait_for_local_service(stack_settings, "database")
 
-        data_workflow_env_values = _data_workflow_script_environment(env_values)
-        # Pass data workflow settings via process environment + name-only `-e KEY`
-        # flags so secrets do not appear in the docker compose command line.
-        exec_environment = dict(local_compose_env(stack_settings))
-        exec_environment.update(data_workflow_env_values)
+    _run_local_compose(
+        stack_settings,
+        ["up", "-d", "--remove-orphans", stack_settings.script_runner_service],
+        check=False,
+    )
+    try:
+        wait_for_local_service(stack_settings, stack_settings.script_runner_service)
+    except ValueError:
+        _ensure_stack_running()
+        wait_for_local_service(stack_settings, stack_settings.script_runner_service)
+    _run_local_compose(stack_settings, ["stop", "web"], check=False)
 
-        exec_extra = [
-            "exec",
-            "-T",
-            "--user",
-            "root",
+    data_workflow_env_values = _data_workflow_script_environment(env_values)
+    # Pass data workflow settings via process environment + name-only `-e KEY`
+    # flags so secrets do not appear in the docker compose command line.
+    exec_environment = dict(local_compose_env(stack_settings))
+    exec_environment.update(data_workflow_env_values)
+
+    exec_extra = [
+        "exec",
+        "-T",
+        "--user",
+        "root",
+    ]
+    _add_exec_env_names(exec_extra, data_workflow_env_values.keys())
+    _add_toggle_env_flags(exec_extra, bootstrap=bootstrap, no_sanitize=no_sanitize)
+    exec_extra.extend(
+        [
+            stack_settings.script_runner_service,
+            "python3",
+            "-u",
+            DATA_WORKFLOW_SCRIPT,
         ]
-        _add_exec_env_names(exec_extra, data_workflow_env_values.keys())
-        _add_toggle_env_flags(exec_extra, bootstrap=bootstrap, no_sanitize=no_sanitize)
-        exec_extra.extend(
-            [
-                stack_settings.script_runner_service,
-                "python3",
-                "-u",
-                DATA_WORKFLOW_SCRIPT,
-            ]
-        )
-        _add_toggle_args(exec_extra, bootstrap=bootstrap, no_sanitize=no_sanitize)
+    )
+    _add_toggle_args(exec_extra, bootstrap=bootstrap, no_sanitize=no_sanitize)
 
-        try:
-            run_process(
-                local_compose_command(stack_settings, exec_extra),
-                cwd=stack_settings.repo_root,
-                env=exec_environment,
-            )
-        except CommandError as error:
-            _handle_data_workflow_exit(error)
-        _run_local_compose(stack_settings, ["up", "-d", "--remove-orphans", "web"], check=False)
+    try:
+        run_process(
+            local_compose_command(stack_settings, exec_extra),
+            cwd=stack_settings.repo_root,
+            env=exec_environment,
+        )
+    except CommandError as error:
+        _handle_data_workflow_exit(error)
+    _run_local_compose(stack_settings, ["up", "-d", "--remove-orphans", "web"], check=False)
 
     _logger.info("Data workflow completed for stack %s", stack_name)
     return 0

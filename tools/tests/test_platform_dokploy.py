@@ -96,9 +96,122 @@ class PlatformDokployHelpersTests(unittest.TestCase):
 
         self.assertEqual(deploy_servers, ({"serverId": "deploy-1", "name": "docker-cm-prod", "serverType": "deploy"},))
 
+    def test_extract_schedules_accepts_wrapped_payload(self) -> None:
+        wrapped_payload: JsonValue = {
+            "data": [
+                {"scheduleId": "schedule-1", "name": "platform-data-workflow"},
+                {"scheduleId": "schedule-2", "name": "nightly-maintenance"},
+            ]
+        }
+
+        extracted_schedules = dokploy.extract_schedules(wrapped_payload)
+
+        self.assertEqual(
+            extracted_schedules,
+            [
+                {"scheduleId": "schedule-1", "name": "platform-data-workflow"},
+                {"scheduleId": "schedule-2", "name": "nightly-maintenance"},
+            ],
+        )
+
+    def test_resolve_dokploy_user_id_reads_current_user_from_session(self) -> None:
+        with patch(
+            "tools.platform.dokploy.dokploy_request",
+            return_value={"user": {"id": "user-123"}, "session": {"activeOrganizationId": "org-1"}},
+        ):
+            user_id = dokploy.resolve_dokploy_user_id(host="https://dokploy.example", token="token")
+
+        self.assertEqual(user_id, "user-123")
+
+    def test_find_matching_dokploy_schedule_matches_name_and_app_name(self) -> None:
+        schedules_payload = (
+            {"scheduleId": "schedule-1", "name": "platform-data-workflow", "appName": "platform-opw-testing-data-workflow"},
+            {"scheduleId": "schedule-2", "name": "platform-data-workflow", "appName": "platform-cm-testing-data-workflow"},
+        )
+
+        with patch("tools.platform.dokploy.list_dokploy_schedules", return_value=schedules_payload):
+            matching_schedule = dokploy.find_matching_dokploy_schedule(
+                host="https://dokploy.example",
+                token="token",
+                target_id="user-1",
+                schedule_type="dokploy-server",
+                schedule_name="platform-data-workflow",
+                app_name="platform-opw-testing-data-workflow",
+            )
+
+        self.assertEqual(
+            matching_schedule,
+            {"scheduleId": "schedule-1", "name": "platform-data-workflow", "appName": "platform-opw-testing-data-workflow"},
+        )
+
+    def test_latest_deployment_for_schedule_uses_schedule_deployment_type(self) -> None:
+        with patch(
+            "tools.platform.dokploy.dokploy_request",
+            return_value=[{"deploymentId": "deployment-1", "status": "done"}],
+        ) as request_mock:
+            latest_deployment = dokploy.latest_deployment_for_schedule(
+                host="https://dokploy.example",
+                token="token",
+                schedule_id="schedule-123",
+            )
+
+        self.assertEqual(latest_deployment, {"deploymentId": "deployment-1", "status": "done"})
+        self.assertEqual(
+            request_mock.call_args.kwargs["query"],
+            {"id": "schedule-123", "type": "schedule"},
+        )
+
+    def test_upsert_dokploy_schedule_updates_existing_schedule(self) -> None:
+        with (
+            patch(
+                "tools.platform.dokploy.find_matching_dokploy_schedule",
+                side_effect=[
+                    {"scheduleId": "schedule-1", "name": "platform-data-workflow", "appName": "platform-opw-testing-data-workflow"},
+                    {"scheduleId": "schedule-1", "name": "platform-data-workflow", "appName": "platform-opw-testing-data-workflow"},
+                ],
+            ),
+            patch("tools.platform.dokploy.dokploy_request") as request_mock,
+        ):
+            resolved_schedule = dokploy.upsert_dokploy_schedule(
+                host="https://dokploy.example",
+                token="token",
+                target_id="user-1",
+                schedule_type="dokploy-server",
+                schedule_name="platform-data-workflow",
+                app_name="platform-opw-testing-data-workflow",
+                schedule_payload={
+                    "name": "platform-data-workflow",
+                    "appName": "platform-opw-testing-data-workflow",
+                    "command": "platform data workflow",
+                    "cronExpression": "0 0 31 2 *",
+                },
+            )
+
+        self.assertEqual(
+            request_mock.call_args.kwargs,
+            {
+                "host": "https://dokploy.example",
+                "token": "token",
+                "path": "/api/schedule.update",
+                "method": "POST",
+                "payload": {
+                    "scheduleId": "schedule-1",
+                    "name": "platform-data-workflow",
+                    "appName": "platform-opw-testing-data-workflow",
+                    "command": "platform data workflow",
+                    "cronExpression": "0 0 31 2 *",
+                },
+            },
+        )
+        self.assertEqual(
+            resolved_schedule,
+            {"scheduleId": "schedule-1", "name": "platform-data-workflow", "appName": "platform-opw-testing-data-workflow"},
+        )
+
     def test_resolve_dokploy_target_prefers_source_of_truth_target_id(self) -> None:
-        target_definition = DokployTargetDefinition(context="cm", instance="testing", target_id="compose-123",
-                                                    target_name="cm-testing-compose")
+        target_definition = DokployTargetDefinition(
+            context="cm", instance="testing", target_id="compose-123", target_name="cm-testing-compose"
+        )
 
         resolved_target = dokploy.resolve_dokploy_target(
             host="https://dokploy.example",
@@ -127,8 +240,9 @@ class PlatformDokployHelpersTests(unittest.TestCase):
             )
 
     def test_dokploy_status_payload_prefers_source_of_truth_target_id(self) -> None:
-        target_definition = DokployTargetDefinition(context="cm", instance="testing", target_id="compose-123",
-                                                    target_name="cm-testing-compose")
+        target_definition = DokployTargetDefinition(
+            context="cm", instance="testing", target_id="compose-123", target_name="cm-testing-compose"
+        )
 
         def fake_request(**kwargs: object) -> JsonValue:
             self.assertEqual(kwargs.get("path"), "/api/compose.one")
@@ -158,8 +272,9 @@ class PlatformDokployHelpersTests(unittest.TestCase):
         self.assertEqual(payload["server_id"], "server-1")
 
     def test_resolve_dokploy_target_for_command_prefers_source_of_truth_target_id(self) -> None:
-        target_definition = DokployTargetDefinition(context="cm", instance="testing", target_id="compose-123",
-                                                    target_name="cm-testing-compose")
+        target_definition = DokployTargetDefinition(
+            context="cm", instance="testing", target_id="compose-123", target_name="cm-testing-compose"
+        )
 
         resolved_target = dokploy.resolve_dokploy_target_for_command(
             host="https://dokploy.example",

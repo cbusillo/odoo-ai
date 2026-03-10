@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from tools import stack_data_workflow
 from tools.deployer.settings import StackSettings
+from tools.platform.models import DokployTargetDefinition
 
 
 class StackDataWorkflowTests(unittest.TestCase):
@@ -169,11 +170,6 @@ class StackDataWorkflowTests(unittest.TestCase):
             script_runner_service="script-runner",
             odoo_bin_path="/odoo/odoo-bin",
             image_variable_name="DOCKER_IMAGE",
-            remote_host=None,
-            remote_user=None,
-            remote_port=None,
-            remote_stack_path=None,
-            remote_env_path=None,
             github_token=None,
         )
         stack_settings.env_file.parent.mkdir(parents=True, exist_ok=True)
@@ -189,7 +185,9 @@ class StackDataWorkflowTests(unittest.TestCase):
             patch.object(stack_data_workflow, "wait_for_local_service"),
             patch.object(stack_data_workflow, "_run_local_compose"),
             patch.object(stack_data_workflow, "_run_dokploy_managed_remote_data_workflow") as dokploy_runner,
-            patch.object(stack_data_workflow, "local_compose_command", side_effect=lambda _settings, extra: ["docker", "compose", *extra]),
+            patch.object(
+                stack_data_workflow, "local_compose_command", side_effect=lambda _settings, extra: ["docker", "compose", *extra]
+            ),
             patch.object(stack_data_workflow, "local_compose_env", return_value={}),
             patch.object(
                 stack_data_workflow,
@@ -202,168 +200,140 @@ class StackDataWorkflowTests(unittest.TestCase):
         dokploy_runner.assert_not_called()
         self.assertTrue(local_exec_commands)
 
-    def test_resolve_dokploy_remote_runtime_uses_compose_server_id_and_api_remote_config(self) -> None:
-        deploy_servers = (
-            {
-                "serverId": "server-1",
-                "name": "docker-cm-prod",
-                "ipAddress": "100.73.170.113",
-                "username": "root",
-                "port": 22,
-            },
-            {
-                "serverId": "server-2",
-                "name": "docker-opw-prod",
-                "ipAddress": "192.168.1.34",
-                "username": "root",
-                "port": 22,
-            },
-        )
-
-        with (
-            patch.object(stack_data_workflow, "collect_dokploy_deploy_servers", return_value=deploy_servers),
-            patch.object(
-                stack_data_workflow,
-                "resolve_dokploy_compose_remote_config",
-                return_value=(
-                    Path("/etc/dokploy/applications/compose-input-haptic-protocol-hwmi8x"),
-                    "compose-input-haptic-protocol-hwmi8x",
-                ),
-            ),
-            patch.object(stack_data_workflow, "dokploy_request", return_value={"serverId": "server-2"}),
+    def test_resolve_dokploy_schedule_runtime_uses_server_schedule_for_linked_server(self) -> None:
+        with patch.object(
+            stack_data_workflow,
+            "dokploy_request",
+            return_value={"serverId": "server-2", "appName": "compose-opw-prod-abc123"},
         ):
-            resolved = stack_data_workflow._resolve_dokploy_remote_runtime(
+            resolved = stack_data_workflow._resolve_dokploy_schedule_runtime(
                 dokploy_host="https://dokploy.example",
                 dokploy_token="token",
                 compose_id="compose-1",
                 compose_name="opw-prod",
-                env_values={},
             )
 
-        self.assertEqual(
-            resolved,
-            (
-                "docker-opw-prod",
-                "root",
-                22,
-                Path("/etc/dokploy/applications/compose-input-haptic-protocol-hwmi8x"),
-                "compose-input-haptic-protocol-hwmi8x",
-            ),
-        )
+        self.assertEqual(resolved, ("server", "server-2", "compose-opw-prod-abc123", "server-2"))
 
-    def test_resolve_dokploy_remote_runtime_uses_dokploy_host_when_server_linkage_is_missing(self) -> None:
+    def test_resolve_dokploy_schedule_runtime_uses_dokploy_server_when_server_linkage_is_missing(self) -> None:
         with (
             patch.object(
                 stack_data_workflow,
-                "resolve_dokploy_compose_remote_config",
-                return_value=(Path("/etc/dokploy/applications/cm-testing"), "cm-testing"),
+                "dokploy_request",
+                return_value={"serverId": None, "appName": "compose-cm-testing-abc123"},
             ),
-            patch.object(stack_data_workflow, "dokploy_request", return_value={"serverId": None}),
+            patch.object(stack_data_workflow, "resolve_dokploy_user_id", return_value="user-123"),
         ):
-            resolved = stack_data_workflow._resolve_dokploy_remote_runtime(
+            resolved = stack_data_workflow._resolve_dokploy_schedule_runtime(
                 dokploy_host="https://dokploy.example",
                 dokploy_token="token",
                 compose_id="compose-1",
                 compose_name="cm-testing",
-                env_values={},
             )
 
-        self.assertEqual(
-            resolved,
-            (
-                "dokploy.example",
-                "root",
-                22,
-                Path("/etc/dokploy/applications/cm-testing"),
-                "cm-testing",
-            ),
+        self.assertEqual(resolved, ("dokploy-server", "user-123", "compose-cm-testing-abc123", None))
+
+    def test_build_dokploy_data_workflow_script_includes_project_labels_and_flags(self) -> None:
+        schedule_script = stack_data_workflow._build_dokploy_data_workflow_script(
+            compose_app_name="compose-opw-testing-abc123",
+            bootstrap=True,
+            no_sanitize=True,
         )
 
-    def test_resolve_dokploy_remote_runtime_uses_override_host(self) -> None:
-        deploy_servers = (
-            {
-                "name": "docker-cm-prod",
-                "ipAddress": "100.73.170.113",
-                "username": "root",
-                "port": 22,
-            },
-            {
-                "name": "docker-opw-prod",
-                "ipAddress": "192.168.1.34",
-                "username": "ubuntu",
-                "port": 2222,
-            },
+        self.assertIn("com.docker.compose.project=${compose_project}", schedule_script)
+        self.assertIn('script_runner_container_id=$(resolve_container_id "script-runner")', schedule_script)
+        self.assertIn("--bootstrap", schedule_script)
+        self.assertIn("--no-sanitize", schedule_script)
+        self.assertIn("docker exec -u root", schedule_script)
+
+    def test_run_dokploy_managed_remote_data_workflow_upserts_and_runs_schedule(self) -> None:
+        stack_settings = StackSettings(
+            name="opw-testing",
+            repo_root=Path("/tmp/repo"),
+            env_file=Path("/tmp/opw-testing.env"),
+            source_env_file=Path("/tmp/opw-testing.env"),
+            environment={},
+            state_root=Path("/tmp/state/opw-testing"),
+            data_dir=Path("/tmp/state/opw-testing/data"),
+            db_dir=Path("/tmp/state/opw-testing/db"),
+            log_dir=Path("/tmp/state/opw-testing/logs"),
+            compose_command=("docker", "compose"),
+            compose_project="opw-testing",
+            compose_files=(Path("/tmp/repo/docker-compose.yml"),),
+            docker_context=Path("/tmp/repo"),
+            registry_image="odoo-ai",
+            healthcheck_url="https://opw-testing.example.com/web/health",
+            update_modules=("AUTO",),
+            services=("database", "script-runner", "web"),
+            script_runner_service="script-runner",
+            odoo_bin_path="/odoo/odoo-bin",
+            image_variable_name="DOCKER_IMAGE",
+            github_token=None,
         )
+        target_definition = DokployTargetDefinition(
+            context="opw",
+            instance="testing",
+            target_id="compose-1",
+            target_name="opw-testing",
+            deploy_timeout_seconds=7200,
+        )
+        dokploy_request_calls: list[dict[str, object]] = []
+
+        def record_dokploy_request(**kwargs: object) -> object:
+            dokploy_request_calls.append(dict(kwargs))
+            return True
 
         with (
-            patch.object(stack_data_workflow, "collect_dokploy_deploy_servers", return_value=deploy_servers),
             patch.object(
                 stack_data_workflow,
-                "resolve_dokploy_compose_remote_config",
-                return_value=(Path("/etc/dokploy/applications/opw-testing"), "opw-testing"),
+                "_resolve_required_dokploy_compose_target_definition",
+                return_value=target_definition,
             ),
+            patch.object(
+                stack_data_workflow,
+                "_resolve_dokploy_schedule_runtime",
+                return_value=("dokploy-server", "user-123", "compose-opw-testing-abc123", None),
+            ),
+            patch.object(
+                stack_data_workflow,
+                "upsert_dokploy_schedule",
+                return_value={"scheduleId": "schedule-123"},
+            ) as upsert_schedule,
+            patch.object(
+                stack_data_workflow,
+                "latest_deployment_for_schedule",
+                side_effect=[{"deploymentId": "before-1", "status": "done"}, {"deploymentId": "after-1", "status": "done"}],
+            ),
+            patch.object(stack_data_workflow, "wait_for_dokploy_schedule_deployment", return_value="deployment=after-1 status=done"),
+            patch.object(stack_data_workflow, "dokploy_request", side_effect=record_dokploy_request),
         ):
-            resolved = stack_data_workflow._resolve_dokploy_remote_runtime(
-                dokploy_host="https://dokploy.example",
-                dokploy_token="token",
-                compose_id="compose-1",
-                compose_name="opw-testing",
-                env_values={
-                    "DOKPLOY_SSH_HOST": "docker-opw-prod",
-                },
+            exit_code = stack_data_workflow._run_dokploy_managed_remote_data_workflow(
+                stack_settings,
+                {"DOKPLOY_HOST": "https://dokploy.example", "DOKPLOY_TOKEN": "token"},
+                bootstrap=True,
+                no_sanitize=True,
             )
 
+        self.assertEqual(exit_code, 0)
+        upsert_payload = upsert_schedule.call_args.kwargs["schedule_payload"]
+        self.assertEqual(upsert_payload["scheduleType"], "dokploy-server")
+        self.assertEqual(upsert_payload["userId"], "user-123")
+        self.assertEqual(upsert_payload["enabled"], False)
+        self.assertEqual(upsert_payload["timezone"], "UTC")
+        self.assertIn("--bootstrap", str(upsert_payload["script"]))
+        self.assertIn("--no-sanitize", str(upsert_payload["script"]))
         self.assertEqual(
-            resolved,
-            (
-                "docker-opw-prod",
-                "ubuntu",
-                2222,
-                Path("/etc/dokploy/applications/opw-testing"),
-                "opw-testing",
-            ),
-        )
-
-    def test_resolve_dokploy_remote_runtime_preserves_custom_path_and_project_overrides(self) -> None:
-        deploy_servers = (
-            {
-                "serverId": "server-1",
-                "name": "dokploy-host-1",
-                "ipAddress": "10.0.0.1",
-                "username": "root",
-                "port": 22,
-            },
-        )
-
-        def fake_dokploy_request(**kwargs: object) -> dict[str, str]:
-            self.assertEqual(kwargs.get("path"), "/api/compose.one")
-            self.assertEqual(kwargs.get("query"), {"composeId": "compose-1"})
-            return {"serverId": "server-1", "appName": "dokploy-generated-name"}
-
-        with (
-            patch.object(stack_data_workflow, "collect_dokploy_deploy_servers", return_value=deploy_servers),
-            patch.object(stack_data_workflow, "dokploy_request", side_effect=fake_dokploy_request),
-        ):
-            resolved = stack_data_workflow._resolve_dokploy_remote_runtime(
-                dokploy_host="https://dokploy.example",
-                dokploy_token="token",
-                compose_id="compose-1",
-                compose_name="opsingle",
-                env_values={
-                    "DOKPLOY_REMOTE_STACK_PATH_OPSINGLE": "/custom/compose/path",
-                    "DOKPLOY_COMPOSE_PROJECT_OPSINGLE": "custom-compose-project",
-                },
-            )
-
-        self.assertEqual(
-            resolved,
-            (
-                "dokploy-host-1",
-                "root",
-                22,
-                Path("/custom/compose/path"),
-                "custom-compose-project",
-            ),
+            dokploy_request_calls,
+            [
+                {
+                    "host": "https://dokploy.example",
+                    "token": "token",
+                    "path": "/api/schedule.runManually",
+                    "method": "POST",
+                    "payload": {"scheduleId": "schedule-123"},
+                    "timeout_seconds": 7200,
+                }
+            ],
         )
 
 

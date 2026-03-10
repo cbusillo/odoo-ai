@@ -25,13 +25,21 @@ def dokploy_request(
     method: str = "GET",
     payload: JsonObject | None = None,
     query: dict[str, str | int | float] | None = None,
+    timeout_seconds: int | float = 60,
 ) -> JsonValue:
     normalized_host = host.rstrip("/")
     normalized_path = path if path.startswith("/") else f"/{path}"
     url = f"{normalized_host}{normalized_path}"
     headers = {"x-api-key": token}
     try:
-        response = requests.request(method, url, headers=headers, json=payload, params=query, timeout=60)
+        response = requests.request(
+            method,
+            url,
+            headers=headers,
+            json=payload,
+            params=query,
+            timeout=timeout_seconds,
+        )
     except requests.RequestException as error:
         raise click.ClickException(f"Dokploy API {method} {normalized_path} request failed: {error}") from error
     if response.status_code >= 400:
@@ -51,8 +59,7 @@ def read_dokploy_config(environment_values: dict[str, str]) -> tuple[str, str]:
     token = environment_values.get("DOKPLOY_TOKEN", "").strip()
     if not host or not token:
         raise click.ClickException(
-            "Missing DOKPLOY_HOST or DOKPLOY_TOKEN in resolved environment "
-            "(selected env file and/or platform/secrets.toml)."
+            "Missing DOKPLOY_HOST or DOKPLOY_TOKEN in resolved environment (selected env file and/or platform/secrets.toml)."
         )
     return host, token
 
@@ -84,6 +91,35 @@ def extract_deployments(raw_payload: JsonValue) -> list[JsonObject]:
                         deployment_items.append(item_as_object)
                 return deployment_items
     return []
+
+
+def extract_schedules(raw_payload: JsonValue) -> list[JsonObject]:
+    if isinstance(raw_payload, list):
+        schedule_items: list[JsonObject] = []
+        for item in raw_payload:
+            item_as_object = as_json_object(item)
+            if item_as_object is not None:
+                schedule_items.append(item_as_object)
+        return schedule_items
+    if isinstance(raw_payload, dict):
+        for key in ("data", "schedules", "items", "result"):
+            value = raw_payload.get(key)
+            if isinstance(value, list):
+                schedule_items: list[JsonObject] = []
+                for item in value:
+                    item_as_object = as_json_object(item)
+                    if item_as_object is not None:
+                        schedule_items.append(item_as_object)
+                return schedule_items
+    return []
+
+
+def schedule_key(schedule: JsonObject) -> str:
+    for key in ("scheduleId", "schedule_id", "id", "uuid"):
+        value = schedule.get(key)
+        if value:
+            return str(value)
+    return ""
 
 
 def deployment_key(deployment: JsonObject) -> str:
@@ -141,9 +177,7 @@ def resolve_dokploy_ship_mode(context_name: str, instance_name: str, environment
     if not configured_mode:
         configured_mode = environment_values.get("DOKPLOY_SHIP_MODE", "auto").strip().lower() or "auto"
     if configured_mode not in {"auto", "compose", "application"}:
-        raise click.ClickException(
-            f"Invalid Dokploy ship mode '{configured_mode}'. Expected auto, compose, or application."
-        )
+        raise click.ClickException(f"Invalid Dokploy ship mode '{configured_mode}'. Expected auto, compose, or application.")
     return configured_mode
 
 
@@ -177,6 +211,139 @@ def latest_deployment_for_compose(host: str, token: str, compose_id: str) -> Jso
         if deployment_as_object is not None:
             deployments.append(deployment_as_object)
     return _latest_deployment_from_list(deployments)
+
+
+def latest_deployment_for_schedule(host: str, token: str, schedule_id: str) -> JsonObject | None:
+    payload = dokploy_request(
+        host=host,
+        token=token,
+        path="/api/deployment.allByType",
+        query={"id": schedule_id, "type": "schedule"},
+    )
+    deployments = extract_deployments(payload)
+    return _latest_deployment_from_list(deployments)
+
+
+def wait_for_dokploy_schedule_deployment(
+    *,
+    host: str,
+    token: str,
+    schedule_id: str,
+    before_key: str,
+    timeout_seconds: int,
+) -> str:
+    return _wait_for_deployment_status(
+        fetch_latest_deployment=lambda: latest_deployment_for_schedule(host, token, schedule_id),
+        before_key=before_key,
+        timeout_seconds=timeout_seconds,
+        failure_message_prefix="Dokploy schedule deployment failed",
+    )
+
+
+def resolve_dokploy_user_id(*, host: str, token: str) -> str:
+    payload = dokploy_request(host=host, token=token, path="/api/user.session")
+    payload_as_object = as_json_object(payload)
+    if payload_as_object is None:
+        raise click.ClickException("Dokploy user.session returned an invalid response payload.")
+    user_payload = as_json_object(payload_as_object.get("user"))
+    if user_payload is None:
+        raise click.ClickException("Dokploy user.session returned no user payload.")
+    user_id = str(user_payload.get("id") or "").strip()
+    if not user_id:
+        raise click.ClickException("Dokploy user.session returned no user id.")
+    return user_id
+
+
+def list_dokploy_schedules(
+    *,
+    host: str,
+    token: str,
+    target_id: str,
+    schedule_type: str,
+) -> tuple[JsonObject, ...]:
+    payload = dokploy_request(
+        host=host,
+        token=token,
+        path="/api/schedule.list",
+        query={"id": target_id, "scheduleType": schedule_type},
+    )
+    return tuple(extract_schedules(payload))
+
+
+def find_matching_dokploy_schedule(
+    *,
+    host: str,
+    token: str,
+    target_id: str,
+    schedule_type: str,
+    schedule_name: str,
+    app_name: str,
+) -> JsonObject | None:
+    for schedule in list_dokploy_schedules(
+        host=host,
+        token=token,
+        target_id=target_id,
+        schedule_type=schedule_type,
+    ):
+        if str(schedule.get("name") or "").strip() != schedule_name:
+            continue
+        if str(schedule.get("appName") or "").strip() != app_name:
+            continue
+        return schedule
+    return None
+
+
+def upsert_dokploy_schedule(
+    *,
+    host: str,
+    token: str,
+    target_id: str,
+    schedule_type: str,
+    schedule_name: str,
+    app_name: str,
+    schedule_payload: JsonObject,
+) -> JsonObject:
+    existing_schedule = find_matching_dokploy_schedule(
+        host=host,
+        token=token,
+        target_id=target_id,
+        schedule_type=schedule_type,
+        schedule_name=schedule_name,
+        app_name=app_name,
+    )
+
+    if existing_schedule is not None:
+        updated_payload = dict(schedule_payload)
+        updated_payload["scheduleId"] = schedule_key(existing_schedule)
+        dokploy_request(
+            host=host,
+            token=token,
+            path="/api/schedule.update",
+            method="POST",
+            payload=updated_payload,
+        )
+    else:
+        dokploy_request(
+            host=host,
+            token=token,
+            path="/api/schedule.create",
+            method="POST",
+            payload=schedule_payload,
+        )
+
+    resolved_schedule = find_matching_dokploy_schedule(
+        host=host,
+        token=token,
+        target_id=target_id,
+        schedule_type=schedule_type,
+        schedule_name=schedule_name,
+        app_name=app_name,
+    )
+    if resolved_schedule is None:
+        raise click.ClickException(
+            f"Dokploy schedule {schedule_name!r} for {schedule_type} target {target_id!r} could not be resolved after upsert."
+        )
+    return resolved_schedule
 
 
 def _wait_for_deployment_status(
@@ -246,6 +413,7 @@ def resolve_dokploy_target(
     ship_mode: str,
     target_definition: DokployTargetDefinition | None = None,
 ) -> tuple[str, str, str, click.ClickException | None, click.ClickException | None]:
+    _ = host, token, environment_values
     configured_target = _resolve_configured_target_reference(
         context_name=context_name,
         instance_name=instance_name,
@@ -352,6 +520,7 @@ def resolve_dokploy_target_for_command(
     target_type: str,
     target_definition: DokployTargetDefinition | None = None,
 ) -> tuple[str, str, str]:
+    _ = host, token, environment_values
     normalized_target_type = target_type.strip().lower()
     if normalized_target_type not in {"auto", "compose", "application"}:
         raise click.ClickException("target-type must be one of: auto, compose, application.")
@@ -705,43 +874,3 @@ def collect_dokploy_deploy_servers(*, host: str, token: str) -> tuple[JsonObject
             continue
         deploy_servers.append(server_entry)
     return tuple(deploy_servers)
-
-
-def resolve_dokploy_compose_remote_config(
-    *,
-    host: str,
-    token: str,
-    compose_id: str,
-    compose_name: str,
-    environment_values: dict[str, str] | None = None,
-) -> tuple[Path, str]:
-    """Resolve (remote_stack_path, compose_project_name) for a Dokploy compose target.
-
-    The remote stack path is /etc/dokploy/applications/<appName> by default.
-    The compose project name is the Dokploy appName (what Dokploy passes via -p).
-    """
-
-    resolved_environment_values = environment_values or {}
-    safe_name = compose_name.upper().replace("-", "_")
-    path_override_key = f"DOKPLOY_REMOTE_STACK_PATH_{safe_name}"
-    project_override_key = f"DOKPLOY_COMPOSE_PROJECT_{safe_name}"
-    path_override = resolved_environment_values.get(path_override_key, "").strip()
-    project_override = resolved_environment_values.get(project_override_key, "").strip()
-    if path_override and project_override:
-        return Path(path_override), project_override
-
-    compose_payload = dokploy_request(
-        host=host,
-        token=token,
-        path="/api/compose.one",
-        query={"composeId": compose_id},
-    )
-    compose_as_object = as_json_object(compose_payload)
-    if compose_as_object is None:
-        raise click.ClickException(f"Dokploy compose.one returned an invalid response for {compose_id}.")
-
-    app_name = compose_as_object.get("appName")
-    if not isinstance(app_name, str) or not app_name:
-        raise click.ClickException(f"Dokploy compose {compose_name!r} ({compose_id}) has no appName in API response.")
-
-    return Path("/etc/dokploy/applications") / app_name, app_name

@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import tempfile
 import time
 from collections.abc import Mapping
 from pathlib import Path
 
 from .command import run_process
 from .compose_ops import local_compose_command, local_compose_env
-from .remote import ensure_remote_directory, upload_file
 from .settings import StackSettings
 
 
@@ -38,35 +36,6 @@ def ensure_local_bind_mounts(settings: StackSettings) -> None:
     (settings.log_dir / "sessions").mkdir(parents=True, exist_ok=True)
 
 
-def push_env_to_remote(settings: StackSettings, env_values: Mapping[str, str]) -> None:
-    if settings.remote_host is None:
-        raise ValueError("remote host missing")
-    if settings.remote_env_path is None:
-        raise ValueError("remote env path missing")
-
-    ensure_remote_directory(settings.remote_host, settings.remote_user, settings.remote_port, settings.remote_env_path.parent)
-
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as temporary_handle:
-        temporary_path = Path(temporary_handle.name)
-        temporary_handle.write(render_env_content(env_values))
-    try:
-        upload_file(settings.remote_host, settings.remote_user, settings.remote_port, temporary_path, settings.remote_env_path)
-        if settings.remote_stack_path is not None:
-            default_env_path = settings.remote_stack_path / ".env"
-            if default_env_path != settings.remote_env_path:
-                ensure_remote_directory(settings.remote_host, settings.remote_user, settings.remote_port, default_env_path.parent)
-                from .remote import run_remote
-
-                run_remote(
-                    settings.remote_host,
-                    settings.remote_user,
-                    settings.remote_port,
-                    ["cp", str(settings.remote_env_path), str(default_env_path)],
-                )
-    finally:
-        temporary_path.unlink(missing_ok=True)
-
-
 def wait_for_local_service(settings: StackSettings, service: str, *, timeout_seconds: int = 60) -> None:
     if service not in settings.services:
         return
@@ -91,16 +60,3 @@ def wait_for_local_service(settings: StackSettings, service: str, *, timeout_sec
         if time.monotonic() - start_time > timeout_seconds:
             raise ValueError(f"Timed out waiting for {service} to be running.")
         time.sleep(2)
-
-
-def prepare_remote_stack(settings: StackSettings, repository_url: str | None, commit: str | None) -> None:
-    if settings.remote_host is None or settings.remote_stack_path is None:
-        raise ValueError("remote stack configuration incomplete")
-    if not repository_url or not commit:
-        raise ValueError("repository metadata required for remote deployment")
-
-    for compose_file_path in settings.compose_files:
-        relative_path = compose_file_path.relative_to(settings.repo_root)
-        remote_target_path = settings.remote_stack_path / relative_path
-        ensure_remote_directory(settings.remote_host, settings.remote_user, settings.remote_port, remote_target_path.parent)
-        upload_file(settings.remote_host, settings.remote_user, settings.remote_port, compose_file_path, remote_target_path)

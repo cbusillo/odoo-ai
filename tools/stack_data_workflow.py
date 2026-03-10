@@ -4,8 +4,6 @@ import re
 from collections.abc import Iterable, Sequence
 from dataclasses import replace as _dataclass_replace
 from pathlib import Path
-from subprocess import CompletedProcess
-from urllib.parse import urlparse
 
 from tools.deployer.command import CommandError, run_process
 from tools.deployer.compose_ops import local_compose_command, local_compose_env, remote_compose_command
@@ -20,7 +18,13 @@ from tools.deployer.data_workflow_support import (
 from tools.deployer.helpers import get_git_commit, get_git_remote_url
 from tools.deployer.remote import run_remote
 from tools.deployer.settings import StackSettings, load_stack_settings
-from tools.platform.dokploy import collect_dokploy_deploy_servers, resolve_dokploy_compose_name
+from tools.platform.dokploy import (
+    collect_dokploy_deploy_servers,
+    dokploy_request,
+    resolve_dokploy_compose_id,
+    resolve_dokploy_compose_name,
+    resolve_dokploy_compose_remote_config,
+)
 from tools.platform.environment import resolve_stack_runtime_scope
 
 _logger = logging.getLogger(__name__)
@@ -314,53 +318,81 @@ def _resolve_dokploy_remote_runtime(
     project_override_key = f"DOKPLOY_COMPOSE_PROJECT_{safe_name}"
     path_override = env_values.get(path_override_key, "").strip()
     project_override = env_values.get(project_override_key, "").strip()
-    base_url = env_values.get("ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL", "").strip()
 
     ssh_user_override = env_values.get("DOKPLOY_SSH_USER", "").strip()
     ssh_port_raw = env_values.get("DOKPLOY_SSH_PORT", "").strip()
     ssh_port_override = int(ssh_port_raw) if ssh_port_raw.isdigit() else None
-
-    if not base_url and not (path_override and project_override):
-        raise ValueError(
-            "Dokploy remote data workflow requires ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL, "
-            f"or explicit {path_override_key} and {project_override_key} overrides."
-        )
 
     deploy_servers = collect_dokploy_deploy_servers(host=dokploy_host, token=dokploy_token)
     if not deploy_servers:
         raise ValueError("Dokploy reported no deploy servers for remote data workflow discovery.")
 
     ssh_host_override = env_values.get("DOKPLOY_SSH_HOST", "").strip()
+
     if path_override and project_override:
-        if ssh_host_override:
-            for deploy_server in deploy_servers:
-                server_name = str(deploy_server.get("name") or "").strip()
-                server_ip = str(deploy_server.get("ipAddress") or "").strip()
-                if ssh_host_override not in {server_name, server_ip}:
-                    continue
-                ssh_user = ssh_user_override or str(deploy_server.get("username") or "").strip() or "root"
-                raw_server_port = deploy_server.get("port")
-                if ssh_port_override is not None:
-                    ssh_port = ssh_port_override
-                elif isinstance(raw_server_port, int):
-                    ssh_port = raw_server_port
-                else:
-                    ssh_port = 22
-                return ssh_host_override, ssh_user, ssh_port, Path(path_override), project_override
+        remote_stack_path = Path(path_override)
+        compose_project = project_override
+    else:
+        remote_stack_path, compose_project = resolve_dokploy_compose_remote_config(
+            host=dokploy_host,
+            token=dokploy_token,
+            compose_name=compose_name,
+            environment_values=env_values,
+        )
 
-            ssh_port = ssh_port_override if ssh_port_override is not None else 22
-            ssh_user = ssh_user_override or "root"
-            return ssh_host_override, ssh_user, ssh_port, Path(path_override), project_override
-
-        if len(deploy_servers) == 1:
-            deploy_server = deploy_servers[0]
+    if ssh_host_override:
+        for deploy_server in deploy_servers:
             server_name = str(deploy_server.get("name") or "").strip()
             server_ip = str(deploy_server.get("ipAddress") or "").strip()
-            ssh_host = server_name or server_ip
+            if ssh_host_override not in {server_name, server_ip}:
+                continue
+            ssh_user = ssh_user_override or str(deploy_server.get("username") or "").strip() or "root"
+            raw_server_port = deploy_server.get("port")
+            if ssh_port_override is not None:
+                ssh_port = ssh_port_override
+            elif isinstance(raw_server_port, int):
+                ssh_port = raw_server_port
+            else:
+                ssh_port = 22
+            return ssh_host_override, ssh_user, ssh_port, remote_stack_path, compose_project
+
+        ssh_port = ssh_port_override if ssh_port_override is not None else 22
+        ssh_user = ssh_user_override or "root"
+        return ssh_host_override, ssh_user, ssh_port, remote_stack_path, compose_project
+
+    context_name, instance_name = compose_name.split("-", 1)
+    compose_id, _resolved_compose_name = resolve_dokploy_compose_id(
+        host=dokploy_host,
+        token=dokploy_token,
+        context_name=context_name,
+        instance_name=instance_name,
+        environment_values=env_values,
+    )
+    compose_payload = dokploy_request(
+        host=dokploy_host,
+        token=dokploy_token,
+        path="/api/compose.one",
+        query={"composeId": compose_id},
+    )
+    if not isinstance(compose_payload, dict):
+        raise ValueError(f"Dokploy compose.one returned an invalid response for compose {compose_name!r}.")
+
+    compose_server_id = str(compose_payload.get("serverId") or "").strip()
+    if compose_server_id:
+        for deploy_server in deploy_servers:
+            server_id = str(
+                deploy_server.get("serverId")
+                or deploy_server.get("id")
+                or deploy_server.get("_id")
+                or ""
+            ).strip()
+            if server_id != compose_server_id:
+                continue
+            ssh_host = str(deploy_server.get("name") or "").strip() or str(deploy_server.get("ipAddress") or "").strip()
             if not ssh_host:
                 raise ValueError(
-                    f"Dokploy override-based remote workflow for {compose_name!r} needs a deploy host, "
-                    "but the only Dokploy deploy server has no hostname or IP address."
+                    f"Dokploy compose {compose_name!r} resolved to server {compose_server_id!r}, "
+                    "but that deploy server has no hostname or IP address."
                 )
             ssh_user = ssh_user_override or str(deploy_server.get("username") or "").strip() or "root"
             raw_server_port = deploy_server.get("port")
@@ -370,31 +402,18 @@ def _resolve_dokploy_remote_runtime(
                 ssh_port = raw_server_port
             else:
                 ssh_port = 22
-            return ssh_host, ssh_user, ssh_port, Path(path_override), project_override
-
-        known_hosts = sorted(
-            {
-                host_name
-                for deploy_server in deploy_servers
-                for host_name in (
-                    str(deploy_server.get("name") or "").strip(),
-                    str(deploy_server.get("ipAddress") or "").strip(),
-                )
-                if host_name
-            }
-        )
+            return ssh_host, ssh_user, ssh_port, remote_stack_path, compose_project
         raise ValueError(
-            f"Dokploy override-based remote workflow for {compose_name!r} is ambiguous across multiple deploy servers. "
-            f"Set DOKPLOY_SSH_HOST explicitly. Known hosts: {known_hosts!r}."
+            f"Dokploy compose {compose_name!r} resolved to unknown deploy server id {compose_server_id!r}."
         )
 
-    matches: list[tuple[str, str | None, int | None, Path, str]] = []
-    for deploy_server in deploy_servers:
-        server_name = str(deploy_server.get("name") or "").strip()
-        server_ip = str(deploy_server.get("ipAddress") or "").strip()
-        ssh_host = ssh_host_override or server_name or server_ip
+    if len(deploy_servers) == 1:
+        deploy_server = deploy_servers[0]
+        ssh_host = str(deploy_server.get("name") or "").strip() or str(deploy_server.get("ipAddress") or "").strip()
         if not ssh_host:
-            continue
+            raise ValueError(
+                f"Dokploy remote workflow for {compose_name!r} needs a deploy host, but the only deploy server has no hostname or IP address."
+            )
         ssh_user = ssh_user_override or str(deploy_server.get("username") or "").strip() or "root"
         raw_server_port = deploy_server.get("port")
         if ssh_port_override is not None:
@@ -403,105 +422,23 @@ def _resolve_dokploy_remote_runtime(
             ssh_port = raw_server_port
         else:
             ssh_port = 22
+        return ssh_host, ssh_user, ssh_port, remote_stack_path, compose_project
 
-        remote_match = _probe_dokploy_remote_stack(
-            ssh_host=ssh_host,
-            ssh_user=ssh_user,
-            ssh_port=ssh_port,
-            base_url=base_url,
-        )
-        if remote_match is None:
-            continue
-        matches.append((ssh_host, ssh_user, ssh_port, remote_match[0], remote_match[1]))
-
-    unique_matches = {
-        (ssh_host, ssh_user, ssh_port, str(remote_stack_path), compose_project)
-        for ssh_host, ssh_user, ssh_port, remote_stack_path, compose_project in matches
-    }
-    if not unique_matches:
-        raise ValueError(
-            f"Could not locate Dokploy remote stack for compose {compose_name!r} with base URL {base_url!r}."
-        )
-    if len(unique_matches) > 1:
-        raise ValueError(
-            f"Dokploy remote stack resolution for compose {compose_name!r} is ambiguous: {sorted(unique_matches)!r}."
-        )
-
-    ssh_host, ssh_user, ssh_port, remote_stack_path, compose_project = next(iter(unique_matches))
-    return ssh_host, ssh_user, ssh_port, Path(remote_stack_path), compose_project
-
-
-def _normalize_base_url_match_key(base_url: str) -> tuple[str, str, str]:
-    normalized_base_url = base_url.strip()
-    if not normalized_base_url:
-        return "", "", ""
-    parsed_base_url = urlparse(normalized_base_url if "://" in normalized_base_url else f"https://{normalized_base_url}")
-    hostname = (parsed_base_url.hostname or "").strip().lower().rstrip(".")
-    if hostname:
-        normalized_path = parsed_base_url.path.rstrip("/") or "/"
-        explicit_port = str(parsed_base_url.port) if parsed_base_url.port is not None else ""
-        return hostname, explicit_port, normalized_path
-    return normalized_base_url.rstrip("/").lower(), "", ""
-
-
-def _probe_dokploy_remote_stack(
-    *,
-    ssh_host: str,
-    ssh_user: str | None,
-    ssh_port: int | None,
-    base_url: str,
-) -> tuple[Path, str] | None:
-    probe_command = (
-        "find /etc/dokploy/applications /etc/dokploy/compose "
-        "-type f \\( -path '/etc/dokploy/applications/*/.env' -o -path '/etc/dokploy/compose/*/code/.env' \\) "
-        "-exec sh -c 'for env_path do "
-        "base_url=$(grep -m1 \"^ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL=\" \"$env_path\" | cut -d= -f2-); "
-        "if [ -n \"$base_url\" ]; then printf \"%s\\t%s\\n\" \"$env_path\" \"$base_url\"; fi; "
-        "done' sh {} + 2>/dev/null"
+    known_hosts = sorted(
+        {
+            host_name
+            for deploy_server in deploy_servers
+            for host_name in (
+                str(deploy_server.get("name") or "").strip(),
+                str(deploy_server.get("ipAddress") or "").strip(),
+            )
+            if host_name
+        }
     )
-    ssh_arguments = [
-        "ssh",
-        "-o",
-        "BatchMode=yes",
-        "-o",
-        "ConnectTimeout=3",
-        "-o",
-        "ConnectionAttempts=1",
-    ]
-    if ssh_port is not None:
-        ssh_arguments.extend(["-p", str(ssh_port)])
-    ssh_target = f"{ssh_user}@{ssh_host}" if ssh_user else ssh_host
-    ssh_arguments.extend([ssh_target, probe_command])
-
-    try:
-        result: CompletedProcess[str] = run_process(ssh_arguments, capture_output=True)
-    except CommandError:
-        return None
-
-    target_base_url_key = _normalize_base_url_match_key(base_url)
-    matched_paths: list[Path] = []
-    for line in (result.stdout or "").splitlines():
-        stripped_line = line.strip()
-        if not stripped_line or "\t" not in stripped_line:
-            continue
-        env_path_text, candidate_base_url = stripped_line.split("\t", 1)
-        if _normalize_base_url_match_key(candidate_base_url) != target_base_url_key:
-            continue
-        matched_paths.append(Path(env_path_text))
-    if not matched_paths:
-        return None
-    if len(matched_paths) > 1:
-        raise ValueError(
-            f"Dokploy remote stack probe on {ssh_host} found multiple matches for {base_url!r}: {matched_paths!r}."
-        )
-
-    remote_env_path = matched_paths[0]
-    remote_stack_path = remote_env_path.parent
-    if remote_stack_path.parent.name == "applications":
-        compose_project = remote_stack_path.name
-    else:
-        compose_project = remote_stack_path.parent.name
-    return remote_stack_path, compose_project
+    raise ValueError(
+        f"Dokploy compose {compose_name!r} does not expose deploy server linkage. "
+        f"Set DOKPLOY_SSH_HOST explicitly. Known hosts: {known_hosts!r}."
+    )
 
 
 def run_stack_data_workflow(

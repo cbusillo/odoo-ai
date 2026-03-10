@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 import unittest
 from pathlib import Path
-from subprocess import CompletedProcess
 from unittest.mock import patch
 
 from tools import stack_data_workflow
@@ -203,15 +202,17 @@ class StackDataWorkflowTests(unittest.TestCase):
         dokploy_runner.assert_not_called()
         self.assertTrue(local_exec_commands)
 
-    def test_resolve_dokploy_remote_runtime_discovers_host_and_project_from_base_url(self) -> None:
+    def test_resolve_dokploy_remote_runtime_uses_compose_server_id_and_api_remote_config(self) -> None:
         deploy_servers = (
             {
+                "serverId": "server-1",
                 "name": "docker-cm-prod",
                 "ipAddress": "100.73.170.113",
                 "username": "root",
                 "port": 22,
             },
             {
+                "serverId": "server-2",
                 "name": "docker-opw-prod",
                 "ipAddress": "192.168.1.34",
                 "username": "root",
@@ -223,15 +224,20 @@ class StackDataWorkflowTests(unittest.TestCase):
             patch.object(stack_data_workflow, "collect_dokploy_deploy_servers", return_value=deploy_servers),
             patch.object(
                 stack_data_workflow,
-                "_probe_dokploy_remote_stack",
-                side_effect=[None, (Path("/etc/dokploy/compose/compose-input-haptic-protocol-hwmi8x/code"), "compose-input-haptic-protocol-hwmi8x")],
-            ) as probe_remote_stack,
+                "resolve_dokploy_compose_remote_config",
+                return_value=(
+                    Path("/etc/dokploy/applications/compose-input-haptic-protocol-hwmi8x"),
+                    "compose-input-haptic-protocol-hwmi8x",
+                ),
+            ),
+            patch.object(stack_data_workflow, "resolve_dokploy_compose_id", return_value=("compose-1", "opw-prod")),
+            patch.object(stack_data_workflow, "dokploy_request", return_value={"serverId": "server-2"}),
         ):
             resolved = stack_data_workflow._resolve_dokploy_remote_runtime(
                 dokploy_host="https://dokploy.example",
                 dokploy_token="token",
                 compose_name="opw-prod",
-                env_values={"ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL": "https://opw-prod.shinycomputers.com"},
+                env_values={},
             )
 
         self.assertEqual(
@@ -240,21 +246,22 @@ class StackDataWorkflowTests(unittest.TestCase):
                 "docker-opw-prod",
                 "root",
                 22,
-                Path("/etc/dokploy/compose/compose-input-haptic-protocol-hwmi8x/code"),
+                Path("/etc/dokploy/applications/compose-input-haptic-protocol-hwmi8x"),
                 "compose-input-haptic-protocol-hwmi8x",
             ),
         )
-        self.assertEqual(probe_remote_stack.call_count, 2)
 
-    def test_resolve_dokploy_remote_runtime_requires_explicit_host_for_overrides_when_multiple_servers_exist(self) -> None:
+    def test_resolve_dokploy_remote_runtime_requires_explicit_host_when_server_linkage_is_missing(self) -> None:
         deploy_servers = (
             {
+                "serverId": "server-1",
                 "name": "docker-cm-prod",
                 "ipAddress": "100.73.170.113",
                 "username": "root",
                 "port": 22,
             },
             {
+                "serverId": "server-2",
                 "name": "docker-opw-prod",
                 "ipAddress": "192.168.1.34",
                 "username": "root",
@@ -262,16 +269,22 @@ class StackDataWorkflowTests(unittest.TestCase):
             },
         )
 
-        with patch.object(stack_data_workflow, "collect_dokploy_deploy_servers", return_value=deploy_servers):
+        with (
+            patch.object(stack_data_workflow, "collect_dokploy_deploy_servers", return_value=deploy_servers),
+            patch.object(
+                stack_data_workflow,
+                "resolve_dokploy_compose_remote_config",
+                return_value=(Path("/etc/dokploy/applications/cm-testing"), "cm-testing"),
+            ),
+            patch.object(stack_data_workflow, "resolve_dokploy_compose_id", return_value=("compose-1", "cm-testing")),
+            patch.object(stack_data_workflow, "dokploy_request", return_value={"serverId": None}),
+        ):
             with self.assertRaises(ValueError) as raised_error:
                 stack_data_workflow._resolve_dokploy_remote_runtime(
                     dokploy_host="https://dokploy.example",
                     dokploy_token="token",
                     compose_name="cm-testing",
-                    env_values={
-                        "DOKPLOY_REMOTE_STACK_PATH_CM_TESTING": "/etc/dokploy/applications/cm-testing",
-                        "DOKPLOY_COMPOSE_PROJECT_CM_TESTING": "cm-testing",
-                    },
+                    env_values={},
                 )
 
         self.assertIn("Set DOKPLOY_SSH_HOST explicitly", str(raised_error.exception))
@@ -312,58 +325,6 @@ class StackDataWorkflowTests(unittest.TestCase):
                 2222,
                 Path("/etc/dokploy/applications/opw-testing"),
                 "opw-testing",
-            ),
-        )
-
-    def test_probe_dokploy_remote_stack_matches_equivalent_base_urls(self) -> None:
-        command_result = CompletedProcess(
-            args=["ssh"],
-            returncode=0,
-            stdout=(
-                "/etc/dokploy/compose/compose-input-cm-testing/code/.env\thttps://cm-testing.shinycomputers.com/\n"
-            ),
-            stderr="",
-        )
-
-        with patch.object(stack_data_workflow, "run_process", return_value=command_result):
-            resolved = stack_data_workflow._probe_dokploy_remote_stack(
-                ssh_host="docker-cm-prod",
-                ssh_user="root",
-                ssh_port=22,
-                base_url="https://cm-testing.shinycomputers.com",
-            )
-
-        self.assertEqual(
-            resolved,
-            (
-                Path("/etc/dokploy/compose/compose-input-cm-testing/code"),
-                "compose-input-cm-testing",
-            ),
-        )
-
-    def test_probe_dokploy_remote_stack_supports_applications_root(self) -> None:
-        command_result = CompletedProcess(
-            args=["ssh"],
-            returncode=0,
-            stdout=(
-                "/etc/dokploy/applications/odoo-cm-testing-jwlez9/.env\thttps://cm-testing.shinycomputers.com\n"
-            ),
-            stderr="",
-        )
-
-        with patch.object(stack_data_workflow, "run_process", return_value=command_result):
-            resolved = stack_data_workflow._probe_dokploy_remote_stack(
-                ssh_host="docker-cm-prod",
-                ssh_user="root",
-                ssh_port=22,
-                base_url="https://cm-testing.shinycomputers.com",
-            )
-
-        self.assertEqual(
-            resolved,
-            (
-                Path("/etc/dokploy/applications/odoo-cm-testing-jwlez9"),
-                "odoo-cm-testing-jwlez9",
             ),
         )
 

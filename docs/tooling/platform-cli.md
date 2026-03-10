@@ -74,6 +74,9 @@ Behavior Highlights
   `DOKPLOY_COMPOSE_PROJECT_<CONTEXT_INSTANCE>` (e.g.
   `DOKPLOY_COMPOSE_PROJECT_CM_DEV`). The remote `.env` is temporarily
   overwritten during the workflow and restored by the next `platform ship`.
+  When Dokploy does not expose deploy-server linkage for a compose target, the
+  workflow now fails closed and requires `DOKPLOY_SSH_HOST` instead of probing
+  candidate hosts over SSH.
 - `platform tui` allows wildcard or comma-separated fan-out only for read-only
   `status` and `info` workflows.
 

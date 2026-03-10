@@ -5,7 +5,8 @@ import { WebClient } from "@web/webclient/webclient"
 
 export function observeNotificationPermissionChanges(permissionStatus, onPermissionChange) {
     if (!permissionStatus || typeof onPermissionChange !== "function") {
-        return () => {}
+        return () => {
+        }
     }
 
     if (typeof permissionStatus.addEventListener === "function") {
@@ -14,7 +15,8 @@ export function observeNotificationPermissionChanges(permissionStatus, onPermiss
     }
 
     if (!("onchange" in permissionStatus)) {
-        return () => {}
+        return () => {
+        }
     }
 
     const previousOnchange = permissionStatus.onchange
@@ -28,7 +30,8 @@ export function observeNotificationPermissionChanges(permissionStatus, onPermiss
     try {
         permissionStatus.onchange = wrappedOnchange
     } catch {
-        return () => {}
+        return () => {
+        }
     }
 
     return () => {
@@ -50,7 +53,8 @@ export async function registerNotificationPermissionObserver(
     try {
         const permissionStatus = await permissionQueryPromise
         if (wasDestroyed()) {
-            return () => {}
+            return () => {
+            }
         }
         const removeObserver = observeNotificationPermissionChanges(
             permissionStatus,
@@ -58,14 +62,17 @@ export async function registerNotificationPermissionObserver(
         )
         if (wasDestroyed()) {
             removeObserver()
-            return () => {}
+            return () => {
+            }
         }
         return removeObserver
     } catch {
-        return () => {}
+        return () => {
+        }
     }
 }
 
+// noinspection JSUnusedGlobalSymbols
 patch(WebClient.prototype, {
     setup() {
         const originalNavigator = browser.navigator
@@ -81,7 +88,8 @@ patch(WebClient.prototype, {
             return
         }
 
-        let removePermissionObserver = () => {}
+        let removePermissionObserver = () => {
+        }
         let destroyed = false
         const onPermissionChange = () => {
             if (this._canSendNativeNotification) {
@@ -107,5 +115,5 @@ patch(WebClient.prototype, {
             destroyed = true
             removePermissionObserver()
         })
-    },
+    }
 })

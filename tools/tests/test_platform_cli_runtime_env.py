@@ -15,6 +15,7 @@ from tools.platform.cli import (
     _compose_base_command,
     _dokploy_request,
     _load_environment,
+    _resolve_dokploy_target,
     _resolve_ship_health_timeout_seconds,
     _resolve_ship_healthcheck_urls,
     _resolve_ship_timeout_seconds,
@@ -330,6 +331,31 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
             )
 
             self.assertEqual(environment_values.get("DOKPLOY_COMPOSE_ID_OPW_TESTING"), "compose-id-1")
+
+    def test_resolve_dokploy_target_wrapper_accepts_target_definition(self) -> None:
+        target_definition = DokployTargetDefinition(
+            context="cm",
+            instance="testing",
+            target_type="compose",
+            target_id="compose-id-1",
+        )
+
+        with patch(
+            "tools.platform.cli.platform_dokploy.resolve_dokploy_target",
+            return_value=("compose", "compose-id-1", "cm-testing", None, None),
+        ) as resolve_target_mock:
+            resolved = _resolve_dokploy_target(
+                host="https://dokploy.example",
+                token="token",
+                context_name="cm",
+                instance_name="testing",
+                environment_values={},
+                ship_mode="auto",
+                target_definition=target_definition,
+            )
+
+        self.assertEqual(resolved, ("compose", "compose-id-1", "cm-testing", None, None))
+        self.assertEqual(resolve_target_mock.call_args.kwargs["target_definition"], target_definition)
 
 
 class PlatformWebPauseTests(unittest.TestCase):

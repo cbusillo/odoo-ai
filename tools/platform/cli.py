@@ -607,6 +607,7 @@ def _resolve_dokploy_target(
     instance_name: str,
     environment_values: dict[str, str],
     ship_mode: str,
+    target_definition: DokployTargetDefinition | None = None,
 ) -> tuple[str, str, str, click.ClickException | None, click.ClickException | None]:
     return platform_dokploy.resolve_dokploy_target(
         host=host,
@@ -615,6 +616,7 @@ def _resolve_dokploy_target(
         instance_name=instance_name,
         environment_values=environment_values,
         ship_mode=ship_mode,
+        target_definition=target_definition,
     )
 
 

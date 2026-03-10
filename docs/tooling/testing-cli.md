@@ -36,9 +36,11 @@ Commands
 - `run-plan.json` also records host-level resource budgets under
   `host_resources` so browser-heavy and production-clone-heavy concurrency is
   explicit before execution begins.
-- `uv run test validate --json` — verify all tests executed + summarize
-  failures. Validation output now also includes phase outcome kinds and the
-  host resource budget recorded in the run plan.
+- `uv run test validate --json` — verify session success plus module/tag/init
+  coverage and summarize failures. Validation output now also includes phase
+  outcome kinds and the host resource budget recorded in the run plan; raw
+  source-vs-executed counts remain diagnostic because Odoo runtime counters do
+  not map 1:1 to static source regex counts in every phase.
 - `--stack opw|cm` (or `--env-file .platform/env/<context>.<instance>.env`) —
   load the matching local stack env before running.
 - Test runs require a resolved stack context. Stack-based runs fail closed when

@@ -135,6 +135,11 @@ def _outcome_kinds_summary(session_dir: Path) -> dict[str, dict[str, int]]:
     return phase_outcome_kinds_from_results(results)
 
 
+def _session_success(session_dir: Path) -> bool:
+    summary = _read_json(session_dir / "summary.json") or {}
+    return bool(summary.get("success"))
+
+
 def validate(session: str | None = None, json_out: bool = False) -> int:
     repo_root = discover_repo_root(Path.cwd())
     base_dir = repo_root / "tmp" / "test-logs"
@@ -161,9 +166,13 @@ def validate(session: str | None = None, json_out: bool = False) -> int:
     missing_inits = _missing_test_package_inits(addons_root)
     tags_ok = all(len(items) == 0 for items in missing_tags.values())
     init_ok = all(len(items) == 0 for items in missing_inits.values())
+    session_success = _session_success(session_dir)
+    validation_ok = session_success and ok_modules and tags_ok and init_ok
 
     payload = {
         "session": session_dir.name,
+        "session_success": session_success,
+        "validation_ok": validation_ok,
         "host_resources": _run_plan_host_resources(session_dir),
         "source_counts": source_counts,
         "executed_counts": executed_counts,
@@ -184,6 +193,7 @@ def validate(session: str | None = None, json_out: bool = False) -> int:
         host_resources = payload["host_resources"]
         outcome_kinds = payload["outcome_kinds"]
         print(f"Session: {payload['session']}")
+        print(f"Session success: {session_success}")
         if isinstance(host_resources, dict) and host_resources:
             print(
                 "Host resources: "
@@ -226,9 +236,9 @@ def validate(session: str | None = None, json_out: bool = False) -> int:
                 if dirs:
                     print(f"  {phase:<12}: {', '.join(dirs)}")
         print(f"Summary: {payload['summary']}")
+        print(f"Validation OK: {validation_ok}")
 
-    # Final code: counts/modules/tags/package markers must be OK; failures/errors allowed per your policy
-    return 0 if (ok_counts and ok_modules and tags_ok and init_ok) else 1
+    return 0 if validation_ok else 1
 
 
 def main(argv: list[str] | None = None) -> int:

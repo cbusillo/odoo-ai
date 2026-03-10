@@ -56,6 +56,10 @@ Notes
 
 - Parse `tmp/test-logs/latest/summary.json` (or phase-specific summaries); wait
   for `success: true` before declaring a run green.
+- `uv run test validate --json` now treats raw source-vs-executed test counts
+  as diagnostic only. Gate the harness on session success plus module/tag/init
+  coverage, because Odoo runtime counters do not map 1:1 to static source
+  regex counts in every phase.
 - Phase timeouts are defined under `[tool.odoo-test.timeouts]` in
   `pyproject.toml` and are enforced as hard shard kill limits.
 - The runner preflight validates test structure (missing tags/`__init__.py`) and

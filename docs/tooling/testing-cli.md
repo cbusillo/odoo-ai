@@ -29,7 +29,8 @@ Commands
   now includes phase outcome kinds, top failure reasons, and host resource
   budgets.
 - `uv run test plan --phase all` — inspect sharding/phase allocations before a
-  large run.
+  large run. Add `--overlap` to preview the same parallel phase groups that
+  `uv run test run --overlap` will use.
 - `uv run test run` writes `tmp/test-logs/<session>/run-plan.json` before shard
   execution starts so phase groups, worker limits, and shard allocations are
   explicit before side effects begin.

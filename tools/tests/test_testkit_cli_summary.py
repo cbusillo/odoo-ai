@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from contextlib import chdir
@@ -14,6 +15,7 @@ from click.testing import CliRunner
 
 from tools.testkit.cli import _host_resources_from_run_plan, _outcome_kinds_from_summary, _top_failure_reasons
 from tools.testkit.cli import test as test_command_group
+from tools.testkit.plan import PhaseExecutionPlan, RunExecutionPlan
 from tools.testkit.summary_helpers import host_resources_from_run_plan, outcome_kinds_from_results, phase_outcome_kinds_from_results
 from tools.testkit.validate import _outcome_kinds_summary, _run_plan_host_resources
 
@@ -134,6 +136,54 @@ class TestkitCliSummaryTests(unittest.TestCase):
                 "summary": str((temp_path / finished_session / "summary.json").resolve()),
             },
         )
+
+    def test_plan_overlap_flag_enables_parallel_phase_groups(self) -> None:
+        runner = CliRunner()
+
+        class _FakeSession:
+            def build_run_plan(self) -> RunExecutionPlan:
+                self_overlap = os.environ.get("PHASES_OVERLAP")
+                assert self_overlap == "1"
+                phase_groups = (("unit", "js"), ("integration", "tour"))
+                phases = tuple(
+                    PhaseExecutionPlan(
+                        phase=phase_name,
+                        modules=(f"{phase_name}_module",),
+                        timeout=1200,
+                        strategy="lpt_v1",
+                        requested_shards=1,
+                        effective_shards=1,
+                        max_workers=1,
+                        template_strategy="production" if phase_name in {"integration", "tour"} else "phase",
+                        uses_browser=phase_name in {"js", "tour"},
+                        uses_production_clone=phase_name in {"integration", "tour"},
+                        module_shards=((f"{phase_name}_module",),),
+                    )
+                    for phase_name in ("unit", "js", "integration", "tour")
+                )
+                return RunExecutionPlan(
+                    phases=phases,
+                    phase_groups=phase_groups,
+                    overlap_enabled=True,
+                    browser_slots=1,
+                    production_clone_slots=2,
+                )
+
+        with patch.dict(os.environ, {}, clear=False):
+            with (
+                patch("tools.testkit.cli._apply_stack_env"),
+                patch("tools.testkit.cli._build_session", return_value=_FakeSession()),
+            ):
+                result = runner.invoke(
+                    _as_click_command(test_command_group),
+                    ["plan", "--stack", "opw", "--phase", "all", "--json", "--overlap"],
+                    catch_exceptions=False,
+                )
+
+        self.assertEqual(result.exit_code, 0)
+        payload = json.loads(result.output)
+        self.assertTrue(payload["overlap_enabled"])
+        self.assertEqual(payload["phase_groups"], [["unit", "js"], ["integration", "tour"]])
 
 
 if __name__ == "__main__":

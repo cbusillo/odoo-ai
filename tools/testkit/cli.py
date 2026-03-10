@@ -672,6 +672,7 @@ def run_tour(
 @click.option("--integration-exclude", multiple=True, help="Integration phase: exclude these modules")
 @click.option("--tour-modules", multiple=True, help="Tour phase: only include these modules")
 @click.option("--tour-exclude", multiple=True, help="Tour phase: exclude these modules")
+@click.option("--overlap", is_flag=True, help="Plan phases with parallel groups (unit+js, integration+tour)")
 def plan_cmd(
     stack: str | None,
     env_file: str | None,
@@ -691,11 +692,14 @@ def plan_cmd(
     integration_exclude: tuple[str, ...],
     tour_modules: tuple[str, ...],
     tour_exclude: tuple[str, ...],
+    overlap: bool,
 ) -> None:
     """Print the weight-aware sharding plan for a phase or all phases."""
     _apply_stack_env(stack, env_file)
     # apply overrides to env so TestSession sees them if needed
     _apply_shard_overrides(unit_shards, js_shards, integration_shards, tour_shards)
+    if overlap:
+        os.environ["PHASES_OVERLAP"] = "1"
 
     include = _parse_multi(modules)
     omit = _parse_multi(exclude)

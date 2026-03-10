@@ -1742,7 +1742,7 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
 
     def test_execute_ship_passes_source_of_truth_target_definition_to_target_resolution(self) -> None:
         emitted_lines: list[str] = []
-        target_definition = self._target_definition(target_type="compose")
+        target_definition = self._target_definition()
         source_of_truth = self._source_of_truth(target_definition)
         seen_target_definitions: list[DokployTargetDefinition | None] = []
 

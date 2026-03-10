@@ -97,13 +97,8 @@ class PlatformDokployHelpersTests(unittest.TestCase):
         self.assertEqual(deploy_servers, ({"serverId": "deploy-1", "name": "docker-cm-prod", "serverType": "deploy"},))
 
     def test_resolve_dokploy_target_prefers_source_of_truth_target_id(self) -> None:
-        target_definition = DokployTargetDefinition(
-            context="cm",
-            instance="testing",
-            target_type="compose",
-            target_id="compose-123",
-            target_name="cm-testing-compose",
-        )
+        target_definition = DokployTargetDefinition(context="cm", instance="testing", target_id="compose-123",
+                                                    target_name="cm-testing-compose")
 
         resolved_target = dokploy.resolve_dokploy_target(
             host="https://dokploy.example",
@@ -118,12 +113,7 @@ class PlatformDokployHelpersTests(unittest.TestCase):
         self.assertEqual(resolved_target, ("compose", "compose-123", "cm-testing-compose", None, None))
 
     def test_resolve_dokploy_target_rejects_conflicting_target_type_override(self) -> None:
-        target_definition = DokployTargetDefinition(
-            context="cm",
-            instance="testing",
-            target_type="compose",
-            target_id="compose-123",
-        )
+        target_definition = DokployTargetDefinition(context="cm", instance="testing", target_id="compose-123")
 
         with self.assertRaises(click.ClickException):
             dokploy.resolve_dokploy_target(
@@ -137,13 +127,8 @@ class PlatformDokployHelpersTests(unittest.TestCase):
             )
 
     def test_dokploy_status_payload_prefers_source_of_truth_target_id(self) -> None:
-        target_definition = DokployTargetDefinition(
-            context="cm",
-            instance="testing",
-            target_type="compose",
-            target_id="compose-123",
-            target_name="cm-testing-compose",
-        )
+        target_definition = DokployTargetDefinition(context="cm", instance="testing", target_id="compose-123",
+                                                    target_name="cm-testing-compose")
 
         def fake_request(**kwargs: object) -> JsonValue:
             self.assertEqual(kwargs.get("path"), "/api/compose.one")
@@ -173,13 +158,8 @@ class PlatformDokployHelpersTests(unittest.TestCase):
         self.assertEqual(payload["server_id"], "server-1")
 
     def test_resolve_dokploy_target_for_command_prefers_source_of_truth_target_id(self) -> None:
-        target_definition = DokployTargetDefinition(
-            context="cm",
-            instance="testing",
-            target_type="compose",
-            target_id="compose-123",
-            target_name="cm-testing-compose",
-        )
+        target_definition = DokployTargetDefinition(context="cm", instance="testing", target_id="compose-123",
+                                                    target_name="cm-testing-compose")
 
         resolved_target = dokploy.resolve_dokploy_target_for_command(
             host="https://dokploy.example",

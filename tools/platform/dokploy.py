@@ -381,6 +381,40 @@ def _wait_for_deployment_status(
     raise click.ClickException("Timed out waiting for Dokploy deployment status.")
 
 
+def _resolve_configured_target_reference(
+    *,
+    context_name: str,
+    instance_name: str,
+    environment_values: dict[str, str],
+    requested_target_type: str,
+    target_definition: DokployTargetDefinition | None,
+) -> tuple[str, str, str] | None:
+    if target_definition is None:
+        return None
+
+    configured_target_id = target_definition.target_id.strip()
+    if not configured_target_id:
+        return None
+
+    configured_target_type = target_definition.target_type.strip().lower()
+    if requested_target_type != "auto" and requested_target_type != configured_target_type:
+        raise click.ClickException(
+            "Dokploy target-type override conflicts with platform/dokploy.toml. "
+            f"Target {context_name}/{instance_name} is configured as '{configured_target_type}', "
+            f"but the command requested '{requested_target_type}'."
+        )
+
+    configured_target_name = target_definition.target_name.strip()
+    if configured_target_name:
+        return configured_target_type, configured_target_id, configured_target_name
+
+    if configured_target_type == "compose":
+        configured_target_name = resolve_dokploy_compose_name(context_name, instance_name, environment_values)
+    else:
+        configured_target_name = resolve_dokploy_app_name(context_name, instance_name, environment_values)
+    return configured_target_type, configured_target_id, configured_target_name
+
+
 def resolve_dokploy_target(
     *,
     host: str,
@@ -389,6 +423,7 @@ def resolve_dokploy_target(
     instance_name: str,
     environment_values: dict[str, str],
     ship_mode: str,
+    target_definition: DokployTargetDefinition | None = None,
 ) -> tuple[str, str, str, click.ClickException | None, click.ClickException | None]:
     compose_resolution_error: click.ClickException | None = None
     app_resolution_error: click.ClickException | None = None
@@ -396,6 +431,23 @@ def resolve_dokploy_target(
     selected_target_type = ""
     selected_target_id = ""
     selected_target_name = ""
+
+    configured_target = _resolve_configured_target_reference(
+        context_name=context_name,
+        instance_name=instance_name,
+        environment_values=environment_values,
+        requested_target_type=ship_mode,
+        target_definition=target_definition,
+    )
+    if configured_target is not None:
+        selected_target_type, selected_target_id, selected_target_name = configured_target
+        return (
+            selected_target_type,
+            selected_target_id,
+            selected_target_name,
+            compose_resolution_error,
+            app_resolution_error,
+        )
 
     if ship_mode in {"auto", "compose"}:
         try:
@@ -443,6 +495,7 @@ def dokploy_status_payload(
     context_name: str,
     instance_name: str,
     environment_values: dict[str, str],
+    target_definition: DokployTargetDefinition | None = None,
 ) -> JsonObject:
     payload: JsonObject = {
         "enabled": context_name in {"cm", "opw"} and instance_name in {"dev", "testing", "prod"},
@@ -476,6 +529,7 @@ def dokploy_status_payload(
         instance_name=instance_name,
         environment_values=environment_values,
         ship_mode=ship_mode,
+        target_definition=target_definition,
     )
 
     if not target_type:
@@ -518,10 +572,21 @@ def resolve_dokploy_target_for_command(
     instance_name: str,
     environment_values: dict[str, str],
     target_type: str,
+    target_definition: DokployTargetDefinition | None = None,
 ) -> tuple[str, str, str]:
     normalized_target_type = target_type.strip().lower()
     if normalized_target_type not in {"auto", "compose", "application"}:
         raise click.ClickException("target-type must be one of: auto, compose, application.")
+
+    configured_target = _resolve_configured_target_reference(
+        context_name=context_name,
+        instance_name=instance_name,
+        environment_values=environment_values,
+        requested_target_type=normalized_target_type,
+        target_definition=target_definition,
+    )
+    if configured_target is not None:
+        return configured_target
 
     if normalized_target_type == "compose":
         compose_id, compose_name = resolve_dokploy_compose_id(
@@ -557,6 +622,7 @@ def resolve_dokploy_target_for_command(
         instance_name=instance_name,
         environment_values=environment_values,
         ship_mode=ship_mode,
+        target_definition=target_definition,
     )
     if selected_target_type:
         return selected_target_type, selected_target_id, selected_target_name

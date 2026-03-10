@@ -65,11 +65,11 @@ Behavior Highlights
 - `platform select` writes both `.platform/env/<context>.<instance>.env` and
   `.platform/ide/<context>.<instance>.odoo.conf`.
 - Remote `restore`/`bootstrap` for Dokploy-managed targets (`dev`, `testing`,
-  `prod`) SSH directly into the Dokploy server host. The SSH hostname is
-  derived from `DOKPLOY_HOST`; override with `DOKPLOY_SSH_HOST`,
-  `DOKPLOY_SSH_USER` (default `root`), `DOKPLOY_SSH_PORT`. The remote compose
-  project name and stack path are resolved from the Dokploy API
-  (`appName`); override per-target with
+  `prod`) SSH directly into the Dokploy deploy server host. The SSH hostname,
+  user, and port are resolved from Dokploy deploy-server metadata when
+  available; override with `DOKPLOY_SSH_HOST`, `DOKPLOY_SSH_USER` (default
+  `root`), `DOKPLOY_SSH_PORT`. The remote compose project name and stack path
+  are resolved from the Dokploy API (`appName`); override per-target with
   `DOKPLOY_REMOTE_STACK_PATH_<CONTEXT_INSTANCE>` and
   `DOKPLOY_COMPOSE_PROJECT_<CONTEXT_INSTANCE>` (e.g.
   `DOKPLOY_COMPOSE_PROJECT_CM_DEV`). The remote `.env` is temporarily
@@ -77,6 +77,11 @@ Behavior Highlights
   When Dokploy does not expose deploy-server linkage for a compose target, the
   workflow now fails closed and requires `DOKPLOY_SSH_HOST` instead of probing
   candidate hosts over SSH.
+- `platform ship`, `platform rollback`, `platform status`, `platform info`,
+  `platform doctor`, and `platform dokploy ...` helper commands prefer
+  `target_id` / `target_name`
+  from `platform/dokploy.toml` when present. Name-based Dokploy API discovery
+  is now the fallback path for targets that have not been pinned yet.
 - `platform tui` allows wildcard or comma-separated fan-out only for read-only
   `status` and `info` workflows.
 

@@ -123,6 +123,9 @@ uv run platform dokploy reconcile --context cm --instance prod --apply
   against `platform/stack.toml`.
 - `platform dokploy reconcile --prune-env --apply` removes reconcile-managed
   remote env keys absent from `platform/dokploy.toml`.
+- Once a target is pinned with `target_id` in `platform/dokploy.toml`, these
+  helper commands reuse that id instead of discovering the Dokploy target by
+  name at runtime.
 - Direct log streaming remains gated behind Dokploy websocket session auth.
 
 TUI Patterns

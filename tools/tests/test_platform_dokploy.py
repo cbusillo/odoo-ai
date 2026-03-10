@@ -96,6 +96,109 @@ class PlatformDokployHelpersTests(unittest.TestCase):
 
         self.assertEqual(deploy_servers, ({"serverId": "deploy-1", "name": "docker-cm-prod", "serverType": "deploy"},))
 
+    def test_resolve_dokploy_target_prefers_source_of_truth_target_id(self) -> None:
+        target_definition = DokployTargetDefinition(
+            context="cm",
+            instance="testing",
+            target_type="compose",
+            target_id="compose-123",
+            target_name="cm-testing-compose",
+        )
+
+        with (
+            patch("tools.platform.dokploy.resolve_dokploy_compose_id", side_effect=AssertionError("compose lookup should not run")),
+            patch("tools.platform.dokploy.resolve_dokploy_application_id", side_effect=AssertionError("app lookup should not run")),
+        ):
+            resolved_target = dokploy.resolve_dokploy_target(
+                host="https://dokploy.example",
+                token="token",
+                context_name="cm",
+                instance_name="testing",
+                environment_values={},
+                ship_mode="auto",
+                target_definition=target_definition,
+            )
+
+        self.assertEqual(resolved_target, ("compose", "compose-123", "cm-testing-compose", None, None))
+
+    def test_resolve_dokploy_target_rejects_conflicting_target_type_override(self) -> None:
+        target_definition = DokployTargetDefinition(
+            context="cm",
+            instance="testing",
+            target_type="compose",
+            target_id="compose-123",
+        )
+
+        with self.assertRaises(click.ClickException):
+            dokploy.resolve_dokploy_target(
+                host="https://dokploy.example",
+                token="token",
+                context_name="cm",
+                instance_name="testing",
+                environment_values={},
+                ship_mode="application",
+                target_definition=target_definition,
+            )
+
+    def test_dokploy_status_payload_prefers_source_of_truth_target_id(self) -> None:
+        target_definition = DokployTargetDefinition(
+            context="cm",
+            instance="testing",
+            target_type="compose",
+            target_id="compose-123",
+            target_name="cm-testing-compose",
+        )
+
+        def fake_request(**kwargs: object) -> JsonValue:
+            self.assertEqual(kwargs.get("path"), "/api/compose.one")
+            self.assertEqual(kwargs.get("query"), {"composeId": "compose-123"})
+            return {
+                "composeStatus": "running",
+                "sourceType": "git",
+                "serverId": "server-1",
+                "appName": "odoo-cm-testing",
+            }
+
+        with (
+            patch("tools.platform.dokploy.read_dokploy_config", return_value=("https://dokploy.example", "token")),
+            patch("tools.platform.dokploy.dokploy_request", side_effect=fake_request),
+            patch("tools.platform.dokploy.latest_deployment_for_compose", return_value={"id": "deploy-1", "status": "done"}),
+            patch("tools.platform.dokploy.resolve_dokploy_compose_id", side_effect=AssertionError("compose lookup should not run")),
+        ):
+            payload = dokploy.dokploy_status_payload(
+                context_name="cm",
+                instance_name="testing",
+                environment_values={},
+                target_definition=target_definition,
+            )
+
+        self.assertEqual(payload["target_type"], "compose")
+        self.assertEqual(payload["target_id"], "compose-123")
+        self.assertEqual(payload["target_name"], "cm-testing-compose")
+        self.assertEqual(payload["server_id"], "server-1")
+
+    def test_resolve_dokploy_target_for_command_prefers_source_of_truth_target_id(self) -> None:
+        target_definition = DokployTargetDefinition(
+            context="cm",
+            instance="testing",
+            target_type="compose",
+            target_id="compose-123",
+            target_name="cm-testing-compose",
+        )
+
+        with patch("tools.platform.dokploy.resolve_dokploy_compose_id", side_effect=AssertionError("compose lookup should not run")):
+            resolved_target = dokploy.resolve_dokploy_target_for_command(
+                host="https://dokploy.example",
+                token="token",
+                context_name="cm",
+                instance_name="testing",
+                environment_values={},
+                target_type="compose",
+                target_definition=target_definition,
+            )
+
+        self.assertEqual(resolved_target, ("compose", "compose-123", "cm-testing-compose"))
+
     def test_update_dokploy_target_env_preserves_application_build_fields_when_strings(self) -> None:
         with patch("tools.platform.dokploy.dokploy_request") as request_mock:
             dokploy.update_dokploy_target_env(

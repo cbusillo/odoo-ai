@@ -251,6 +251,7 @@ def execute_ship(
         instance_name=instance_name,
         environment_values=environment_values,
         ship_mode=ship_mode,
+        target_definition=target_definition,
     )
 
     if not selected_target_type:
@@ -387,6 +388,8 @@ def execute_rollback(
     dry_run: bool,
     discover_repo_root_fn: Callable[[Path], Path],
     load_environment_fn: Callable[..., tuple[Path, dict[str, str]]],
+    load_dokploy_source_of_truth_if_present_fn: Callable[[Path], DokploySourceOfTruth | None],
+    find_dokploy_target_definition_fn: Callable[..., DokployTargetDefinition | None],
     resolve_dokploy_ship_mode_fn: Callable[[str, str, dict[str, str]], str],
     read_dokploy_config_fn: Callable[[dict[str, str]], tuple[str, str]],
     resolve_dokploy_app_name_fn: Callable[[str, str, dict[str, str]], str],
@@ -409,6 +412,14 @@ def execute_rollback(
         load_environment_fn=load_environment_fn,
     )
     environment_values = runtime_environment.environment_values
+    source_of_truth = load_dokploy_source_of_truth_if_present_fn(runtime_environment.repo_root)
+    target_definition = None
+    if source_of_truth is not None:
+        target_definition = find_dokploy_target_definition_fn(
+            source_of_truth,
+            context_name=context_name,
+            instance_name=instance_name,
+        )
     ship_mode = resolve_dokploy_ship_mode_fn(context_name, instance_name, environment_values)
     if ship_mode == "compose":
         raise click.ClickException("Rollback in compose ship mode is not supported yet. Use Dokploy UI rollback controls.")
@@ -417,18 +428,33 @@ def execute_rollback(
     except click.ClickException as error:
         if dry_run:
             app_name = resolve_dokploy_app_name_fn(context_name, instance_name, environment_values)
+            if target_definition is not None and target_definition.target_type == "application":
+                app_name = target_definition.target_name.strip() or app_name
             echo_fn(f"app_name={app_name}")
             echo_fn(f"dry_run_note={error.message}")
             return
         raise
 
-    application_id, app_name = resolve_dokploy_application_id_fn(
-        host=host,
-        token=token,
-        context_name=context_name,
-        instance_name=instance_name,
-        environment_values=environment_values,
-    )
+    if target_definition is not None and target_definition.target_id.strip():
+        if target_definition.target_type != "application":
+            raise click.ClickException(
+                "Rollback requires an application target, but platform/dokploy.toml "
+                f"configures {context_name}/{instance_name} as '{target_definition.target_type}'."
+            )
+        application_id = target_definition.target_id.strip()
+        app_name = target_definition.target_name.strip() or resolve_dokploy_app_name_fn(
+            context_name,
+            instance_name,
+            environment_values,
+        )
+    else:
+        application_id, app_name = resolve_dokploy_application_id_fn(
+            host=host,
+            token=token,
+            context_name=context_name,
+            instance_name=instance_name,
+            environment_values=environment_values,
+        )
 
     deployment_payload = dokploy_request_fn(
         host=host,

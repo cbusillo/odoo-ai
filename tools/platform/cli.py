@@ -571,10 +571,21 @@ def _dokploy_status_payload(
     instance_name: str,
     environment_values: dict[str, str],
 ) -> JsonObject:
+    repo_root = _discover_repo_root(Path.cwd())
+    source_of_truth = _load_dokploy_source_of_truth_if_present(repo_root)
+    target_definition: DokployTargetDefinition | None = None
+    if source_of_truth is not None:
+        target_definition = _find_dokploy_target_definition(
+            source_of_truth,
+            context_name=context_name,
+            instance_name=instance_name,
+        )
+
     return platform_dokploy.dokploy_status_payload(
         context_name=context_name,
         instance_name=instance_name,
         environment_values=environment_values,
+        target_definition=target_definition,
     )
 
 
@@ -597,6 +608,7 @@ def _resolve_dokploy_target_for_command(
     instance_name: str,
     environment_values: dict[str, str],
     target_type: str,
+    target_definition: DokployTargetDefinition | None = None,
 ) -> tuple[str, str, str]:
     return platform_dokploy.resolve_dokploy_target_for_command(
         host=host,
@@ -605,6 +617,7 @@ def _resolve_dokploy_target_for_command(
         instance_name=instance_name,
         environment_values=environment_values,
         target_type=target_type,
+        target_definition=target_definition,
     )
 
 
@@ -658,6 +671,15 @@ def _resolve_dokploy_runtime(
     instance_name: str,
     target_type: str,
 ) -> tuple[str, str, str, str, str, dict[str, str]]:
+    source_of_truth = _load_dokploy_source_of_truth_if_present(repo_root)
+    target_definition: DokployTargetDefinition | None = None
+    if source_of_truth is not None:
+        target_definition = _find_dokploy_target_definition(
+            source_of_truth,
+            context_name=context_name,
+            instance_name=instance_name,
+        )
+
     _env_file_path, environment_values = _load_environment(
         repo_root,
         env_file,
@@ -672,6 +694,7 @@ def _resolve_dokploy_runtime(
         instance_name=instance_name,
         environment_values=environment_values,
         target_type=target_type,
+        target_definition=target_definition,
     )
     return host, token, resolved_target_type, resolved_target_id, resolved_target_name, environment_values
 
@@ -2419,6 +2442,8 @@ def rollback(
         dry_run=dry_run,
         discover_repo_root_fn=_discover_repo_root,
         load_environment_fn=_load_environment,
+        load_dokploy_source_of_truth_if_present_fn=_load_dokploy_source_of_truth_if_present,
+        find_dokploy_target_definition_fn=_find_dokploy_target_definition,
         resolve_dokploy_ship_mode_fn=_resolve_dokploy_ship_mode,
         read_dokploy_config_fn=_read_dokploy_config,
         resolve_dokploy_app_name_fn=_resolve_dokploy_app_name,

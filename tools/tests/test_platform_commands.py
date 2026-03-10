@@ -1781,6 +1781,59 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
         self.assertEqual(call_order, ["latest_before", "deploy", "wait"])
         self.assertIn("deployment=after status=done", emitted_lines)
 
+    def test_execute_ship_passes_source_of_truth_target_definition_to_target_resolution(self) -> None:
+        emitted_lines: list[str] = []
+        target_definition = self._target_definition(target_type="compose")
+        source_of_truth = self._source_of_truth(target_definition)
+        seen_target_definitions: list[DokployTargetDefinition | None] = []
+
+        def resolve_target(**kwargs: object) -> tuple[str, str, str, click.ClickException | None, click.ClickException | None]:
+            target_definition_value = kwargs.get("target_definition")
+            if target_definition_value is not None:
+                self.assertIsInstance(target_definition_value, DokployTargetDefinition)
+            typed_target_definition = target_definition_value if isinstance(target_definition_value, DokployTargetDefinition) else None
+            seen_target_definitions.append(typed_target_definition)
+            return "compose", "compose-id", "compose-name", None, None
+
+        commands_release.execute_ship(
+            context_name="cm",
+            instance_name="dev",
+            env_file=None,
+            wait=False,
+            timeout_override_seconds=None,
+            verify_health=False,
+            health_timeout_override_seconds=None,
+            dry_run=True,
+            no_cache=False,
+            skip_gate=False,
+            source_git_ref="main",
+            discover_repo_root_fn=lambda _path: Path("/tmp"),
+            load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+            load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+            find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+            resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
+            resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
+            resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
+            prepare_ship_branch_sync_fn=lambda _source_git_ref, _target_definition: None,
+            run_required_gates_fn=lambda **_kwargs: None,
+            resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
+            read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+            resolve_dokploy_compose_name_fn=lambda _context_name, _instance_name, _environment_values: "compose-name",
+            resolve_dokploy_app_name_fn=lambda _context_name, _instance_name, _environment_values: "app-name",
+            resolve_dokploy_target_fn=resolve_target,
+            apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
+            dokploy_request_fn=lambda **_kwargs: {},
+            latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
+            deployment_key_fn=lambda _deployment: "",
+            wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: "",
+            verify_ship_healthchecks_fn=lambda **_kwargs: None,
+            latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
+            wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
+            echo_fn=emitted_lines.append,
+        )
+
+        self.assertEqual(seen_target_definitions, [target_definition])
+
     def test_execute_ship_loads_environment_with_error_collision_mode(self) -> None:
         target_definition = self._target_definition()
         source_of_truth = self._source_of_truth(target_definition)
@@ -2165,6 +2218,8 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
 
     def test_execute_rollback_dry_run_reports_missing_dokploy_config(self) -> None:
         emitted_lines: list[str] = []
+        target_definition = self._target_definition(target_type="application", instance_name="testing")
+        source_of_truth = self._source_of_truth(target_definition)
 
         commands_release.execute_rollback(
             context_name="cm",
@@ -2177,6 +2232,8 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             dry_run=True,
             discover_repo_root_fn=lambda _path: Path("/tmp"),
             load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+            load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+            find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
             resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "application",
             read_dokploy_config_fn=lambda _environment_values: (_ for _ in ()).throw(click.ClickException("missing dokploy config")),
             resolve_dokploy_app_name_fn=lambda _context_name, _instance_name, _environment_values: "application-name",
@@ -2190,8 +2247,50 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             echo_fn=emitted_lines.append,
         )
 
-        self.assertIn("app_name=application-name", emitted_lines)
+        self.assertIn(f"app_name={target_definition.target_name}", emitted_lines)
         self.assertIn("dry_run_note=missing dokploy config", emitted_lines)
+
+    def test_execute_rollback_prefers_source_of_truth_target_id(self) -> None:
+        emitted_lines: list[str] = []
+        target_definition = self._target_definition(target_type="application", instance_name="testing")
+        source_of_truth = self._source_of_truth(target_definition)
+        seen_application_ids: list[str] = []
+
+        def dokploy_request(**kwargs: object) -> JsonObject:
+            query = kwargs.get("query")
+            if isinstance(query, dict) and query.get("applicationId"):
+                seen_application_ids.append(str(query["applicationId"]))
+            response: JsonObject = {"items": []}
+            return response
+
+        commands_release.execute_rollback(
+            context_name="cm",
+            instance_name="testing",
+            env_file=None,
+            rollback_id="rollback-1",
+            list_only=True,
+            wait=False,
+            timeout_seconds=300,
+            dry_run=False,
+            discover_repo_root_fn=lambda _path: Path("/tmp"),
+            load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+            load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+            find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+            resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "application",
+            read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+            resolve_dokploy_app_name_fn=lambda _context_name, _instance_name, _environment_values: "application-name",
+            resolve_dokploy_application_id_fn=lambda **_kwargs: (_ for _ in ()).throw(AssertionError("application lookup should not run")),
+            dokploy_request_fn=dokploy_request,
+            extract_deployments_fn=lambda _payload: [],
+            collect_rollback_ids_fn=lambda _deployments: [],
+            latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
+            deployment_key_fn=lambda _deployment: "",
+            wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
+            echo_fn=emitted_lines.append,
+        )
+
+        self.assertEqual(seen_application_ids, [target_definition.target_id])
+        self.assertIn(f"application_id={target_definition.target_id}", emitted_lines)
 
 
 if __name__ == "__main__":

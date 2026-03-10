@@ -32,3 +32,6 @@ Notes
 - Use `uv run platform dokploy inventory` before destructive Dokploy cleanup to
   snapshot the live project, server, and compose state into JSON artifacts.
 - Remote target metadata contract lives in `platform/dokploy.toml`.
+- When a target has been pinned with `target_id` and optional `target_name` in
+  `platform/dokploy.toml`, platform release/status/helper commands use those
+  source-of-truth values instead of scanning Dokploy by target name.

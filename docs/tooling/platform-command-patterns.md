@@ -98,6 +98,8 @@ Remote Release Patterns
 - Release-sensitive commands (`ship`, `rollback`, `gate`, `promote`, and
   `platform dokploy reconcile`) always resolve env layers with collision mode
   `error`.
+- `platform rollback` currently works only for Dokploy application targets.
+  Compose targets must use Dokploy UI rollback controls.
 
 Release Gates and Promotion
 

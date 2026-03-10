@@ -33,6 +33,8 @@ Operator Contract
   Use `platform ship`, `platform rollback`, `platform gate`,
   `platform promote`, `platform restore`, and `platform bootstrap` there.
 - `platform ship` is the non-destructive remote deploy/restart path.
+- `platform rollback` currently supports Dokploy application targets only.
+  Compose targets must use Dokploy UI rollback controls.
 - `platform restore` is the destructive upstream-data replacement path.
 - `platform bootstrap` is the destructive fresh-start rebuild path.
 - `platform init` remains a local-only module initialization pass for an

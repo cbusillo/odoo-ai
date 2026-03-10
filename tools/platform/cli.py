@@ -2464,6 +2464,7 @@ def ship(
     "rollback",
     help=(
         "List or trigger Dokploy rollback targets for a remote deployment. "
+        "Rollback currently supports Dokploy application targets only; compose targets must use Dokploy UI rollback controls. "
         f"{REMOTE_RUNTIME_CONTRACT_HELP}"
     ),
 )

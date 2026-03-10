@@ -1198,62 +1198,29 @@ class PlatformCommandsLifecycleTests(unittest.TestCase):
 
 
 class PlatformCommandsDokployTests(unittest.TestCase):
-    def test_resolve_dokploy_compose_remote_config_rejects_ambiguous_matches(self) -> None:
-        project_all_payload = {
-            "projects": [
-                {
-                    "services": [
-                        {"composeId": "compose-id-1", "name": "cm-dev", "appName": "odoo-cm-dev-a"},
-                        {"composeId": "compose-id-2", "name": "cm-dev", "appName": "odoo-cm-dev-b"},
-                    ]
-                }
-            ]
-        }
-
-        with patch.object(platform_dokploy, "dokploy_request", return_value=project_all_payload):
-            with self.assertRaises(click.ClickException) as raised_error:
-                platform_dokploy.resolve_dokploy_compose_remote_config(
-                    host="https://dokploy.example",
-                    token="token",
-                    compose_name="cm-dev",
-                    environment_values={},
-                )
-
-        self.assertIn("ambiguous", str(raised_error.exception))
-        self.assertIn("DOKPLOY_COMPOSE_ID_CM_DEV", str(raised_error.exception))
-
-    def test_resolve_dokploy_compose_remote_config_accepts_compose_id_override(self) -> None:
-        recorded_paths: list[str] = []
-
-        def dokploy_request(**kwargs: object) -> object:
-            path = str(kwargs.get("path"))
-            recorded_paths.append(path)
-            if path == "/api/project.all":
-                return {
-                    "projects": [
-                        {
-                            "services": [
-                                {"composeId": "compose-id-1", "name": "cm-dev", "appName": "odoo-cm-dev-a"},
-                                {"composeId": "compose-id-2", "name": "cm-dev", "appName": "odoo-cm-dev-b"},
-                            ]
-                        }
-                    ]
-                }
-            if path == "/api/compose.one":
-                return {"composeId": "compose-id-2", "appName": "odoo-cm-dev-b"}
-            raise AssertionError(f"Unexpected Dokploy path: {path}")
-
-        with patch.object(platform_dokploy, "dokploy_request", side_effect=dokploy_request):
+    def test_resolve_dokploy_compose_remote_config_reads_app_name_from_compose_payload(self) -> None:
+        with patch.object(platform_dokploy, "dokploy_request", return_value={"composeId": "compose-id-2", "appName": "odoo-cm-dev-b"}):
             remote_stack_path, compose_project = platform_dokploy.resolve_dokploy_compose_remote_config(
                 host="https://dokploy.example",
                 token="token",
+                compose_id="compose-id-2",
                 compose_name="cm-dev",
-                environment_values={"DOKPLOY_COMPOSE_ID_CM_DEV": "compose-id-2"},
             )
 
         self.assertEqual(remote_stack_path, Path("/etc/dokploy/applications/odoo-cm-dev-b"))
         self.assertEqual(compose_project, "odoo-cm-dev-b")
-        self.assertEqual(recorded_paths, ["/api/project.all", "/api/compose.one"])
+
+    def test_resolve_dokploy_compose_remote_config_requires_app_name(self) -> None:
+        with patch.object(platform_dokploy, "dokploy_request", return_value={"composeId": "compose-id-2"}):
+            with self.assertRaises(click.ClickException) as raised_error:
+                platform_dokploy.resolve_dokploy_compose_remote_config(
+                    host="https://dokploy.example",
+                    token="token",
+                    compose_id="compose-id-2",
+                    compose_name="cm-dev",
+                )
+
+        self.assertIn("has no appName", str(raised_error.exception))
 
     def test_execute_reconcile_fails_when_target_missing_from_stack(self) -> None:
         with TemporaryDirectory() as temporary_directory_name:
@@ -1286,8 +1253,6 @@ class PlatformCommandsDokployTests(unittest.TestCase):
                     load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
                     read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
                     target_matches_filters_fn=lambda *_args, **_kwargs: True,
-                    resolve_dokploy_compose_id_fn=lambda **_kwargs: ("compose-id", "compose-name"),
-                    resolve_dokploy_application_id_fn=lambda **_kwargs: ("application-id", "application-name"),
                     fetch_dokploy_target_payload_fn=lambda **_kwargs: {},
                     normalize_domains_fn=lambda _raw_domains: [],
                     dokploy_request_fn=lambda **_kwargs: {},
@@ -1355,8 +1320,6 @@ class PlatformCommandsDokployTests(unittest.TestCase):
                 load_environment_fn=load_environment,
                 read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
                 target_matches_filters_fn=lambda *_args, **_kwargs: True,
-                resolve_dokploy_compose_id_fn=lambda **_kwargs: ("compose-id", "compose-name"),
-                resolve_dokploy_application_id_fn=lambda **_kwargs: ("application-id", "application-name"),
                 fetch_dokploy_target_payload_fn=lambda **_kwargs: {"name": "compose-name", "domains": [], "env": ""},
                 normalize_domains_fn=lambda _raw_domains: [],
                 dokploy_request_fn=lambda **_kwargs: {},
@@ -1416,8 +1379,6 @@ class PlatformCommandsDokployTests(unittest.TestCase):
                 ),
                 read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
                 target_matches_filters_fn=lambda *_args, **_kwargs: True,
-                resolve_dokploy_compose_id_fn=lambda **_kwargs: ("compose-id", "compose-name"),
-                resolve_dokploy_application_id_fn=lambda **_kwargs: ("application-id", "application-name"),
                 fetch_dokploy_target_payload_fn=lambda **_kwargs: {
                     "name": "compose-name",
                     "domains": [],
@@ -1758,8 +1719,6 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             run_required_gates_fn=lambda **_kwargs: None,
             resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: target_type,
             read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
-            resolve_dokploy_compose_name_fn=lambda _context_name, _instance_name, _environment_values: "compose-name",
-            resolve_dokploy_app_name_fn=lambda _context_name, _instance_name, _environment_values: "application-name",
             resolve_dokploy_target_fn=lambda **_kwargs: (
                 target_type,
                 f"{target_type}-id",
@@ -1818,8 +1777,6 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             run_required_gates_fn=lambda **_kwargs: None,
             resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
             read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
-            resolve_dokploy_compose_name_fn=lambda _context_name, _instance_name, _environment_values: "compose-name",
-            resolve_dokploy_app_name_fn=lambda _context_name, _instance_name, _environment_values: "app-name",
             resolve_dokploy_target_fn=resolve_target,
             apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
             dokploy_request_fn=lambda **_kwargs: {},
@@ -1866,8 +1823,6 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             run_required_gates_fn=lambda **_kwargs: None,
             resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
             read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
-            resolve_dokploy_compose_name_fn=lambda _context_name, _instance_name, _environment_values: "compose-name",
-            resolve_dokploy_app_name_fn=lambda _context_name, _instance_name, _environment_values: "application-name",
             resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
             apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
             dokploy_request_fn=lambda **_kwargs: {},
@@ -1910,8 +1865,6 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
                 run_required_gates_fn=lambda **_kwargs: None,
                 resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
                 read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
-                resolve_dokploy_compose_name_fn=lambda _context_name, _instance_name, _environment_values: "compose-name",
-                resolve_dokploy_app_name_fn=lambda _context_name, _instance_name, _environment_values: "application-name",
                 resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
                 apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
                 dokploy_request_fn=lambda **_kwargs: {},
@@ -1956,8 +1909,6 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
                 run_required_gates_fn=lambda **_kwargs: None,
                 resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
                 read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
-                resolve_dokploy_compose_name_fn=lambda _context_name, _instance_name, _environment_values: "compose-name",
-                resolve_dokploy_app_name_fn=lambda _context_name, _instance_name, _environment_values: "application-name",
                 resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
                 apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
                 dokploy_request_fn=lambda **_kwargs: {},
@@ -2002,8 +1953,6 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             run_required_gates_fn=lambda **_kwargs: None,
             resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
             read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
-            resolve_dokploy_compose_name_fn=lambda _context_name, _instance_name, _environment_values: "compose-name",
-            resolve_dokploy_app_name_fn=lambda _context_name, _instance_name, _environment_values: "application-name",
             resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
             apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
             dokploy_request_fn=lambda **_kwargs: {},
@@ -2062,8 +2011,6 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
                 run_required_gates_fn=lambda **_kwargs: None,
                 resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
                 read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
-                resolve_dokploy_compose_name_fn=lambda _context_name, _instance_name, _environment_values: "compose-name",
-                resolve_dokploy_app_name_fn=lambda _context_name, _instance_name, _environment_values: "application-name",
                 resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
                 apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
                 dokploy_request_fn=lambda **_kwargs: {},
@@ -2107,8 +2054,6 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
                 run_required_gates_fn=lambda **_kwargs: None,
                 resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
                 read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
-                resolve_dokploy_compose_name_fn=lambda _context_name, _instance_name, _environment_values: "compose-name",
-                resolve_dokploy_app_name_fn=lambda _context_name, _instance_name, _environment_values: "application-name",
                 resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
                 apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
                 dokploy_request_fn=lambda **_kwargs: {},
@@ -2157,8 +2102,6 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             run_required_gates_fn=lambda **_kwargs: None,
             resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
             read_dokploy_config_fn=lambda _environment_values: (_ for _ in ()).throw(click.ClickException("missing dokploy config")),
-            resolve_dokploy_compose_name_fn=lambda _context_name, _instance_name, _environment_values: "compose-name",
-            resolve_dokploy_app_name_fn=lambda _context_name, _instance_name, _environment_values: "application-name",
             resolve_dokploy_target_fn=lambda **_kwargs: ("", "", "", None, None),
             apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
             dokploy_request_fn=lambda **_kwargs: {},
@@ -2202,8 +2145,6 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
                 run_required_gates_fn=lambda **_kwargs: None,
                 resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
                 read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
-                resolve_dokploy_compose_name_fn=lambda _context_name, _instance_name, _environment_values: "compose-name",
-                resolve_dokploy_app_name_fn=lambda _context_name, _instance_name, _environment_values: "app-name",
                 resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
                 apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
                 dokploy_request_fn=lambda **_kwargs: {},
@@ -2236,8 +2177,6 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
             resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "application",
             read_dokploy_config_fn=lambda _environment_values: (_ for _ in ()).throw(click.ClickException("missing dokploy config")),
-            resolve_dokploy_app_name_fn=lambda _context_name, _instance_name, _environment_values: "application-name",
-            resolve_dokploy_application_id_fn=lambda **_kwargs: ("", ""),
             dokploy_request_fn=lambda **_kwargs: {},
             extract_deployments_fn=lambda _payload: [],
             collect_rollback_ids_fn=lambda _deployments: [],
@@ -2278,8 +2217,6 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
             resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "application",
             read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
-            resolve_dokploy_app_name_fn=lambda _context_name, _instance_name, _environment_values: "application-name",
-            resolve_dokploy_application_id_fn=lambda **_kwargs: (_ for _ in ()).throw(AssertionError("application lookup should not run")),
             dokploy_request_fn=dokploy_request,
             extract_deployments_fn=lambda _payload: [],
             collect_rollback_ids_fn=lambda _deployments: [],

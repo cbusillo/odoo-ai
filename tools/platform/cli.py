@@ -113,9 +113,6 @@ PLATFORM_RUNTIME_ENV_KEYS = (
 PLATFORM_RUNTIME_PASSTHROUGH_PREFIXES = (
     "ENV_OVERRIDE_",
     "ODOO_UPSTREAM_",
-    "DOKPLOY_REMOTE_STACK_PATH_",
-    "DOKPLOY_COMPOSE_PROJECT_",
-    "DOKPLOY_COMPOSE_ID_",
 )
 
 PLATFORM_RUNTIME_PASSTHROUGH_KEYS = (
@@ -172,46 +169,6 @@ def _handle_environment_collisions(collisions: tuple[EnvironmentCollision, ...],
     platform_environment.handle_environment_collisions(collisions, collision_mode)
 
 
-def _project_dokploy_target_id_overrides(
-    repo_root: Path,
-    environment_values: dict[str, str],
-    source_by_key: dict[str, str] | None = None,
-    *,
-    context_name: str | None,
-    instance_name: str | None,
-) -> tuple[dict[str, str], dict[str, str] | None]:
-    if not context_name or not instance_name:
-        return environment_values, source_by_key
-
-    source_of_truth = _load_dokploy_source_of_truth_if_present(repo_root)
-    if source_of_truth is None:
-        return environment_values, source_by_key
-
-    target_definition = _find_dokploy_target_definition(
-        source_of_truth,
-        context_name=context_name,
-        instance_name=instance_name,
-    )
-    if target_definition is None:
-        return environment_values, source_by_key
-
-    configured_target_id = target_definition.target_id.strip()
-    if not configured_target_id:
-        return environment_values, source_by_key
-
-    target_key_prefix = "DOKPLOY_APPLICATION_ID" if target_definition.target_type == "application" else "DOKPLOY_COMPOSE_ID"
-    target_env_key = f"{target_key_prefix}_{context_name}_{instance_name}".upper()
-    if target_env_key in environment_values:
-        return environment_values, source_by_key
-
-    projected_environment = dict(environment_values)
-    projected_environment[target_env_key] = configured_target_id
-    projected_sources = None if source_by_key is None else dict(source_by_key)
-    if projected_sources is not None:
-        projected_sources[target_env_key] = "platform/dokploy.toml"
-    return projected_environment, projected_sources
-
-
 def _load_environment_with_details(
     repo_root: Path,
     env_file: Path | None,
@@ -220,27 +177,12 @@ def _load_environment_with_details(
     instance_name: str | None = None,
     collision_mode: str | None = None,
 ) -> LoadedEnvironment:
-    loaded_environment = platform_environment.load_environment_with_details(
+    return platform_environment.load_environment_with_details(
         repo_root,
         env_file,
         context_name=context_name,
         instance_name=instance_name,
         collision_mode=collision_mode,
-    )
-    projected_environment_values, projected_source_by_key = _project_dokploy_target_id_overrides(
-        repo_root,
-        loaded_environment.merged_values,
-        loaded_environment.source_by_key,
-        context_name=context_name,
-        instance_name=instance_name,
-    )
-    if projected_environment_values == loaded_environment.merged_values:
-        return loaded_environment
-    return LoadedEnvironment(
-        env_file_path=loaded_environment.env_file_path,
-        merged_values=projected_environment_values,
-        source_by_key=projected_source_by_key or dict(loaded_environment.source_by_key),
-        collisions=loaded_environment.collisions,
     )
 
 
@@ -252,20 +194,13 @@ def _load_environment(
     instance_name: str | None = None,
     collision_mode: str | None = None,
 ) -> tuple[Path, dict[str, str]]:
-    env_file_path, environment_values = platform_environment.load_environment(
+    return platform_environment.load_environment(
         repo_root,
         env_file,
         context_name=context_name,
         instance_name=instance_name,
         collision_mode=collision_mode,
     )
-    projected_environment_values, _projected_source_by_key = _project_dokploy_target_id_overrides(
-        repo_root,
-        environment_values,
-        context_name=context_name,
-        instance_name=instance_name,
-    )
-    return env_file_path, projected_environment_values
 
 
 def _load_stack(stack_file_path: Path) -> LoadedStack:
@@ -1034,8 +969,6 @@ def _run_tui_ship_workflow(
         run_required_gates_fn=_run_required_gates,
         resolve_dokploy_ship_mode_fn=_resolve_dokploy_ship_mode,
         read_dokploy_config_fn=_read_dokploy_config,
-        resolve_dokploy_compose_name_fn=_resolve_dokploy_compose_name,
-        resolve_dokploy_app_name_fn=_resolve_dokploy_app_name,
         resolve_dokploy_target_fn=_resolve_dokploy_target,
         apply_ship_branch_sync_fn=_apply_ship_branch_sync,
         dokploy_request_fn=_dokploy_request,
@@ -1104,54 +1037,12 @@ def _deployment_key(deployment: JsonObject) -> str:
     return platform_dokploy.deployment_key(deployment)
 
 
-def _resolve_dokploy_app_name(context_name: str, instance_name: str, environment_values: dict[str, str]) -> str:
-    return platform_dokploy.resolve_dokploy_app_name(context_name, instance_name, environment_values)
-
-
-def _resolve_dokploy_compose_name(context_name: str, instance_name: str, environment_values: dict[str, str]) -> str:
-    return platform_dokploy.resolve_dokploy_compose_name(context_name, instance_name, environment_values)
-
-
-def _resolve_dokploy_compose_id(
-    *,
-    host: str,
-    token: str,
-    context_name: str,
-    instance_name: str,
-    environment_values: dict[str, str],
-) -> tuple[str, str]:
-    return platform_dokploy.resolve_dokploy_compose_id(
-        host=host,
-        token=token,
-        context_name=context_name,
-        instance_name=instance_name,
-        environment_values=environment_values,
-    )
-
-
 def _resolve_dokploy_ship_mode(
     context_name: str,
     instance_name: str,
     environment_values: dict[str, str],
 ) -> str:
     return platform_dokploy.resolve_dokploy_ship_mode(context_name, instance_name, environment_values)
-
-
-def _resolve_dokploy_application_id(
-    *,
-    host: str,
-    token: str,
-    context_name: str,
-    instance_name: str,
-    environment_values: dict[str, str],
-) -> tuple[str, str]:
-    return platform_dokploy.resolve_dokploy_application_id(
-        host=host,
-        token=token,
-        context_name=context_name,
-        instance_name=instance_name,
-        environment_values=environment_values,
-    )
 
 
 def _latest_deployment_for_application(host: str, token: str, application_id: str) -> JsonObject | None:
@@ -2002,8 +1893,6 @@ def dokploy_reconcile(
         load_environment_fn=_load_environment,
         read_dokploy_config_fn=_read_dokploy_config,
         target_matches_filters_fn=_target_matches_filters,
-        resolve_dokploy_compose_id_fn=_resolve_dokploy_compose_id,
-        resolve_dokploy_application_id_fn=_resolve_dokploy_application_id,
         fetch_dokploy_target_payload_fn=_fetch_dokploy_target_payload,
         normalize_domains_fn=_normalize_domains,
         dokploy_request_fn=_dokploy_request,
@@ -2449,8 +2338,6 @@ def ship(
         run_required_gates_fn=_run_required_gates,
         resolve_dokploy_ship_mode_fn=_resolve_dokploy_ship_mode,
         read_dokploy_config_fn=_read_dokploy_config,
-        resolve_dokploy_compose_name_fn=_resolve_dokploy_compose_name,
-        resolve_dokploy_app_name_fn=_resolve_dokploy_app_name,
         resolve_dokploy_target_fn=_resolve_dokploy_target,
         apply_ship_branch_sync_fn=_apply_ship_branch_sync,
         dokploy_request_fn=_dokploy_request,
@@ -2511,8 +2398,6 @@ def rollback(
         find_dokploy_target_definition_fn=_find_dokploy_target_definition,
         resolve_dokploy_ship_mode_fn=_resolve_dokploy_ship_mode,
         read_dokploy_config_fn=_read_dokploy_config,
-        resolve_dokploy_app_name_fn=_resolve_dokploy_app_name,
-        resolve_dokploy_application_id_fn=_resolve_dokploy_application_id,
         dokploy_request_fn=_dokploy_request,
         extract_deployments_fn=_extract_deployments,
         collect_rollback_ids_fn=_collect_rollback_ids,

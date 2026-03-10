@@ -178,14 +178,12 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
                 "DOKPLOY_HOST": "https://dokploy.example",
                 "DOKPLOY_TOKEN": "token",
                 "DOKPLOY_SSH_HOST": "dokploy.internal",
-                "DOKPLOY_COMPOSE_ID_OPW_TESTING": "compose-id-1",
             },
         )
 
         self.assertEqual(runtime_values.get("DOKPLOY_HOST"), "https://dokploy.example")
         self.assertEqual(runtime_values.get("DOKPLOY_TOKEN"), "token")
         self.assertEqual(runtime_values.get("DOKPLOY_SSH_HOST"), "dokploy.internal")
-        self.assertEqual(runtime_values.get("DOKPLOY_COMPOSE_ID_OPW_TESTING"), "compose-id-1")
 
     def test_runtime_env_sets_restore_defaults(self) -> None:
         runtime_values = self._build_runtime_values(runtime_env_file="/tmp/cm.local.env")
@@ -300,74 +298,6 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
             self.assertEqual(cm_environment.get("ODOO_ADMIN_PASSWORD"), "secure-password")
             self.assertIsNone(opw_environment.get("ODOO_ADMIN_LOGIN"))
             self.assertIsNone(opw_environment.get("ODOO_ADMIN_PASSWORD"))
-
-    def test_load_environment_projects_pinned_dokploy_compose_id_from_source_of_truth(self) -> None:
-        with TemporaryDirectory() as temporary_directory_name:
-            temporary_directory = Path(temporary_directory_name)
-            (temporary_directory / ".env").write_text("ODOO_DB_USER=odoo\n", encoding="utf-8")
-
-            platform_directory = temporary_directory / "platform"
-            platform_directory.mkdir(parents=True, exist_ok=True)
-            (platform_directory / "dokploy.toml").write_text(
-                "\n".join(
-                    [
-                        "schema_version = 2",
-                        "",
-                        "[[targets]]",
-                        'context = "opw"',
-                        'instance = "testing"',
-                        'target_type = "compose"',
-                        'target_id = "compose-id-1"',
-                    ]
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-
-            _env_file_path, environment_values = _load_environment(
-                temporary_directory,
-                None,
-                context_name="opw",
-                instance_name="testing",
-            )
-
-            self.assertEqual(environment_values.get("DOKPLOY_COMPOSE_ID_OPW_TESTING"), "compose-id-1")
-
-    def test_load_environment_with_details_tracks_source_for_projected_dokploy_compose_id(self) -> None:
-        with TemporaryDirectory() as temporary_directory_name:
-            temporary_directory = Path(temporary_directory_name)
-            (temporary_directory / ".env").write_text("ODOO_DB_USER=odoo\n", encoding="utf-8")
-
-            platform_directory = temporary_directory / "platform"
-            platform_directory.mkdir(parents=True, exist_ok=True)
-            (platform_directory / "dokploy.toml").write_text(
-                "\n".join(
-                    [
-                        "schema_version = 2",
-                        "",
-                        "[[targets]]",
-                        'context = "opw"',
-                        'instance = "testing"',
-                        'target_type = "compose"',
-                        'target_id = "compose-id-1"',
-                    ]
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-
-            loaded_environment = _load_environment_with_details(
-                temporary_directory,
-                None,
-                context_name="opw",
-                instance_name="testing",
-            )
-
-            self.assertEqual(loaded_environment.merged_values.get("DOKPLOY_COMPOSE_ID_OPW_TESTING"), "compose-id-1")
-            self.assertEqual(
-                loaded_environment.source_by_key.get("DOKPLOY_COMPOSE_ID_OPW_TESTING"),
-                "platform/dokploy.toml",
-            )
 
     def test_resolve_dokploy_target_wrapper_accepts_target_definition(self) -> None:
         target_definition = DokployTargetDefinition(

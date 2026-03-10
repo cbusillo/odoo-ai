@@ -105,19 +105,15 @@ class PlatformDokployHelpersTests(unittest.TestCase):
             target_name="cm-testing-compose",
         )
 
-        with (
-            patch("tools.platform.dokploy.resolve_dokploy_compose_id", side_effect=AssertionError("compose lookup should not run")),
-            patch("tools.platform.dokploy.resolve_dokploy_application_id", side_effect=AssertionError("app lookup should not run")),
-        ):
-            resolved_target = dokploy.resolve_dokploy_target(
-                host="https://dokploy.example",
-                token="token",
-                context_name="cm",
-                instance_name="testing",
-                environment_values={},
-                ship_mode="auto",
-                target_definition=target_definition,
-            )
+        resolved_target = dokploy.resolve_dokploy_target(
+            host="https://dokploy.example",
+            token="token",
+            context_name="cm",
+            instance_name="testing",
+            environment_values={},
+            ship_mode="auto",
+            target_definition=target_definition,
+        )
 
         self.assertEqual(resolved_target, ("compose", "compose-123", "cm-testing-compose", None, None))
 
@@ -163,7 +159,6 @@ class PlatformDokployHelpersTests(unittest.TestCase):
             patch("tools.platform.dokploy.read_dokploy_config", return_value=("https://dokploy.example", "token")),
             patch("tools.platform.dokploy.dokploy_request", side_effect=fake_request),
             patch("tools.platform.dokploy.latest_deployment_for_compose", return_value={"id": "deploy-1", "status": "done"}),
-            patch("tools.platform.dokploy.resolve_dokploy_compose_id", side_effect=AssertionError("compose lookup should not run")),
         ):
             payload = dokploy.dokploy_status_payload(
                 context_name="cm",
@@ -186,16 +181,15 @@ class PlatformDokployHelpersTests(unittest.TestCase):
             target_name="cm-testing-compose",
         )
 
-        with patch("tools.platform.dokploy.resolve_dokploy_compose_id", side_effect=AssertionError("compose lookup should not run")):
-            resolved_target = dokploy.resolve_dokploy_target_for_command(
-                host="https://dokploy.example",
-                token="token",
-                context_name="cm",
-                instance_name="testing",
-                environment_values={},
-                target_type="compose",
-                target_definition=target_definition,
-            )
+        resolved_target = dokploy.resolve_dokploy_target_for_command(
+            host="https://dokploy.example",
+            token="token",
+            context_name="cm",
+            instance_name="testing",
+            environment_values={},
+            target_type="compose",
+            target_definition=target_definition,
+        )
 
         self.assertEqual(resolved_target, ("compose", "compose-123", "cm-testing-compose"))
 

@@ -21,11 +21,11 @@ from tools.deployer.settings import StackSettings, load_stack_settings
 from tools.platform.dokploy import (
     collect_dokploy_deploy_servers,
     dokploy_request,
-    resolve_dokploy_compose_id,
-    resolve_dokploy_compose_name,
+    find_dokploy_target_definition,
+    load_dokploy_source_of_truth_if_present,
     resolve_dokploy_compose_remote_config,
 )
-from tools.platform.environment import resolve_stack_runtime_scope
+from tools.platform.environment import load_dokploy_source_of_truth, resolve_stack_runtime_scope
 
 _logger = logging.getLogger(__name__)
 
@@ -77,6 +77,45 @@ REQUIRED_UPSTREAM_ENV_KEYS = (
     "ODOO_UPSTREAM_DB_USER",
     "ODOO_UPSTREAM_FILESTORE_PATH",
 )
+
+
+def _resolve_required_dokploy_compose_target(
+    settings: StackSettings,
+    *,
+    context_name: str,
+    instance_name: str,
+) -> tuple[str, str]:
+    source_of_truth = load_dokploy_source_of_truth_if_present(settings.repo_root, load_dokploy_source_of_truth)
+    if source_of_truth is None:
+        raise ValueError(
+            "Dokploy-managed remote workflows require platform/dokploy.toml with pinned target metadata."
+        )
+
+    target_definition = find_dokploy_target_definition(
+        source_of_truth,
+        context_name=context_name,
+        instance_name=instance_name,
+    )
+    if target_definition is None:
+        raise ValueError(
+            "Dokploy-managed remote workflow requires a target definition in platform/dokploy.toml for "
+            f"{context_name}/{instance_name}."
+        )
+    if target_definition.target_type != "compose":
+        raise ValueError(
+            "Dokploy-managed remote data workflows require compose targets, but "
+            f"platform/dokploy.toml configures {context_name}/{instance_name} as '{target_definition.target_type}'."
+        )
+
+    compose_id = target_definition.target_id.strip()
+    if not compose_id:
+        raise ValueError(
+            "Dokploy-managed remote workflow requires a pinned target_id in platform/dokploy.toml for "
+            f"{context_name}/{instance_name}."
+        )
+
+    compose_name = target_definition.target_name.strip() or f"{context_name}-{instance_name}"
+    return compose_id, compose_name
 
 
 def _data_workflow_script_environment(env_values: dict[str, str]) -> dict[str, str]:
@@ -213,10 +252,11 @@ def _run_dokploy_managed_remote_data_workflow(
     The remote .env is temporarily overwritten for the duration of the workflow.
     The next Dokploy deploy (platform ship) will restore the Dokploy-managed environment.
 
-    Compose project name and remote stack path are derived from the Dokploy API.
-    Override via env vars if Dokploy's appName does not match what is expected:
-      DOKPLOY_REMOTE_STACK_PATH_<STACK_NAME_UPPER>  e.g. DOKPLOY_REMOTE_STACK_PATH_CM_DEV
-      DOKPLOY_COMPOSE_PROJECT_<STACK_NAME_UPPER>    e.g. DOKPLOY_COMPOSE_PROJECT_CM_DEV
+    Compose project name and remote stack path are derived from Dokploy compose metadata.
+    Break-glass overrides are limited to SSH host/user/port and explicit
+    path/project layout when a Dokploy target uses a non-standard remote layout:
+      DOKPLOY_REMOTE_STACK_PATH_<STACK_NAME_UPPER>   e.g. DOKPLOY_REMOTE_STACK_PATH_CM_DEV
+      DOKPLOY_COMPOSE_PROJECT_<STACK_NAME_UPPER>     e.g. DOKPLOY_COMPOSE_PROJECT_CM_DEV
       DOKPLOY_SSH_HOST                              explicit SSH hostname override
       DOKPLOY_SSH_USER                              SSH user (default: root)
       DOKPLOY_SSH_PORT                              SSH port (default: 22)
@@ -233,14 +273,17 @@ def _run_dokploy_managed_remote_data_workflow(
     if runtime_scope is None:
         raise ValueError(f"Unable to derive runtime scope from stack name {settings.name!r}.")
     context_name, instance_name = runtime_scope
-    compose_name = resolve_dokploy_compose_name(context_name, instance_name, env_values)
+    compose_id, compose_name = _resolve_required_dokploy_compose_target(
+        settings,
+        context_name=context_name,
+        instance_name=instance_name,
+    )
 
     ssh_host, ssh_user, ssh_port, remote_stack_path, compose_project = _resolve_dokploy_remote_runtime(
         dokploy_host=dokploy_host,
         dokploy_token=dokploy_token,
+        compose_id=compose_id,
         compose_name=compose_name,
-        context_name=context_name,
-        instance_name=instance_name,
         env_values=env_values,
     )
 
@@ -312,19 +355,10 @@ def _resolve_dokploy_remote_runtime(
     *,
     dokploy_host: str,
     dokploy_token: str,
+    compose_id: str,
     compose_name: str,
-    context_name: str,
-    instance_name: str,
     env_values: dict[str, str],
 ) -> tuple[str, str | None, int | None, Path, str]:
-    safe_name = compose_name.upper().replace("-", "_")
-    path_override_key = f"DOKPLOY_REMOTE_STACK_PATH_{safe_name}"
-    project_override_key = f"DOKPLOY_COMPOSE_PROJECT_{safe_name}"
-    compose_id_override_key = f"DOKPLOY_COMPOSE_ID_{safe_name}"
-    path_override = env_values.get(path_override_key, "").strip()
-    project_override = env_values.get(project_override_key, "").strip()
-    compose_id_override = env_values.get(compose_id_override_key, "").strip()
-
     ssh_user_override = env_values.get("DOKPLOY_SSH_USER", "").strip()
     ssh_port_raw = env_values.get("DOKPLOY_SSH_PORT", "").strip()
     ssh_port_override = int(ssh_port_raw) if ssh_port_raw.isdigit() else None
@@ -334,17 +368,13 @@ def _resolve_dokploy_remote_runtime(
         raise ValueError("Dokploy reported no deploy servers for remote data workflow discovery.")
 
     ssh_host_override = env_values.get("DOKPLOY_SSH_HOST", "").strip()
-
-    if path_override and project_override:
-        remote_stack_path = Path(path_override)
-        compose_project = project_override
-    else:
-        remote_stack_path, compose_project = resolve_dokploy_compose_remote_config(
-            host=dokploy_host,
-            token=dokploy_token,
-            compose_name=compose_name,
-            environment_values=env_values,
-        )
+    remote_stack_path, compose_project = resolve_dokploy_compose_remote_config(
+        host=dokploy_host,
+        token=dokploy_token,
+        compose_id=compose_id,
+        compose_name=compose_name,
+        environment_values=env_values,
+    )
 
     if ssh_host_override:
         for deploy_server in deploy_servers:
@@ -366,15 +396,6 @@ def _resolve_dokploy_remote_runtime(
         ssh_user = ssh_user_override or "root"
         return ssh_host_override, ssh_user, ssh_port, remote_stack_path, compose_project
 
-    compose_id = compose_id_override
-    if not compose_id:
-        compose_id, _resolved_compose_name = resolve_dokploy_compose_id(
-            host=dokploy_host,
-            token=dokploy_token,
-            context_name=context_name,
-            instance_name=instance_name,
-            environment_values=env_values,
-        )
     compose_payload = dokploy_request(
         host=dokploy_host,
         token=dokploy_token,

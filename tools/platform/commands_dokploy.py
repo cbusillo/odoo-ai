@@ -585,8 +585,6 @@ def execute_reconcile(
     load_environment_fn: Callable[..., tuple[Path, dict[str, str]]],
     read_dokploy_config_fn: Callable[[dict[str, str]], tuple[str, str]],
     target_matches_filters_fn: Callable[..., bool],
-    resolve_dokploy_compose_id_fn: Callable[..., tuple[str, str]],
-    resolve_dokploy_application_id_fn: Callable[..., tuple[str, str]],
     fetch_dokploy_target_payload_fn: Callable[..., JsonObject],
     normalize_domains_fn: Callable[[object], list[str]],
     dokploy_request_fn: Callable[..., JsonObject],
@@ -643,24 +641,10 @@ def execute_reconcile(
 
         resolved_target_id = target.target_id.strip()
         resolved_target_name = target.target_name.strip() or f"{context_name}-{instance_name}"
-
         if not resolved_target_id:
-            if target_type == "compose":
-                resolved_target_id, resolved_target_name = resolve_dokploy_compose_id_fn(
-                    host=host,
-                    token=token,
-                    context_name=context_name,
-                    instance_name=instance_name,
-                    environment_values=environment_values,
-                )
-            else:
-                resolved_target_id, resolved_target_name = resolve_dokploy_application_id_fn(
-                    host=host,
-                    token=token,
-                    context_name=context_name,
-                    instance_name=instance_name,
-                    environment_values=environment_values,
-                )
+            raise click.ClickException(
+                f"Target {context_name}/{instance_name} in {source_file_path} must define target_id."
+            )
 
         target_payload = fetch_dokploy_target_payload_fn(
             host=host,

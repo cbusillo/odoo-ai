@@ -138,8 +138,6 @@ def execute_ship(
     run_required_gates_fn: Callable[..., None],
     resolve_dokploy_ship_mode_fn: Callable[[str, str, dict[str, str]], str],
     read_dokploy_config_fn: Callable[[dict[str, str]], tuple[str, str]],
-    resolve_dokploy_compose_name_fn: Callable[[str, str, dict[str, str]], str],
-    resolve_dokploy_app_name_fn: Callable[[str, str, dict[str, str]], str],
     resolve_dokploy_target_fn: Callable[..., tuple[str, str, str, click.ClickException | None, click.ClickException | None]],
     apply_ship_branch_sync_fn: Callable[[ShipBranchSyncPlan], None],
     dokploy_request_fn: Callable[..., JsonObject],
@@ -219,9 +217,7 @@ def execute_ship(
         host, token = read_dokploy_config_fn(environment_values)
     except click.ClickException as error:
         if dry_run:
-            target_name = resolve_dokploy_compose_name_fn(context_name, instance_name, environment_values)
-            if ship_mode == "application":
-                target_name = resolve_dokploy_app_name_fn(context_name, instance_name, environment_values)
+            target_name = target_definition.target_name.strip() or f"{context_name}-{instance_name}"
             echo_fn(f"ship_mode=dokploy-{ship_mode}-api")
             echo_fn(f"target_name={target_name}")
             echo_fn(f"dry_run_note={error.message}")
@@ -392,8 +388,6 @@ def execute_rollback(
     find_dokploy_target_definition_fn: Callable[..., DokployTargetDefinition | None],
     resolve_dokploy_ship_mode_fn: Callable[[str, str, dict[str, str]], str],
     read_dokploy_config_fn: Callable[[dict[str, str]], tuple[str, str]],
-    resolve_dokploy_app_name_fn: Callable[[str, str, dict[str, str]], str],
-    resolve_dokploy_application_id_fn: Callable[..., tuple[str, str]],
     dokploy_request_fn: Callable[..., JsonObject],
     extract_deployments_fn: Callable[[JsonObject], list[JsonObject]],
     collect_rollback_ids_fn: Callable[[list[JsonObject]], list[str]],
@@ -427,7 +421,7 @@ def execute_rollback(
         host, token = read_dokploy_config_fn(environment_values)
     except click.ClickException as error:
         if dry_run:
-            app_name = resolve_dokploy_app_name_fn(context_name, instance_name, environment_values)
+            app_name = f"{context_name}-{instance_name}"
             if target_definition is not None and target_definition.target_type == "application":
                 app_name = target_definition.target_name.strip() or app_name
             echo_fn(f"app_name={app_name}")
@@ -435,26 +429,22 @@ def execute_rollback(
             return
         raise
 
-    if target_definition is not None and target_definition.target_id.strip():
-        if target_definition.target_type != "application":
-            raise click.ClickException(
-                "Rollback requires an application target, but platform/dokploy.toml "
-                f"configures {context_name}/{instance_name} as '{target_definition.target_type}'."
-            )
-        application_id = target_definition.target_id.strip()
-        app_name = target_definition.target_name.strip() or resolve_dokploy_app_name_fn(
-            context_name,
-            instance_name,
-            environment_values,
+    if target_definition is None:
+        raise click.ClickException(
+            f"Rollback target {context_name}/{instance_name} is missing from platform/dokploy.toml."
         )
-    else:
-        application_id, app_name = resolve_dokploy_application_id_fn(
-            host=host,
-            token=token,
-            context_name=context_name,
-            instance_name=instance_name,
-            environment_values=environment_values,
+    if target_definition.target_type != "application":
+        raise click.ClickException(
+            "Rollback requires an application target, but platform/dokploy.toml "
+            f"configures {context_name}/{instance_name} as '{target_definition.target_type}'."
         )
+
+    application_id = target_definition.target_id.strip()
+    if not application_id:
+        raise click.ClickException(
+            f"Rollback target {context_name}/{instance_name} must define target_id in platform/dokploy.toml."
+        )
+    app_name = target_definition.target_name.strip() or f"{context_name}-{instance_name}"
 
     deployment_payload = dokploy_request_fn(
         host=host,

@@ -65,9 +65,13 @@ Local Workflow Patterns
 - `platform restore` and `platform bootstrap` now generate and use
   `.platform/env/<context>.<instance>.env` by default. Pass `--env-file ...`
   only for explicit one-off overrides.
-- When `platform/dokploy.toml` pins a remote target `target_id`, the generated
-  runtime env projects that id into the matching Dokploy id env key so restore
-  and bootstrap do not need to rediscover the target by name.
+- `platform restore` and `platform bootstrap` now require the remote target to
+  be pinned in `platform/dokploy.toml`; the workflow reads the target id from
+  source of truth instead of rediscovering it through env overrides.
+- When a Dokploy target uses a custom remote stack layout, keep the target
+  pinned but set `DOKPLOY_REMOTE_STACK_PATH_<CONTEXT_INSTANCE>` and
+  `DOKPLOY_COMPOSE_PROJECT_<CONTEXT_INSTANCE>` explicitly as break-glass
+  overrides.
 - Restore performs a filestore capacity preflight before upstream copy.
 - Restore acquires a shared lock file (`ODOO_DATA_WORKFLOW_LOCK_FILE`, default
   `/volumes/data/.data_workflow_in_progress`) so bootstrap waits for restore
@@ -128,9 +132,9 @@ uv run platform dokploy reconcile --context cm --instance prod --apply
   against `platform/stack.toml`.
 - `platform dokploy reconcile --prune-env --apply` removes reconcile-managed
   remote env keys absent from `platform/dokploy.toml`.
-- Once a target is pinned with `target_id` in `platform/dokploy.toml`, these
-  helper commands reuse that id instead of discovering the Dokploy target by
-  name at runtime.
+- Managed Dokploy helper commands now require `target_id` in
+  `platform/dokploy.toml`; name-based target discovery is no longer part of
+  the steady-state contract.
 - Direct log streaming remains gated behind Dokploy websocket session auth.
 
 TUI Patterns

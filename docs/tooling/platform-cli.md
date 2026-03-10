@@ -71,23 +71,20 @@ Behavior Highlights
   user, and port are resolved from Dokploy deploy-server metadata when
   available; override with `DOKPLOY_SSH_HOST`, `DOKPLOY_SSH_USER` (default
   `root`), `DOKPLOY_SSH_PORT`. The remote compose project name and stack path
-  are resolved from the Dokploy API (`appName`); override per-target with
-  `DOKPLOY_REMOTE_STACK_PATH_<CONTEXT_INSTANCE>` and
-  `DOKPLOY_COMPOSE_PROJECT_<CONTEXT_INSTANCE>` (e.g.
-  `DOKPLOY_COMPOSE_PROJECT_CM_DEV`). The remote `.env` is temporarily
+  are resolved from the Dokploy API (`appName`) for the pinned target id in
+  `platform/dokploy.toml`. As a break-glass escape hatch for non-standard
+  remote layouts, `DOKPLOY_REMOTE_STACK_PATH_<CONTEXT_INSTANCE>` and
+  `DOKPLOY_COMPOSE_PROJECT_<CONTEXT_INSTANCE>` still override those derived
+  values. The remote `.env` is temporarily
   overwritten during the workflow and restored by the next `platform ship`.
   When Dokploy does not expose deploy-server linkage for a compose target, the
   workflow now fails closed and requires `DOKPLOY_SSH_HOST` instead of probing
   candidate hosts over SSH.
 - `platform ship`, `platform rollback`, `platform status`, `platform info`,
-  `platform doctor`, and `platform dokploy ...` helper commands prefer
-  `target_id` / `target_name`
-  from `platform/dokploy.toml` when present. Name-based Dokploy API discovery
-  is now the fallback path for targets that have not been pinned yet.
-- Generated remote runtime envs also project pinned `target_id` values into the
-  corresponding `DOKPLOY_COMPOSE_ID_<CONTEXT_INSTANCE>` or
-  `DOKPLOY_APPLICATION_ID_<CONTEXT_INSTANCE>` key so `platform restore` /
-  `platform bootstrap` reuse the same source-of-truth ids.
+  `platform doctor`, and `platform dokploy ...` helper commands require
+  `target_id` / `target_name` from `platform/dokploy.toml` for managed remote
+  targets. Name-based Dokploy API discovery is no longer part of the normal
+  contract.
 - `platform tui` allows wildcard or comma-separated fan-out only for read-only
   `status` and `info` workflows.
 

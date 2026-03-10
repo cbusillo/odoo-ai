@@ -60,12 +60,15 @@ See `addons/shopify_sync/services/shopify/sync/importers/order_importer.py`.
   `ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY`,
   `ENV_OVERRIDE_SHOPIFY__API_VERSION`, and
   `ENV_OVERRIDE_SHOPIFY__API_TOKEN`.
-- For local tooling, define the four `ENV_OVERRIDE_SHOPIFY__*` variables in
-  your shell or root `.env` before GraphQL introspection.
-- For platform runtime consistency, mirror those values in
-  `platform/secrets.toml` under `contexts.opw.instances.local.env`, then run
-  `uv run platform select --context opw --instance local` so they are written to
-  `.platform/env/opw.local.env`.
+- Keep Shopify instance secrets in `platform/secrets.toml`, not duplicated in
+  root `.env`, so release-time env collision checks stay clean.
+- `uv run python docker/scripts/generate_shopify_models.py --context opw \
+  --instance local` now loads Shopify credentials from the same layered
+  platform env used by runtime commands.
+- For IDE GraphQL tooling that reads `graphql.config.yml` directly, export the
+  scoped values from `.platform/env/<context>.<instance>.env` after
+  `uv run platform select --context <context> --instance <instance>` instead of
+  copying them into root `.env`.
 - Checked-in schema snapshots remain under
   `addons/shopify_sync/graphql/schema/` for reference and generated client
   history.

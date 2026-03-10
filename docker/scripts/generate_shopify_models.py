@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import re
@@ -6,20 +7,38 @@ from pathlib import Path
 import requests
 from ariadne_codegen.main import client as codegen_client
 from graphql import IntrospectionQuery, build_client_schema, get_introspection_query, print_schema
-from tools.environment_files import parse_env_file
+
+from tools.platform import environment as platform_environment
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 ADDONS_PATH = REPOSITORY_ROOT / "addons" / "shopify_sync"
+DEFAULT_CONTEXT_NAME = "opw"
+DEFAULT_INSTANCE_NAME = "local"
 
 
-def load_runtime_env_values() -> dict[str, str]:
-    root_env_file = REPOSITORY_ROOT / ".env"
-    if root_env_file.exists():
-        return parse_env_file(root_env_file)
-    platform_env_file = REPOSITORY_ROOT / "platform" / ".env"
-    if platform_env_file.exists():
-        return parse_env_file(platform_env_file)
-    return {}
+def load_runtime_env_values(
+    *,
+    repository_root: Path,
+    env_file: Path | None,
+    context_name: str,
+    instance_name: str,
+) -> dict[str, str]:
+    _env_file_path, environment_values = platform_environment.load_environment(
+        repository_root,
+        env_file,
+        context_name=context_name,
+        instance_name=instance_name,
+        collision_mode="error",
+    )
+    return environment_values
+
+
+def parse_arguments() -> argparse.Namespace:
+    argument_parser = argparse.ArgumentParser(description="Fetch Shopify GraphQL schema and regenerate generated models.")
+    argument_parser.add_argument("--context", default=DEFAULT_CONTEXT_NAME)
+    argument_parser.add_argument("--instance", default=DEFAULT_INSTANCE_NAME)
+    argument_parser.add_argument("--env-file", type=Path, default=None)
+    return argument_parser.parse_args()
 
 
 def resolve_runtime_env_value(environment_values: dict[str, str], variable_name: str) -> str | None:
@@ -61,7 +80,13 @@ def save_schema_sdl(json_data: IntrospectionQuery, output_file_path: Path) -> No
 
 
 def main() -> None:
-    runtime_env_values = load_runtime_env_values()
+    parsed_arguments = parse_arguments()
+    runtime_env_values = load_runtime_env_values(
+        repository_root=REPOSITORY_ROOT,
+        env_file=parsed_arguments.env_file,
+        context_name=parsed_arguments.context,
+        instance_name=parsed_arguments.instance,
+    )
     shopify_store_key = resolve_runtime_env_value(runtime_env_values, "ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY")
     shopify_api_token = resolve_runtime_env_value(runtime_env_values, "ENV_OVERRIDE_SHOPIFY__API_TOKEN")
     shopify_api_version = resolve_runtime_env_value(runtime_env_values, "ENV_OVERRIDE_SHOPIFY__API_VERSION")

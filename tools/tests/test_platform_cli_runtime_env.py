@@ -15,7 +15,6 @@ from tools.platform.cli import (
     _compose_base_command,
     _dokploy_request,
     _load_environment,
-    _load_environment_with_details,
     _resolve_dokploy_target,
     _resolve_ship_health_timeout_seconds,
     _resolve_ship_healthcheck_urls,
@@ -178,12 +177,16 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
                 "DOKPLOY_HOST": "https://dokploy.example",
                 "DOKPLOY_TOKEN": "token",
                 "DOKPLOY_SSH_HOST": "dokploy.internal",
+                "DOKPLOY_REMOTE_STACK_PATH_OPW_TESTING": "/custom/stack/path",
+                "DOKPLOY_COMPOSE_PROJECT_OPW_TESTING": "custom-compose-project",
             },
         )
 
         self.assertEqual(runtime_values.get("DOKPLOY_HOST"), "https://dokploy.example")
         self.assertEqual(runtime_values.get("DOKPLOY_TOKEN"), "token")
         self.assertEqual(runtime_values.get("DOKPLOY_SSH_HOST"), "dokploy.internal")
+        self.assertEqual(runtime_values.get("DOKPLOY_REMOTE_STACK_PATH_OPW_TESTING"), "/custom/stack/path")
+        self.assertEqual(runtime_values.get("DOKPLOY_COMPOSE_PROJECT_OPW_TESTING"), "custom-compose-project")
 
     def test_runtime_env_sets_restore_defaults(self) -> None:
         runtime_values = self._build_runtime_values(runtime_env_file="/tmp/cm.local.env")
@@ -303,7 +306,6 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
         target_definition = DokployTargetDefinition(
             context="cm",
             instance="testing",
-            target_type="compose",
             target_id="compose-id-1",
         )
 

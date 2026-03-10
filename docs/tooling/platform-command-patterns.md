@@ -68,6 +68,8 @@ Local Workflow Patterns
 - `platform restore` and `platform bootstrap` now require the remote target to
   be pinned in `platform/dokploy.toml`; the workflow reads the target id from
   source of truth instead of rediscovering it through env overrides.
+- When a pinned Dokploy compose target has no explicit deploy-server linkage,
+  restore/bootstrap SSH to the Dokploy host from `DOKPLOY_HOST` by default.
 - When a Dokploy target uses a custom remote stack layout, keep the target
   pinned but set `DOKPLOY_REMOTE_STACK_PATH_<CONTEXT_INSTANCE>` and
   `DOKPLOY_COMPOSE_PROJECT_<CONTEXT_INSTANCE>` explicitly as break-glass

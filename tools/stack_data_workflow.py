@@ -4,6 +4,7 @@ import re
 from collections.abc import Iterable, Sequence
 from dataclasses import replace as _dataclass_replace
 from pathlib import Path
+from urllib.parse import urlparse
 
 from tools.deployer.command import CommandError, run_process
 from tools.deployer.compose_ops import local_compose_command, local_compose_env, remote_compose_command
@@ -19,6 +20,7 @@ from tools.deployer.helpers import get_git_commit, get_git_remote_url
 from tools.deployer.remote import run_remote
 from tools.deployer.settings import StackSettings, load_stack_settings
 from tools.platform.dokploy import (
+    JsonObject,
     collect_dokploy_deploy_servers,
     dokploy_request,
     find_dokploy_target_definition,
@@ -169,6 +171,46 @@ def _run_remote_compose(settings: StackSettings, extra: Sequence[str]) -> None:
     run_remote(settings.remote_host, settings.remote_user, settings.remote_port, command, settings.remote_stack_path)
 
 
+def _run_remote_data_workflow_compose_sequence(
+    settings: StackSettings,
+    *,
+    bootstrap: bool,
+    no_sanitize: bool,
+) -> None:
+    if "database" in settings.services:
+        _run_remote_compose(settings, ["up", "-d", "--remove-orphans", "database"])
+
+    _run_remote_compose(
+        settings,
+        ["up", "-d", "--remove-orphans", settings.script_runner_service],
+    )
+    _run_remote_compose(settings, ["stop", "web"])
+
+    remote_exec: list[str] = [
+        "exec",
+        "-T",
+        "--user",
+        "root",
+    ]
+    _add_toggle_env_flags(remote_exec, bootstrap=bootstrap, no_sanitize=no_sanitize)
+    remote_exec.extend(
+        [
+            settings.script_runner_service,
+            "python3",
+            "-u",
+            DATA_WORKFLOW_SCRIPT,
+        ]
+    )
+    _add_toggle_args(remote_exec, bootstrap=bootstrap, no_sanitize=no_sanitize)
+
+    try:
+        _run_remote_compose(settings, remote_exec)
+    except CommandError as error:
+        _handle_data_workflow_exit(error)
+
+    _run_remote_compose(settings, ["up", "-d", "--remove-orphans", "web"])
+
+
 def _current_image_reference(settings: StackSettings) -> str:
     return settings.environment.get(settings.image_variable_name) or settings.registry_image
 
@@ -185,6 +227,30 @@ def _add_toggle_args(command: list[str], *, bootstrap: bool, no_sanitize: bool) 
         command.append("--bootstrap")
     if no_sanitize:
         command.append("--no-sanitize")
+
+
+def _resolve_ssh_user_and_port(
+    *,
+    deploy_server: JsonObject | None,
+    ssh_user_override: str,
+    ssh_port_override: int | None,
+) -> tuple[str, int]:
+    if ssh_user_override:
+        ssh_user = ssh_user_override
+    elif deploy_server is not None:
+        ssh_user = str(deploy_server.get("username") or "").strip() or "root"
+    else:
+        ssh_user = "root"
+
+    if ssh_port_override is not None:
+        ssh_port = ssh_port_override
+    elif deploy_server is not None:
+        raw_server_port = deploy_server.get("port")
+        ssh_port = raw_server_port if isinstance(raw_server_port, int) else 22
+    else:
+        ssh_port = 22
+
+    return ssh_user, ssh_port
 
 
 def _resolve_data_workflow_environment(raw_values: dict[str, str]) -> dict[str, str]:
@@ -253,6 +319,8 @@ def _run_dokploy_managed_remote_data_workflow(
     The next Dokploy deploy (platform ship) will restore the Dokploy-managed environment.
 
     Compose project name and remote stack path are derived from Dokploy compose metadata.
+    When a compose target has no deploy-server linkage, the workflow SSHes to the
+    Dokploy host itself.
     Break-glass overrides are limited to SSH host/user/port and explicit
     path/project layout when a Dokploy target uses a non-standard remote layout:
       DOKPLOY_REMOTE_STACK_PATH_<STACK_NAME_UPPER>   e.g. DOKPLOY_REMOTE_STACK_PATH_CM_DEV
@@ -311,38 +379,11 @@ def _run_dokploy_managed_remote_data_workflow(
     # The next `platform ship` (Dokploy deploy) will restore the Dokploy-managed environment.
     push_env_to_remote(remote_settings, env_values)
 
-    if "database" in remote_settings.services:
-        _run_remote_compose(remote_settings, ["up", "-d", "--remove-orphans", "database"])
-
-    _run_remote_compose(
+    _run_remote_data_workflow_compose_sequence(
         remote_settings,
-        ["up", "-d", "--remove-orphans", remote_settings.script_runner_service],
+        bootstrap=bootstrap,
+        no_sanitize=no_sanitize,
     )
-    _run_remote_compose(remote_settings, ["stop", "web"])
-
-    remote_exec: list[str] = [
-        "exec",
-        "-T",
-        "--user",
-        "root",
-    ]
-    _add_toggle_env_flags(remote_exec, bootstrap=bootstrap, no_sanitize=no_sanitize)
-    remote_exec.extend(
-        [
-            remote_settings.script_runner_service,
-            "python3",
-            "-u",
-            DATA_WORKFLOW_SCRIPT,
-        ]
-    )
-    _add_toggle_args(remote_exec, bootstrap=bootstrap, no_sanitize=no_sanitize)
-
-    try:
-        _run_remote_compose(remote_settings, remote_exec)
-    except CommandError as error:
-        _handle_data_workflow_exit(error)
-
-    _run_remote_compose(remote_settings, ["up", "-d", "--remove-orphans", "web"])
     _logger.info(
         "Dokploy compose data workflow completed for stack %s on %s",
         settings.name,
@@ -363,10 +404,6 @@ def _resolve_dokploy_remote_runtime(
     ssh_port_raw = env_values.get("DOKPLOY_SSH_PORT", "").strip()
     ssh_port_override = int(ssh_port_raw) if ssh_port_raw.isdigit() else None
 
-    deploy_servers = collect_dokploy_deploy_servers(host=dokploy_host, token=dokploy_token)
-    if not deploy_servers:
-        raise ValueError("Dokploy reported no deploy servers for remote data workflow discovery.")
-
     ssh_host_override = env_values.get("DOKPLOY_SSH_HOST", "").strip()
     remote_stack_path, compose_project = resolve_dokploy_compose_remote_config(
         host=dokploy_host,
@@ -377,23 +414,24 @@ def _resolve_dokploy_remote_runtime(
     )
 
     if ssh_host_override:
+        deploy_servers = collect_dokploy_deploy_servers(host=dokploy_host, token=dokploy_token)
         for deploy_server in deploy_servers:
             server_name = str(deploy_server.get("name") or "").strip()
             server_ip = str(deploy_server.get("ipAddress") or "").strip()
             if ssh_host_override not in {server_name, server_ip}:
                 continue
-            ssh_user = ssh_user_override or str(deploy_server.get("username") or "").strip() or "root"
-            raw_server_port = deploy_server.get("port")
-            if ssh_port_override is not None:
-                ssh_port = ssh_port_override
-            elif isinstance(raw_server_port, int):
-                ssh_port = raw_server_port
-            else:
-                ssh_port = 22
+            ssh_user, ssh_port = _resolve_ssh_user_and_port(
+                deploy_server=deploy_server,
+                ssh_user_override=ssh_user_override,
+                ssh_port_override=ssh_port_override,
+            )
             return ssh_host_override, ssh_user, ssh_port, remote_stack_path, compose_project
 
-        ssh_port = ssh_port_override if ssh_port_override is not None else 22
-        ssh_user = ssh_user_override or "root"
+        ssh_user, ssh_port = _resolve_ssh_user_and_port(
+            deploy_server=None,
+            ssh_user_override=ssh_user_override,
+            ssh_port_override=ssh_port_override,
+        )
         return ssh_host_override, ssh_user, ssh_port, remote_stack_path, compose_project
 
     compose_payload = dokploy_request(
@@ -407,6 +445,9 @@ def _resolve_dokploy_remote_runtime(
 
     compose_server_id = str(compose_payload.get("serverId") or "").strip()
     if compose_server_id:
+        deploy_servers = collect_dokploy_deploy_servers(host=dokploy_host, token=dokploy_token)
+        if not deploy_servers:
+            raise ValueError("Dokploy reported no deploy servers for remote data workflow discovery.")
         for deploy_server in deploy_servers:
             server_id = str(
                 deploy_server.get("serverId")
@@ -422,51 +463,29 @@ def _resolve_dokploy_remote_runtime(
                     f"Dokploy compose {compose_name!r} resolved to server {compose_server_id!r}, "
                     "but that deploy server has no hostname or IP address."
                 )
-            ssh_user = ssh_user_override or str(deploy_server.get("username") or "").strip() or "root"
-            raw_server_port = deploy_server.get("port")
-            if ssh_port_override is not None:
-                ssh_port = ssh_port_override
-            elif isinstance(raw_server_port, int):
-                ssh_port = raw_server_port
-            else:
-                ssh_port = 22
+            ssh_user, ssh_port = _resolve_ssh_user_and_port(
+                deploy_server=deploy_server,
+                ssh_user_override=ssh_user_override,
+                ssh_port_override=ssh_port_override,
+            )
             return ssh_host, ssh_user, ssh_port, remote_stack_path, compose_project
         raise ValueError(
             f"Dokploy compose {compose_name!r} resolved to unknown deploy server id {compose_server_id!r}."
         )
 
-    if len(deploy_servers) == 1:
-        deploy_server = deploy_servers[0]
-        ssh_host = str(deploy_server.get("name") or "").strip() or str(deploy_server.get("ipAddress") or "").strip()
-        if not ssh_host:
-            raise ValueError(
-                f"Dokploy remote workflow for {compose_name!r} needs a deploy host, but the only deploy server has no hostname or IP address."
-            )
-        ssh_user = ssh_user_override or str(deploy_server.get("username") or "").strip() or "root"
-        raw_server_port = deploy_server.get("port")
-        if ssh_port_override is not None:
-            ssh_port = ssh_port_override
-        elif isinstance(raw_server_port, int):
-            ssh_port = raw_server_port
-        else:
-            ssh_port = 22
-        return ssh_host, ssh_user, ssh_port, remote_stack_path, compose_project
+    parsed_dokploy_host = urlparse(dokploy_host.strip())
+    ssh_host = (parsed_dokploy_host.hostname or parsed_dokploy_host.path or "").strip()
+    if not ssh_host:
+        raise ValueError(
+            f"Dokploy compose {compose_name!r} does not expose deploy server linkage, and DOKPLOY_HOST {dokploy_host!r} has no SSH hostname."
+        )
 
-    known_hosts = sorted(
-        {
-            host_name
-            for deploy_server in deploy_servers
-            for host_name in (
-                str(deploy_server.get("name") or "").strip(),
-                str(deploy_server.get("ipAddress") or "").strip(),
-            )
-            if host_name
-        }
+    ssh_user, ssh_port = _resolve_ssh_user_and_port(
+        deploy_server=None,
+        ssh_user_override=ssh_user_override,
+        ssh_port_override=ssh_port_override,
     )
-    raise ValueError(
-        f"Dokploy compose {compose_name!r} does not expose deploy server linkage. "
-        f"Set DOKPLOY_SSH_HOST explicitly. Known hosts: {known_hosts!r}."
-    )
+    return ssh_host, ssh_user, ssh_port, remote_stack_path, compose_project
 
 
 def run_stack_data_workflow(
@@ -499,35 +518,11 @@ def run_stack_data_workflow(
         prepare_remote_stack(stack_settings, repository_url, commit)
         push_env_to_remote(stack_settings, env_values)
 
-        if "database" in stack_settings.services:
-            _run_remote_compose(stack_settings, ["up", "-d", "--remove-orphans", "database"])
-
-        _run_remote_compose(stack_settings, ["up", "-d", "--remove-orphans", stack_settings.script_runner_service])
-        _run_remote_compose(stack_settings, ["stop", "web"])
-
-        remote_exec: list[str] = [
-            "exec",
-            "-T",
-            "--user",
-            "root",
-        ]
-        _add_toggle_env_flags(remote_exec, bootstrap=bootstrap, no_sanitize=no_sanitize)
-
-        remote_exec.extend(
-            [
-                stack_settings.script_runner_service,
-                "python3",
-                "-u",
-                DATA_WORKFLOW_SCRIPT,
-            ]
+        _run_remote_data_workflow_compose_sequence(
+            stack_settings,
+            bootstrap=bootstrap,
+            no_sanitize=no_sanitize,
         )
-        _add_toggle_args(remote_exec, bootstrap=bootstrap, no_sanitize=no_sanitize)
-
-        try:
-            _run_remote_compose(stack_settings, remote_exec)
-        except CommandError as error:
-            _handle_data_workflow_exit(error)
-        _run_remote_compose(stack_settings, ["up", "-d", "--remove-orphans", "web"])
     elif (
         runtime_scope is not None
         and runtime_scope[1] in {"dev", "testing", "prod"}

@@ -69,17 +69,15 @@ Behavior Highlights
 - Remote `restore`/`bootstrap` for Dokploy-managed targets (`dev`, `testing`,
   `prod`) SSH directly into the Dokploy deploy server host. The SSH hostname,
   user, and port are resolved from Dokploy deploy-server metadata when
-  available; override with `DOKPLOY_SSH_HOST`, `DOKPLOY_SSH_USER` (default
-  `root`), `DOKPLOY_SSH_PORT`. The remote compose project name and stack path
-  are resolved from the Dokploy API (`appName`) for the pinned target id in
-  `platform/dokploy.toml`. As a break-glass escape hatch for non-standard
-  remote layouts, `DOKPLOY_REMOTE_STACK_PATH_<CONTEXT_INSTANCE>` and
-  `DOKPLOY_COMPOSE_PROJECT_<CONTEXT_INSTANCE>` still override those derived
-  values. The remote `.env` is temporarily
-  overwritten during the workflow and restored by the next `platform ship`.
-  When Dokploy does not expose deploy-server linkage for a compose target, the
-  workflow now fails closed and requires `DOKPLOY_SSH_HOST` instead of probing
-  candidate hosts over SSH.
+  available; compose targets without explicit deploy-server linkage are treated
+  as running on the Dokploy host itself. Override with `DOKPLOY_SSH_HOST`,
+  `DOKPLOY_SSH_USER` (default `root`), `DOKPLOY_SSH_PORT`. The remote compose
+  project name and stack path are resolved from the Dokploy API (`appName`) for
+  the pinned target id in `platform/dokploy.toml`. As a break-glass escape
+  hatch for non-standard remote layouts, `DOKPLOY_REMOTE_STACK_PATH_<CONTEXT_INSTANCE>`
+  and `DOKPLOY_COMPOSE_PROJECT_<CONTEXT_INSTANCE>` still override those derived
+  values. The remote `.env` is temporarily overwritten during the workflow and
+  restored by the next `platform ship`.
 - `platform ship`, `platform rollback`, `platform status`, `platform info`,
   `platform doctor`, and `platform dokploy ...` helper commands require
   `target_id` / `target_name` from `platform/dokploy.toml` for managed remote

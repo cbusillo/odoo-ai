@@ -251,26 +251,8 @@ class StackDataWorkflowTests(unittest.TestCase):
             ),
         )
 
-    def test_resolve_dokploy_remote_runtime_requires_explicit_host_when_server_linkage_is_missing(self) -> None:
-        deploy_servers = (
-            {
-                "serverId": "server-1",
-                "name": "docker-cm-prod",
-                "ipAddress": "100.73.170.113",
-                "username": "root",
-                "port": 22,
-            },
-            {
-                "serverId": "server-2",
-                "name": "docker-opw-prod",
-                "ipAddress": "192.168.1.34",
-                "username": "root",
-                "port": 22,
-            },
-        )
-
+    def test_resolve_dokploy_remote_runtime_uses_dokploy_host_when_server_linkage_is_missing(self) -> None:
         with (
-            patch.object(stack_data_workflow, "collect_dokploy_deploy_servers", return_value=deploy_servers),
             patch.object(
                 stack_data_workflow,
                 "resolve_dokploy_compose_remote_config",
@@ -278,16 +260,24 @@ class StackDataWorkflowTests(unittest.TestCase):
             ),
             patch.object(stack_data_workflow, "dokploy_request", return_value={"serverId": None}),
         ):
-            with self.assertRaises(ValueError) as raised_error:
-                stack_data_workflow._resolve_dokploy_remote_runtime(
-                    dokploy_host="https://dokploy.example",
-                    dokploy_token="token",
-                    compose_id="compose-1",
-                    compose_name="cm-testing",
-                    env_values={},
-                )
+            resolved = stack_data_workflow._resolve_dokploy_remote_runtime(
+                dokploy_host="https://dokploy.example",
+                dokploy_token="token",
+                compose_id="compose-1",
+                compose_name="cm-testing",
+                env_values={},
+            )
 
-        self.assertIn("Set DOKPLOY_SSH_HOST explicitly", str(raised_error.exception))
+        self.assertEqual(
+            resolved,
+            (
+                "dokploy.example",
+                "root",
+                22,
+                Path("/etc/dokploy/applications/cm-testing"),
+                "cm-testing",
+            ),
+        )
 
     def test_resolve_dokploy_remote_runtime_uses_override_host(self) -> None:
         deploy_servers = (

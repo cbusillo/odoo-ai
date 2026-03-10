@@ -23,6 +23,18 @@ def load_runtime_env_values(
     context_name: str,
     instance_name: str,
 ) -> dict[str, str]:
+    env_file_candidates = [
+        repository_root / ".env",
+        repository_root / "platform" / ".env",
+    ]
+    if env_file is None:
+        for candidate_env_file in env_file_candidates:
+            if candidate_env_file.exists():
+                env_file = candidate_env_file
+                break
+    if env_file is None:
+        return {}
+
     _env_file_path, environment_values = platform_environment.load_environment(
         repository_root,
         env_file,

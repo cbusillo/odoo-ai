@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Protocol
+from unittest import mock
 
 
 class GenerateShopifyModelsModule(Protocol):
@@ -65,3 +67,18 @@ class GenerateShopifyModelsEnvironmentTests(unittest.TestCase):
         self.assertEqual(runtime_env_values["ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY"], "opw-local")
         self.assertEqual(runtime_env_values["ENV_OVERRIDE_SHOPIFY__API_TOKEN"], "token-123")
         self.assertEqual(runtime_env_values["ENV_OVERRIDE_SHOPIFY__API_VERSION"], "2026-01")
+
+    def test_load_runtime_env_values_uses_process_environment_when_no_env_file_exists(self) -> None:
+        generate_shopify_models = _load_generate_shopify_models_module()
+
+        with TemporaryDirectory() as temporary_directory_name:
+            repository_root = Path(temporary_directory_name)
+            with mock.patch.dict(os.environ, {"ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY": "env-store"}, clear=False):
+                runtime_env_values = generate_shopify_models.load_runtime_env_values(
+                    repository_root=repository_root,
+                    env_file=None,
+                    context_name="opw",
+                    instance_name="local",
+                )
+
+        self.assertEqual(runtime_env_values, {})

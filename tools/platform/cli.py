@@ -175,16 +175,17 @@ def _handle_environment_collisions(collisions: tuple[EnvironmentCollision, ...],
 def _project_dokploy_target_id_overrides(
     repo_root: Path,
     environment_values: dict[str, str],
+    source_by_key: dict[str, str] | None = None,
     *,
     context_name: str | None,
     instance_name: str | None,
-) -> dict[str, str]:
+) -> tuple[dict[str, str], dict[str, str] | None]:
     if not context_name or not instance_name:
-        return environment_values
+        return environment_values, source_by_key
 
     source_of_truth = _load_dokploy_source_of_truth_if_present(repo_root)
     if source_of_truth is None:
-        return environment_values
+        return environment_values, source_by_key
 
     target_definition = _find_dokploy_target_definition(
         source_of_truth,
@@ -192,20 +193,23 @@ def _project_dokploy_target_id_overrides(
         instance_name=instance_name,
     )
     if target_definition is None:
-        return environment_values
+        return environment_values, source_by_key
 
     configured_target_id = target_definition.target_id.strip()
     if not configured_target_id:
-        return environment_values
+        return environment_values, source_by_key
 
     target_key_prefix = "DOKPLOY_APPLICATION_ID" if target_definition.target_type == "application" else "DOKPLOY_COMPOSE_ID"
     target_env_key = f"{target_key_prefix}_{context_name}_{instance_name}".upper()
     if target_env_key in environment_values:
-        return environment_values
+        return environment_values, source_by_key
 
     projected_environment = dict(environment_values)
     projected_environment[target_env_key] = configured_target_id
-    return projected_environment
+    projected_sources = None if source_by_key is None else dict(source_by_key)
+    if projected_sources is not None:
+        projected_sources[target_env_key] = "platform/dokploy.toml"
+    return projected_environment, projected_sources
 
 
 def _load_environment_with_details(
@@ -223,9 +227,10 @@ def _load_environment_with_details(
         instance_name=instance_name,
         collision_mode=collision_mode,
     )
-    projected_environment_values = _project_dokploy_target_id_overrides(
+    projected_environment_values, projected_source_by_key = _project_dokploy_target_id_overrides(
         repo_root,
         loaded_environment.merged_values,
+        loaded_environment.source_by_key,
         context_name=context_name,
         instance_name=instance_name,
     )
@@ -234,7 +239,7 @@ def _load_environment_with_details(
     return LoadedEnvironment(
         env_file_path=loaded_environment.env_file_path,
         merged_values=projected_environment_values,
-        source_by_key=dict(loaded_environment.source_by_key),
+        source_by_key=projected_source_by_key or dict(loaded_environment.source_by_key),
         collisions=loaded_environment.collisions,
     )
 
@@ -254,7 +259,7 @@ def _load_environment(
         instance_name=instance_name,
         collision_mode=collision_mode,
     )
-    projected_environment_values = _project_dokploy_target_id_overrides(
+    projected_environment_values, _projected_source_by_key = _project_dokploy_target_id_overrides(
         repo_root,
         environment_values,
         context_name=context_name,

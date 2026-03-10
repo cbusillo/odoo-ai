@@ -141,7 +141,8 @@ class TestkitCliSummaryTests(unittest.TestCase):
         runner = CliRunner()
 
         class _FakeSession:
-            def build_run_plan(self) -> RunExecutionPlan:
+            @staticmethod
+            def build_run_plan() -> RunExecutionPlan:
                 self_overlap = os.environ.get("PHASES_OVERLAP")
                 assert self_overlap == "1"
                 phase_groups = (("unit", "js"), ("integration", "tour"))
@@ -169,7 +170,7 @@ class TestkitCliSummaryTests(unittest.TestCase):
                     production_clone_slots=2,
                 )
 
-        with patch.dict(os.environ, {}, clear=False):
+        with patch.dict(os.environ, {}):
             with (
                 patch("tools.testkit.cli._apply_stack_env"),
                 patch("tools.testkit.cli._build_session", return_value=_FakeSession()),

@@ -79,9 +79,13 @@ Tips
   `ODOO_PYTHON_SYNC_SKIP_ADDONS=openupgrade_framework,openupgrade_scripts,openupgrade_scripts_custom`
   so those addon paths are available to Odoo without trying to package them
   into `/venv`.
-- `odoo-ai` keeps the remaining OpenUpgrade-specific Python support locally:
-  when `OCA/OpenUpgrade` is present in the external addon repo list, the image
-  also installs `openupgradelib==3.12.0` into `/venv`.
+- `OPENUPGRADE_ADDON_REPOSITORY` pins the exact OpenUpgrade addon snapshot used
+  by restore/openupgrade workflows.
+- `OPENUPGRADELIB_INSTALL_SPEC` pins the matching `openupgradelib` install
+  source, including git-SHA installs when the needed fix is not on PyPI yet.
+- `odoo-ai` installs `openupgradelib` only when the pinned
+  `OPENUPGRADE_ADDON_REPOSITORY` is present in `ODOO_ADDON_REPOSITORIES`, so
+  steady-state builds stay clean while OpenUpgrade builds remain repeatable.
 
 ## Layered Compose Configuration
 

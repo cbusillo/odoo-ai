@@ -8,7 +8,7 @@ version = "0.0.0"
 description = "Custom OpenUpgrade migration scripts"
 requires-python = ">=3.13"
 dependencies = [
-    "openupgradelib==3.12.0",
+    "openupgradelib @ git+https://github.com/OCA/openupgradelib.git@46d66ff5ed6a99481f84d3c79fc6e50835da7286",
 ]
 
 [tool.setuptools]

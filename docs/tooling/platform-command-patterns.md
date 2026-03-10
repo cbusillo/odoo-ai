@@ -68,12 +68,9 @@ Local Workflow Patterns
 - `platform restore` and `platform bootstrap` now require the remote target to
   be pinned in `platform/dokploy.toml`; the workflow reads the target id from
   source of truth instead of rediscovering it through env overrides.
-- When a pinned Dokploy compose target has no explicit deploy-server linkage,
-  restore/bootstrap SSH to the Dokploy host from `DOKPLOY_HOST` by default.
-- When a Dokploy target uses a custom remote stack layout, keep the target
-  pinned but set `DOKPLOY_REMOTE_STACK_PATH_<CONTEXT_INSTANCE>` and
-  `DOKPLOY_COMPOSE_PROJECT_<CONTEXT_INSTANCE>` explicitly as break-glass
-  overrides.
+- Dokploy-managed restore/bootstrap now execute through Dokploy schedule jobs,
+  not host SSH. The only remaining SSH hop in the restore path is the upstream
+  source host accessed by `run_odoo_data_workflows.py`.
 - Restore performs a filestore capacity preflight before upstream copy.
 - Restore acquires a shared lock file (`ODOO_DATA_WORKFLOW_LOCK_FILE`, default
   `/volumes/data/.data_workflow_in_progress`) so bootstrap waits for restore
@@ -99,6 +96,9 @@ Remote Release Patterns
   an explicit exception.
 - `platform ship` syncs the deployment branch before deploy/redeploy.
   Default source refs come from `platform/dokploy.toml`.
+- Managed Dokploy targets use `platform ship` as the only deployment trigger.
+  Leave Dokploy auto deploy disabled so branch sync does not race the
+  explicit deploy call.
 - `platform ship` verifies `/web/health` by default when `--wait` is enabled.
   `--no-verify-health` is for one-off troubleshooting.
 - Release-sensitive commands (`ship`, `rollback`, `gate`, `promote`, and

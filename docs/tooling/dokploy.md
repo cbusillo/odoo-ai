@@ -29,6 +29,12 @@ Notes
   `uv run platform select` and should not drift from Dokploy.
 - Primary automation commands are `uv run platform ship|rollback|gate|promote`
   and `uv run platform dokploy ...` helpers.
+- Managed Dokploy targets keep auto deploy disabled and rely on
+  `uv run platform ship` as the only supported deploy trigger.
+- Destructive remote data workflows (`platform restore`, `platform bootstrap`)
+  now execute through Dokploy schedule jobs triggered by the Dokploy API.
+  Dokploy-managed targets are no longer mutated over SSH; only the upstream
+  source host inside the restore script still uses SSH.
 - Use `uv run platform dokploy inventory` before destructive Dokploy cleanup to
   snapshot the live project, server, and compose state into JSON artifacts.
 - Remote target metadata contract lives in `platform/dokploy.toml`.

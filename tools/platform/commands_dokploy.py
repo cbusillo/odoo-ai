@@ -450,7 +450,6 @@ def execute_inventory(
                         "custom_git_url": target_payload.get("customGitUrl"),
                         "compose_path": target_payload.get("composePath"),
                         "source_type": target_payload.get("sourceType"),
-                        "auto_deploy": target_payload.get("autoDeploy"),
                         "compose_status": target_payload.get("composeStatus"),
                     }
                 )
@@ -642,9 +641,7 @@ def execute_reconcile(
         resolved_target_id = target.target_id.strip()
         resolved_target_name = target.target_name.strip() or f"{context_name}-{instance_name}"
         if not resolved_target_id:
-            raise click.ClickException(
-                f"Target {context_name}/{instance_name} in {source_file_path} must define target_id."
-            )
+            raise click.ClickException(f"Target {context_name}/{instance_name} in {source_file_path} must define target_id.")
 
         target_payload = fetch_dokploy_target_payload_fn(
             host=host,
@@ -663,10 +660,6 @@ def execute_reconcile(
         current_branch = ""
         branch_needs_update = False
         branch_updated = False
-        current_auto_deploy: bool | None = None
-        desired_auto_deploy = target.auto_deploy
-        auto_deploy_needs_update = False
-        auto_deploy_updated = False
         env_map = parse_dokploy_env_text_fn(str(target_payload.get("env") or ""))
         desired_env = {key: value for key, value in target.env.items() if key}
         env_needs_update_keys: list[str] = []
@@ -678,17 +671,9 @@ def execute_reconcile(
             if desired_branch:
                 branch_needs_update = current_branch != desired_branch
 
-            raw_auto_deploy = target_payload.get("autoDeploy")
-            if isinstance(raw_auto_deploy, bool):
-                current_auto_deploy = raw_auto_deploy
-            if desired_auto_deploy is not None and current_auto_deploy is not None:
-                auto_deploy_needs_update = current_auto_deploy != desired_auto_deploy
-
             compose_update_payload: JsonObject = {"composeId": resolved_target_id}
             if branch_needs_update:
                 compose_update_payload["customGitBranch"] = desired_branch
-            if auto_deploy_needs_update and desired_auto_deploy is not None:
-                compose_update_payload["autoDeploy"] = desired_auto_deploy
 
             if apply and len(compose_update_payload) > 1:
                 dokploy_request_fn(
@@ -699,7 +684,6 @@ def execute_reconcile(
                     payload=compose_update_payload,
                 )
                 branch_updated = branch_needs_update
-                auto_deploy_updated = auto_deploy_needs_update
 
         for env_key, env_value in desired_env.items():
             if env_map.get(env_key) != env_value:
@@ -737,10 +721,6 @@ def execute_reconcile(
                 "current_branch": current_branch,
                 "branch_needs_update": branch_needs_update,
                 "branch_updated": branch_updated,
-                "desired_auto_deploy": desired_auto_deploy,
-                "current_auto_deploy": current_auto_deploy,
-                "auto_deploy_needs_update": auto_deploy_needs_update,
-                "auto_deploy_updated": auto_deploy_updated,
                 "desired_env_keys": sorted(desired_env.keys()),
                 "env_needs_update_keys": env_needs_update_keys,
                 "prune_env": prune_env,
@@ -757,15 +737,7 @@ def execute_reconcile(
         "source_file": str(source_file_path),
         "apply": apply,
         "matched_targets": len(results),
-        "updated_targets": len(
-            [
-                item
-                for item in results
-                if bool(item.get("branch_updated"))
-                or bool(item.get("auto_deploy_updated"))
-                or bool(item.get("env_updated"))
-            ]
-        ),
+        "updated_targets": len([item for item in results if bool(item.get("branch_updated")) or bool(item.get("env_updated"))]),
         "targets": results,
     }
     emit_payload_fn(payload, json_output=json_output)

@@ -43,7 +43,6 @@ class DokployTargetDefinition(BaseModel):
     target_name: str = ""
     git_branch: str = ""
     source_git_ref: str = "origin/main"
-    auto_deploy: bool | None = None
     require_test_gate: bool = False
     require_prod_gate: bool = False
     deploy_timeout_seconds: int | None = Field(default=None, ge=1)

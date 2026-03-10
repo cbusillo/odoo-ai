@@ -3,10 +3,14 @@ ARG ODOO_VERSION=19.0
 ARG ODOO_BASE_RUNTIME_IMAGE=ghcr.io/cbusillo/odoo-enterprise-docker:19.0-runtime
 ARG ODOO_BASE_DEVTOOLS_IMAGE=ghcr.io/cbusillo/odoo-enterprise-docker:19.0-devtools
 ARG ODOO_ADDON_REPOSITORIES
+ARG OPENUPGRADE_ADDON_REPOSITORY
+ARG OPENUPGRADELIB_INSTALL_SPEC
 ARG ODOO_PYTHON_SYNC_SKIP_ADDONS
 
 FROM ${ODOO_BASE_RUNTIME_IMAGE} AS addon-sources
 ARG ODOO_ADDON_REPOSITORIES
+ARG OPENUPGRADE_ADDON_REPOSITORY
+ARG OPENUPGRADELIB_INSTALL_SPEC
 USER root
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN --mount=type=secret,id=github_token \
@@ -16,6 +20,8 @@ RUN --mount=type=secret,id=github_token \
 
 FROM ${ODOO_BASE_RUNTIME_IMAGE} AS base-runtime
 ARG ODOO_ADDON_REPOSITORIES
+ARG OPENUPGRADE_ADDON_REPOSITORY
+ARG OPENUPGRADELIB_INSTALL_SPEC
 ARG ODOO_PYTHON_SYNC_SKIP_ADDONS
 USER root
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -33,6 +39,8 @@ RUN mkdir -p /opt \
 
 FROM ${ODOO_BASE_DEVTOOLS_IMAGE} AS base-devtools
 ARG ODOO_ADDON_REPOSITORIES
+ARG OPENUPGRADE_ADDON_REPOSITORY
+ARG OPENUPGRADELIB_INSTALL_SPEC
 ARG ODOO_PYTHON_SYNC_SKIP_ADDONS
 USER root
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -53,9 +61,13 @@ FROM runtime-common AS production
 WORKDIR /opt/project
 RUN --mount=type=cache,target=/home/ubuntu/.cache/uv,uid=1000,gid=1000,sharing=locked \
 	ODOO_PYTHON_SYNC_SKIP_ADDONS="${ODOO_PYTHON_SYNC_SKIP_ADDONS}" /usr/local/bin/odoo-python-sync.sh prod
-RUN if [[ ",${ODOO_ADDON_REPOSITORIES}," == *,OCA/OpenUpgrade@* ]] || [[ ",${ODOO_ADDON_REPOSITORIES}," == *,OCA/OpenUpgrade,* ]]; then \
-		uv pip install --python /venv/bin/python openupgradelib==3.12.0; \
-	fi
+RUN if [[ -n "${OPENUPGRADE_ADDON_REPOSITORY}" ]] && [[ ",${ODOO_ADDON_REPOSITORIES}," == *,${OPENUPGRADE_ADDON_REPOSITORY},* ]]; then \
+			if [[ -z "${OPENUPGRADELIB_INSTALL_SPEC}" ]]; then \
+				echo "OPENUPGRADELIB_INSTALL_SPEC is required when OpenUpgrade addons are enabled" >&2; \
+				exit 1; \
+			fi; \
+			uv pip install --python /venv/bin/python "${OPENUPGRADELIB_INSTALL_SPEC}"; \
+		fi
 WORKDIR /
 USER ubuntu
 
@@ -64,7 +76,11 @@ WORKDIR /opt/project
 
 RUN --mount=type=cache,target=/home/ubuntu/.cache/uv,uid=1000,gid=1000,sharing=locked \
 	ODOO_PYTHON_SYNC_SKIP_ADDONS="${ODOO_PYTHON_SYNC_SKIP_ADDONS}" /usr/local/bin/odoo-python-sync.sh dev
-RUN if [[ ",${ODOO_ADDON_REPOSITORIES}," == *,OCA/OpenUpgrade@* ]] || [[ ",${ODOO_ADDON_REPOSITORIES}," == *,OCA/OpenUpgrade,* ]]; then \
-		uv pip install --python /venv/bin/python openupgradelib==3.12.0; \
-	fi
+RUN if [[ -n "${OPENUPGRADE_ADDON_REPOSITORY}" ]] && [[ ",${ODOO_ADDON_REPOSITORIES}," == *,${OPENUPGRADE_ADDON_REPOSITORY},* ]]; then \
+			if [[ -z "${OPENUPGRADELIB_INSTALL_SPEC}" ]]; then \
+				echo "OPENUPGRADELIB_INSTALL_SPEC is required when OpenUpgrade addons are enabled" >&2; \
+				exit 1; \
+			fi; \
+			uv pip install --python /venv/bin/python "${OPENUPGRADELIB_INSTALL_SPEC}"; \
+		fi
 USER ubuntu

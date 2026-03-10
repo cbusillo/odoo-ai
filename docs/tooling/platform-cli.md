@@ -59,6 +59,8 @@ Behavior Highlights
   Dokploy target diagnostics.
 - `platform ship` fails closed on dirty tracked files. Prefer a clean worktree
   plus `--source-ref HEAD` for surgical remote testing.
+- `platform ship` is the only supported remote deployment trigger for managed
+  Dokploy targets. Keep Dokploy auto deploy disabled for those targets.
 - Remote web startup uses `run_odoo_startup.py` to initialize missing modules
   when needed before launching the long-running server.
 - Release-sensitive commands resolve env layers with collision mode `error`.
@@ -67,17 +69,12 @@ Behavior Highlights
 - `platform select` writes both `.platform/env/<context>.<instance>.env` and
   `.platform/ide/<context>.<instance>.odoo.conf`.
 - Remote `restore`/`bootstrap` for Dokploy-managed targets (`dev`, `testing`,
-  `prod`) SSH directly into the Dokploy deploy server host. The SSH hostname,
-  user, and port are resolved from Dokploy deploy-server metadata when
-  available; compose targets without explicit deploy-server linkage are treated
-  as running on the Dokploy host itself. Override with `DOKPLOY_SSH_HOST`,
-  `DOKPLOY_SSH_USER` (default `root`), `DOKPLOY_SSH_PORT`. The remote compose
-  project name and stack path are resolved from the Dokploy API (`appName`) for
-  the pinned target id in `platform/dokploy.toml`. As a break-glass escape
-  hatch for non-standard remote layouts, `DOKPLOY_REMOTE_STACK_PATH_<CONTEXT_INSTANCE>`
-  and `DOKPLOY_COMPOSE_PROJECT_<CONTEXT_INSTANCE>` still override those derived
-  values. The remote `.env` is temporarily overwritten during the workflow and
-  restored by the next `platform ship`.
+  `prod`) run through Dokploy schedule jobs triggered by the Dokploy API.
+  Targets with deploy-server linkage use Dokploy `server` jobs; targets without
+  linkage use Dokploy `dokploy-server` jobs. The platform no longer SSHes to
+  Dokploy-managed targets or overwrites their runtime `.env` during restore or
+  bootstrap. Only the upstream source host copy inside
+  `run_odoo_data_workflows.py` still uses SSH.
 - `platform ship`, `platform rollback`, `platform status`, `platform info`,
   `platform doctor`, and `platform dokploy ...` helper commands require
   `target_id` / `target_name` from `platform/dokploy.toml` for managed remote

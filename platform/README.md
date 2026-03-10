@@ -45,7 +45,8 @@ Operator Contract Summary
 - Treat `dev`, `testing`, and `prod` as Dokploy-managed remote targets.
   Use `platform ship`, `platform rollback`, `platform gate`,
   `platform promote`, `platform restore`, and `platform bootstrap` there.
-- `platform ship` deploys and restarts remote code without replacing data.
+- `platform ship` deploys and restarts remote code without replacing data, and
+  is the only supported deploy trigger for managed Dokploy targets.
 - `platform restore` replaces database and filestore state from upstream data.
 - `platform bootstrap` clears database and filestore state, then builds a
   fresh runtime.

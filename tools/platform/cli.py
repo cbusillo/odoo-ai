@@ -99,22 +99,19 @@ PLATFORM_RUNTIME_ENV_KEYS = (
     "ODOO_UPSTREAM_DB_USER",
     "ODOO_UPSTREAM_FILESTORE_PATH",
     "OPENUPGRADE_ENABLED",
+    "OPENUPGRADE_ADDON_REPOSITORY",
     "OPENUPGRADE_SCRIPTS_PATH",
     "OPENUPGRADE_TARGET_VERSION",
     "OPENUPGRADE_SKIP_UPDATE_ADDONS",
+    "OPENUPGRADELIB_INSTALL_SPEC",
     "GITHUB_TOKEN",
     "DOKPLOY_HOST",
     "DOKPLOY_TOKEN",
-    "DOKPLOY_SSH_HOST",
-    "DOKPLOY_SSH_USER",
-    "DOKPLOY_SSH_PORT",
 )
 
 PLATFORM_RUNTIME_PASSTHROUGH_PREFIXES = (
     "ENV_OVERRIDE_",
     "ODOO_UPSTREAM_",
-    "DOKPLOY_REMOTE_STACK_PATH_",
-    "DOKPLOY_COMPOSE_PROJECT_",
 )
 
 PLATFORM_RUNTIME_PASSTHROUGH_KEYS = (
@@ -122,9 +119,6 @@ PLATFORM_RUNTIME_PASSTHROUGH_KEYS = (
     "DATA_WORKFLOW_SSH_KEY",
     "DOKPLOY_HOST",
     "DOKPLOY_TOKEN",
-    "DOKPLOY_SSH_HOST",
-    "DOKPLOY_SSH_USER",
-    "DOKPLOY_SSH_PORT",
 )
 
 ENV_COLLISION_MODE_ENV_KEY = platform_environment.ENV_COLLISION_MODE_ENV_KEY
@@ -243,10 +237,13 @@ def _build_runtime_env_values(
     runtime_selection: RuntimeSelection,
     source_environment: dict[str, str],
 ) -> dict[str, str]:
+    openupgrade_environment = dict(source_environment)
+    for runtime_key, runtime_value in runtime_selection.effective_runtime_env.items():
+        openupgrade_environment[runtime_key] = str(runtime_value)
+
     effective_addon_repositories = platform_runtime.effective_runtime_addon_repositories(
-        stack_definition=stack_definition,
         runtime_selection=runtime_selection,
-        source_environment=source_environment,
+        source_environment=openupgrade_environment,
     )
 
     runtime_values = {
@@ -283,27 +280,27 @@ def _build_runtime_env_values(
         "ODOO_DATA_WORKFLOW_LOCK_FILE": source_environment.get(
             "ODOO_DATA_WORKFLOW_LOCK_FILE", "/volumes/data/.data_workflow_in_progress"
         ),
-        "ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS": source_environment.get(
-            "ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS", "7200"
-        ),
+        "ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS": source_environment.get("ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS", "7200"),
         "DATA_WORKFLOW_SSH_DIR": source_environment.get(
             "DATA_WORKFLOW_SSH_DIR",
-            str(Path.home() / ".ssh")
-            if runtime_selection.instance_name == "local"
-            else "/root/.ssh",
+            str(Path.home() / ".ssh") if runtime_selection.instance_name == "local" else "/root/.ssh",
         ),
-        "OPENUPGRADE_ENABLED": source_environment.get("OPENUPGRADE_ENABLED", "False"),
-        "OPENUPGRADE_SCRIPTS_PATH": source_environment.get("OPENUPGRADE_SCRIPTS_PATH", ""),
-        "OPENUPGRADE_TARGET_VERSION": source_environment.get("OPENUPGRADE_TARGET_VERSION", ""),
-        "OPENUPGRADE_SKIP_UPDATE_ADDONS": source_environment.get("OPENUPGRADE_SKIP_UPDATE_ADDONS", "True"),
+        "OPENUPGRADE_ENABLED": openupgrade_environment.get("OPENUPGRADE_ENABLED", "False"),
+        "OPENUPGRADE_ADDON_REPOSITORY": openupgrade_environment.get("OPENUPGRADE_ADDON_REPOSITORY", ""),
+        "OPENUPGRADE_SCRIPTS_PATH": openupgrade_environment.get("OPENUPGRADE_SCRIPTS_PATH", ""),
+        "OPENUPGRADE_TARGET_VERSION": openupgrade_environment.get("OPENUPGRADE_TARGET_VERSION", ""),
+        "OPENUPGRADE_SKIP_UPDATE_ADDONS": openupgrade_environment.get("OPENUPGRADE_SKIP_UPDATE_ADDONS", "True"),
+        "OPENUPGRADELIB_INSTALL_SPEC": openupgrade_environment.get("OPENUPGRADELIB_INSTALL_SPEC", ""),
         "ODOO_PYTHON_SYNC_SKIP_ADDONS": source_environment.get("ODOO_PYTHON_SYNC_SKIP_ADDONS", ""),
         "GITHUB_TOKEN": source_environment.get("GITHUB_TOKEN", ""),
     }
 
-    if platform_runtime.openupgrade_enabled(source_environment):
-        runtime_values["ODOO_PYTHON_SYNC_SKIP_ADDONS"] = (
-            "openupgrade_framework,openupgrade_scripts,openupgrade_scripts_custom"
+    if platform_runtime.openupgrade_enabled(openupgrade_environment):
+        runtime_values["OPENUPGRADE_ADDON_REPOSITORY"] = platform_runtime.resolve_openupgrade_addon_repository(
+            openupgrade_environment
         )
+        runtime_values["OPENUPGRADELIB_INSTALL_SPEC"] = platform_runtime.resolve_openupgradelib_install_spec(openupgrade_environment)
+        runtime_values["ODOO_PYTHON_SYNC_SKIP_ADDONS"] = "openupgrade_framework,openupgrade_scripts,openupgrade_scripts_custom"
 
     for environment_key in sorted(source_environment):
         include_value = environment_key in PLATFORM_RUNTIME_PASSTHROUGH_KEYS or any(
@@ -1024,7 +1021,6 @@ def _dokploy_request(
             f"Dokploy endpoint {path} returned an unsupported scalar payload: {type(response_payload).__name__}."
         )
     raise click.ClickException(f"Dokploy endpoint {path} returned a non-object payload.")
-    
 
 
 def _read_dokploy_config(environment_values: dict[str, str]) -> tuple[str, str]:
@@ -2155,10 +2151,7 @@ def inspect_context(
 
 @main.command(
     "promote",
-    help=(
-        "Promote the exact tested commit from testing to prod for a Dokploy-managed target. "
-        f"{REMOTE_RUNTIME_CONTRACT_HELP}"
-    ),
+    help=f"Promote the exact tested commit from testing to prod for a Dokploy-managed target. {REMOTE_RUNTIME_CONTRACT_HELP}",
 )
 @click.option("--context", "context_name", required=True)
 @click.option(
@@ -2254,10 +2247,7 @@ def promote(
 
 @main.command(
     "ship",
-    help=(
-        "Deploy an exact git ref to a Dokploy-managed remote target. "
-        f"{REMOTE_RUNTIME_CONTRACT_HELP}"
-    ),
+    help=f"Deploy an exact git ref to a Dokploy-managed remote target. {REMOTE_RUNTIME_CONTRACT_HELP}",
 )
 @click.option("--context", "context_name", required=True)
 @click.option(
@@ -2412,10 +2402,7 @@ def rollback(
 
 @main.command(
     "restore",
-    help=(
-        "Restore database and filestore state from the configured upstream source. "
-        f"{DESTRUCTIVE_DATA_WORKFLOW_HELP}"
-    ),
+    help=f"Restore database and filestore state from the configured upstream source. {DESTRUCTIVE_DATA_WORKFLOW_HELP}",
 )
 @click.option(
     "--stack-file",
@@ -2457,10 +2444,7 @@ def restore(
 
 @main.command(
     "bootstrap",
-    help=(
-        "Reset database and filestore state, then initialize a fresh runtime. "
-        f"{DESTRUCTIVE_DATA_WORKFLOW_HELP}"
-    ),
+    help=f"Reset database and filestore state, then initialize a fresh runtime. {DESTRUCTIVE_DATA_WORKFLOW_HELP}",
 )
 @click.option(
     "--stack-file",
@@ -2502,10 +2486,7 @@ def bootstrap(
 
 @main.command(
     "init",
-    help=(
-        "Initialize modules in the existing local runtime database. "
-        f"{LOCAL_RUNTIME_CONTRACT_HELP}"
-    ),
+    help=f"Initialize modules in the existing local runtime database. {LOCAL_RUNTIME_CONTRACT_HELP}",
 )
 @click.option(
     "--stack-file",
@@ -2545,10 +2526,7 @@ def init(
 
 @main.command(
     "openupgrade",
-    help=(
-        "Run the local OpenUpgrade workflow. "
-        f"{LOCAL_RUNTIME_CONTRACT_HELP}"
-    ),
+    help=f"Run the local OpenUpgrade workflow. {LOCAL_RUNTIME_CONTRACT_HELP}",
 )
 @click.option(
     "--stack-file",
@@ -2585,10 +2563,7 @@ def openupgrade(
 
 @main.command(
     "update",
-    help=(
-        "Apply module updates against the local runtime. "
-        f"{LOCAL_RUNTIME_CONTRACT_HELP}"
-    ),
+    help=f"Apply module updates against the local runtime. {LOCAL_RUNTIME_CONTRACT_HELP}",
 )
 @click.option(
     "--stack-file",

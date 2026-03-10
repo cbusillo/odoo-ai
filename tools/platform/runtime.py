@@ -11,16 +11,29 @@ def openupgrade_enabled(source_environment: dict[str, str]) -> bool:
     return raw_value in {"1", "true", "yes", "on"}
 
 
+def resolve_openupgrade_addon_repository(source_environment: dict[str, str]) -> str:
+    repository_name = source_environment.get("OPENUPGRADE_ADDON_REPOSITORY", "").strip()
+    if repository_name:
+        return repository_name
+    raise ValueError("OPENUPGRADE_ADDON_REPOSITORY must be set when OPENUPGRADE_ENABLED is true.")
+
+
+def resolve_openupgradelib_install_spec(source_environment: dict[str, str]) -> str:
+    install_specification = source_environment.get("OPENUPGRADELIB_INSTALL_SPEC", "").strip()
+    if install_specification:
+        return install_specification
+    raise ValueError("OPENUPGRADELIB_INSTALL_SPEC must be set when OPENUPGRADE_ENABLED is true.")
+
+
 def effective_runtime_addon_repositories(
     *,
-    stack_definition: StackDefinition,
     runtime_selection: RuntimeSelection,
     source_environment: dict[str, str],
 ) -> tuple[str, ...]:
     effective_repositories = list(runtime_selection.effective_addon_repositories)
 
     if openupgrade_enabled(source_environment):
-        openupgrade_repository = f"OCA/OpenUpgrade@{stack_definition.odoo_version}"
+        openupgrade_repository = resolve_openupgrade_addon_repository(source_environment)
         if openupgrade_repository not in effective_repositories:
             effective_repositories.append(openupgrade_repository)
 
@@ -116,10 +129,7 @@ def resolve_runtime_selection(
     context_definition = stack_definition.contexts[context_name]
     if instance_name not in context_definition.instances:
         available_instances = ", ".join(sorted(context_definition.instances))
-        raise ValueError(
-            f"Unknown instance '{instance_name}' for context '{context_name}'. "
-            f"Available: {available_instances}"
-        )
+        raise ValueError(f"Unknown instance '{instance_name}' for context '{context_name}'. Available: {available_instances}")
     instance_definition = context_definition.instances[instance_name]
 
     effective_install_modules = merge_effective_modules(context_definition, instance_definition)
@@ -205,9 +215,7 @@ def render_runtime_env(runtime_values: dict[str, str]) -> str:
 def runtime_env_diff(existing_values: dict[str, str], proposed_values: dict[str, str]) -> JsonObject:
     added_keys = sorted(key for key in proposed_values if key not in existing_values)
     removed_keys = sorted(key for key in existing_values if key not in proposed_values)
-    changed_keys = sorted(
-        key for key in proposed_values if key in existing_values and proposed_values[key] != existing_values[key]
-    )
+    changed_keys = sorted(key for key in proposed_values if key in existing_values and proposed_values[key] != existing_values[key])
     unchanged_count = len(proposed_values) - len(added_keys) - len(changed_keys)
     return {
         "added_keys": added_keys,

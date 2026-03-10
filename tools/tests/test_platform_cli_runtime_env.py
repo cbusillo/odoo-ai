@@ -33,6 +33,9 @@ from tools.platform.models import (
 )
 from tools.tests.platform_test_helpers import write_compose_stack_files, write_runtime_env_file
 
+OPENUPGRADE_ADDON_REPOSITORY = "OCA/OpenUpgrade@89e649728027a8ab656b3aa4be18f4bd364db417"
+OPENUPGRADELIB_INSTALL_SPEC = "git+https://github.com/OCA/openupgradelib.git@46d66ff5ed6a99481f84d3c79fc6e50835da7286"
+
 
 def _sample_runtime_selection() -> RuntimeSelection:
     context_definition = ContextDefinition()
@@ -81,7 +84,8 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
             runtime_env_file=Path(runtime_env_file),
             stack_definition=_sample_stack_definition(),
             runtime_selection=runtime_selection or _sample_runtime_selection(),
-            source_environment=source_environment or {
+            source_environment=source_environment
+            or {
                 "ODOO_DB_USER": "odoo",
                 "ODOO_DB_PASSWORD": "database-password",
             },
@@ -96,7 +100,9 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
             with patch("tools.platform.cli._discover_repo_root", return_value=repo_root):
                 command = _compose_base_command(runtime_env_file)
 
-        self.assertEqual(command[:6], ["docker", "compose", "--project-directory", str(repo_root), "--env-file", str(runtime_env_file)])
+        self.assertEqual(
+            command[:6], ["docker", "compose", "--project-directory", str(repo_root), "--env-file", str(runtime_env_file)]
+        )
         self.assertEqual(
             command[6:],
             [
@@ -161,7 +167,7 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
             "/volumes/data/.data_workflow_in_progress",
         )
 
-    def test_runtime_env_includes_dokploy_connection_keys_for_remote_data_workflows(self) -> None:
+    def test_runtime_env_includes_only_dokploy_api_connection_keys_for_remote_data_workflows(self) -> None:
         remote_runtime_selection = replace(
             _sample_runtime_selection(),
             instance_name="testing",
@@ -176,17 +182,14 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
                 "ODOO_DB_PASSWORD": "database-password",
                 "DOKPLOY_HOST": "https://dokploy.example",
                 "DOKPLOY_TOKEN": "token",
-                "DOKPLOY_SSH_HOST": "dokploy.internal",
-                "DOKPLOY_REMOTE_STACK_PATH_OPW_TESTING": "/custom/stack/path",
-                "DOKPLOY_COMPOSE_PROJECT_OPW_TESTING": "custom-compose-project",
             },
         )
 
         self.assertEqual(runtime_values.get("DOKPLOY_HOST"), "https://dokploy.example")
         self.assertEqual(runtime_values.get("DOKPLOY_TOKEN"), "token")
-        self.assertEqual(runtime_values.get("DOKPLOY_SSH_HOST"), "dokploy.internal")
-        self.assertEqual(runtime_values.get("DOKPLOY_REMOTE_STACK_PATH_OPW_TESTING"), "/custom/stack/path")
-        self.assertEqual(runtime_values.get("DOKPLOY_COMPOSE_PROJECT_OPW_TESTING"), "custom-compose-project")
+        self.assertNotIn("DOKPLOY_SSH_HOST", runtime_values)
+        self.assertNotIn("DOKPLOY_REMOTE_STACK_PATH_OPW_TESTING", runtime_values)
+        self.assertNotIn("DOKPLOY_COMPOSE_PROJECT_OPW_TESTING", runtime_values)
 
     def test_runtime_env_sets_restore_defaults(self) -> None:
         runtime_values = self._build_runtime_values(runtime_env_file="/tmp/cm.local.env")
@@ -218,13 +221,17 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
                 "ODOO_DB_USER": "odoo",
                 "ODOO_DB_PASSWORD": "database-password",
                 "OPENUPGRADE_ENABLED": "True",
+                "OPENUPGRADE_ADDON_REPOSITORY": OPENUPGRADE_ADDON_REPOSITORY,
+                "OPENUPGRADELIB_INSTALL_SPEC": OPENUPGRADELIB_INSTALL_SPEC,
             },
         )
 
         self.assertEqual(
             runtime_values.get("ODOO_ADDON_REPOSITORIES"),
-            "cbusillo/disable_odoo_online@main,OCA/OpenUpgrade@19.0",
+            f"cbusillo/disable_odoo_online@main,{OPENUPGRADE_ADDON_REPOSITORY}",
         )
+        self.assertEqual(runtime_values.get("OPENUPGRADE_ADDON_REPOSITORY"), OPENUPGRADE_ADDON_REPOSITORY)
+        self.assertEqual(runtime_values.get("OPENUPGRADELIB_INSTALL_SPEC"), OPENUPGRADELIB_INSTALL_SPEC)
         self.assertEqual(
             runtime_values.get("ODOO_PYTHON_SYNC_SKIP_ADDONS"),
             "openupgrade_framework,openupgrade_scripts,openupgrade_scripts_custom",
@@ -235,7 +242,7 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
             _sample_runtime_selection(),
             effective_addon_repositories=(
                 "cbusillo/disable_odoo_online@main",
-                "OCA/OpenUpgrade@19.0",
+                OPENUPGRADE_ADDON_REPOSITORY,
             ),
         )
 
@@ -246,13 +253,53 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
                 "ODOO_DB_USER": "odoo",
                 "ODOO_DB_PASSWORD": "database-password",
                 "OPENUPGRADE_ENABLED": "True",
+                "OPENUPGRADE_ADDON_REPOSITORY": OPENUPGRADE_ADDON_REPOSITORY,
+                "OPENUPGRADELIB_INSTALL_SPEC": OPENUPGRADELIB_INSTALL_SPEC,
             },
         )
 
         self.assertEqual(
             runtime_values.get("ODOO_ADDON_REPOSITORIES"),
-            "cbusillo/disable_odoo_online@main,OCA/OpenUpgrade@19.0",
+            f"cbusillo/disable_odoo_online@main,{OPENUPGRADE_ADDON_REPOSITORY}",
         )
+
+    def test_runtime_env_reads_openupgrade_pins_from_runtime_selection_env(self) -> None:
+        runtime_selection = replace(
+            _sample_runtime_selection(),
+            effective_runtime_env={
+                "OPENUPGRADE_ENABLED": "True",
+                "OPENUPGRADE_ADDON_REPOSITORY": OPENUPGRADE_ADDON_REPOSITORY,
+                "OPENUPGRADELIB_INSTALL_SPEC": OPENUPGRADELIB_INSTALL_SPEC,
+            },
+        )
+
+        runtime_values = self._build_runtime_values(
+            runtime_env_file="/tmp/opw.local.env",
+            runtime_selection=runtime_selection,
+            source_environment={
+                "ODOO_DB_USER": "odoo",
+                "ODOO_DB_PASSWORD": "database-password",
+            },
+        )
+
+        self.assertEqual(
+            runtime_values.get("ODOO_ADDON_REPOSITORIES"),
+            f"cbusillo/disable_odoo_online@main,{OPENUPGRADE_ADDON_REPOSITORY}",
+        )
+        self.assertEqual(runtime_values.get("OPENUPGRADELIB_INSTALL_SPEC"), OPENUPGRADELIB_INSTALL_SPEC)
+
+    def test_runtime_env_rejects_openupgrade_without_pinned_inputs(self) -> None:
+        with self.assertRaises(ValueError) as captured_error:
+            self._build_runtime_values(
+                runtime_env_file="/tmp/opw.local.env",
+                source_environment={
+                    "ODOO_DB_USER": "odoo",
+                    "ODOO_DB_PASSWORD": "database-password",
+                    "OPENUPGRADE_ENABLED": "True",
+                },
+            )
+
+        self.assertIn("OPENUPGRADE_ADDON_REPOSITORY", str(captured_error.exception))
 
     def test_runtime_env_keeps_python_sync_skip_addons_empty_without_openupgrade(self) -> None:
         runtime_values = self._build_runtime_values(runtime_env_file="/tmp/opw.local.env")
@@ -276,7 +323,7 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
                         'ODOO_ADMIN_PASSWORD = "secure-password"',
                         "",
                         "[contexts.opw.shared]",
-                        'ENV_OVERRIDE_SHOPIFY__TEST_STORE = true',
+                        "ENV_OVERRIDE_SHOPIFY__TEST_STORE = true",
                         "",
                     ]
                 )

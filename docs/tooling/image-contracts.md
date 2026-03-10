@@ -85,6 +85,9 @@ Layer Model
     layers
   - request external addons explicitly with `ODOO_ADDON_REPOSITORIES`; do not
     auto-inject OpenUpgrade or other workflow-specific repos into every build
+  - pin OpenUpgrade workflows explicitly through tracked
+    `OPENUPGRADE_ADDON_REPOSITORY` and `OPENUPGRADELIB_INSTALL_SPEC` values so
+    local and remote restores use the same tested stack
 
 Promotion Rule
 

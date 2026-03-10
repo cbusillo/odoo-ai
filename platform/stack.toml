@@ -97,6 +97,9 @@ install_modules = [
 
 [contexts.opw.runtime_env]
 ODOO_DEV_MODE = ""
+OPENUPGRADE_ENABLED = true
+OPENUPGRADE_ADDON_REPOSITORY = "OCA/OpenUpgrade@89e649728027a8ab656b3aa4be18f4bd364db417"
+OPENUPGRADELIB_INSTALL_SPEC = "git+https://github.com/OCA/openupgradelib.git@46d66ff5ed6a99481f84d3c79fc6e50835da7286"
 
 [contexts.opw.instances.local]
 

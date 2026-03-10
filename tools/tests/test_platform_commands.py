@@ -22,7 +22,6 @@ from tools.platform import (
     commands_workflow,
     release_workflows,
 )
-from tools.platform import dokploy as platform_dokploy
 from tools.platform.models import (
     ContextDefinition,
     DokploySourceOfTruth,
@@ -1152,7 +1151,9 @@ class PlatformCommandsSelectionTests(unittest.TestCase):
                         repo_root / ".env",
                         {"ODOO_DB_USER": "odoo", "ODOO_DB_PASSWORD": "pw"},
                     ),
-                    write_runtime_odoo_conf_file_fn=lambda *_args, **_kwargs: repo_root / ".platform" / "state" / "cm-local" / "platform.odoo.conf",
+                    write_runtime_odoo_conf_file_fn=lambda *_args, **_kwargs: (
+                        repo_root / ".platform" / "state" / "cm-local" / "platform.odoo.conf"
+                    ),
                     write_pycharm_odoo_conf_fn=lambda **_kwargs: repo_root / ".platform" / "ide" / "cm.local.odoo.conf",
                 )
 
@@ -1198,40 +1199,13 @@ class PlatformCommandsLifecycleTests(unittest.TestCase):
 
 
 class PlatformCommandsDokployTests(unittest.TestCase):
-    def test_resolve_dokploy_compose_remote_config_reads_app_name_from_compose_payload(self) -> None:
-        with patch.object(platform_dokploy, "dokploy_request", return_value={"composeId": "compose-id-2", "appName": "odoo-cm-dev-b"}):
-            remote_stack_path, compose_project = platform_dokploy.resolve_dokploy_compose_remote_config(
-                host="https://dokploy.example",
-                token="token",
-                compose_id="compose-id-2",
-                compose_name="cm-dev",
-            )
-
-        self.assertEqual(remote_stack_path, Path("/etc/dokploy/applications/odoo-cm-dev-b"))
-        self.assertEqual(compose_project, "odoo-cm-dev-b")
-
-    def test_resolve_dokploy_compose_remote_config_requires_app_name(self) -> None:
-        with patch.object(platform_dokploy, "dokploy_request", return_value={"composeId": "compose-id-2"}):
-            with self.assertRaises(click.ClickException) as raised_error:
-                platform_dokploy.resolve_dokploy_compose_remote_config(
-                    host="https://dokploy.example",
-                    token="token",
-                    compose_id="compose-id-2",
-                    compose_name="cm-dev",
-                )
-
-        self.assertIn("has no appName", str(raised_error.exception))
-
     def test_execute_reconcile_fails_when_target_missing_from_stack(self) -> None:
         with TemporaryDirectory() as temporary_directory_name:
             repo_root = Path(temporary_directory_name)
             loaded_stack = _build_loaded_stack_for_test(repo_root, stack_definition=_sample_stack_definition())
             source_of_truth = DokploySourceOfTruth(
                 schema_version=1,
-                targets=(
-                    DokployTargetDefinition(context="cm", instance="prod", target_id="compose-id",
-                                            target_name="cm-prod"),
-                ),
+                targets=(DokployTargetDefinition(context="cm", instance="prod", target_id="compose-id", target_name="cm-prod"),),
             )
 
             with self.assertRaises(click.ClickException) as captured_error:
@@ -1246,9 +1220,9 @@ class PlatformCommandsDokployTests(unittest.TestCase):
                     json_output=False,
                     discover_repo_root_fn=lambda _path: repo_root,
                     load_stack_fn=lambda _path: loaded_stack,
-                    resolve_dokploy_source_file_fn=lambda _repo_root, _source_file: _source_file
-                    if _source_file is not None
-                    else Path("platform/dokploy.toml"),
+                    resolve_dokploy_source_file_fn=lambda _repo_root, _source_file: (
+                        _source_file if _source_file is not None else Path("platform/dokploy.toml")
+                    ),
                     load_dokploy_source_of_truth_fn=lambda _source_file_path: source_of_truth,
                     load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
                     read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
@@ -1274,10 +1248,10 @@ class PlatformCommandsDokployTests(unittest.TestCase):
             source_of_truth = DokploySourceOfTruth(
                 schema_version=1,
                 targets=(
-                    DokployTargetDefinition(context="cm", instance="local", target_id="cm-local-compose-id",
-                                            target_name="cm-local"),
-                    DokployTargetDefinition(context="opw", instance="local", target_id="opw-local-compose-id",
-                                            target_name="opw-local"),
+                    DokployTargetDefinition(context="cm", instance="local", target_id="cm-local-compose-id", target_name="cm-local"),
+                    DokployTargetDefinition(
+                        context="opw", instance="local", target_id="opw-local-compose-id", target_name="opw-local"
+                    ),
                 ),
             )
 
@@ -1313,9 +1287,9 @@ class PlatformCommandsDokployTests(unittest.TestCase):
                 json_output=False,
                 discover_repo_root_fn=lambda _path: repo_root,
                 load_stack_fn=lambda _path: loaded_stack,
-                resolve_dokploy_source_file_fn=lambda _repo_root, _source_file: _source_file
-                if _source_file is not None
-                else Path("platform/dokploy.toml"),
+                resolve_dokploy_source_file_fn=lambda _repo_root, _source_file: (
+                    _source_file if _source_file is not None else Path("platform/dokploy.toml")
+                ),
                 load_dokploy_source_of_truth_fn=lambda _source_file_path: source_of_truth,
                 load_environment_fn=load_environment,
                 read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
@@ -1344,11 +1318,16 @@ class PlatformCommandsDokployTests(unittest.TestCase):
             source_of_truth = DokploySourceOfTruth(
                 schema_version=1,
                 targets=(
-                    DokployTargetDefinition(context="cm", instance="local", target_id="cm-local-compose-id",
-                                            target_name="cm-local", env={
+                    DokployTargetDefinition(
+                        context="cm",
+                        instance="local",
+                        target_id="cm-local-compose-id",
+                        target_name="cm-local",
+                        env={
                             "ENV_OVERRIDE_KEEP": "desired",
                             "ODOO_WEB_COMMAND": "python3 /volumes/scripts/run_odoo_startup.py",
-                        }),
+                        },
+                    ),
                 ),
             )
 
@@ -1369,9 +1348,9 @@ class PlatformCommandsDokployTests(unittest.TestCase):
                 json_output=False,
                 discover_repo_root_fn=lambda _path: repo_root,
                 load_stack_fn=lambda _path: loaded_stack,
-                resolve_dokploy_source_file_fn=lambda _repo_root, _source_file: _source_file
-                if _source_file is not None
-                else Path("platform/dokploy.toml"),
+                resolve_dokploy_source_file_fn=lambda _repo_root, _source_file: (
+                    _source_file if _source_file is not None else Path("platform/dokploy.toml")
+                ),
                 load_dokploy_source_of_truth_fn=lambda _source_file_path: source_of_truth,
                 load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (
                     Path("/tmp/.env"),
@@ -1525,7 +1504,6 @@ class PlatformCommandsDokployTests(unittest.TestCase):
                 "customGitUrl": "git@github.com:cbusillo/odoo-ai.git",
                 "composePath": "./docker-compose.yml",
                 "sourceType": "git",
-                "autoDeploy": True,
                 "composeStatus": "done",
             }
 
@@ -1627,7 +1605,6 @@ class PlatformCommandsDokployTests(unittest.TestCase):
                     "customGitUrl": "git@github.com:cbusillo/odoo-ai.git",
                     "composePath": "./docker-compose.yml",
                     "sourceType": "git",
-                    "autoDeploy": True,
                     "composeStatus": "done",
                 }
 
@@ -1650,6 +1627,7 @@ class PlatformCommandsDokployTests(unittest.TestCase):
             snapshot_dir = repo_root / "tmp" / "dokploy-snapshots" / "compose"
             self.assertTrue((snapshot_dir / "cm-dev--compose-1.json").exists())
             self.assertTrue((snapshot_dir / "cm-dev--compose-2.json").exists())
+
 
 class PlatformCommandsReleaseTests(unittest.TestCase):
     @staticmethod
@@ -1728,11 +1706,15 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             ),
             apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
             dokploy_request_fn=dokploy_request,
-            latest_deployment_for_compose_fn=latest_deployment if target_type == "compose" else lambda _host, _token, _compose_id: None,
+            latest_deployment_for_compose_fn=latest_deployment
+            if target_type == "compose"
+            else lambda _host, _token, _compose_id: None,
             deployment_key_fn=lambda deployment: str(deployment.get("id", "")) if isinstance(deployment, dict) else "",
             wait_for_dokploy_compose_deployment_fn=wait_for_deployment if target_type == "compose" else lambda **_kwargs: "",
             verify_ship_healthchecks_fn=lambda **_kwargs: None,
-            latest_deployment_for_application_fn=latest_deployment if target_type == "application" else lambda _host, _token, _application_id: None,
+            latest_deployment_for_application_fn=latest_deployment
+            if target_type == "application"
+            else lambda _host, _token, _application_id: None,
             wait_for_dokploy_deployment_fn=wait_for_deployment if target_type == "application" else lambda **_kwargs: "",
             echo_fn=emitted_lines.append,
         )
@@ -1750,7 +1732,9 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             target_definition_value = kwargs.get("target_definition")
             if target_definition_value is not None:
                 self.assertIsInstance(target_definition_value, DokployTargetDefinition)
-            typed_target_definition = target_definition_value if isinstance(target_definition_value, DokployTargetDefinition) else None
+            typed_target_definition = (
+                target_definition_value if isinstance(target_definition_value, DokployTargetDefinition) else None
+            )
             seen_target_definitions.append(typed_target_definition)
             return "compose", "compose-id", "compose-name", None, None
 
@@ -2026,9 +2010,7 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
         self.assertIn("requires platform/dokploy.toml", captured_error.exception.message)
 
     def test_execute_ship_requires_target_definition_in_source_of_truth(self) -> None:
-        source_of_truth = self._source_of_truth(
-            self._target_definition(instance_name="testing")
-        )
+        source_of_truth = self._source_of_truth(self._target_definition(instance_name="testing"))
 
         with self.assertRaises(click.ClickException) as captured_error:
             commands_release.execute_ship(

@@ -320,8 +320,10 @@ def _resolve_dokploy_remote_runtime(
     safe_name = compose_name.upper().replace("-", "_")
     path_override_key = f"DOKPLOY_REMOTE_STACK_PATH_{safe_name}"
     project_override_key = f"DOKPLOY_COMPOSE_PROJECT_{safe_name}"
+    compose_id_override_key = f"DOKPLOY_COMPOSE_ID_{safe_name}"
     path_override = env_values.get(path_override_key, "").strip()
     project_override = env_values.get(project_override_key, "").strip()
+    compose_id_override = env_values.get(compose_id_override_key, "").strip()
 
     ssh_user_override = env_values.get("DOKPLOY_SSH_USER", "").strip()
     ssh_port_raw = env_values.get("DOKPLOY_SSH_PORT", "").strip()
@@ -364,13 +366,15 @@ def _resolve_dokploy_remote_runtime(
         ssh_user = ssh_user_override or "root"
         return ssh_host_override, ssh_user, ssh_port, remote_stack_path, compose_project
 
-    compose_id, _resolved_compose_name = resolve_dokploy_compose_id(
-        host=dokploy_host,
-        token=dokploy_token,
-        context_name=context_name,
-        instance_name=instance_name,
-        environment_values=env_values,
-    )
+    compose_id = compose_id_override
+    if not compose_id:
+        compose_id, _resolved_compose_name = resolve_dokploy_compose_id(
+            host=dokploy_host,
+            token=dokploy_token,
+            context_name=context_name,
+            instance_name=instance_name,
+            environment_values=env_values,
+        )
     compose_payload = dokploy_request(
         host=dokploy_host,
         token=dokploy_token,

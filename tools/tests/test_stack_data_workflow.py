@@ -373,6 +373,55 @@ class StackDataWorkflowTests(unittest.TestCase):
             ),
         )
 
+    def test_resolve_dokploy_remote_runtime_uses_safe_name_compose_id_override_for_server_lookup(self) -> None:
+        deploy_servers = (
+            {
+                "serverId": "server-1",
+                "name": "dokploy-host-1",
+                "ipAddress": "10.0.0.1",
+                "username": "root",
+                "port": 22,
+            },
+        )
+
+        def fake_dokploy_request(**kwargs: object) -> dict[str, str]:
+            self.assertEqual(kwargs.get("path"), "/api/compose.one")
+            self.assertEqual(kwargs.get("query"), {"composeId": "compose-1"})
+            return {"serverId": "server-1"}
+
+        with (
+            patch.object(stack_data_workflow, "collect_dokploy_deploy_servers", return_value=deploy_servers),
+            patch.object(
+                stack_data_workflow,
+                "resolve_dokploy_compose_id",
+                side_effect=AssertionError("context-scoped compose lookup should not run"),
+            ),
+            patch.object(stack_data_workflow, "dokploy_request", side_effect=fake_dokploy_request),
+        ):
+            resolved = stack_data_workflow._resolve_dokploy_remote_runtime(
+                dokploy_host="https://dokploy.example",
+                dokploy_token="token",
+                compose_name="opsingle",
+                context_name="opw",
+                instance_name="prod",
+                env_values={
+                    "DOKPLOY_REMOTE_STACK_PATH_OPSINGLE": "/etc/dokploy/applications/opsingle",
+                    "DOKPLOY_COMPOSE_PROJECT_OPSINGLE": "opsingle",
+                    "DOKPLOY_COMPOSE_ID_OPSINGLE": "compose-1",
+                },
+            )
+
+        self.assertEqual(
+            resolved,
+            (
+                "dokploy-host-1",
+                "root",
+                22,
+                Path("/etc/dokploy/applications/opsingle"),
+                "opsingle",
+            ),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

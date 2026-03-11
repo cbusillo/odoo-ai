@@ -10,6 +10,8 @@ from tempfile import TemporaryDirectory
 from typing import Protocol
 from unittest import mock
 
+import click
+
 
 class GenerateShopifyModelsModule(Protocol):
     def load_runtime_env_values(
@@ -75,7 +77,7 @@ class GenerateShopifyModelsEnvironmentTests(unittest.TestCase):
 
         with TemporaryDirectory() as temporary_directory_name:
             repository_root = Path(temporary_directory_name)
-            with mock.patch.dict(os.environ, {"ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY": "env-store"}, clear=False):
+            with mock.patch.dict(os.environ, {"ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY": "env-store"}):
                 runtime_env_values = generate_shopify_models.load_runtime_env_values(
                     repository_root=repository_root,
                     env_file=None,
@@ -160,6 +162,46 @@ class GenerateShopifyModelsEnvironmentTests(unittest.TestCase):
         self.assertEqual(runtime_env_values["ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY"], "secret-store")
         self.assertEqual(runtime_env_values["ENV_OVERRIDE_SHOPIFY__API_TOKEN"], "secret-token")
         self.assertEqual(runtime_env_values["ENV_OVERRIDE_SHOPIFY__API_VERSION"], "2026-01")
+
+    def test_load_runtime_env_values_respects_error_collision_mode_for_env_file_layers(self) -> None:
+        generate_shopify_models = _load_generate_shopify_models_module()
+
+        with TemporaryDirectory() as temporary_directory_name:
+            repository_root = Path(temporary_directory_name)
+            (repository_root / ".env").write_text(
+                "\n".join(
+                    (
+                        "ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY=env-store",
+                        "ENV_OVERRIDE_SHOPIFY__API_TOKEN=env-token",
+                        "ENV_OVERRIDE_SHOPIFY__API_VERSION=2026-01",
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            platform_directory = repository_root / "platform"
+            platform_directory.mkdir(parents=True, exist_ok=True)
+            (platform_directory / "secrets.toml").write_text(
+                "\n".join(
+                    (
+                        "schema_version = 1",
+                        "",
+                        "[contexts.opw.instances.local.env]",
+                        'ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY = "secret-store"',
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with mock.patch.dict(os.environ, {"PLATFORM_ENV_COLLISION_MODE": "error"}):
+                with self.assertRaises(click.ClickException):
+                    generate_shopify_models.load_runtime_env_values(
+                        repository_root=repository_root,
+                        env_file=None,
+                        context_name="opw",
+                        instance_name="local",
+                    )
 
     def test_update_graphql_config_points_ide_to_local_schema_snapshot(self) -> None:
         generate_shopify_models = _load_generate_shopify_models_module()

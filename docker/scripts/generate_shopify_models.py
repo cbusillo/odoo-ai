@@ -45,7 +45,6 @@ def load_runtime_env_values(
         env_file,
         context_name=context_name,
         instance_name=instance_name,
-        collision_mode="warn",
     )
     return environment_values
 

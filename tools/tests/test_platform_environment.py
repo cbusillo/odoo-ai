@@ -119,6 +119,35 @@ class PlatformEnvironmentTests(unittest.TestCase):
                     collision_mode="warn",
                 )
 
+    def test_load_secret_environment_raises_when_collision_mode_is_error(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            repo_root = Path(temporary_directory_name)
+            platform_directory = repo_root / "platform"
+            platform_directory.mkdir(parents=True, exist_ok=True)
+            (platform_directory / "secrets.toml").write_text(
+                "\n".join(
+                    (
+                        "schema_version = 1",
+                        "",
+                        "[shared]",
+                        'ENV_OVERRIDE_SHOPIFY__TEST_STORE = false',
+                        "",
+                        "[contexts.opw.shared]",
+                        'ENV_OVERRIDE_SHOPIFY__TEST_STORE = true',
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(click.ClickException):
+                environment.load_secret_environment(
+                    repo_root,
+                    context_name="opw",
+                    instance_name="local",
+                    collision_mode="error",
+                )
+
     @staticmethod
     def test_resolve_stack_runtime_scope_handles_context_and_instance_names() -> None:
         assert environment.resolve_stack_runtime_scope("opw") == ("opw", "local")

@@ -140,13 +140,16 @@ def load_secret_environment(
     *,
     context_name: str | None = None,
     instance_name: str | None = None,
+    collision_mode: str | None = None,
 ) -> dict[str, str]:
     secret_layers = build_platform_secret_layers(
         repo_root=repo_root,
         context_name=context_name,
         instance_name=instance_name,
     )
-    merged_values, _source_by_key, _collisions = merge_environment_layers(secret_layers)
+    normalized_collision_mode = resolve_env_collision_mode(collision_mode)
+    merged_values, _source_by_key, collisions = merge_environment_layers(secret_layers)
+    handle_environment_collisions(collisions, normalized_collision_mode)
     return merged_values
 
 

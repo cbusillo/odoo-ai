@@ -12,7 +12,8 @@ from tools.platform import environment as platform_environment
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 ADDONS_PATH = REPOSITORY_ROOT / "addons" / "shopify_sync"
-GRAPHQL_CONFIG_PATH = ADDONS_PATH / "graphql" / "graphql.config.yml"
+GRAPHQL_PATH = ADDONS_PATH / "graphql"
+GRAPHQL_ENV_FILE_NAMES = (".env", ".env.local")
 DEFAULT_CONTEXT_NAME = "opw"
 DEFAULT_INSTANCE_NAME = "local"
 
@@ -95,10 +96,36 @@ def save_schema_sdl(json_data: IntrospectionQuery, output_file_path: Path) -> No
     output_file_path.write_text(sdl)
 
 
-def update_graphql_config(*, config_file_path: Path, schema_file_path: Path) -> None:
-    relative_schema_path = os.path.relpath(schema_file_path, config_file_path.parent)
-    config_text = f'schema: "{relative_schema_path}"\ndocuments:\n  - "shopify/**/*.graphql"\n'
-    config_file_path.write_text(config_text, encoding="utf-8")
+def resolve_graphql_env_file(graphql_path: Path) -> Path | None:
+    for env_file_name in GRAPHQL_ENV_FILE_NAMES:
+        env_file_path = graphql_path / env_file_name
+        if env_file_path.exists():
+            return env_file_path
+    return None
+
+
+def sync_graphql_ide_api_version(*, graphql_path: Path, shopify_api_version: str) -> None:
+    env_file_path = resolve_graphql_env_file(graphql_path)
+    if env_file_path is None:
+        return
+
+    env_lines = env_file_path.read_text(encoding="utf-8").splitlines()
+    api_version_key = "SHOPIFY_GRAPHQL_API_VERSION"
+    synchronized_lines: list[str] = []
+    did_update_existing_value = False
+
+    for env_line in env_lines:
+        if env_line.startswith(f"{api_version_key}="):
+            synchronized_lines.append(f"{api_version_key}={shopify_api_version}")
+            did_update_existing_value = True
+            continue
+        synchronized_lines.append(env_line)
+
+    if not did_update_existing_value:
+        synchronized_lines.append(f"{api_version_key}={shopify_api_version}")
+
+    env_file_path.write_text("\n".join(synchronized_lines) + "\n", encoding="utf-8")
+    print(f"Synchronized Shopify GraphQL IDE API version in {env_file_path}")
 
 
 def main() -> None:
@@ -146,7 +173,7 @@ def main() -> None:
     if not sdl_file_path.exists():
         save_schema_sdl(introspection_data, sdl_file_path)
 
-    update_graphql_config(config_file_path=GRAPHQL_CONFIG_PATH, schema_file_path=introspection_file_path)
+    sync_graphql_ide_api_version(graphql_path=GRAPHQL_PATH, shopify_api_version=shopify_api_version)
 
     config_dict = {
         "schema_path": str(sdl_file_path),

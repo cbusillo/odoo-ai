@@ -55,22 +55,33 @@ See `addons/shopify_sync/services/shopify/sync/importers/order_importer.py`.
 
 - `addons/shopify_sync/graphql/shopify/*.graphql` — hand-edited operations
   and fragments.
-- `addons/shopify_sync/graphql/graphql.config.yml` points IDE tooling
-  at the checked-in Shopify introspection JSON snapshot under
-  `addons/shopify_sync/graphql/schema/`, and the tracked IDE module config must
-  keep that schema directory included so PyCharm can resolve it without local
-  Shopify secrets or an extra generated `.graphql` schema file.
+- `addons/shopify_sync/graphql/graphql.config.yml` points PyCharm GraphQL
+  tooling at the live Shopify Admin GraphQL endpoint using local-only
+  `SHOPIFY_GRAPHQL_SHOP_URL_KEY`, `SHOPIFY_GRAPHQL_API_VERSION`, and
+  `SHOPIFY_GRAPHQL_API_TOKEN` variables from
+  `addons/shopify_sync/graphql/.env` or `addons/shopify_sync/graphql/.env.local`.
 - Keep Shopify instance secrets in `platform/secrets.toml`, not duplicated in
   root `.env`, so release-time env collision checks stay clean.
 - `uv run python docker/scripts/generate_shopify_models.py --context opw \
-  --instance local` now loads Shopify credentials from the same layered
-  platform env used by runtime commands and rewrites `graphql.config.yml` to
-  the freshly generated schema version.
+  --instance local` loads Shopify credentials from the same layered platform
+  env used by runtime commands and refreshes the checked-in schema snapshots
+  used for code generation. If `addons/shopify_sync/graphql/.env` exists, that
+  command also keeps `SHOPIFY_GRAPHQL_API_VERSION` aligned with the generated
+  schema version. If `.env` is absent, it applies the same update to
+  `addons/shopify_sync/graphql/.env.local` when present.
 - Checked-in schema snapshots remain under
   `addons/shopify_sync/graphql/schema/` for reference and generated client
   history.
 - `addons/shopify_sync/services/shopify/gql/` — generated client and models
   (do not edit).
+
+Create `addons/shopify_sync/graphql/.env` for PyCharm GraphQL only:
+
+```bash
+SHOPIFY_GRAPHQL_SHOP_URL_KEY=your-store
+SHOPIFY_GRAPHQL_API_VERSION=2026-01
+SHOPIFY_GRAPHQL_API_TOKEN=shpat_...
+```
 
 Regenerate generated code from the repo root:
 
@@ -78,9 +89,9 @@ Regenerate generated code from the repo root:
 uv run python docker/scripts/generate_shopify_models.py
 ```
 
-That command is the only live Shopify introspection path. PyCharm reads the
-local schema snapshot through `graphql.config.yml` instead of introspecting the
-remote endpoint directly.
+That command is the only tracked schema refresh path. PyCharm introspects the
+remote endpoint directly through `graphql.config.yml`, while generated schema
+snapshots remain checked in for codegen history and reference.
 
 ## Configuration (System Parameters)
 

@@ -23,7 +23,7 @@ class GenerateShopifyModelsModule(Protocol):
         instance_name: str,
     ) -> dict[str, str]: ...
 
-    def update_graphql_config(self, *, config_file_path: Path, schema_file_path: Path) -> None: ...
+    def sync_graphql_ide_api_version(self, *, graphql_path: Path, shopify_api_version: str) -> None: ...
 
 
 def _load_generate_shopify_models_module() -> GenerateShopifyModelsModule:
@@ -203,22 +203,70 @@ class GenerateShopifyModelsEnvironmentTests(unittest.TestCase):
                         instance_name="local",
                     )
 
-    def test_update_graphql_config_points_ide_to_local_introspection_snapshot(self) -> None:
+    def test_sync_graphql_ide_api_version_updates_dot_env_when_present(self) -> None:
         generate_shopify_models = _load_generate_shopify_models_module()
 
         with TemporaryDirectory() as temporary_directory_name:
-            repository_root = Path(temporary_directory_name)
-            config_file_path = repository_root / "addons" / "shopify_sync" / "graphql" / "graphql.config.yml"
-            config_file_path.parent.mkdir(parents=True, exist_ok=True)
-            schema_file_path = repository_root / "addons" / "shopify_sync" / "graphql" / "schema" / "shopify_schema_2026-01.json"
-            schema_file_path.parent.mkdir(parents=True, exist_ok=True)
-            schema_file_path.write_text('{"__schema": {}}\n', encoding="utf-8")
-
-            generate_shopify_models.update_graphql_config(
-                config_file_path=config_file_path,
-                schema_file_path=schema_file_path,
+            graphql_path = Path(temporary_directory_name) / "addons" / "shopify_sync" / "graphql"
+            graphql_path.mkdir(parents=True, exist_ok=True)
+            graphql_env_file = graphql_path / ".env"
+            graphql_env_file.write_text(
+                "\n".join(
+                    (
+                        "SHOPIFY_GRAPHQL_SHOP_URL_KEY=opw-local",
+                        "SHOPIFY_GRAPHQL_API_VERSION=2025-10",
+                        "SHOPIFY_GRAPHQL_API_TOKEN=token-123",
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
             )
 
-            graphql_config_text = config_file_path.read_text(encoding="utf-8")
+            generate_shopify_models.sync_graphql_ide_api_version(
+                graphql_path=graphql_path,
+                shopify_api_version="2026-01",
+            )
 
-        self.assertEqual(graphql_config_text, 'schema: "schema/shopify_schema_2026-01.json"\ndocuments:\n  - "shopify/**/*.graphql"\n')
+            graphql_env_text = graphql_env_file.read_text(encoding="utf-8")
+
+        self.assertEqual(
+            graphql_env_text,
+            "\n".join(
+                (
+                    "SHOPIFY_GRAPHQL_SHOP_URL_KEY=opw-local",
+                    "SHOPIFY_GRAPHQL_API_VERSION=2026-01",
+                    "SHOPIFY_GRAPHQL_API_TOKEN=token-123",
+                    "",
+                )
+            ),
+        )
+
+    def test_sync_graphql_ide_api_version_falls_back_to_dot_env_local(self) -> None:
+        generate_shopify_models = _load_generate_shopify_models_module()
+
+        with TemporaryDirectory() as temporary_directory_name:
+            graphql_path = Path(temporary_directory_name) / "addons" / "shopify_sync" / "graphql"
+            graphql_path.mkdir(parents=True, exist_ok=True)
+            graphql_env_file = graphql_path / ".env.local"
+            graphql_env_file.write_text(
+                "SHOPIFY_GRAPHQL_API_TOKEN=token-123\n",
+                encoding="utf-8",
+            )
+
+            generate_shopify_models.sync_graphql_ide_api_version(
+                graphql_path=graphql_path,
+                shopify_api_version="2026-01",
+            )
+
+            graphql_env_text = graphql_env_file.read_text(encoding="utf-8")
+
+        self.assertEqual(
+            graphql_env_text,
+            "\n".join(
+                (
+                    "SHOPIFY_GRAPHQL_API_TOKEN=token-123",
+                    "SHOPIFY_GRAPHQL_API_VERSION=2026-01",
+                    "",
+                )
+            ),
+        )

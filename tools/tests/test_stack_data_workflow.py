@@ -327,13 +327,46 @@ class StackDataWorkflowTests(unittest.TestCase):
             compose_app_name="compose-opw-testing-abc123",
             bootstrap=True,
             no_sanitize=True,
+            clear_stale_lock=True,
+            data_workflow_lock_path="/volumes/data/.data_workflow_in_progress",
         )
 
         self.assertIn("com.docker.compose.project=${compose_project}", schedule_script)
         self.assertIn('script_runner_container_id=$(resolve_container_id "script-runner")', schedule_script)
         self.assertIn("--bootstrap", schedule_script)
         self.assertIn("--no-sanitize", schedule_script)
+        self.assertIn("Clearing stale data workflow lock ${data_workflow_lock_path}", schedule_script)
         self.assertIn("docker exec -u root", schedule_script)
+
+    def test_should_clear_stale_data_workflow_lock_only_for_cancelled_latest_deployment(self) -> None:
+        self.assertTrue(
+            stack_data_workflow._should_clear_stale_data_workflow_lock(
+                {
+                    "deployments": [
+                        {"status": "cancelled"},
+                    ]
+                }
+            )
+        )
+        self.assertFalse(
+            stack_data_workflow._should_clear_stale_data_workflow_lock(
+                {
+                    "deployments": [
+                        {"status": "running"},
+                        {"status": "cancelled"},
+                    ]
+                }
+            )
+        )
+        self.assertFalse(
+            stack_data_workflow._should_clear_stale_data_workflow_lock(
+                {
+                    "deployments": [
+                        {"status": "done"},
+                    ]
+                }
+            )
+        )
 
     def test_run_dokploy_managed_remote_data_workflow_upserts_and_runs_schedule(self) -> None:
         stack_settings = StackSettings(
@@ -386,6 +419,11 @@ class StackDataWorkflowTests(unittest.TestCase):
                 stack_data_workflow,
                 "_resolve_dokploy_schedule_runtime",
                 return_value=("dokploy-server", "user-123", "compose-opw-testing-abc123", None),
+            ),
+            patch.object(
+                stack_data_workflow,
+                "find_matching_dokploy_schedule",
+                return_value={"deployments": [{"status": "cancelled"}]},
             ),
             patch.object(
                 stack_data_workflow,
@@ -448,6 +486,7 @@ class StackDataWorkflowTests(unittest.TestCase):
         self.assertEqual(upsert_payload["userId"], "user-123")
         self.assertEqual(upsert_payload["enabled"], False)
         self.assertEqual(upsert_payload["timezone"], "UTC")
+        self.assertIn("Clearing stale data workflow lock ${data_workflow_lock_path}", str(upsert_payload["script"]))
         self.assertIn("--bootstrap", str(upsert_payload["script"]))
         self.assertIn("--no-sanitize", str(upsert_payload["script"]))
         self.assertEqual(

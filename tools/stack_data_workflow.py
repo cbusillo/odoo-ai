@@ -20,6 +20,7 @@ from tools.platform.dokploy import (
     deployment_status,
     dokploy_request,
     fetch_dokploy_target_payload,
+    find_matching_dokploy_schedule,
     find_dokploy_target_definition,
     latest_deployment_for_compose,
     latest_deployment_for_schedule,
@@ -34,13 +35,15 @@ from tools.platform.dokploy import (
     wait_for_dokploy_schedule_deployment,
 )
 from tools.platform.environment import load_dokploy_source_of_truth, resolve_stack_runtime_scope
-from tools.platform.models import DokployTargetDefinition
+from tools.platform.models import DokployTargetDefinition, JsonObject
 
 _logger = logging.getLogger(__name__)
 
 DATA_WORKFLOW_SCRIPT = "/volumes/scripts/run_odoo_data_workflows.py"
 DOKPLOY_DATA_WORKFLOW_SCHEDULE_NAME = "platform-data-workflow"
 DOKPLOY_MANUAL_ONLY_CRON_EXPRESSION = "0 0 31 2 *"
+DOKPLOY_CANCELLED_DEPLOYMENT_STATUSES = {"cancelled", "canceled"}
+DOKPLOY_RUNNING_DEPLOYMENT_STATUSES = {"pending", "queued", "running", "in_progress", "starting"}
 
 DATA_WORKFLOW_SCRIPT_ENV_KEYS = {
     "ODOO_DB_HOST",
@@ -274,6 +277,8 @@ def _build_dokploy_data_workflow_script(
     compose_app_name: str,
     bootstrap: bool,
     no_sanitize: bool,
+    clear_stale_lock: bool,
+    data_workflow_lock_path: str,
 ) -> str:
     workflow_arguments: list[str] = []
     if bootstrap:
@@ -285,12 +290,15 @@ def _build_dokploy_data_workflow_script(
     workflow_argument_line = (
         f"workflow_arguments=({quoted_workflow_arguments})" if quoted_workflow_arguments else "workflow_arguments=()"
     )
+    clear_stale_lock_line = f"clear_stale_lock={'1' if clear_stale_lock else '0'}"
 
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 
 compose_project={shlex.quote(compose_app_name)}
 {workflow_argument_line}
+{clear_stale_lock_line}
+data_workflow_lock_path={shlex.quote(data_workflow_lock_path)}
 
 resolve_container_id() {{
     local service_name="$1"
@@ -332,6 +340,11 @@ web_container_id=$(resolve_container_id "web")
 ensure_running "${{database_container_id}}" "database"
 ensure_running "${{script_runner_container_id}}" "script-runner"
 
+if [ "${{clear_stale_lock}}" = "1" ]; then
+    echo "Clearing stale data workflow lock ${{data_workflow_lock_path}}"
+    docker exec -u root "${{script_runner_container_id}}" rm -f "${{data_workflow_lock_path}}"
+fi
+
 trap start_web_container EXIT
 
 web_status=$(docker inspect -f '{{{{.State.Status}}}}' "${{web_container_id}}")
@@ -347,6 +360,38 @@ docker exec -u root "${{script_runner_container_id}}" \
 start_web_container
 trap - EXIT
 """
+
+
+def _schedule_deployments(schedule: JsonObject | None) -> tuple[JsonObject, ...]:
+    if not isinstance(schedule, dict):
+        return ()
+    raw_deployments = schedule.get("deployments")
+    if not isinstance(raw_deployments, list):
+        return ()
+    deployment_entries: list[JsonObject] = []
+    for raw_deployment in raw_deployments:
+        if isinstance(raw_deployment, dict):
+            deployment_entries.append(raw_deployment)
+    return tuple(deployment_entries)
+
+
+def _deployment_status_value(deployment: JsonObject) -> str:
+    return str(deployment.get("status") or "").strip().lower()
+
+
+def _has_running_schedule_deployment(schedule: JsonObject | None) -> bool:
+    return any(
+        _deployment_status_value(deployment) in DOKPLOY_RUNNING_DEPLOYMENT_STATUSES
+        for deployment in _schedule_deployments(schedule)
+    )
+
+
+def _should_clear_stale_data_workflow_lock(schedule: JsonObject | None) -> bool:
+    deployments = _schedule_deployments(schedule)
+    if not deployments or _has_running_schedule_deployment(schedule):
+        return False
+    latest_status = _deployment_status_value(deployments[0])
+    return latest_status in DOKPLOY_CANCELLED_DEPLOYMENT_STATUSES
 
 
 def _sync_dokploy_target_environment_and_deploy(
@@ -459,10 +504,24 @@ def _run_dokploy_managed_remote_data_workflow(
         env_values=env_values,
         deploy_timeout_seconds=schedule_timeout_seconds,
     )
+    existing_schedule = find_matching_dokploy_schedule(
+        host=dokploy_host,
+        token=dokploy_token,
+        target_id=schedule_lookup_id,
+        schedule_type=schedule_type,
+        schedule_name=schedule_name,
+        app_name=schedule_app_name,
+    )
+    if _has_running_schedule_deployment(existing_schedule):
+        raise ValueError(
+            f"Dokploy-managed data workflow already has a running schedule deployment for {context_name}/{instance_name}."
+        )
     schedule_script = _build_dokploy_data_workflow_script(
         compose_app_name=compose_app_name,
         bootstrap=bootstrap,
         no_sanitize=no_sanitize,
+        clear_stale_lock=_should_clear_stale_data_workflow_lock(existing_schedule),
+        data_workflow_lock_path=env_values.get("ODOO_DATA_WORKFLOW_LOCK_FILE", "/volumes/data/.data_workflow_in_progress"),
     )
     schedule_payload = {
         "name": schedule_name,

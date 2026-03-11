@@ -9,7 +9,6 @@
       <excludeFolder url="file://$MODULE_DIR$/.claude" />
       <excludeFolder url="file://$MODULE_DIR$/.codex" />
       <excludeFolder url="file://$MODULE_DIR$/docs/internal/data" />
-      <excludeFolder url="file://$MODULE_DIR$/addons/shopify_sync/graphql/schema" />
       <excludeFolder url="file://$MODULE_DIR$/addons/shopify_sync/services/shopify/gql" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />

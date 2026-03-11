@@ -12,7 +12,7 @@ from tools.platform import environment as platform_environment
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 ADDONS_PATH = REPOSITORY_ROOT / "addons" / "shopify_sync"
-GRAPHQL_CONFIG_PATH = ADDONS_PATH / "graphql" / "shopify" / "graphql.config.yml"
+GRAPHQL_CONFIG_PATH = ADDONS_PATH / "graphql" / "graphql.config.yml"
 DEFAULT_CONTEXT_NAME = "opw"
 DEFAULT_INSTANCE_NAME = "local"
 
@@ -97,7 +97,7 @@ def save_schema_sdl(json_data: IntrospectionQuery, output_file_path: Path) -> No
 
 def update_graphql_config(*, config_file_path: Path, schema_file_path: Path) -> None:
     relative_schema_path = os.path.relpath(schema_file_path, config_file_path.parent)
-    config_text = f'schema: "{relative_schema_path}"\ninclude:\n  - "**/*.graphql"\n'
+    config_text = f'schema: "{relative_schema_path}"\ndocuments:\n  - "shopify/**/*.graphql"\n'
     config_file_path.write_text(config_text, encoding="utf-8")
 
 
@@ -131,6 +131,7 @@ def main() -> None:
     schema_path.mkdir(parents=True, exist_ok=True)
     introspection_file_path = schema_path / f"shopify_schema_{shopify_api_version}.json"
     sdl_file_path = schema_path / f"shopify_schema_{shopify_api_version}.sdl"
+    graphql_schema_file_path = schema_path / f"shopify_schema_{shopify_api_version}.graphql"
     services_path = addon_path / "services" / "shopify"
     client_name = "gql"
 
@@ -146,7 +147,9 @@ def main() -> None:
     if not sdl_file_path.exists():
         save_schema_sdl(introspection_data, sdl_file_path)
 
-    update_graphql_config(config_file_path=GRAPHQL_CONFIG_PATH, schema_file_path=sdl_file_path)
+    graphql_schema_file_path.write_text(sdl_file_path.read_text(encoding="utf-8"), encoding="utf-8")
+
+    update_graphql_config(config_file_path=GRAPHQL_CONFIG_PATH, schema_file_path=graphql_schema_file_path)
 
     config_dict = {
         "schema_path": str(sdl_file_path),

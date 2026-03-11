@@ -1,0 +1,3 @@
+schema: "schema/shopify_schema_2026-01.graphql"
+documents:
+  - "shopify/**/*.graphql"

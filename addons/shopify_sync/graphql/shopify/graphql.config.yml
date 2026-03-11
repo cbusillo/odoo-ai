@@ -1,3 +1,0 @@
-schema: ../schema/shopify_schema_2026-01.sdl
-include:
-  - "**/*.graphql"

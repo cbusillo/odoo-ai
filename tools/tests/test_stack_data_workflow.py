@@ -367,10 +367,14 @@ class StackDataWorkflowTests(unittest.TestCase):
             deploy_timeout_seconds=7200,
         )
         dokploy_request_calls: list[dict[str, object]] = []
+        updated_target_env_calls: list[dict[str, object]] = []
 
         def record_dokploy_request(**kwargs: object) -> object:
             dokploy_request_calls.append(dict(kwargs))
             return True
+
+        def record_target_env_update(**kwargs: object) -> None:
+            updated_target_env_calls.append(dict(kwargs))
 
         with (
             patch.object(
@@ -385,9 +389,29 @@ class StackDataWorkflowTests(unittest.TestCase):
             ),
             patch.object(
                 stack_data_workflow,
+                "fetch_dokploy_target_payload",
+                return_value={
+                    "env": "ODOO_ADDON_REPOSITORIES=cbusillo/disable_odoo_online@main,OCA/OpenUpgrade@19.0\n"
+                    "OPENUPGRADE_ADDON_REPOSITORY=OCA/OpenUpgrade@89e649728027a8ab656b3aa4be18f4bd364db417\n"
+                    "OPENUPGRADELIB_INSTALL_SPEC=git+https://github.com/OCA/openupgradelib.git@46d66ff5ed6a99481f84d3c79fc6e50835da7286",
+                },
+            ),
+            patch.object(stack_data_workflow, "update_dokploy_target_env", side_effect=record_target_env_update),
+            patch.object(
+                stack_data_workflow,
                 "upsert_dokploy_schedule",
                 return_value={"scheduleId": "schedule-123"},
             ) as upsert_schedule,
+            patch.object(
+                stack_data_workflow,
+                "latest_deployment_for_compose",
+                return_value={"deploymentId": "compose-before-1", "status": "done"},
+            ),
+            patch.object(
+                stack_data_workflow,
+                "wait_for_dokploy_compose_deployment",
+                return_value="deployment=compose-after-1 status=done",
+            ),
             patch.object(
                 stack_data_workflow,
                 "latest_deployment_for_schedule",
@@ -398,12 +422,27 @@ class StackDataWorkflowTests(unittest.TestCase):
         ):
             exit_code = stack_data_workflow._run_dokploy_managed_remote_data_workflow(
                 stack_settings,
-                {"DOKPLOY_HOST": "https://dokploy.example", "DOKPLOY_TOKEN": "token"},
+                {
+                    "DOKPLOY_HOST": "https://dokploy.example",
+                    "DOKPLOY_TOKEN": "token",
+                    "ODOO_ADDON_REPOSITORIES": "cbusillo/disable_odoo_online@main,"
+                    "OCA/OpenUpgrade@89e649728027a8ab656b3aa4be18f4bd364db417",
+                    "OPENUPGRADE_ADDON_REPOSITORY": "OCA/OpenUpgrade@89e649728027a8ab656b3aa4be18f4bd364db417",
+                    "OPENUPGRADELIB_INSTALL_SPEC": "git+https://github.com/OCA/openupgradelib.git@"
+                    "46d66ff5ed6a99481f84d3c79fc6e50835da7286",
+                },
                 bootstrap=True,
                 no_sanitize=True,
             )
 
         self.assertEqual(exit_code, 0)
+        self.assertEqual(len(updated_target_env_calls), 1)
+        rendered_env_text = str(updated_target_env_calls[0]["env_text"])
+        self.assertIn(
+            "ODOO_ADDON_REPOSITORIES=cbusillo/disable_odoo_online@main,"
+            "OCA/OpenUpgrade@89e649728027a8ab656b3aa4be18f4bd364db417",
+            rendered_env_text,
+        )
         upsert_payload = upsert_schedule.call_args.kwargs["schedule_payload"]
         self.assertEqual(upsert_payload["scheduleType"], "dokploy-server")
         self.assertEqual(upsert_payload["userId"], "user-123")
@@ -414,6 +453,14 @@ class StackDataWorkflowTests(unittest.TestCase):
         self.assertEqual(
             dokploy_request_calls,
             [
+                {
+                    "host": "https://dokploy.example",
+                    "token": "token",
+                    "path": "/api/compose.deploy",
+                    "method": "POST",
+                    "payload": {"composeId": "compose-1"},
+                    "timeout_seconds": 7200,
+                },
                 {
                     "host": "https://dokploy.example",
                     "token": "token",

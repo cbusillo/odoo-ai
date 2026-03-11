@@ -19,12 +19,18 @@ from tools.platform.dokploy import (
     deployment_key,
     deployment_status,
     dokploy_request,
+    fetch_dokploy_target_payload,
     find_dokploy_target_definition,
+    latest_deployment_for_compose,
     latest_deployment_for_schedule,
     load_dokploy_source_of_truth_if_present,
+    parse_dokploy_env_text,
     resolve_dokploy_user_id,
     schedule_key,
+    serialize_dokploy_env_text,
+    update_dokploy_target_env,
     upsert_dokploy_schedule,
+    wait_for_dokploy_compose_deployment,
     wait_for_dokploy_schedule_deployment,
 )
 from tools.platform.environment import load_dokploy_source_of_truth, resolve_stack_runtime_scope
@@ -343,6 +349,69 @@ trap - EXIT
 """
 
 
+def _sync_dokploy_target_environment_and_deploy(
+    *,
+    dokploy_host: str,
+    dokploy_token: str,
+    target_definition: DokployTargetDefinition,
+    env_values: dict[str, str],
+    deploy_timeout_seconds: int,
+) -> None:
+    compose_id = target_definition.target_id.strip()
+    compose_name = target_definition.target_name.strip() or f"{target_definition.context}-{target_definition.instance}"
+    target_payload = fetch_dokploy_target_payload(
+        host=dokploy_host,
+        token=dokploy_token,
+        target_type="compose",
+        target_id=compose_id,
+    )
+    current_env_map = parse_dokploy_env_text(str(target_payload.get("env") or ""))
+    desired_env_map = dict(current_env_map)
+    updated_environment_keys: list[str] = []
+    for environment_key, environment_value in env_values.items():
+        if desired_env_map.get(environment_key) == environment_value:
+            continue
+        desired_env_map[environment_key] = environment_value
+        updated_environment_keys.append(environment_key)
+
+    if updated_environment_keys:
+        update_dokploy_target_env(
+            host=dokploy_host,
+            token=dokploy_token,
+            target_type="compose",
+            target_id=compose_id,
+            target_payload=target_payload,
+            env_text=serialize_dokploy_env_text(desired_env_map),
+        )
+        _logger.info(
+            "Updated Dokploy compose env for %s with %s key(s): %s",
+            compose_name,
+            len(updated_environment_keys),
+            ",".join(sorted(updated_environment_keys)),
+        )
+    else:
+        _logger.info("Dokploy compose env already matched generated workflow env for %s", compose_name)
+
+    latest_compose_deployment = latest_deployment_for_compose(dokploy_host, dokploy_token, compose_id)
+    previous_deployment_key = deployment_key(latest_compose_deployment or {})
+    dokploy_request(
+        host=dokploy_host,
+        token=dokploy_token,
+        path="/api/compose.deploy",
+        method="POST",
+        payload={"composeId": compose_id},
+        timeout_seconds=deploy_timeout_seconds,
+    )
+    deployment_result = wait_for_dokploy_compose_deployment(
+        host=dokploy_host,
+        token=dokploy_token,
+        compose_id=compose_id,
+        before_key=previous_deployment_key,
+        timeout_seconds=deploy_timeout_seconds,
+    )
+    _logger.info("Dokploy compose deployment completed before data workflow: %s", deployment_result)
+
+
 def _run_dokploy_managed_remote_data_workflow(
     settings: StackSettings,
     env_values: dict[str, str],
@@ -383,6 +452,13 @@ def _run_dokploy_managed_remote_data_workflow(
         instance_name=instance_name,
     )
     schedule_timeout_seconds = target_definition.deploy_timeout_seconds or DEFAULT_DOKPLOY_DEPLOY_TIMEOUT_SECONDS
+    _sync_dokploy_target_environment_and_deploy(
+        dokploy_host=dokploy_host,
+        dokploy_token=dokploy_token,
+        target_definition=target_definition,
+        env_values=env_values,
+        deploy_timeout_seconds=schedule_timeout_seconds,
+    )
     schedule_script = _build_dokploy_data_workflow_script(
         compose_app_name=compose_app_name,
         bootstrap=bootstrap,

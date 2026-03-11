@@ -72,8 +72,10 @@ Behavior Highlights
   `prod`) run through Dokploy schedule jobs triggered by the Dokploy API.
   Targets with deploy-server linkage use Dokploy `server` jobs; targets without
   linkage use Dokploy `dokploy-server` jobs. The platform no longer SSHes to
-  Dokploy-managed targets or overwrites their runtime `.env` during restore or
-  bootstrap. Only the upstream source host copy inside
+  Dokploy-managed targets. Before those schedule jobs run, platform syncs the
+  generated workflow env into the Dokploy target and triggers a compose deploy
+  so `script-runner` uses the workflow-specific image/runtime contract. Only
+  the upstream source host copy inside
   `run_odoo_data_workflows.py` still uses SSH.
 - `platform ship`, `platform rollback`, `platform status`, `platform info`,
   `platform doctor`, and `platform dokploy ...` helper commands require

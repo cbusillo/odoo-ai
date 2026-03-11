@@ -12,6 +12,7 @@ from tools.platform import environment as platform_environment
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 ADDONS_PATH = REPOSITORY_ROOT / "addons" / "shopify_sync"
+GRAPHQL_CONFIG_PATH = ADDONS_PATH / "graphql" / "shopify" / "graphql.config.yml"
 DEFAULT_CONTEXT_NAME = "opw"
 DEFAULT_INSTANCE_NAME = "local"
 
@@ -44,7 +45,7 @@ def load_runtime_env_values(
         env_file,
         context_name=context_name,
         instance_name=instance_name,
-        collision_mode="error",
+        collision_mode="warn",
     )
     return environment_values
 
@@ -95,6 +96,12 @@ def save_schema_sdl(json_data: IntrospectionQuery, output_file_path: Path) -> No
     output_file_path.write_text(sdl)
 
 
+def update_graphql_config(*, config_file_path: Path, schema_file_path: Path) -> None:
+    relative_schema_path = os.path.relpath(schema_file_path, config_file_path.parent)
+    config_text = f'schema: "{relative_schema_path}"\ninclude:\n  - "**/*.graphql"\n'
+    config_file_path.write_text(config_text, encoding="utf-8")
+
+
 def main() -> None:
     parsed_arguments = parse_arguments()
     runtime_env_values = load_runtime_env_values(
@@ -139,6 +146,8 @@ def main() -> None:
 
     if not sdl_file_path.exists():
         save_schema_sdl(introspection_data, sdl_file_path)
+
+    update_graphql_config(config_file_path=GRAPHQL_CONFIG_PATH, schema_file_path=sdl_file_path)
 
     config_dict = {
         "schema_path": str(sdl_file_path),

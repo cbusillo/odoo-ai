@@ -21,6 +21,8 @@ class GenerateShopifyModelsModule(Protocol):
         instance_name: str,
     ) -> dict[str, str]: ...
 
+    def update_graphql_config(self, *, config_file_path: Path, schema_file_path: Path) -> None: ...
+
 
 def _load_generate_shopify_models_module() -> GenerateShopifyModelsModule:
     module_path = Path(__file__).resolve().parents[2] / "docker" / "scripts" / "generate_shopify_models.py"
@@ -115,3 +117,66 @@ class GenerateShopifyModelsEnvironmentTests(unittest.TestCase):
         self.assertEqual(runtime_env_values["ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY"], "platform-only-store")
         self.assertEqual(runtime_env_values["ENV_OVERRIDE_SHOPIFY__API_TOKEN"], "platform-only-token")
         self.assertEqual(runtime_env_values["ENV_OVERRIDE_SHOPIFY__API_VERSION"], "2026-01")
+
+    def test_load_runtime_env_values_warns_but_does_not_fail_on_env_secret_collisions(self) -> None:
+        generate_shopify_models = _load_generate_shopify_models_module()
+
+        with TemporaryDirectory() as temporary_directory_name:
+            repository_root = Path(temporary_directory_name)
+            (repository_root / ".env").write_text(
+                "\n".join(
+                    (
+                        "ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY=env-store",
+                        "ENV_OVERRIDE_SHOPIFY__API_TOKEN=env-token",
+                        "ENV_OVERRIDE_SHOPIFY__API_VERSION=2026-01",
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            platform_directory = repository_root / "platform"
+            platform_directory.mkdir(parents=True, exist_ok=True)
+            (platform_directory / "secrets.toml").write_text(
+                "\n".join(
+                    (
+                        "schema_version = 1",
+                        "",
+                        "[contexts.opw.instances.local.env]",
+                        'ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY = "secret-store"',
+                        'ENV_OVERRIDE_SHOPIFY__API_TOKEN = "secret-token"',
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            runtime_env_values = generate_shopify_models.load_runtime_env_values(
+                repository_root=repository_root,
+                env_file=None,
+                context_name="opw",
+                instance_name="local",
+            )
+
+        self.assertEqual(runtime_env_values["ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY"], "secret-store")
+        self.assertEqual(runtime_env_values["ENV_OVERRIDE_SHOPIFY__API_TOKEN"], "secret-token")
+        self.assertEqual(runtime_env_values["ENV_OVERRIDE_SHOPIFY__API_VERSION"], "2026-01")
+
+    def test_update_graphql_config_points_ide_to_local_schema_snapshot(self) -> None:
+        generate_shopify_models = _load_generate_shopify_models_module()
+
+        with TemporaryDirectory() as temporary_directory_name:
+            repository_root = Path(temporary_directory_name)
+            config_file_path = repository_root / "addons" / "shopify_sync" / "graphql" / "shopify" / "graphql.config.yml"
+            config_file_path.parent.mkdir(parents=True, exist_ok=True)
+            schema_file_path = repository_root / "addons" / "shopify_sync" / "graphql" / "schema" / "shopify_schema_2026-01.sdl"
+            schema_file_path.parent.mkdir(parents=True, exist_ok=True)
+            schema_file_path.write_text("type Query { shop: String }\n", encoding="utf-8")
+
+            generate_shopify_models.update_graphql_config(
+                config_file_path=config_file_path,
+                schema_file_path=schema_file_path,
+            )
+
+            graphql_config_text = config_file_path.read_text(encoding="utf-8")
+
+        self.assertEqual(graphql_config_text, 'schema: "../schema/shopify_schema_2026-01.sdl"\ninclude:\n  - "**/*.graphql"\n')

@@ -3,6 +3,11 @@
 from .base_client import BaseClient
 from .base_model import BaseModel, Upload
 from .client import Client
+from .current_bulk_operation import (
+    CurrentBulkOperation,
+    CurrentBulkOperationBulkOperations,
+    CurrentBulkOperationBulkOperationsNodes,
+)
 from .delete_product import (
     DeleteProduct,
     DeleteProductProductDelete,
@@ -1214,6 +1219,7 @@ from .input_types import (
     WeightInput,
 )
 from .operations import (
+    CURRENT_BULK_OPERATION_GQL,
     DELETE_PRODUCT_GQL,
     GET_CUSTOMERS_GQL,
     GET_LOCATIONS_GQL,
@@ -1222,7 +1228,9 @@ from .operations import (
     GET_PRODUCT_IDS_GQL,
     GET_PRODUCTS_GQL,
     PRODUCT_REORDER_MEDIA_GQL,
+    PRODUCT_SET_BULK_RUN_GQL,
     PRODUCT_SET_GQL,
+    STAGED_UPLOADS_CREATE_GQL,
     UPDATE_PUBLICATIONS_GQL,
 )
 from .product_reorder_media import (
@@ -1246,6 +1254,19 @@ from .product_set import (
     ProductSetProductSetProductVariants,
     ProductSetProductSetProductVariantsNodes,
     ProductSetProductSetUserErrors,
+)
+from .product_set_bulk_run import (
+    ProductSetBulkRun,
+    ProductSetBulkRunBulkOperationRunMutation,
+    ProductSetBulkRunBulkOperationRunMutationBulkOperation,
+    ProductSetBulkRunBulkOperationRunMutationUserErrors,
+)
+from .staged_uploads_create import (
+    StagedUploadsCreate,
+    StagedUploadsCreateStagedUploadsCreate,
+    StagedUploadsCreateStagedUploadsCreateStagedTargets,
+    StagedUploadsCreateStagedUploadsCreateStagedTargetsParameters,
+    StagedUploadsCreateStagedUploadsCreateUserErrors,
 )
 from .update_publications import (
     UpdatePublications,
@@ -1325,6 +1346,7 @@ __all__ = [
     "BusinessCustomerErrorCode",
     "BuyerExperienceConfigurationInput",
     "BuyerSignalInput",
+    "CURRENT_BULK_OPERATION_GQL",
     "CalculateExchangeLineItemInput",
     "CalculateReturnInput",
     "CalculateReturnLineItemInput",
@@ -1476,6 +1498,9 @@ __all__ = [
     "CreateMediaInput",
     "CropRegion",
     "CurrencyCode",
+    "CurrentBulkOperation",
+    "CurrentBulkOperationBulkOperations",
+    "CurrentBulkOperationBulkOperationsNodes",
     "CustomShippingPackageInput",
     "CustomerAccountNativePagePageType",
     "CustomerAccountsVersion",
@@ -2064,6 +2089,7 @@ __all__ = [
     "OrderTransactionKind",
     "OrderTransactionStatus",
     "PRODUCT_REORDER_MEDIA_GQL",
+    "PRODUCT_SET_BULK_RUN_GQL",
     "PRODUCT_SET_GQL",
     "PageCreateInput",
     "PageCreateUserErrorCode",
@@ -2162,6 +2188,10 @@ __all__ = [
     "ProductReorderMediaProductReorderMediaMediaUserErrors",
     "ProductResourceFeedbackInput",
     "ProductSet",
+    "ProductSetBulkRun",
+    "ProductSetBulkRunBulkOperationRunMutation",
+    "ProductSetBulkRunBulkOperationRunMutationBulkOperation",
+    "ProductSetBulkRunBulkOperationRunMutationUserErrors",
     "ProductSetIdentifiers",
     "ProductSetInput",
     "ProductSetInventoryInput",
@@ -2266,6 +2296,7 @@ __all__ = [
     "RiskAssessmentResult",
     "RiskFactSentiment",
     "SEOInput",
+    "STAGED_UPLOADS_CREATE_GQL",
     "SaleActionType",
     "SaleLineType",
     "SavedSearchCreateInput",
@@ -2354,6 +2385,11 @@ __all__ = [
     "StagedUploadInput",
     "StagedUploadTargetGenerateInput",
     "StagedUploadTargetGenerateUploadResource",
+    "StagedUploadsCreate",
+    "StagedUploadsCreateStagedUploadsCreate",
+    "StagedUploadsCreateStagedUploadsCreateStagedTargets",
+    "StagedUploadsCreateStagedUploadsCreateStagedTargetsParameters",
+    "StagedUploadsCreateStagedUploadsCreateUserErrors",
     "StandardMetafieldDefinitionAccessInput",
     "StandardMetafieldDefinitionEnableUserErrorCode",
     "StoreCreditAccountCreditInput",

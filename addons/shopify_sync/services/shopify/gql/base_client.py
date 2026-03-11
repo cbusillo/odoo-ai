@@ -66,8 +66,7 @@ class BaseClient:
             **kwargs,
         )
 
-    @staticmethod
-    def get_data(response: httpx.Response) -> dict[str, Any]:
+    def get_data(self, response: httpx.Response) -> dict[str, Any]:
         if not response.is_success:
             raise GraphQLClientHttpError(
                 status_code=response.status_code, response=response
@@ -120,9 +119,8 @@ class BaseClient:
             return [self._convert_value(item) for item in value]
         return value
 
-    @staticmethod
     def _get_files_from_variables(
-            variables: dict[str, Any]
+        self, variables: dict[str, Any]
     ) -> tuple[
         dict[str, Any], dict[str, tuple[str, IO[bytes], str]], dict[str, list[str]]
     ]:

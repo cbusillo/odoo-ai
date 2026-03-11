@@ -1,3 +1,6 @@
-schema: "schema/shopify_schema_2026-01.json"
+schema:
+  - https://${SHOPIFY_GRAPHQL_SHOP_URL_KEY}.myshopify.com/admin/api/${SHOPIFY_GRAPHQL_API_VERSION}/graphql.json:
+      headers:
+        X-Shopify-Access-Token: ${SHOPIFY_GRAPHQL_API_TOKEN}
 documents:
   - "shopify/**/*.graphql"

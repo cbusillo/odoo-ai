@@ -82,3 +82,36 @@ class GenerateShopifyModelsEnvironmentTests(unittest.TestCase):
                 )
 
         self.assertEqual(runtime_env_values, {})
+
+    def test_load_runtime_env_values_reads_platform_secrets_without_root_env_file(self) -> None:
+        generate_shopify_models = _load_generate_shopify_models_module()
+
+        with TemporaryDirectory() as temporary_directory_name:
+            repository_root = Path(temporary_directory_name)
+            platform_directory = repository_root / "platform"
+            platform_directory.mkdir(parents=True, exist_ok=True)
+            (platform_directory / "secrets.toml").write_text(
+                "\n".join(
+                    (
+                        "schema_version = 1",
+                        "",
+                        "[contexts.opw.instances.local.env]",
+                        'ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY = "platform-only-store"',
+                        'ENV_OVERRIDE_SHOPIFY__API_TOKEN = "platform-only-token"',
+                        'ENV_OVERRIDE_SHOPIFY__API_VERSION = "2026-01"',
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            runtime_env_values = generate_shopify_models.load_runtime_env_values(
+                repository_root=repository_root,
+                env_file=None,
+                context_name="opw",
+                instance_name="local",
+            )
+
+        self.assertEqual(runtime_env_values["ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY"], "platform-only-store")
+        self.assertEqual(runtime_env_values["ENV_OVERRIDE_SHOPIFY__API_TOKEN"], "platform-only-token")
+        self.assertEqual(runtime_env_values["ENV_OVERRIDE_SHOPIFY__API_VERSION"], "2026-01")

@@ -61,10 +61,7 @@ def resolve_env_collision_mode(collision_mode: str | None) -> str:
         normalized_mode = env_mode.strip().lower() if env_mode else "warn"
     if normalized_mode not in VALID_ENV_COLLISION_MODES:
         valid_modes = ", ".join(VALID_ENV_COLLISION_MODES)
-        raise click.ClickException(
-            f"Invalid collision mode '{normalized_mode}'. "
-            f"Expected one of: {valid_modes}."
-        )
+        raise click.ClickException(f"Invalid collision mode '{normalized_mode}'. Expected one of: {valid_modes}.")
     return normalized_mode
 
 
@@ -81,6 +78,24 @@ def build_environment_layers(
             values=parse_env_file(env_file_path),
         ),
     ]
+
+    environment_layers.extend(
+        build_platform_secret_layers(
+            repo_root=repo_root,
+            context_name=context_name,
+            instance_name=instance_name,
+        )
+    )
+    return environment_layers
+
+
+def build_platform_secret_layers(
+    *,
+    repo_root: Path,
+    context_name: str | None,
+    instance_name: str | None,
+) -> list[EnvironmentLayer]:
+    environment_layers: list[EnvironmentLayer] = []
 
     platform_secrets = load_platform_secrets_definition(repo_root)
     if platform_secrets is None:
@@ -120,7 +135,24 @@ def build_environment_layers(
     return environment_layers
 
 
-def merge_environment_layers(environment_layers: list[EnvironmentLayer]) -> tuple[dict[str, str], dict[str, str], tuple[EnvironmentCollision, ...]]:
+def load_secret_environment(
+    repo_root: Path,
+    *,
+    context_name: str | None = None,
+    instance_name: str | None = None,
+) -> dict[str, str]:
+    secret_layers = build_platform_secret_layers(
+        repo_root=repo_root,
+        context_name=context_name,
+        instance_name=instance_name,
+    )
+    merged_values, _source_by_key, _collisions = merge_environment_layers(secret_layers)
+    return merged_values
+
+
+def merge_environment_layers(
+    environment_layers: list[EnvironmentLayer],
+) -> tuple[dict[str, str], dict[str, str], tuple[EnvironmentCollision, ...]]:
     merged_values: dict[str, str] = {}
     source_by_key: dict[str, str] = {}
     collisions: list[EnvironmentCollision] = []
@@ -230,8 +262,7 @@ def resolve_default_env_file(repo_root: Path) -> Path:
     if platform_env.exists():
         return platform_env
     raise click.ClickException(
-        "Missing environment file. Create .env at repository root or platform/.env, "
-        "or pass --env-file explicitly."
+        "Missing environment file. Create .env at repository root or platform/.env, or pass --env-file explicitly."
     )
 
 

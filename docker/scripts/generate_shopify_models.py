@@ -33,7 +33,11 @@ def load_runtime_env_values(
                 env_file = candidate_env_file
                 break
     if env_file is None:
-        return {}
+        return platform_environment.load_secret_environment(
+            repository_root,
+            context_name=context_name,
+            instance_name=instance_name,
+        )
 
     _env_file_path, environment_values = platform_environment.load_environment(
         repository_root,

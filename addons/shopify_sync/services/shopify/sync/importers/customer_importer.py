@@ -519,6 +519,7 @@ class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
             state = self.env["res.country.state"].search(domain, limit=1)
 
         formatted_phone = self._format_phone_number(address.phone) if address.phone else ""
+        postal_code = (address.zip_ or "").strip()
 
         def get_phone_numbers(target_partner: "odoo.model.res_partner") -> set[str]:
             if hasattr(target_partner, "_phone_get_number_fields"):
@@ -550,7 +551,7 @@ class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
                 normalize_str(address.address_1) != normalize_str(partner.street),
                 normalize_str(address.address_2) != normalize_str(partner.street2),
                 normalize_str(address.city) != normalize_str(partner.city),
-                normalize_str(address.zip) != normalize_str(partner.zip),
+                normalize_str(postal_code) != normalize_str(partner.zip),
                 country and country.id != partner.country_id.id,
                 state and state.id != partner.state_id.id,
                 phone_mismatch,
@@ -572,7 +573,7 @@ class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
                 lambda a: normalize_str(a.street) == normalize_str(address.address_1)
                 and normalize_str(a.street2) == normalize_str(address.address_2)
                 and normalize_str(a.city) == normalize_str(address.city)
-                and normalize_str(a.zip) == normalize_str(address.zip)
+                and normalize_str(a.zip) == normalize_str(postal_code)
                 and (not country or a.country_id.id == country.id)
                 and (not state or a.state_id.id == state.id)
                 and phone_matches(a)
@@ -601,7 +602,7 @@ class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
                 "street": (address.address_1 or "").strip(),
                 "street2": (address.address_2 or "").strip(),
                 "city": (address.city or "").strip(),
-                "zip": (address.zip or "").strip(),
+                "zip": postal_code,
                 "state_id": state.id if state else False,
                 "country_id": country.id if country else False,
             }
@@ -636,7 +637,7 @@ class CustomerImporter(ShopifyBaseImporter[CustomerFields]):
             "street": (address.address_1 or "").strip(),
             "street2": (address.address_2 or "").strip(),
             "city": (address.city or "").strip(),
-            "zip": (address.zip or "").strip(),
+            "zip": postal_code,
             "state_id": state.id if state else False,
             "country_id": country.id if country else False,
         }

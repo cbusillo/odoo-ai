@@ -43,7 +43,7 @@ class TestProductExporter(IntegrationTestCase):
         self.assertEqual(result.namespace, "custom")
         self.assertEqual(result.key, "k")
         self.assertEqual(result.value, "v")
-        self.assertEqual(result.type, "text")
+        self.assertEqual(result.type_, "text")
         self.assertEqual(str(result.id), "gid://shopify/Metafield/5")
 
     def test_is_published_on_channel(self) -> None:

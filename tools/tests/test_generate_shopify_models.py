@@ -203,16 +203,16 @@ class GenerateShopifyModelsEnvironmentTests(unittest.TestCase):
                         instance_name="local",
                     )
 
-    def test_update_graphql_config_points_ide_to_local_graphql_schema_snapshot(self) -> None:
+    def test_update_graphql_config_points_ide_to_local_introspection_snapshot(self) -> None:
         generate_shopify_models = _load_generate_shopify_models_module()
 
         with TemporaryDirectory() as temporary_directory_name:
             repository_root = Path(temporary_directory_name)
             config_file_path = repository_root / "addons" / "shopify_sync" / "graphql" / "graphql.config.yml"
             config_file_path.parent.mkdir(parents=True, exist_ok=True)
-            schema_file_path = repository_root / "addons" / "shopify_sync" / "graphql" / "schema" / "shopify_schema_2026-01.graphql"
+            schema_file_path = repository_root / "addons" / "shopify_sync" / "graphql" / "schema" / "shopify_schema_2026-01.json"
             schema_file_path.parent.mkdir(parents=True, exist_ok=True)
-            schema_file_path.write_text("type QueryRoot { shop: String }\n", encoding="utf-8")
+            schema_file_path.write_text('{"__schema": {}}\n', encoding="utf-8")
 
             generate_shopify_models.update_graphql_config(
                 config_file_path=config_file_path,
@@ -221,4 +221,4 @@ class GenerateShopifyModelsEnvironmentTests(unittest.TestCase):
 
             graphql_config_text = config_file_path.read_text(encoding="utf-8")
 
-        self.assertEqual(graphql_config_text, 'schema: "schema/shopify_schema_2026-01.graphql"\ndocuments:\n  - "shopify/**/*.graphql"\n')
+        self.assertEqual(graphql_config_text, 'schema: "schema/shopify_schema_2026-01.json"\ndocuments:\n  - "shopify/**/*.graphql"\n')

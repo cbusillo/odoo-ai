@@ -131,7 +131,6 @@ def main() -> None:
     schema_path.mkdir(parents=True, exist_ok=True)
     introspection_file_path = schema_path / f"shopify_schema_{shopify_api_version}.json"
     sdl_file_path = schema_path / f"shopify_schema_{shopify_api_version}.sdl"
-    graphql_schema_file_path = schema_path / f"shopify_schema_{shopify_api_version}.graphql"
     services_path = addon_path / "services" / "shopify"
     client_name = "gql"
 
@@ -147,9 +146,7 @@ def main() -> None:
     if not sdl_file_path.exists():
         save_schema_sdl(introspection_data, sdl_file_path)
 
-    graphql_schema_file_path.write_text(sdl_file_path.read_text(encoding="utf-8"), encoding="utf-8")
-
-    update_graphql_config(config_file_path=GRAPHQL_CONFIG_PATH, schema_file_path=graphql_schema_file_path)
+    update_graphql_config(config_file_path=GRAPHQL_CONFIG_PATH, schema_file_path=introspection_file_path)
 
     config_dict = {
         "schema_path": str(sdl_file_path),

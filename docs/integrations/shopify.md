@@ -56,10 +56,10 @@ See `addons/shopify_sync/services/shopify/sync/importers/order_importer.py`.
 - `addons/shopify_sync/graphql/shopify/*.graphql` — hand-edited operations
   and fragments.
 - `addons/shopify_sync/graphql/graphql.config.yml` points IDE tooling
-  at the checked-in Shopify GraphQL schema snapshot under
+  at the checked-in Shopify introspection JSON snapshot under
   `addons/shopify_sync/graphql/schema/`, and the tracked IDE module config must
   keep that schema directory included so PyCharm can resolve it without local
-  Shopify secrets.
+  Shopify secrets or an extra generated `.graphql` schema file.
 - Keep Shopify instance secrets in `platform/secrets.toml`, not duplicated in
   root `.env`, so release-time env collision checks stay clean.
 - `uv run python docker/scripts/generate_shopify_models.py --context opw \

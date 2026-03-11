@@ -43,6 +43,7 @@ DATA_WORKFLOW_SCRIPT = "/volumes/scripts/run_odoo_data_workflows.py"
 DOKPLOY_DATA_WORKFLOW_SCHEDULE_NAME = "platform-data-workflow"
 DOKPLOY_MANUAL_ONLY_CRON_EXPRESSION = "0 0 31 2 *"
 DOKPLOY_CANCELLED_DEPLOYMENT_STATUSES = {"cancelled", "canceled"}
+DOKPLOY_SUCCESS_DEPLOYMENT_STATUSES = {"done", "success", "succeeded", "completed", "finished", "healthy"}
 DOKPLOY_RUNNING_DEPLOYMENT_STATUSES = {"pending", "queued", "running", "in_progress", "starting"}
 
 DATA_WORKFLOW_SCRIPT_ENV_KEYS = {
@@ -390,8 +391,13 @@ def _should_clear_stale_data_workflow_lock(schedule: JsonObject | None) -> bool:
     deployments = _schedule_deployments(schedule)
     if not deployments or _has_running_schedule_deployment(schedule):
         return False
-    latest_status = _deployment_status_value(deployments[0])
-    return latest_status in DOKPLOY_CANCELLED_DEPLOYMENT_STATUSES
+    for deployment in deployments:
+        deployment_status_value = _deployment_status_value(deployment)
+        if deployment_status_value in DOKPLOY_CANCELLED_DEPLOYMENT_STATUSES:
+            return True
+        if deployment_status_value in DOKPLOY_SUCCESS_DEPLOYMENT_STATUSES:
+            return False
+    return False
 
 
 def _sync_dokploy_target_environment_and_deploy(

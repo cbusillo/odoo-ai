@@ -367,6 +367,17 @@ class StackDataWorkflowTests(unittest.TestCase):
                 }
             )
         )
+        self.assertTrue(
+            stack_data_workflow._should_clear_stale_data_workflow_lock(
+                {
+                    "deployments": [
+                        {"status": "error"},
+                        {"status": "cancelled"},
+                        {"status": "error"},
+                    ]
+                }
+            )
+        )
 
     def test_run_dokploy_managed_remote_data_workflow_upserts_and_runs_schedule(self) -> None:
         stack_settings = StackSettings(

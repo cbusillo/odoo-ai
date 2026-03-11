@@ -2,15 +2,36 @@ import json
 import os
 import subprocess
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 
 import click
 
+from tools.environment_files import discover_repo_root, parse_env_file
+
+
+@lru_cache(maxsize=1)
+def _repo_env_defaults() -> dict[str, str]:
+    repo_root = discover_repo_root(Path.cwd())
+    for candidate_path in (repo_root / ".env", repo_root / "platform" / ".env"):
+        if candidate_path.exists():
+            return parse_env_file(candidate_path)
+    return {}
+
 
 def _env(prefix: str, key: str, *, required: bool = False, default: str | None = None) -> str | None:
-    value = os.getenv(f"{prefix}_{key}", default)
+    environment_key = f"{prefix}_{key}"
+    repo_default = _repo_env_defaults().get(environment_key)
+    if repo_default is not None and repo_default.strip():
+        value = repo_default
+    else:
+        value = os.getenv(environment_key)
+        if value is not None and not value.strip():
+            value = None
+    if value is None:
+        value = default
     if required and not value:
-        raise click.ClickException(f"Missing required env var: {prefix}_{key}")
+        raise click.ClickException(f"Missing required env var: {environment_key}")
     return value
 
 

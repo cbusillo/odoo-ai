@@ -200,6 +200,95 @@ class StackDataWorkflowTests(unittest.TestCase):
         dokploy_runner.assert_not_called()
         self.assertTrue(local_exec_commands)
 
+    def test_local_data_workflow_builds_script_runner_before_execution(self) -> None:
+        stack_settings = StackSettings(
+            name="opw-local",
+            repo_root=Path("/tmp/repo"),
+            env_file=Path("/tmp/opw-local.env"),
+            source_env_file=Path("/tmp/opw-local.env"),
+            environment={
+                "ODOO_UPSTREAM_HOST": "source.example.com",
+                "ODOO_UPSTREAM_USER": "root",
+                "ODOO_UPSTREAM_DB_NAME": "opw",
+                "ODOO_UPSTREAM_DB_USER": "odoo",
+                "ODOO_UPSTREAM_FILESTORE_PATH": "/var/lib/odoo/filestore/opw",
+            },
+            state_root=Path("/tmp/state/opw-local"),
+            data_dir=Path("/tmp/state/opw-local/data"),
+            db_dir=Path("/tmp/state/opw-local/db"),
+            log_dir=Path("/tmp/state/opw-local/logs"),
+            compose_command=("docker", "compose"),
+            compose_project="opw-local",
+            compose_files=(Path("/tmp/repo/docker-compose.yml"),),
+            docker_context=Path("/tmp/repo"),
+            registry_image="odoo-ai",
+            healthcheck_url="https://opw-local.example.com/web/health",
+            update_modules=("AUTO",),
+            services=("database", "script-runner", "web"),
+            script_runner_service="script-runner",
+            odoo_bin_path="/odoo/odoo-bin",
+            image_variable_name="DOCKER_IMAGE",
+            github_token=None,
+        )
+        compose_calls: list[list[str]] = []
+        exec_commands: list[list[str]] = []
+        stack_settings.env_file.write_text("ODOO_DB_USER=odoo\n", encoding="utf-8")
+
+        def record_compose_call(_settings: StackSettings, extra: list[str], *, check: bool = True) -> None:
+            self.assertIn(check, (True, False))
+            compose_calls.append(list(extra))
+
+        with (
+            patch.object(stack_data_workflow, "load_stack_settings", return_value=stack_settings),
+            patch.object(stack_data_workflow, "build_updated_environment", return_value=stack_settings.environment.copy()),
+            patch.object(stack_data_workflow, "ensure_local_bind_mounts"),
+            patch.object(stack_data_workflow, "write_env_file"),
+            patch.object(stack_data_workflow, "wait_for_local_service"),
+            patch.object(stack_data_workflow, "_run_local_compose", side_effect=record_compose_call),
+            patch.object(
+                stack_data_workflow, "local_compose_command", side_effect=lambda _settings, extra: ["docker", "compose", *extra]
+            ),
+            patch.object(stack_data_workflow, "local_compose_env", return_value={}),
+            patch.object(
+                stack_data_workflow,
+                "run_process",
+                side_effect=lambda command, **_kwargs: exec_commands.append(list(command)),
+            ),
+        ):
+            stack_data_workflow.run_stack_data_workflow("opw-local")
+
+        self.assertGreaterEqual(len(compose_calls), 4)
+        self.assertEqual(compose_calls[0], ["build", "script-runner"])
+        self.assertEqual(compose_calls[1], ["up", "-d", "--remove-orphans", "database"])
+        self.assertEqual(compose_calls[2], ["up", "-d", "--remove-orphans", "script-runner"])
+        self.assertEqual(compose_calls[3], ["stop", "web"])
+        self.assertTrue(exec_commands)
+        self.assertEqual(
+            exec_commands[0],
+            [
+                "docker",
+                "compose",
+                "exec",
+                "-T",
+                "--user",
+                "root",
+                "-e",
+                "ODOO_UPSTREAM_DB_NAME",
+                "-e",
+                "ODOO_UPSTREAM_DB_USER",
+                "-e",
+                "ODOO_UPSTREAM_FILESTORE_PATH",
+                "-e",
+                "ODOO_UPSTREAM_HOST",
+                "-e",
+                "ODOO_UPSTREAM_USER",
+                "script-runner",
+                "python3",
+                "-u",
+                stack_data_workflow.DATA_WORKFLOW_SCRIPT,
+            ],
+        )
+
     def test_resolve_dokploy_schedule_runtime_uses_server_schedule_for_linked_server(self) -> None:
         with patch.object(
             stack_data_workflow,

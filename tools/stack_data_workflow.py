@@ -484,6 +484,7 @@ def run_stack_data_workflow(
 
     ensure_local_bind_mounts(stack_settings)
     write_env_file(stack_settings.env_file, env_values)
+    _run_local_compose(stack_settings, ["build", stack_settings.script_runner_service])
 
     stack_started = False
 

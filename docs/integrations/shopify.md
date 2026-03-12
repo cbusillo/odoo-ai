@@ -34,6 +34,15 @@ When
 - Sync orchestration lives in the sources-of-truth files above.
 - Sync runs can be canceled from the UI and will stop at the next safe
   checkpoint; canceled runs move to the `canceled` state.
+- Validation note for restored staging/local databases: confirm the Shopify
+  dispatcher cron (`shopify_sync.ir_cron_shopify_sync_dispatch`) is active
+  before relying on queued `reset_shopify`, `export_all_products`, or follow-up
+  import/export jobs. Restored database state can leave that `ir.cron` record
+  inactive even when env-level cron disabling is off.
+- Stale `shopify.sync` runs are normally recovered by the dispatcher itself via
+  its stale-run cleanup path on the next cron execution. If the dispatcher cron
+  is inactive, stale `running` rows will not self-heal and fresh queued Shopify
+  validation work can appear stuck behind them.
 
 ## eBay Orders via Shopify
 

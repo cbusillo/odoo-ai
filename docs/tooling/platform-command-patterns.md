@@ -48,6 +48,16 @@ Quick Start
   uv run platform down --context cm --instance local
   ```
 
+- Promote reusable local validation scenarios out of `tmp/scripts/` into
+  tracked scripts under `tools/validate/`, then invoke them through
+  `platform odoo-shell` until a dedicated `platform validate ...` command
+  exists:
+
+  ```bash
+  uv run platform odoo-shell --context opw --instance local \
+    --script tools/validate/shopify_roundtrip.py
+  ```
+
 Local Workflow Patterns
 
 - Run destructive data workflows:

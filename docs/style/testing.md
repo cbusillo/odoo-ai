@@ -18,6 +18,28 @@ Sources of Truth
 - `addons/*/static/tests/` — JS/Hoot/tour tests.
 - `addons/*/static/tests/helpers/` — shared JS helpers (when present).
 
+Environment Validation Scenarios
+
+- Use `validation scenario` or `environment-level validation` for
+  instance-aware checks that exercise real restored/testing stacks and may rely
+  on real credentials, real network calls, or destructive setup such as reset
+  plus re-export flows.
+- Do not treat these scenarios as normal `uv run test ...` assets unless they
+  become deterministic enough for the shared test gate.
+- When a one-off validation flow proves reusable, promote it out of
+  `tmp/scripts/` into a tracked script under `tools/validate/` instead of
+  leaving it as scratch code.
+- Keep addon test trees (`addons/*/tests/`) focused on gateable unit,
+  integration, JS, and tour coverage. Put environment orchestration and
+  instance-aware round-trip checks in tracked validation scripts, not in addon
+  test suites.
+- Prefer platform-managed entry points for these scenarios so target selection,
+  env loading, and logging remain consistent. Until a dedicated
+  `uv run platform validate ...` command exists, run promoted local scenarios
+  through `uv run platform odoo-shell --context <ctx> --instance local --script
+  tools/validate/<scenario>.py` and keep remote variants behind explicit
+  managed entry points rather than ad hoc shell snippets.
+
 Recorded Tours
 
 - DB-recorded tours live in `web_tour.tour`/`web_tour.tour.step`

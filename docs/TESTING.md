@@ -56,6 +56,18 @@ Notes
 
 - Parse `tmp/test-logs/latest/summary.json` (or phase-specific summaries); wait
   for `success: true` before declaring a run green.
+- Environment-level validation scenarios are separate from the normal
+  `uv run test ...` gate. Use them for real integration checks against a
+  selected stack when the workflow depends on restored data, live credentials,
+  or destructive setup such as reset/export/round-trip verification.
+- Prefer tracked validation scripts over ad hoc terminal snippets. When a flow
+  graduates from `tmp/scripts/`, place it under `tools/validate/` and run it
+  through platform-managed entry points so stack selection, env loading, and
+  logs stay reproducible.
+- Use precise language in docs and commits: `validation scenario`,
+  `environment-level validation`, or `round-trip validation` are better fits
+  than `end-to-end test` when the workflow is stateful and intentionally runs
+  outside the shared test gate.
 - `uv run test validate --json` now treats raw source-vs-executed test counts
   as diagnostic only. Gate the harness on session success plus module/tag/init
   coverage, because Odoo runtime counters do not map 1:1 to static source

@@ -186,6 +186,8 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
             return
         if odoo_product not in self.sync_record.odoo_products_to_sync:
             return
+        if odoo_product.shopify_next_export:
+            return
         self.sync_record.write({"odoo_products_to_sync": [(3, odoo_product.id)]})
 
     @staticmethod

@@ -58,3 +58,16 @@ class TestExportAllProductsResume(UnitTestCase):
         exporter._mark_export_all_product_complete(self.products[0])
 
         self.assertEqual(sorted(sync.odoo_products_to_sync.ids), sorted([self.products[1].id, self.products[2].id]))
+
+    def test_mark_export_all_product_complete_keeps_product_when_reexport_is_flagged(self) -> None:
+        sync = ShopifySyncFactory.create(
+            self.env,
+            mode="export_all_products",
+            odoo_products_to_sync=[(6, 0, [product.id for product in self.products])],
+        )
+        exporter = ProductExporter(self.env, sync)
+
+        self.products[0].shopify_next_export = True
+        exporter._mark_export_all_product_complete(self.products[0])
+
+        self.assertEqual(sorted(sync.odoo_products_to_sync.ids), sorted(product.id for product in self.products))

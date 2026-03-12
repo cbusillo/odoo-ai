@@ -58,6 +58,14 @@ Quick Start
     --script tools/validate/shopify_roundtrip.py
   ```
 
+- Remote validation scenarios can be promoted into tracked `uv run` scripts
+  when they rely on XML-RPC/HTTP rather than local Odoo shell execution. For
+  example:
+
+  ```bash
+  uv run validate-shopify-roundtrip --context opw --instance testing
+  ```
+
 Local Workflow Patterns
 
 - Run destructive data workflows:

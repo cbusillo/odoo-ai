@@ -1,0 +1,332 @@
+from __future__ import annotations
+
+import json
+import time
+import urllib.request
+import xmlrpc.client
+from dataclasses import dataclass
+from pathlib import Path
+
+import click
+
+from tools.platform.environment import discover_repo_root, load_environment
+
+POLL_SECONDS = 5
+SYNC_TIMEOUT_SECONDS = 900
+TITLE_TIMEOUT_SECONDS = 180
+DEFAULT_REMOTE_LOGIN = "gpt-admin"
+SUPPORTED_REMOTE_INSTANCES = ("dev", "testing", "prod")
+
+
+@dataclass(frozen=True)
+class RemoteShopifySettings:
+    odoo_url: str
+    database_name: str
+    odoo_password: str
+    remote_login: str
+    shop_url_key: str
+    shopify_api_token: str
+    shopify_api_version: str
+
+
+def load_settings(
+    *,
+    repository_root: Path,
+    env_file: Path | None,
+    context_name: str,
+    instance_name: str,
+    remote_login: str,
+) -> RemoteShopifySettings:
+    if instance_name not in SUPPORTED_REMOTE_INSTANCES:
+        raise click.ClickException(
+            f"shopify-roundtrip currently supports remote instances only: {', '.join(SUPPORTED_REMOTE_INSTANCES)}"
+        )
+
+    _, environment_values = load_environment(
+        repository_root,
+        env_file,
+        context_name=context_name,
+        instance_name=instance_name,
+        collision_mode="error",
+    )
+    odoo_url = str(environment_values["ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL"])
+    odoo_key = str(environment_values["ODOO_KEY"])
+    return RemoteShopifySettings(
+        odoo_url=odoo_url,
+        database_name=context_name,
+        odoo_password=odoo_key,
+        remote_login=remote_login,
+        shop_url_key=str(environment_values["ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY"]),
+        shopify_api_token=str(environment_values["ENV_OVERRIDE_SHOPIFY__API_TOKEN"]),
+        shopify_api_version=str(environment_values["ENV_OVERRIDE_SHOPIFY__API_VERSION"]),
+    )
+
+
+class RemoteOdooClient:
+    def __init__(self, settings: RemoteShopifySettings) -> None:
+        common_proxy = xmlrpc.client.ServerProxy(f"{settings.odoo_url}/xmlrpc/2/common", allow_none=True)
+        uid = common_proxy.authenticate(settings.database_name, settings.remote_login, settings.odoo_password, {})
+        if not uid:
+            raise RuntimeError(f"Failed to authenticate remote Odoo XML-RPC session for {settings.remote_login}")
+        self.settings = settings
+        self.uid = uid
+        self.object_proxy = xmlrpc.client.ServerProxy(f"{settings.odoo_url}/xmlrpc/2/object", allow_none=True)
+
+    def execute(self, model_name: str, method_name: str, args: list[object], kwargs: dict[str, object] | None = None) -> object:
+        return self.object_proxy.execute_kw(
+            self.settings.database_name,
+            self.uid,
+            self.settings.odoo_password,
+            model_name,
+            method_name,
+            args,
+            kwargs or {},
+        )
+
+
+def shopify_graphql(settings: RemoteShopifySettings, query: str, variables: dict[str, object]) -> dict[str, object]:
+    request = urllib.request.Request(
+        url=f"https://{settings.shop_url_key}.myshopify.com/admin/api/{settings.shopify_api_version}/graphql.json",
+        data=json.dumps({"query": query, "variables": variables}).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": settings.shopify_api_token,
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=60) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    if payload.get("errors"):
+        raise RuntimeError(f"Shopify GraphQL errors: {payload['errors']}")
+    return payload.get("data") or {}
+
+
+def shopify_product_gid(shopify_product_id: str) -> str:
+    return f"gid://shopify/Product/{shopify_product_id}"
+
+
+def get_shopify_title(settings: RemoteShopifySettings, shopify_product_id: str) -> str | None:
+    data = shopify_graphql(
+        settings,
+        query="query ProductTitle($id: ID!) { product(id: $id) { title } }",
+        variables={"id": shopify_product_gid(shopify_product_id)},
+    )
+    product_payload = data.get("product") or {}
+    if not isinstance(product_payload, dict):
+        raise RuntimeError("Unexpected Shopify product payload while reading title")
+    return product_payload.get("title")
+
+
+def set_shopify_title(settings: RemoteShopifySettings, shopify_product_id: str, title: str) -> None:
+    data = shopify_graphql(
+        settings,
+        query=(
+            "mutation ProductSet($identifier: ProductSetIdentifiers!, $input: ProductSetInput!) {"
+            "  productSet(identifier: $identifier, input: $input) {"
+            "    product { id title }"
+            "    userErrors { field message }"
+            "  }"
+            "}"
+        ),
+        variables={
+            "identifier": {"id": shopify_product_gid(shopify_product_id)},
+            "input": {"title": title},
+        },
+    )
+    response_payload = data.get("productSet") or {}
+    if not isinstance(response_payload, dict):
+        raise RuntimeError("Unexpected Shopify productSet payload while updating title")
+    user_errors = response_payload.get("userErrors") or []
+    if user_errors:
+        raise RuntimeError(f"Shopify title update failed: {user_errors}")
+
+
+def search_export_candidate(client: RemoteOdooClient) -> dict[str, object]:
+    domain = [
+        ["sale_ok", "=", True],
+        ["is_ready_for_sale", "=", True],
+        ["is_published", "=", True],
+        ["website_description", "!=", False],
+        ["website_description", "!=", ""],
+        ["type", "=", "consu"],
+        ["external_ids.system_id.code", "=", "shopify"],
+        ["external_ids.resource", "=", "product"],
+    ]
+    result = client.execute(
+        "product.product",
+        "search_read",
+        [domain],
+        {"fields": ["id", "name"], "limit": 1},
+    )
+    if not isinstance(result, list) or not result:
+        raise RuntimeError("No Shopify-linked product found for Shopify round-trip validation")
+    candidate = result[0]
+    if not isinstance(candidate, dict):
+        raise RuntimeError("Unexpected search_read payload for candidate product")
+    return candidate
+
+
+def get_external_system_id(client: RemoteOdooClient, product_id: int, resource: str) -> str:
+    external_id = client.execute("product.product", "get_external_system_id", [[product_id], "shopify", resource])
+    if not isinstance(external_id, str) or not external_id:
+        raise RuntimeError(f"Product {product_id} is missing Shopify {resource} external id")
+    return external_id
+
+
+def read_product_name(client: RemoteOdooClient, product_id: int) -> str:
+    result = client.execute("product.product", "read", [[product_id], ["name"]])
+    if not isinstance(result, list) or not result or not isinstance(result[0], dict):
+        raise RuntimeError(f"Failed to read product {product_id}")
+    return str(result[0].get("name") or "")
+
+
+def create_sync(client: RemoteOdooClient, mode: str, extra_values: dict[str, object] | None = None) -> int:
+    values: dict[str, object] = {"mode": mode}
+    if extra_values:
+        values.update(extra_values)
+    sync_record = client.execute("shopify.sync", "create_and_run_async", [[], values])
+    if isinstance(sync_record, list) and sync_record and isinstance(sync_record[0], int):
+        return sync_record[0]
+    if isinstance(sync_record, int):
+        return sync_record
+    existing_syncs = client.execute(
+        "shopify.sync",
+        "search_read",
+        [
+            [
+                ["mode", "=", mode],
+                ["state", "in", ["queued", "running"]],
+            ]
+        ],
+        {"fields": ["id"], "limit": 1, "order": "id desc"},
+    )
+    if isinstance(existing_syncs, list) and existing_syncs and isinstance(existing_syncs[0], dict):
+        existing_sync_id = existing_syncs[0].get("id")
+        if isinstance(existing_sync_id, int):
+            return existing_sync_id
+    raise RuntimeError(f"Failed to create or resolve remote Shopify sync for mode {mode}: {sync_record!r}")
+
+
+def read_sync_state(client: RemoteOdooClient, sync_id: int) -> dict[str, object]:
+    result = client.execute(
+        "shopify.sync",
+        "read",
+        [[sync_id], ["id", "mode", "state", "updated_count", "total_count", "error_message"]],
+    )
+    if not isinstance(result, list) or not result or not isinstance(result[0], dict):
+        raise RuntimeError(f"Failed to read sync {sync_id}")
+    return result[0]
+
+
+def wait_for_sync(client: RemoteOdooClient, sync_id: int, label: str) -> dict[str, object]:
+    deadline = time.time() + SYNC_TIMEOUT_SECONDS
+    while time.time() < deadline:
+        sync_state = read_sync_state(client, sync_id)
+        state_value = str(sync_state.get("state") or "")
+        print(json.dumps({"label": label, "sync": sync_state}, sort_keys=True), flush=True)
+        if state_value == "success":
+            return sync_state
+        if state_value == "failed":
+            raise RuntimeError(f"Remote sync failed for {label}: {sync_state}")
+        if state_value == "canceled":
+            raise RuntimeError(f"Remote sync was canceled for {label}: {sync_state}")
+        time.sleep(POLL_SECONDS)
+    raise RuntimeError(f"Timed out waiting for remote sync {sync_id} during {label}")
+
+
+def wait_for_shopify_title(settings: RemoteShopifySettings, shopify_product_id: str, expected_title: str, label: str) -> None:
+    deadline = time.time() + TITLE_TIMEOUT_SECONDS
+    while time.time() < deadline:
+        actual_title = get_shopify_title(settings, shopify_product_id)
+        print(json.dumps({"label": label, "expected_shopify_title": expected_title, "actual_shopify_title": actual_title}), flush=True)
+        if actual_title == expected_title:
+            return
+        time.sleep(POLL_SECONDS)
+    raise RuntimeError(f"Timed out waiting for Shopify title during {label}")
+
+
+def wait_for_odoo_title(client: RemoteOdooClient, product_id: int, expected_title: str, label: str) -> None:
+    deadline = time.time() + TITLE_TIMEOUT_SECONDS
+    while time.time() < deadline:
+        actual_title = read_product_name(client, product_id)
+        print(json.dumps({"label": label, "expected_odoo_title": expected_title, "actual_odoo_title": actual_title}), flush=True)
+        if actual_title == expected_title:
+            return
+        time.sleep(POLL_SECONDS)
+    raise RuntimeError(f"Timed out waiting for Odoo title during {label}")
+
+
+def run_roundtrip(settings: RemoteShopifySettings) -> dict[str, object]:
+    client = RemoteOdooClient(settings)
+    candidate = search_export_candidate(client)
+    product_id_value = candidate.get("id")
+    original_title_value = candidate.get("name")
+    if not isinstance(product_id_value, int):
+        raise RuntimeError(f"Unexpected candidate product id payload: {candidate!r}")
+    product_id = product_id_value
+    original_title = str(original_title_value or "")
+    shopify_product_id = get_external_system_id(client, product_id, "product")
+
+    reset_sync_id = create_sync(client, "reset_shopify")
+    reset_sync = wait_for_sync(client, reset_sync_id, "remote reset_shopify")
+    export_sync_id = create_sync(client, "export_all_products")
+    export_sync = wait_for_sync(client, export_sync_id, "remote export_all_products")
+
+    updated_shopify_product_id = get_external_system_id(client, product_id, "product")
+    if updated_shopify_product_id != shopify_product_id:
+        shopify_product_id = updated_shopify_product_id
+
+    timestamp = int(time.time())
+    odoo_title = f"{original_title} [Odoo RPC {timestamp}]"
+    shopify_title = f"{original_title} [Shopify RPC {timestamp}]"
+
+    client.execute("product.product", "write", [[product_id], {"name": odoo_title}])
+    export_changed_sync_id = create_sync(client, "export_changed_products")
+    export_changed_sync = wait_for_sync(client, export_changed_sync_id, "remote export_changed_products")
+    wait_for_shopify_title(settings, shopify_product_id, odoo_title, "odoo-to-shopify")
+
+    set_shopify_title(settings, shopify_product_id, shopify_title)
+    import_sync_id = create_sync(client, "import_one_product", {"shopify_product_id_to_sync": shopify_product_id})
+    import_sync = wait_for_sync(client, import_sync_id, "remote import_one_product")
+    wait_for_odoo_title(client, product_id, shopify_title, "shopify-to-odoo")
+
+    client.execute("product.product", "write", [[product_id], {"name": original_title}])
+    restore_sync_id = create_sync(client, "export_changed_products")
+    restore_sync = wait_for_sync(client, restore_sync_id, "remote restore original title")
+    wait_for_shopify_title(settings, shopify_product_id, original_title, "restore original title")
+
+    return {
+        "candidate_product_id": product_id,
+        "shopify_product_id": shopify_product_id,
+        "original_title": original_title,
+        "reset_sync": reset_sync,
+        "export_all_sync": export_sync,
+        "export_changed_sync": export_changed_sync,
+        "import_one_sync": import_sync,
+        "restore_sync": restore_sync,
+        "remote_odoo_url": settings.odoo_url,
+    }
+
+
+@click.command()
+@click.option("--context", "context_name", default="opw", show_default=True)
+@click.option(
+    "--instance",
+    "instance_name",
+    type=click.Choice(SUPPORTED_REMOTE_INSTANCES, case_sensitive=False),
+    default="testing",
+    show_default=True,
+)
+@click.option("--env-file", type=click.Path(path_type=Path), default=None)
+@click.option("--remote-login", default=DEFAULT_REMOTE_LOGIN, show_default=True)
+def main(context_name: str, instance_name: str, env_file: Path | None, remote_login: str) -> None:
+    repository_root = discover_repo_root(Path.cwd())
+    settings = load_settings(
+        repository_root=repository_root,
+        env_file=env_file,
+        context_name=context_name,
+        instance_name=instance_name,
+        remote_login=remote_login,
+    )
+    results = run_roundtrip(settings)
+    print(json.dumps(results, indent=2, sort_keys=True))

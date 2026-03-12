@@ -54,6 +54,7 @@ test-validate = "tools.testkit.validate:main"
 gate-benchmark = "tools.gate_benchmark:main"
 prod-gate = "tools.prod_gate:main"
 platform = "tools.platform.cli:main"
+validate-shopify-roundtrip = "tools.validate.shopify_roundtrip:main"
 
 [tool.uv]
 preview = true

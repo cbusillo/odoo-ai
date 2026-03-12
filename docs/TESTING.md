@@ -64,6 +64,8 @@ Notes
   graduates from `tmp/scripts/`, place it under `tools/validate/` and run it
   through platform-managed entry points so stack selection, env loading, and
   logs stay reproducible.
+- Example: the tracked Shopify remote round-trip scenario now runs as
+  `uv run validate-shopify-roundtrip --context opw --instance testing`.
 - Use precise language in docs and commits: `validation scenario`,
   `environment-level validation`, or `round-trip validation` are better fits
   than `end-to-end test` when the workflow is stateful and intentionally runs

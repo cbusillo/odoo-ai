@@ -1,4 +1,5 @@
 import base64
+from types import SimpleNamespace
 
 from odoo import fields
 from test_support.tests.shared.sync_doubles import DummySyncRecord
@@ -365,6 +366,30 @@ class TestProductExporter(IntegrationTestCase):
         shopify_response = common.Mock()
         shopify_response.product = None
         shopify_response.user_errors = None
+        self.exporter.service._client = common.MagicMock()
+        self.exporter.service.client.product_set.return_value = shopify_response
+
+        with self.assertRaises(ShopifyApiError):
+            self.exporter._export_one(product)
+
+        self.assertEqual(product.get_external_system_id("shopify", "product"), "555")
+        self.assertEqual(product.get_external_system_id("shopify", "variant"), "556")
+        self.assertEqual(product.get_external_system_id("shopify", "condition"), "557")
+        self.assertEqual(product.get_external_system_id("shopify", "ebay_category"), "558")
+        self.assertFalse(product.shopify_next_export)
+
+    def test_export_one_handles_missing_user_errors_attribute_in_missing_product_response(self) -> None:
+        from ..fixtures.factories import ProductFactory
+
+        product = ProductFactory.create(
+            self.env,
+            shopify_product_id="555",
+            shopify_variant_id="556",
+            shopify_condition_id="557",
+            shopify_ebay_category_id="558",
+        ).product_variant_id
+        self.exporter._map_odoo_product_to_shopify_product_set_input = common.MagicMock(return_value=common.Mock())
+        shopify_response = SimpleNamespace(product=None)
         self.exporter.service._client = common.MagicMock()
         self.exporter.service.client.product_set.return_value = shopify_response
 

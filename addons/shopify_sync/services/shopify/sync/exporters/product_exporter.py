@@ -150,7 +150,8 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
         shopify_product = shopify_response.product if shopify_response else None
         if not shopify_product:
             user_error_messages = []
-            for user_error in (shopify_response.user_errors or []) if shopify_response else []:
+            raw_user_errors = getattr(shopify_response, "user_errors", None) if shopify_response else None
+            for user_error in raw_user_errors or []:
                 if isinstance(user_error, dict):
                     message = str(user_error.get("message", "") or "").strip()
                 else:

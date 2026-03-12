@@ -542,7 +542,21 @@ class ShopifySync(models.TransientModel):
         from ..services.shopify import ProductExporter
 
         exporter = ProductExporter(self.env, self)
-        exporter.export_products_since_datetime(DEFAULT_DATETIME)
+        if self.odoo_products_to_sync:
+            products_to_export = self.odoo_products_to_sync
+        else:
+            products_to_export = exporter._find_products_to_export(DEFAULT_DATETIME)
+            if not products_to_export:
+                _logger.info("No products to export")
+                return
+            self.write(
+                {
+                    "odoo_products_to_sync": [fields.Command.set(products_to_export.ids)],
+                    "total_count": len(products_to_export),
+                }
+            )
+
+        exporter.export_products(products_to_export)
 
     def _run_import_then_export_products(self) -> None:
         self._run_import_changed_products()

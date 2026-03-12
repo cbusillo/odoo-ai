@@ -178,6 +178,14 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
             self._publish_product(shopify_product_gid or shopify_product.id)
         self._update_odoo_product(odoo_product, shopify_product)
         self._sync_images_after_export(odoo_product, shopify_product)
+        self._mark_export_all_product_complete(odoo_product)
+
+    def _mark_export_all_product_complete(self, odoo_product: "odoo.model.product_product") -> None:
+        if self.sync_record.mode != "export_all_products":
+            return
+        if odoo_product not in self.sync_record.odoo_products_to_sync:
+            return
+        self.sync_record.write({"odoo_products_to_sync": [(3, odoo_product.id)]})
 
     @staticmethod
     def _update_odoo_product(odoo_product: "odoo.model.product_product", shopify_product: ProductSetProductSetProduct) -> None:

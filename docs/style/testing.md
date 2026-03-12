@@ -34,11 +34,10 @@ Environment Validation Scenarios
   instance-aware round-trip checks in tracked validation scripts, not in addon
   test suites.
 - Prefer platform-managed entry points for these scenarios so target selection,
-  env loading, and logging remain consistent. Until a dedicated
-  `uv run platform validate ...` command exists, run promoted local scenarios
-  through `uv run platform odoo-shell --context <ctx> --instance local --script
-  tools/validate/<scenario>.py` and keep remote variants behind explicit
-  managed entry points rather than ad hoc shell snippets.
+  env loading, and logging remain consistent. Use
+  `uv run platform validate <scenario> ...` for tracked environment validation
+  scenarios and keep local Odoo-shell helpers or remote RPC helpers behind that
+  operator surface rather than ad hoc shell snippets.
 
 Recorded Tours
 

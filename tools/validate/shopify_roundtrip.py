@@ -11,8 +11,7 @@ from pathlib import Path
 import click
 
 from tools.platform import dokploy as platform_dokploy
-from tools.platform.environment import discover_repo_root, load_environment
-from tools.platform.environment import load_dokploy_source_of_truth
+from tools.platform.environment import discover_repo_root, load_dokploy_source_of_truth, load_environment
 
 POLL_SECONDS = 5
 SYNC_TIMEOUT_SECONDS = 8 * 60 * 60
@@ -355,6 +354,25 @@ def run_roundtrip(settings: RemoteShopifySettings) -> dict[str, object]:
     }
 
 
+def run_validation_command(
+    *,
+    context_name: str,
+    instance_name: str,
+    env_file: Path | None,
+    remote_login: str,
+    repository_root: Path | None = None,
+) -> dict[str, object]:
+    effective_repository_root = repository_root or discover_repo_root(Path.cwd())
+    settings = load_settings(
+        repository_root=effective_repository_root,
+        env_file=env_file,
+        context_name=context_name,
+        instance_name=instance_name,
+        remote_login=remote_login,
+    )
+    return run_roundtrip(settings)
+
+
 @click.command()
 @click.option("--context", "context_name", default="opw", show_default=True)
 @click.option(
@@ -367,15 +385,12 @@ def run_roundtrip(settings: RemoteShopifySettings) -> dict[str, object]:
 @click.option("--env-file", type=click.Path(path_type=Path), default=None)
 @click.option("--remote-login", default=DEFAULT_REMOTE_LOGIN, show_default=True)
 def main(context_name: str, instance_name: str, env_file: Path | None, remote_login: str) -> None:
-    repository_root = discover_repo_root(Path.cwd())
-    settings = load_settings(
-        repository_root=repository_root,
-        env_file=env_file,
+    results = run_validation_command(
         context_name=context_name,
         instance_name=instance_name,
+        env_file=env_file,
         remote_login=remote_login,
     )
-    results = run_roundtrip(settings)
     print(json.dumps(results, indent=2, sort_keys=True))
 
 

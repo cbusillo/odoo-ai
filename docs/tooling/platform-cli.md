@@ -39,6 +39,8 @@ Operator Contract
 - `platform bootstrap` is the destructive fresh-start rebuild path.
 - `platform init` remains a local-only module initialization pass for an
   existing database.
+- `platform validate <scenario>` runs tracked environment validation scenarios
+  against a selected stack or managed target.
 
 Command Families
 
@@ -46,6 +48,7 @@ Command Families
   `down`, `logs`, `inspect`, `odoo-shell`.
 - Data workflows: `restore`, `bootstrap`.
 - Runtime workflows: `run`, `init`, `update`, `openupgrade`.
+- Validation scenarios: `validate ...`.
 - Remote release: `ship`, `rollback`, `gate`, `promote`, and
   `platform dokploy ...` helpers.
 - Dokploy inventory: `platform dokploy inventory` for project/server/target

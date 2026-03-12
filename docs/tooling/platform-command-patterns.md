@@ -48,22 +48,10 @@ Quick Start
   uv run platform down --context cm --instance local
   ```
 
-- Promote reusable local validation scenarios out of `tmp/scripts/` into
-  tracked scripts under `tools/validate/`, then invoke them through
-  `platform odoo-shell` until a dedicated `platform validate ...` command
-  exists:
+- Run tracked environment validation scenarios through `platform validate`:
 
   ```bash
-  uv run platform odoo-shell --context opw --instance local \
-    --script tools/validate/shopify_roundtrip.py
-  ```
-
-- Remote validation scenarios can be promoted into tracked `uv run` scripts
-  when they rely on XML-RPC/HTTP rather than local Odoo shell execution. For
-  example:
-
-  ```bash
-  uv run python tools/validate/shopify_roundtrip.py --context opw --instance testing
+  uv run platform validate shopify-roundtrip --context opw --instance testing
   ```
 
 Local Workflow Patterns

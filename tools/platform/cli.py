@@ -36,6 +36,7 @@ from tools.platform.models import (
     StackDefinition,
 )
 from tools.stack_data_workflow import run_stack_data_workflow
+from tools.validate import shopify_roundtrip as validate_shopify_roundtrip
 
 PLATFORM_RUNTIME_ENV_KEYS = (
     "PLATFORM_CONTEXT",
@@ -1204,6 +1205,38 @@ def validate_config(stack_file: Path, env_file: Path | None) -> None:
         load_stack_fn=_load_stack,
         load_environment_fn=_load_environment,
     )
+
+
+@main.group("validate", help="Run tracked environment validation scenarios against a selected instance.")
+def validate() -> None:
+    return None
+
+
+@validate.command("shopify-roundtrip", help="Run the Shopify round-trip validation scenario against a managed target.")
+@click.option("--context", "context_name", default="opw", show_default=True)
+@click.option(
+    "--instance",
+    "instance_name",
+    type=click.Choice(validate_shopify_roundtrip.SUPPORTED_REMOTE_INSTANCES, case_sensitive=False),
+    default="testing",
+    show_default=True,
+)
+@click.option("--env-file", type=click.Path(path_type=Path), default=None)
+@click.option("--remote-login", default=validate_shopify_roundtrip.DEFAULT_REMOTE_LOGIN, show_default=True)
+def validate_shopify_roundtrip_command(
+    context_name: str,
+    instance_name: str,
+    env_file: Path | None,
+    remote_login: str,
+) -> None:
+    results = validate_shopify_roundtrip.run_validation_command(
+        context_name=context_name,
+        instance_name=instance_name,
+        env_file=env_file,
+        remote_login=remote_login,
+        repository_root=_discover_repo_root(Path.cwd()),
+    )
+    click.echo(json.dumps(results, indent=2, sort_keys=True))
 
 
 @main.command("list-contexts")

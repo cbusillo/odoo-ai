@@ -1,4 +1,5 @@
 import logging
+import json
 from datetime import datetime
 
 from odoo import SUPERUSER_ID, api
@@ -12,6 +13,7 @@ from .services.shopify.helpers import (
 )
 
 _logger = logging.getLogger(__name__)
+SHOPIFY_DISPATCHER_CRON_SNAPSHOT_PARAMETER = "shopify_sync.migration.dispatcher_cron_active"
 
 
 def pre_init_hook(env_or_cursor: Environment | Cursor) -> None:
@@ -29,7 +31,49 @@ def post_init_hook(env_or_cursor: Environment | Cursor, registry: object | None 
         env = env_or_cursor
     else:
         env = api.Environment(env_or_cursor, SUPERUSER_ID, {})
+    _restore_shopify_dispatcher_cron_active(env)
     _migrate_marketplace_external_ids(env)
+
+
+def _restore_shopify_dispatcher_cron_active(env: api.Environment) -> None:
+    config_parameter_model = env["ir.config_parameter"].sudo()
+    snapshot_record = config_parameter_model.search(
+        [("key", "=", SHOPIFY_DISPATCHER_CRON_SNAPSHOT_PARAMETER)],
+        limit=1,
+    )
+    if not snapshot_record:
+        return
+
+    snapshot_value = snapshot_record.value
+    if isinstance(snapshot_value, bool):
+        active_value = snapshot_value
+    elif snapshot_value is None:
+        _logger.warning(
+            "Missing Shopify dispatcher cron snapshot value for key=%s; removing stale snapshot",
+            SHOPIFY_DISPATCHER_CRON_SNAPSHOT_PARAMETER,
+        )
+        snapshot_record.unlink()
+        return
+    else:
+        try:
+            active_value = bool(json.loads(snapshot_value))
+        except (json.JSONDecodeError, TypeError):
+            _logger.warning(
+                "Invalid Shopify dispatcher cron snapshot %r; removing without applying it",
+                snapshot_value,
+            )
+            snapshot_record.unlink()
+            return
+
+    cron = env.ref("shopify_sync.ir_cron_shopify_sync_dispatch", raise_if_not_found=False)
+    cron = cron.exists() if cron else env["ir.cron"]
+    if cron:
+        cron.sudo().write({"active": active_value})
+        _logger.info("Restored Shopify dispatcher cron active=%s from migration snapshot", active_value)
+    else:
+        _logger.warning("Shopify dispatcher cron not found while restoring migration snapshot")
+
+    snapshot_record.unlink()
 
 
 def _migrate_marketplace_external_ids(env: api.Environment) -> None:

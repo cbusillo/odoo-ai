@@ -59,6 +59,8 @@ Post-Cutover Cleanup
 - [ ] Create Odoo 18 archive branch (example: `production-odoo18-archive`) for
   historical rollback reference.
 - [ ] Remove OpenUpgrade addon/runtime wiring once no longer needed.
+- [ ] Inventory and remove upgrade-only hooks, post-migration helpers, and
+  split-module state preservation code once OPW prod is stable on Odoo 19.
 - [ ] Remove obsolete Odoo 19 upgrade planning docs and one-off test-session
   prompts.
 - [ ] Confirm restore/bootstrap flows no longer depend on upgrade-only assets.

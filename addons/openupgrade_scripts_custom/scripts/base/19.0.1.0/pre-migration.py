@@ -29,6 +29,8 @@ MOVED_MODULES = (
     "image_enhancements",
     "shopify_sync",
 )
+MARINE_MOTORS_SNAPSHOT_PARAMETER = "marine_motors.migration.split_preserved_state"
+SHOPIFY_DISPATCHER_CRON_SNAPSHOT_PARAMETER = "shopify_sync.migration.dispatcher_cron_active"
 
 
 def _mark_missing_manifest_modules_uninstalled(env: Environment) -> None:
@@ -153,6 +155,165 @@ def _reassign_xml_ids(env: Environment, target_module: str, xml_ids: set[str]) -
     )
 
 
+def _snapshot_shopify_dispatcher_cron_active(env: Environment) -> None:
+    env.cr.execute(
+        """
+        SELECT cron.active
+          FROM ir_cron AS cron
+          JOIN ir_model_data AS model_data
+            ON model_data.res_id = cron.id
+           AND model_data.model = 'ir.cron'
+         WHERE model_data.module = 'shopify_sync'
+           AND model_data.name = 'ir_cron_shopify_sync_dispatch'
+         LIMIT 1
+        """,
+    )
+    row = env.cr.fetchone()
+    if row is None:
+        _logger.warning("Shopify dispatcher cron not found during product_connect split migration snapshot")
+        return
+
+    snapshot_value = json.dumps(bool(row[0]))
+    env.cr.execute(
+        """
+        INSERT INTO ir_config_parameter (key, value, create_uid, create_date, write_uid, write_date)
+        VALUES (%s, %s, %s, NOW(), %s, NOW())
+        ON CONFLICT (key)
+        DO UPDATE SET value = EXCLUDED.value, write_uid = EXCLUDED.write_uid, write_date = EXCLUDED.write_date
+        """,
+        (SHOPIFY_DISPATCHER_CRON_SNAPSHOT_PARAMETER, snapshot_value, SUPERUSER_ID, SUPERUSER_ID),
+    )
+
+    _logger.info("Snapshot Shopify dispatcher cron active=%s during product_connect split migration", bool(row[0]))
+
+
+def _snapshot_marine_motors_split_state(env: Environment) -> None:
+    selection_template_ids = [
+        "motor_test_template_shaft_length",
+        "motor_test_template_lower_unit_rotation_check",
+        "motor_test_template_fuel_pump_status",
+        "motor_test_template_trim_tilt_unit_status",
+    ]
+    hidden_test_part_ids = [
+        "motor_part_powerhead",
+        "motor_part_trim_unit",
+        "motor_part_lower_unit",
+        "motor_part_fuel_pump",
+    ]
+    sequence_section_ids = [
+        "motor_test_section_engine_details",
+        "motor_test_section_fuel_system",
+        "motor_test_section_trim_unit",
+        "motor_test_section_lower_unit",
+        "motor_test_section_drive_unit",
+        "motor_test_section_additional",
+    ]
+    name_part_ids = [
+        "motor_part_carburetors",
+        "motor_part_ecu",
+    ]
+
+    snapshot_payload = {
+        "selection_options": _fetch_marine_motors_many_to_many_xmlids(
+            env,
+            owner_model="motor.test.template",
+            owner_ids=selection_template_ids,
+            relation_table="motor_test_selection_motor_test_template_rel",
+            owner_column="motor_test_template_id",
+            related_column="motor_test_selection_id",
+            related_model="motor.test.selection",
+        ),
+        "hidden_tests": _fetch_marine_motors_many_to_many_xmlids(
+            env,
+            owner_model="motor.part.template",
+            owner_ids=hidden_test_part_ids,
+            relation_table="motor_part_template_motor_test_template_rel",
+            owner_column="motor_part_template_id",
+            related_column="motor_test_template_id",
+            related_model="motor.test.template",
+        ),
+        "section_sequences": _fetch_marine_motors_scalar_state(
+            env,
+            model_name="motor.test.section",
+            xml_ids=sequence_section_ids,
+            field_name="sequence",
+        ),
+        "part_names": _fetch_marine_motors_scalar_state(
+            env,
+            model_name="motor.part.template",
+            xml_ids=name_part_ids,
+            field_name="name",
+        ),
+    }
+
+    env.cr.execute(
+        """
+        INSERT INTO ir_config_parameter (key, value, create_uid, create_date, write_uid, write_date)
+        VALUES (%s, %s, %s, NOW(), %s, NOW())
+        ON CONFLICT (key)
+        DO UPDATE SET value = EXCLUDED.value, write_uid = EXCLUDED.write_uid, write_date = EXCLUDED.write_date
+        """,
+        (MARINE_MOTORS_SNAPSHOT_PARAMETER, json.dumps(snapshot_payload), SUPERUSER_ID, SUPERUSER_ID),
+    )
+
+
+def _fetch_marine_motors_many_to_many_xmlids(
+    env: Environment,
+    *,
+    owner_model: str,
+    owner_ids: list[str],
+    relation_table: str,
+    owner_column: str,
+    related_column: str,
+    related_model: str,
+) -> dict[str, list[str]]:
+    env.cr.execute(
+        f"""
+        SELECT owner_data.name,
+               COALESCE(array_agg(related_data.name ORDER BY related_data.name)
+                        FILTER (WHERE related_data.name IS NOT NULL), ARRAY[]::text[])
+          FROM ir_model_data owner_data
+          LEFT JOIN {relation_table} relation_table
+            ON relation_table.{owner_column} = owner_data.res_id
+          LEFT JOIN ir_model_data related_data
+            ON related_data.res_id = relation_table.{related_column}
+           AND related_data.model = %s
+           AND related_data.module = 'marine_motors'
+         WHERE owner_data.module = 'marine_motors'
+           AND owner_data.model = %s
+           AND owner_data.name = ANY(%s)
+         GROUP BY owner_data.name
+         ORDER BY owner_data.name
+        """,
+        (related_model, owner_model, owner_ids),
+    )
+    return {xml_id: related_ids for xml_id, related_ids in env.cr.fetchall()}
+
+
+def _fetch_marine_motors_scalar_state(
+    env: Environment,
+    *,
+    model_name: str,
+    xml_ids: list[str],
+    field_name: str,
+) -> dict[str, object]:
+    table_name = model_name.replace(".", "_")
+    env.cr.execute(
+        f"""
+        SELECT model_data.name, record.{field_name}
+          FROM ir_model_data model_data
+          JOIN {table_name} record
+            ON record.id = model_data.res_id
+         WHERE model_data.module = 'marine_motors'
+           AND model_data.model = %s
+           AND model_data.name = ANY(%s)
+         ORDER BY model_data.name
+        """,
+        (model_name, xml_ids),
+    )
+    return {xml_id: value for xml_id, value in env.cr.fetchall()}
+
+
 def _rename_legacy_module(env: Environment) -> None:
     env.cr.execute("UPDATE ir_module_module SET name = %s WHERE name = %s", (RENAMED_MODULE, LEGACY_MODULE))
     env.cr.execute(
@@ -171,6 +332,10 @@ def _rename_product_connect(env: Environment) -> None:
     for module_name in MOVED_MODULES:
         record_ids = _collect_manifest_data_ids(module_name)
         _reassign_xml_ids(env, module_name, record_ids)
+
+    if legacy_state.get("state") not in {"uninstalled", "uninstallable"}:
+        _snapshot_marine_motors_split_state(env)
+        _snapshot_shopify_dispatcher_cron_active(env)
 
     if _legacy_module_exists(env, RENAMED_MODULE):
         renamed_state = _fetch_module_state(env, RENAMED_MODULE) or {}

@@ -324,6 +324,7 @@ class StackDataWorkflowTests(unittest.TestCase):
     def test_build_dokploy_data_workflow_script_includes_project_labels_and_flags(self) -> None:
         schedule_script = stack_data_workflow._build_dokploy_data_workflow_script(
             compose_app_name="compose-opw-testing-abc123",
+            database_name="opw",
             bootstrap=True,
             no_sanitize=True,
             clear_stale_lock=True,
@@ -336,6 +337,47 @@ class StackDataWorkflowTests(unittest.TestCase):
         self.assertIn("--no-sanitize", schedule_script)
         self.assertIn("Clearing stale data workflow lock ${data_workflow_lock_path}", schedule_script)
         self.assertIn("docker exec -u root", schedule_script)
+        self.assertIn("Normalizing filestore ownership for ${database_name}", schedule_script)
+
+    def test_build_dokploy_data_workflow_script_runs_main_workflow_non_root(self) -> None:
+        schedule_script = stack_data_workflow._build_dokploy_data_workflow_script(
+            compose_app_name="compose-opw-testing-abc123",
+            database_name="opw",
+            bootstrap=True,
+            no_sanitize=False,
+            clear_stale_lock=True,
+            data_workflow_lock_path="/volumes/data/.data_workflow_in_progress",
+        )
+
+        self.assertIn('docker exec -u root "${script_runner_container_id}" rm -f', schedule_script)
+        self.assertIn('docker exec "${script_runner_container_id}"', schedule_script)
+        self.assertIn('python3 -u /volumes/scripts/run_odoo_data_workflows.py', schedule_script)
+        self.assertNotIn('docker exec -u root "${script_runner_container_id}"     python3 -u', schedule_script)
+
+    def test_build_dokploy_data_workflow_script_limits_root_usage_to_lock_cleanup(self) -> None:
+        schedule_script = stack_data_workflow._build_dokploy_data_workflow_script(
+            compose_app_name="compose-opw-testing-abc123",
+            database_name="opw",
+            bootstrap=False,
+            no_sanitize=False,
+            clear_stale_lock=True,
+            data_workflow_lock_path="/volumes/data/.data_workflow_in_progress",
+        )
+
+        self.assertEqual(schedule_script.count("docker exec -u root"), 2)
+
+    def test_build_dokploy_data_workflow_script_uses_one_root_exec_without_lock_cleanup(self) -> None:
+        schedule_script = stack_data_workflow._build_dokploy_data_workflow_script(
+            compose_app_name="compose-opw-testing-abc123",
+            database_name="opw",
+            bootstrap=False,
+            no_sanitize=False,
+            clear_stale_lock=False,
+            data_workflow_lock_path="/volumes/data/.data_workflow_in_progress",
+        )
+
+        self.assertIn("clear_stale_lock=0", schedule_script)
+        self.assertEqual(schedule_script.count("docker exec -u root"), 2)
 
     def test_should_clear_stale_data_workflow_lock_only_for_cancelled_latest_deployment(self) -> None:
         self.assertTrue(
@@ -473,6 +515,7 @@ class StackDataWorkflowTests(unittest.TestCase):
                 {
                     "DOKPLOY_HOST": "https://dokploy.example",
                     "DOKPLOY_TOKEN": "token",
+                    "ODOO_DB_NAME": "opw",
                     "ODOO_ADDON_REPOSITORIES": "cbusillo/disable_odoo_online@main,"
                     "OCA/OpenUpgrade@89e649728027a8ab656b3aa4be18f4bd364db417",
                     "OPENUPGRADE_ADDON_REPOSITORY": "OCA/OpenUpgrade@89e649728027a8ab656b3aa4be18f4bd364db417",
@@ -497,6 +540,7 @@ class StackDataWorkflowTests(unittest.TestCase):
         self.assertEqual(upsert_payload["enabled"], False)
         self.assertEqual(upsert_payload["timezone"], "UTC")
         self.assertIn("Clearing stale data workflow lock ${data_workflow_lock_path}", str(upsert_payload["script"]))
+        self.assertIn("Normalizing filestore ownership for ${database_name}", str(upsert_payload["script"]))
         self.assertIn("--bootstrap", str(upsert_payload["script"]))
         self.assertIn("--no-sanitize", str(upsert_payload["script"]))
         self.assertEqual(
@@ -520,6 +564,63 @@ class StackDataWorkflowTests(unittest.TestCase):
                 }
             ],
         )
+
+    def test_run_dokploy_managed_remote_data_workflow_requires_database_name(self) -> None:
+        stack_settings = StackSettings(
+            name="opw-testing",
+            repo_root=Path("/tmp/repo"),
+            env_file=Path("/tmp/opw-testing.env"),
+            source_env_file=Path("/tmp/opw-testing.env"),
+            environment={},
+            state_root=Path("/tmp/state/opw-testing"),
+            data_dir=Path("/tmp/state/opw-testing/data"),
+            db_dir=Path("/tmp/state/opw-testing/db"),
+            log_dir=Path("/tmp/state/opw-testing/logs"),
+            compose_command=("docker", "compose"),
+            compose_project="opw-testing",
+            compose_files=(Path("/tmp/repo/docker-compose.yml"),),
+            docker_context=Path("/tmp/repo"),
+            registry_image="odoo-ai",
+            healthcheck_url="https://opw-testing.example.com/web/health",
+            update_modules=("AUTO",),
+            services=("database", "script-runner", "web"),
+            script_runner_service="script-runner",
+            odoo_bin_path="/odoo/odoo-bin",
+            image_variable_name="DOCKER_IMAGE",
+            github_token=None,
+        )
+        target_definition = DokployTargetDefinition(
+            context="opw",
+            instance="testing",
+            target_id="compose-1",
+            target_name="opw-testing",
+            deploy_timeout_seconds=7200,
+        )
+
+        with (
+            patch.object(
+                stack_data_workflow,
+                "_resolve_required_dokploy_compose_target_definition",
+                return_value=target_definition,
+            ),
+            patch.object(
+                stack_data_workflow,
+                "_resolve_dokploy_schedule_runtime",
+                return_value=("dokploy-server", "user-123", "compose-opw-testing-abc123", None),
+            ),
+            patch.object(stack_data_workflow, "_sync_dokploy_target_environment_and_deploy"),
+            patch.object(stack_data_workflow, "find_matching_dokploy_schedule", return_value=None),
+        ):
+            with self.assertRaisesRegex(ValueError, "requires ODOO_DB_NAME"):
+                stack_data_workflow._run_dokploy_managed_remote_data_workflow(
+                    stack_settings,
+                    {
+                        "DOKPLOY_HOST": "https://dokploy.example",
+                        "DOKPLOY_TOKEN": "token",
+                    },
+                    bootstrap=False,
+                    no_sanitize=False,
+                )
 
 
 if __name__ == "__main__":

@@ -301,6 +301,8 @@ def _resolve_dokploy_schedule_runtime(
 def _build_dokploy_data_workflow_script(
     *,
     compose_app_name: str,
+    database_name: str,
+    filestore_path: str = "/volumes/data/filestore",
     bootstrap: bool,
     no_sanitize: bool,
     clear_stale_lock: bool,
@@ -322,6 +324,8 @@ def _build_dokploy_data_workflow_script(
 set -euo pipefail
 
 compose_project={shlex.quote(compose_app_name)}
+database_name={shlex.quote(database_name)}
+filestore_root={shlex.quote(filestore_path)}
 {workflow_argument_line}
 {clear_stale_lock_line}
 data_workflow_lock_path={shlex.quote(data_workflow_lock_path)}
@@ -379,8 +383,25 @@ if [ "${{web_status}}" = "running" ]; then
     docker stop "${{web_container_id}}" >/dev/null
 fi
 
+echo "Normalizing filestore ownership for ${{database_name}}"
+docker exec -u root \
+    -e ODOO_DATABASE_NAME="${{database_name}}" \
+    -e ODOO_FILESTORE_ROOT="${{filestore_root}}" \
+    "${{script_runner_container_id}}" \
+    /bin/bash -lc '
+        set -euo pipefail
+        target_owner=$(stat -c "%u:%g" /volumes/data)
+        filestore_database_path="$ODOO_FILESTORE_ROOT"
+        if [ "$(basename "$filestore_database_path")" != "$ODOO_DATABASE_NAME" ]; then
+            filestore_database_path="$filestore_database_path/$ODOO_DATABASE_NAME"
+        fi
+        mkdir -p "$ODOO_FILESTORE_ROOT" "$filestore_database_path"
+        chown -R "$target_owner" "$filestore_database_path"
+        chmod -R ug+rwX "$filestore_database_path"
+    '
+
 echo "Running platform data workflow in container ${{script_runner_container_id}}"
-docker exec -u root "${{script_runner_container_id}}" \
+docker exec "${{script_runner_container_id}}" \
     python3 -u {shlex.quote(DATA_WORKFLOW_SCRIPT)} "${{workflow_arguments[@]}}"
 
 start_web_container
@@ -547,8 +568,16 @@ def _run_dokploy_managed_remote_data_workflow(
         raise ValueError(
             f"Dokploy-managed data workflow already has a running schedule deployment for {context_name}/{instance_name}."
         )
+    database_name = env_values.get("ODOO_DB_NAME", "").strip()
+    if not database_name:
+        raise ValueError(
+            "Dokploy-managed remote data workflow requires ODOO_DB_NAME in the resolved environment. "
+            f"Missing database name for {context_name}/{instance_name}."
+        )
     schedule_script = _build_dokploy_data_workflow_script(
         compose_app_name=compose_app_name,
+        database_name=database_name,
+        filestore_path=env_values.get("ODOO_FILESTORE_PATH", "/volumes/data/filestore"),
         bootstrap=bootstrap,
         no_sanitize=no_sanitize,
         clear_stale_lock=_should_clear_stale_data_workflow_lock(existing_schedule),

@@ -113,6 +113,35 @@ class DeployerSettingsTests(unittest.TestCase):
             with self.assertRaises(click.ClickException):
                 settings.select_env_file("opw-local", repo_root, None)
 
+    def test_load_stack_settings_defaults_state_root_under_platform_directory(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            repo_root = Path(temporary_directory_name)
+            write_compose_stack_files(repo_root)
+            runtime_env_file = repo_root / ".platform" / "env" / "opw.local.env"
+            runtime_env_file.parent.mkdir(parents=True, exist_ok=True)
+            runtime_env_file.write_text(
+                "\n".join(
+                    (
+                        "ODOO_PROJECT_NAME=odoo-opw-local",
+                        "DOCKER_IMAGE=odoo-ai",
+                        "ODOO_DB_PASSWORD=database-password",
+                        "ODOO_MASTER_PASSWORD=master-password",
+                        "ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL=https://opw-local.example.com",
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (repo_root / ".env").write_text("DOKPLOY_HOST=example\n", encoding="utf-8")
+
+            stack_settings = settings.load_stack_settings("opw-local", base_directory=repo_root)
+
+        self.assertEqual(stack_settings.state_root, (repo_root / ".platform" / "state" / "opw-local").resolve())
+        self.assertEqual(
+            stack_settings.env_file,
+            (repo_root / ".platform" / "state" / "opw-local" / ".compose.env").resolve(),
+        )
+
     @staticmethod
     def test_validate_base_env_defaults_allows_matching_overlaps() -> None:
         settings._validate_base_env_defaults(

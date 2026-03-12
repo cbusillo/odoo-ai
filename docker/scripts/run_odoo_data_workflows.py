@@ -572,7 +572,8 @@ class OdooDataWorkflowRunner:
         local_database_filestore_path.mkdir(parents=True, exist_ok=True)
         remote_root = str(upstream.filestore_path).rstrip("/")
         local_root = str(local_database_filestore_path).rstrip("/")
-        chown_option = f"--chown={target_owner}" if target_owner else ""
+        current_owner = f"{os.geteuid()}:{os.getegid()}"
+        chown_option = f"--chown={target_owner}" if target_owner and os.geteuid() == 0 and target_owner != current_owner else ""
         ssh_parts = self._build_ssh_command()
         ssh_command = shlex.join(ssh_parts)
         rsync_parts = ["rsync", "-a", "--whole-file", "--delete"]
@@ -588,6 +589,17 @@ class OdooDataWorkflowRunner:
 
     def normalize_filestore_permissions(self, target_owner: str | None) -> None:
         if not target_owner:
+            return
+        current_owner = f"{os.geteuid()}:{os.getegid()}"
+        if target_owner == current_owner:
+            _logger.info("Filestore ownership already matches process owner %s; skipping normalization.", current_owner)
+            return
+        if os.geteuid() != 0:
+            _logger.warning(
+                "Skipping filestore ownership normalization to %s because the workflow is running as %s.",
+                target_owner,
+                current_owner,
+            )
             return
         local_database_filestore_path = self._local_database_filestore_path()
         _logger.info("Normalizing filestore ownership to %s", target_owner)

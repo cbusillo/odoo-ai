@@ -10,6 +10,7 @@ from tools.platform.cli import (
     _assert_prod_data_workflow_allowed,
     _assert_promote_path_allowed,
     _build_runtime_env_values,
+    _command_execution_env,
     _collect_dirty_tracked_files,
     _collect_environment_gate_results,
     _compose_base_command,
@@ -135,6 +136,13 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
 
         self.assertEqual(dirty_lines, ("M platform/dokploy.toml", "M tools/platform/cli.py"))
 
+    def test_command_execution_env_drops_stale_stack_name(self) -> None:
+        with patch.dict("os.environ", {"ODOO_STACK_NAME": "opw-local", "KEEP_ME": "1"}, clear=True):
+            execution_environment = _command_execution_env()
+
+        self.assertNotIn("ODOO_STACK_NAME", execution_environment)
+        self.assertEqual(execution_environment.get("KEEP_ME"), "1")
+
     def test_runtime_env_includes_admin_credential_keys_when_configured(self) -> None:
         runtime_values = _build_runtime_env_values(
             runtime_env_file=Path("/tmp/opw.local.env"),
@@ -194,6 +202,7 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
     def test_runtime_env_sets_restore_defaults(self) -> None:
         runtime_values = self._build_runtime_values(runtime_env_file="/tmp/cm.local.env")
 
+        self.assertEqual(runtime_values.get("ODOO_STACK_NAME"), "opw-local")
         self.assertEqual(runtime_values.get("ODOO_FILESTORE_PATH"), "/volumes/data/filestore")
         self.assertEqual(
             runtime_values.get("ODOO_DATA_WORKFLOW_LOCK_FILE"),

@@ -9,6 +9,9 @@ try:
 except ImportError:  # pragma: no cover - non-Unix runtimes
     fcntl = None
 
+from tools.environment_files import discover_repo_root
+from tools.platform import environment as platform_environment
+
 from .docker_api import compose_env, compose_exec, ensure_services_up, get_script_runner_service
 
 _SCRIPT_RUNNER_RESTART_LOCK = threading.Lock()
@@ -26,7 +29,14 @@ def _runtime_project_name(runtime_environment: dict[str, str]) -> str:
 def _runtime_state_root(runtime_environment: dict[str, str]) -> Path:
     raw_state_root = (runtime_environment.get("ODOO_STATE_ROOT") or "").strip()
     if not raw_state_root:
-        return Path.home() / "odoo-ai" / _runtime_project_name(runtime_environment)
+        repo_root = discover_repo_root(Path.cwd())
+        stack_name = (runtime_environment.get("ODOO_STACK_NAME") or "").strip() or None
+        project_name = _runtime_project_name(runtime_environment)
+        return platform_environment.default_local_state_path(
+            repo_root=repo_root,
+            stack_name=stack_name,
+            project_name=project_name,
+        )
     return Path(os.path.expandvars(os.path.expanduser(raw_state_root))).resolve()
 
 

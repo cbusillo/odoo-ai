@@ -41,6 +41,10 @@ domains = ["cm-dev.shinycomputers.com"]
 
 [targets.env]
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://cm-dev.shinycomputers.com"
+ENV_OVERRIDE_AUTHENTIK__BASE_URL = "https://authentik.cellmechanic.com"
+ENV_OVERRIDE_AUTHENTIK__CLIENT_ID = "vTpPOs9seII8a0xT5jODra0RQTSBenlj1yDDZXI7"
+ENV_OVERRIDE_AUTHENTIK__DISABLE_PROVIDERS = "Odoo.com"
+ENV_OVERRIDE_AUTHENTIK__GROUP_CLAIM = "groups"
 
 [[targets]]
 profile = "cm"
@@ -54,6 +58,10 @@ domains = ["cm-testing.shinycomputers.com"]
 
 [targets.env]
 ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://cm-testing.shinycomputers.com"
+ENV_OVERRIDE_AUTHENTIK__BASE_URL = "https://authentik.cellmechanic.com"
+ENV_OVERRIDE_AUTHENTIK__CLIENT_ID = "E2Gxez3L0NMdP2uKNjXtOAXpkXcmG1NG2JRvPhMZ"
+ENV_OVERRIDE_AUTHENTIK__DISABLE_PROVIDERS = "Odoo.com"
+ENV_OVERRIDE_AUTHENTIK__GROUP_CLAIM = "groups"
 
 [[targets]]
 profile = "cm"
@@ -66,7 +74,11 @@ require_prod_gate = true
 domains = ["cm-prod.shinycomputers.com"]
 
 [targets.env]
-ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://cm-prod.shinycomputers.com"
+ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL = "https://odoo.cellmechanic.com"
+ENV_OVERRIDE_AUTHENTIK__BASE_URL = "https://authentik.cellmechanic.com"
+ENV_OVERRIDE_AUTHENTIK__CLIENT_ID = "eFRxxfLhxme4jM3dqaTjNGTsVAqn97lB04zo9Q7x"
+ENV_OVERRIDE_AUTHENTIK__DISABLE_PROVIDERS = "Odoo.com"
+ENV_OVERRIDE_AUTHENTIK__GROUP_CLAIM = "groups"
 
 [[targets]]
 profile = "opw"

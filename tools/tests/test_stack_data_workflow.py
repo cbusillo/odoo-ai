@@ -261,7 +261,8 @@ class StackDataWorkflowTests(unittest.TestCase):
         self.assertEqual(compose_calls[0], ["build", "script-runner"])
         self.assertEqual(compose_calls[1], ["up", "-d", "--remove-orphans", "database"])
         self.assertEqual(compose_calls[2], ["up", "-d", "--remove-orphans", "script-runner"])
-        self.assertEqual(compose_calls[3], ["stop", "web"])
+        self.assertEqual(compose_calls[3][:5], ["exec", "-T", "--user", "root", "script-runner"])
+        self.assertEqual(compose_calls[4], ["stop", "web"])
         self.assertTrue(exec_commands)
         self.assertEqual(
             exec_commands[0],
@@ -270,8 +271,6 @@ class StackDataWorkflowTests(unittest.TestCase):
                 "compose",
                 "exec",
                 "-T",
-                "--user",
-                "root",
                 "-e",
                 "ODOO_UPSTREAM_DB_NAME",
                 "-e",

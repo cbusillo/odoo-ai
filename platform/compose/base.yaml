@@ -6,13 +6,16 @@ services:
     command: >-
       ${ODOO_WEB_COMMAND:-/odoo/odoo-bin}
     env_file:
+      - ${PLATFORM_RUNTIME_ENV_FILE:-.env}
       - .env
       - platform/config/base.env
   script-runner:
     env_file:
+      - ${PLATFORM_RUNTIME_ENV_FILE:-.env}
       - .env
       - platform/config/base.env
   database:
     env_file:
+      - ${PLATFORM_RUNTIME_ENV_FILE:-.env}
       - .env
       - platform/config/base.env

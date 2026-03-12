@@ -173,6 +173,31 @@ def _run_local_compose(settings: StackSettings, extra: Sequence[str], *, check: 
     run_process(command, cwd=settings.repo_root, check=check, env=local_compose_env(settings))
 
 
+def _normalize_local_filestore_permissions(settings: StackSettings, env_values: dict[str, str]) -> None:
+    filestore_root = (env_values.get("ODOO_FILESTORE_PATH") or "/volumes/data/filestore").strip() or "/volumes/data/filestore"
+    database_name = (env_values.get("ODOO_DB_NAME") or "").strip()
+    filestore_database_path = filestore_root if Path(filestore_root).name == database_name else f"{filestore_root.rstrip('/')}/{database_name}"
+    quoted_filestore_root = shlex.quote(filestore_root)
+    quoted_filestore_database_path = shlex.quote(filestore_database_path)
+    permission_command = [
+        "exec",
+        "-T",
+        "--user",
+        "root",
+        settings.script_runner_service,
+        "/bin/bash",
+        "-lc",
+        (
+            "set -euo pipefail; "
+            "target_owner=$(stat -c '%u:%g' /volumes/data); "
+            f"mkdir -p {quoted_filestore_root} {quoted_filestore_database_path}; "
+            f"chown -R \"$target_owner\" {quoted_filestore_database_path}; "
+            f"chmod -R ug+rwX {quoted_filestore_database_path}"
+        ),
+    ]
+    _run_local_compose(settings, permission_command)
+
+
 def _current_image_reference(settings: StackSettings) -> str:
     return settings.environment.get(settings.image_variable_name) or settings.registry_image
 
@@ -658,6 +683,7 @@ def run_stack_data_workflow(
     except ValueError:
         _ensure_stack_running()
         wait_for_local_service(stack_settings, stack_settings.script_runner_service)
+    _normalize_local_filestore_permissions(stack_settings, env_values)
     _run_local_compose(stack_settings, ["stop", "web"], check=False)
 
     data_workflow_env_values = _data_workflow_script_environment(env_values)
@@ -669,8 +695,6 @@ def run_stack_data_workflow(
     exec_extra = [
         "exec",
         "-T",
-        "--user",
-        "root",
     ]
     _add_exec_env_names(exec_extra, data_workflow_env_values.keys())
     _add_toggle_env_flags(exec_extra, bootstrap=bootstrap, no_sanitize=no_sanitize)

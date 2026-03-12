@@ -299,6 +299,18 @@ print('admin_password_updated=true')
     _run_odoo_shell(settings, script, label="admin hardening")
 
 
+def _apply_environment_overrides_if_available(settings: StartupSettings) -> None:
+    script = """
+if 'environment.overrides' in env.registry:
+    env['environment.overrides'].sudo().apply_from_env()
+elif 'authentik.sso.config' in env.registry:
+    env['authentik.sso.config'].sudo().apply_from_env()
+env.cr.commit()
+print('environment_overrides_applied=true')
+"""
+    _run_odoo_shell(settings, script, label="environment overrides")
+
+
 def _assert_active_admin_password_is_not_default(settings: StartupSettings) -> None:
     login_names_to_check = ["admin"]
     if settings.admin_login not in login_names_to_check:
@@ -385,6 +397,7 @@ def main() -> None:
     _wait_for_database(settings)
     _wait_for_data_workflow_lock(settings)
     _run_initialization_if_needed(settings)
+    _apply_environment_overrides_if_available(settings)
     _apply_admin_password_if_configured(settings)
     if settings.admin_password:
         _assert_active_admin_password_is_not_default(settings)

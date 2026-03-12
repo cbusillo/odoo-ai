@@ -5,7 +5,8 @@ import sys
 import threading
 from pathlib import Path
 
-from tools.environment_files import parse_env_file
+from tools.environment_files import discover_repo_root, parse_env_file
+from tools.platform import environment as platform_environment
 
 DATABASE_SERVICE = "database"
 _SCRIPT_RUNNER_SERVICE_BY_PROJECT: dict[str, str] = {}
@@ -84,7 +85,14 @@ def compose_env() -> dict[str, str]:
     project_name = (_blank_to_none(env.get("ODOO_PROJECT_NAME")) or stack_name or "odoo").strip()
     state_root_raw = _blank_to_none(env.get("ODOO_STATE_ROOT"))
     if state_root_raw is None:
-        state_root_raw = str(Path.home() / "odoo-ai" / project_name)
+        repo_root = discover_repo_root(Path.cwd())
+        state_root_raw = str(
+            platform_environment.default_local_state_path(
+                repo_root=repo_root,
+                stack_name=stack_name,
+                project_name=project_name,
+            )
+        )
     state_root_path = Path(os.path.expandvars(os.path.expanduser(state_root_raw))).resolve()
 
     data_dir_host_raw = _blank_to_none(env.get("ODOO_DATA_HOST_DIR"))

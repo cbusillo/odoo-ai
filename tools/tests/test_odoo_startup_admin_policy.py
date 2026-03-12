@@ -87,6 +87,39 @@ class OdooStartupAdminPolicyTests(unittest.TestCase):
         self.assertIn("write({'password': payload['password']})", str(captured_calls[0]["input"]))
         self.assertIn("secure-password", str(captured_calls[0]["input"]))
 
+    def test_apply_environment_overrides_runs_override_script(self) -> None:
+        settings = odoo_startup.StartupSettings(
+            config_path="/tmp/generated.conf",
+            base_config_path="/tmp/base.conf",
+            database_name="cm",
+            database_host="database",
+            database_port=5432,
+            database_user="odoo",
+            database_password="database-password",
+            master_password="master-password",
+            admin_login="admin",
+            admin_password="",
+            addons_path="/odoo/addons",
+            data_dir="/volumes/data",
+            list_db="False",
+            install_modules=("cm_custom",),
+            data_workflow_lock_file="/volumes/data/.data_workflow_in_progress",
+            data_workflow_lock_timeout_seconds=7200,
+            ready_timeout_seconds=180,
+            poll_interval_seconds=2.0,
+        )
+        captured_calls: list[dict[str, object]] = []
+
+        def _capture_run(command: list[str], input: bytes, check: bool) -> None:
+            captured_calls.append({"command": command, "input": input.decode(), "check": check})
+
+        with patch.object(odoo_startup.subprocess, "run", side_effect=_capture_run):
+            odoo_startup._apply_environment_overrides_if_available(settings)
+
+        self.assertEqual(len(captured_calls), 1)
+        self.assertIn("environment.overrides", str(captured_calls[0]["input"]))
+        self.assertIn("authentik.sso.config", str(captured_calls[0]["input"]))
+
 
 if __name__ == "__main__":
     unittest.main()

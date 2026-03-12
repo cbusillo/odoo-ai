@@ -286,6 +286,32 @@ def runtime_env_file_for_scope(repo_root: Path, context_name: str, instance_name
     return repo_root / ".platform" / "env" / f"{context_name}.{instance_name}.env"
 
 
+def default_local_state_path(
+    *,
+    repo_root: Path,
+    stack_name: str | None = None,
+    project_name: str | None = None,
+) -> Path:
+    normalized_stack_name = (stack_name or "").strip().lower()
+    runtime_scope = resolve_stack_runtime_scope(normalized_stack_name) if normalized_stack_name else None
+    if runtime_scope is not None:
+        context_name, instance_name = runtime_scope
+        return repo_root / ".platform" / "state" / f"{context_name}-{instance_name}"
+    if normalized_stack_name:
+        return repo_root / ".platform" / "state" / normalized_stack_name
+
+    normalized_project_name = (project_name or "").strip().lower()
+    if normalized_project_name.startswith("odoo-"):
+        normalized_project_name = normalized_project_name[5:]
+    runtime_scope = resolve_stack_runtime_scope(normalized_project_name) if normalized_project_name else None
+    if runtime_scope is not None:
+        context_name, instance_name = runtime_scope
+        return repo_root / ".platform" / "state" / f"{context_name}-{instance_name}"
+    if normalized_project_name:
+        return repo_root / ".platform" / "state" / normalized_project_name
+    return repo_root / ".platform" / "state" / "odoo"
+
+
 def resolve_stack_runtime_env_file(repo_root: Path, stack_name: str) -> Path | None:
     runtime_scope = resolve_stack_runtime_scope(stack_name)
     if runtime_scope is None:

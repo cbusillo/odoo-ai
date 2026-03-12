@@ -106,6 +106,17 @@ class TestkitBrowserTests(unittest.TestCase):
             self.assertTrue(lock_path.exists())
             self.assertEqual(fake_fcntl.calls, [fake_fcntl.LOCK_EX, fake_fcntl.LOCK_UN])
 
+    def test_runtime_state_root_defaults_under_platform_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory_name:
+            repo_root = Path(temporary_directory_name)
+            (repo_root / ".git").mkdir()
+            runtime_environment = {"ODOO_STACK_NAME": "cm-local"}
+
+            with patch("tools.testkit.browser.Path.cwd", return_value=repo_root):
+                state_root = browser._runtime_state_root(runtime_environment)
+
+        self.assertEqual(state_root, (repo_root / ".platform" / "state" / "cm-local").resolve())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -325,7 +325,11 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
         expanded = os.path.expandvars(os.path.expanduser(text))
         return Path(expanded).resolve()
 
-    default_state_root = Path.home() / "odoo-ai" / (config.project_name or name)
+    default_state_root = platform_environment.default_local_state_path(
+        repo_root=repo_root,
+        stack_name=name,
+        project_name=config.project_name,
+    )
     state_root_path = _expand_path(config.odoo_state_root or default_state_root)
     data_dir_host = _expand_path(config.odoo_data_host_dir or state_root_path / "data")
     db_dir_host = _expand_path(config.odoo_db_host_dir or state_root_path / "postgres")
@@ -335,7 +339,7 @@ def load_stack_settings(name: str, env_file: Path | None = None, base_directory:
         compose_env_path.parent.mkdir(parents=True, exist_ok=True)
         merged_env_path = compose_env_path
     except OSError:
-        fallback_dir = Path.home() / "odoo-ai" / "stack-env"
+        fallback_dir = repo_root / ".platform" / "env" / "stack-env"
         fallback_dir.mkdir(parents=True, exist_ok=True)
         merged_env_path = fallback_dir / f"{name}.env"
     compose_command = compute_compose_command(config)

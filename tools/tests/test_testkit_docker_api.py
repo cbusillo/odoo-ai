@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import subprocess
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from tools.testkit import docker_api
@@ -185,6 +187,21 @@ class TestkitDockerApiTests(unittest.TestCase):
         self.assertEqual(first_service, "script-runner")
         self.assertEqual(second_service, "my-script-runner")
         self.assertEqual(run_mock.call_count, 2)
+
+    def test_compose_env_defaults_state_root_under_platform_directory(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            repo_root = Path(temporary_directory_name)
+            (repo_root / ".git").mkdir()
+            (repo_root / ".env").write_text("ODOO_STACK_NAME=cm-local\n", encoding="utf-8")
+
+            with patch.dict("os.environ", {}, clear=True):
+                with patch("tools.testkit.docker_api.Path.cwd", return_value=repo_root):
+                    composed_environment = docker_api.compose_env()
+
+        self.assertEqual(
+            composed_environment["ODOO_STATE_ROOT"],
+            str((repo_root / ".platform" / "state" / "cm-local").resolve()),
+        )
 
 
 if __name__ == "__main__":

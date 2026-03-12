@@ -125,6 +125,7 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
                 return
             self._reorder_shopify_media(odoo_product, shopify_product_gid, ordered_odoo_images)
             odoo_product.shopify_last_exported_at = fields.Datetime.now()
+            self._mark_export_all_product_complete(odoo_product)
             return
 
         force_media_upload = bool(image_records) and not all_images_have_media_id

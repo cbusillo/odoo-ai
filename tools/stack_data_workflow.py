@@ -308,6 +308,7 @@ def _build_dokploy_data_workflow_script(
     clear_stale_lock: bool,
     data_workflow_lock_path: str,
 ) -> str:
+    normalized_filestore_path = filestore_path.strip() or "/volumes/data/filestore"
     workflow_arguments: list[str] = []
     if bootstrap:
         workflow_arguments.append("--bootstrap")
@@ -325,7 +326,7 @@ set -euo pipefail
 
 compose_project={shlex.quote(compose_app_name)}
 database_name={shlex.quote(database_name)}
-filestore_root={shlex.quote(filestore_path)}
+filestore_root={shlex.quote(normalized_filestore_path)}
 {workflow_argument_line}
 {clear_stale_lock_line}
 data_workflow_lock_path={shlex.quote(data_workflow_lock_path)}
@@ -548,6 +549,13 @@ def _run_dokploy_managed_remote_data_workflow(
         context_name=context_name,
         instance_name=instance_name,
     )
+    database_name = env_values.get("ODOO_DB_NAME", "").strip()
+    if not database_name:
+        raise ValueError(
+            "Dokploy-managed remote data workflow requires ODOO_DB_NAME in the resolved environment. "
+            f"Missing database name for {context_name}/{instance_name}."
+        )
+    filestore_path = (env_values.get("ODOO_FILESTORE_PATH") or "/volumes/data/filestore").strip() or "/volumes/data/filestore"
     schedule_timeout_seconds = target_definition.deploy_timeout_seconds or DEFAULT_DOKPLOY_DEPLOY_TIMEOUT_SECONDS
     _sync_dokploy_target_environment_and_deploy(
         dokploy_host=dokploy_host,
@@ -568,13 +576,6 @@ def _run_dokploy_managed_remote_data_workflow(
         raise ValueError(
             f"Dokploy-managed data workflow already has a running schedule deployment for {context_name}/{instance_name}."
         )
-    database_name = env_values.get("ODOO_DB_NAME", "").strip()
-    if not database_name:
-        raise ValueError(
-            "Dokploy-managed remote data workflow requires ODOO_DB_NAME in the resolved environment. "
-            f"Missing database name for {context_name}/{instance_name}."
-        )
-    filestore_path = (env_values.get("ODOO_FILESTORE_PATH") or "/volumes/data/filestore").strip() or "/volumes/data/filestore"
     schedule_script = _build_dokploy_data_workflow_script(
         compose_app_name=compose_app_name,
         database_name=database_name,

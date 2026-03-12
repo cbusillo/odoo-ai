@@ -385,6 +385,19 @@ class StackDataWorkflowTests(unittest.TestCase):
         self.assertIn("clear_stale_lock=0", schedule_script)
         self.assertEqual(schedule_script.count("docker exec -u root"), 2)
 
+    def test_build_dokploy_data_workflow_script_normalizes_blank_filestore_path(self) -> None:
+        schedule_script = stack_data_workflow._build_dokploy_data_workflow_script(
+            compose_app_name="compose-opw-testing-abc123",
+            database_name="opw",
+            filestore_path="   ",
+            bootstrap=False,
+            no_sanitize=False,
+            clear_stale_lock=False,
+            data_workflow_lock_path="/volumes/data/.data_workflow_in_progress",
+        )
+
+        self.assertIn("filestore_root=/volumes/data/filestore", schedule_script)
+
     def test_run_dokploy_managed_remote_data_workflow_normalizes_blank_filestore_path(self) -> None:
         stack_settings = StackSettings(
             name="opw-testing",
@@ -684,7 +697,7 @@ class StackDataWorkflowTests(unittest.TestCase):
                 "_resolve_dokploy_schedule_runtime",
                 return_value=("dokploy-server", "user-123", "compose-opw-testing-abc123", None),
             ),
-            patch.object(stack_data_workflow, "_sync_dokploy_target_environment_and_deploy"),
+            patch.object(stack_data_workflow, "_sync_dokploy_target_environment_and_deploy") as sync_target,
             patch.object(stack_data_workflow, "find_matching_dokploy_schedule", return_value=None),
         ):
             with self.assertRaisesRegex(ValueError, "requires ODOO_DB_NAME"):
@@ -697,6 +710,7 @@ class StackDataWorkflowTests(unittest.TestCase):
                     bootstrap=False,
                     no_sanitize=False,
                 )
+        sync_target.assert_not_called()
 
 
 if __name__ == "__main__":

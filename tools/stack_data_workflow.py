@@ -574,10 +574,11 @@ def _run_dokploy_managed_remote_data_workflow(
             "Dokploy-managed remote data workflow requires ODOO_DB_NAME in the resolved environment. "
             f"Missing database name for {context_name}/{instance_name}."
         )
+    filestore_path = (env_values.get("ODOO_FILESTORE_PATH") or "/volumes/data/filestore").strip() or "/volumes/data/filestore"
     schedule_script = _build_dokploy_data_workflow_script(
         compose_app_name=compose_app_name,
         database_name=database_name,
-        filestore_path=env_values.get("ODOO_FILESTORE_PATH", "/volumes/data/filestore"),
+        filestore_path=filestore_path,
         bootstrap=bootstrap,
         no_sanitize=no_sanitize,
         clear_stale_lock=_should_clear_stale_data_workflow_lock(existing_schedule),

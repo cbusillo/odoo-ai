@@ -207,6 +207,8 @@ class StackDataWorkflowTests(unittest.TestCase):
             env_file=Path("/tmp/opw-local.env"),
             source_env_file=Path("/tmp/opw-local.env"),
             environment={
+                "ODOO_DB_NAME": "opw",
+                "ODOO_FILESTORE_PATH": "/volumes/data/filestore",
                 "ODOO_UPSTREAM_HOST": "source.example.com",
                 "ODOO_UPSTREAM_USER": "root",
                 "ODOO_UPSTREAM_DB_NAME": "opw",
@@ -271,6 +273,10 @@ class StackDataWorkflowTests(unittest.TestCase):
                 "compose",
                 "exec",
                 "-T",
+                "-e",
+                "ODOO_DB_NAME",
+                "-e",
+                "ODOO_FILESTORE_PATH",
                 "-e",
                 "ODOO_UPSTREAM_DB_NAME",
                 "-e",
@@ -378,6 +384,76 @@ class StackDataWorkflowTests(unittest.TestCase):
 
         self.assertIn("clear_stale_lock=0", schedule_script)
         self.assertEqual(schedule_script.count("docker exec -u root"), 2)
+
+    def test_run_dokploy_managed_remote_data_workflow_normalizes_blank_filestore_path(self) -> None:
+        stack_settings = StackSettings(
+            name="opw-testing",
+            repo_root=Path("/tmp/repo"),
+            env_file=Path("/tmp/opw-testing.env"),
+            source_env_file=Path("/tmp/opw-testing.env"),
+            environment={},
+            state_root=Path("/tmp/state/opw-testing"),
+            data_dir=Path("/tmp/state/opw-testing/data"),
+            db_dir=Path("/tmp/state/opw-testing/db"),
+            log_dir=Path("/tmp/state/opw-testing/logs"),
+            compose_command=("docker", "compose"),
+            compose_project="opw-testing",
+            compose_files=(Path("/tmp/repo/docker-compose.yml"),),
+            docker_context=Path("/tmp/repo"),
+            registry_image="odoo-ai",
+            healthcheck_url="https://opw-testing.example.com/web/health",
+            update_modules=("AUTO",),
+            services=("database", "script-runner", "web"),
+            script_runner_service="script-runner",
+            odoo_bin_path="/odoo/odoo-bin",
+            image_variable_name="DOCKER_IMAGE",
+            github_token=None,
+        )
+        target_definition = DokployTargetDefinition(
+            context="opw",
+            instance="testing",
+            target_id="compose-1",
+            target_name="opw-testing",
+            deploy_timeout_seconds=7200,
+        )
+
+        with (
+            patch.object(
+                stack_data_workflow,
+                "_resolve_required_dokploy_compose_target_definition",
+                return_value=target_definition,
+            ),
+            patch.object(
+                stack_data_workflow,
+                "_resolve_dokploy_schedule_runtime",
+                return_value=("dokploy-server", "user-123", "compose-opw-testing-abc123", None),
+            ),
+            patch.object(stack_data_workflow, "find_matching_dokploy_schedule", return_value=None),
+            patch.object(stack_data_workflow, "_sync_dokploy_target_environment_and_deploy"),
+            patch.object(stack_data_workflow, "upsert_dokploy_schedule", return_value={"scheduleId": "schedule-123"}) as upsert_schedule,
+            patch.object(
+                stack_data_workflow,
+                "latest_deployment_for_schedule",
+                side_effect=[{"deploymentId": "before-1", "status": "done"}, {"deploymentId": "after-1", "status": "done"}],
+            ),
+            patch.object(stack_data_workflow, "wait_for_dokploy_schedule_deployment", return_value="deployment=after-1 status=done"),
+            patch.object(stack_data_workflow, "dokploy_request", return_value=True),
+        ):
+            exit_code = stack_data_workflow._run_dokploy_managed_remote_data_workflow(
+                stack_settings,
+                {
+                    "DOKPLOY_HOST": "https://dokploy.example",
+                    "DOKPLOY_TOKEN": "token",
+                    "ODOO_DB_NAME": "opw",
+                    "ODOO_FILESTORE_PATH": "   ",
+                },
+                bootstrap=False,
+                no_sanitize=False,
+            )
+
+        self.assertEqual(exit_code, 0)
+        upsert_payload = upsert_schedule.call_args.kwargs["schedule_payload"]
+        self.assertIn('filestore_root=/volumes/data/filestore', str(upsert_payload["script"]))
 
     def test_should_clear_stale_data_workflow_lock_only_for_cancelled_latest_deployment(self) -> None:
         self.assertTrue(

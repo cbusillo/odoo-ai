@@ -44,8 +44,16 @@ from ..base import ShopifyBaseExporter
 
 _logger = logging.getLogger(__name__)
 
+PRODUCT_EXTERNAL_ID_RESOURCES = ("product", "variant", "condition", "ebay_category")
+
 
 class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
+    _PRODUCT_MISSING_USER_ERROR_KEYWORDS: tuple[str, ...] = (
+        "does not exist",
+        "doesn't exist",
+        "not found",
+    )
+
     def __init__(self, env: Environment, sync_record: "odoo.model.shopify_sync") -> None:
         super().__init__(env, sync_record)
         self.odoo_base_url = env["ir.config_parameter"].sudo().get_param("web.base.url")
@@ -84,10 +92,12 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
 
         else:
             odoo_products = odoo_products.filtered(
-                lambda p: p.shopify_next_export is True
-                or (
-                    p.write_date > (p.shopify_last_exported_at or datetime.min)
-                    or p.product_tmpl_id.write_date > (p.shopify_last_exported_at or datetime.min)
+                lambda p: (
+                    p.shopify_next_export is True
+                    or (
+                        p.write_date > (p.shopify_last_exported_at or datetime.min)
+                        or p.product_tmpl_id.write_date > (p.shopify_last_exported_at or datetime.min)
+                    )
                 )
             )
         return odoo_products
@@ -112,12 +122,7 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
             f"all have media IDs: {all_images_have_media_id}"
         )
 
-        if (
-            images_need_update
-            and all_images_have_media_id
-            and shopify_product_id
-            and not odoo_product.shopify_next_export
-        ):
+        if images_need_update and all_images_have_media_id and shopify_product_id and not odoo_product.shopify_next_export:
             ordered_odoo_images = image_records.sorted(key=image_order_key)
             shopify_product_gid = format_shopify_gid_from_id("Product", shopify_product_id)
             if not self._verify_shopify_media_for_reorder(
@@ -137,9 +142,7 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
             force_media_upload=force_media_upload,
         )
 
-        shopify_product_gid = (
-            format_shopify_gid_from_id("Product", shopify_product_id) if shopify_product_id else None
-        )
+        shopify_product_gid = format_shopify_gid_from_id("Product", shopify_product_id) if shopify_product_id else None
         if shopify_product_gid:
             identifier = ProductSetIdentifiers(id=shopify_product_gid)
         else:
@@ -154,6 +157,46 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
 
         shopify_product = shopify_response.product
         if not shopify_product:
+            if shopify_product_id:
+                user_error_messages = self._collect_shopify_user_error_messages(
+                    getattr(shopify_response, "user_errors", [])
+                )
+                if self._all_user_errors_indicate_missing_product(user_error_messages):
+                    _logger.warning(
+                        "Shopify product %s missing from productSet response for Odoo product %s. "
+                        "User errors: %s. Scheduling recreation.",
+                        shopify_product_id,
+                        odoo_product.id,
+                        "; ".join(user_error_messages),
+                    )
+                    self._schedule_product_recreation(
+                        odoo_product,
+                        image_records.sorted(key=image_order_key),
+                        reason="missing remote product after export",
+                    )
+                    return
+
+                if user_error_messages:
+                    _logger.error(
+                        "Shopify product_set returned no product for Odoo product %s. "
+                        "User errors: %s",
+                        odoo_product.id,
+                        "; ".join(user_error_messages),
+                    )
+                else:
+                    _logger.error(
+                        "Shopify product %s missing from productSet response for Odoo product %s without clear cause.",
+                        shopify_product_id,
+                        odoo_product.id,
+                    )
+                exception = ShopifyApiError(
+                    "Shopify product not found in the response",
+                    shopify_record=shopify_response,
+                    odoo_record=odoo_product,
+                    shopify_input=shopify_product_set_input,
+                )
+                _logger.error(exception)
+                raise exception
             exception = ShopifyApiError(
                 "Shopify product not found in the response",
                 shopify_record=shopify_response,
@@ -208,11 +251,7 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
             for image in ordered_odoo_images
             if image.get_external_system_id("shopify", "media")
         }
-        shopify_image_nodes = [
-            node
-            for node in shopify_media_nodes
-            if getattr(node, "typename__", None) == "MediaImage"
-        ]
+        shopify_image_nodes = [node for node in shopify_media_nodes if getattr(node, "typename__", None) == "MediaImage"]
         if not shopify_image_nodes:
             if local_media_identifiers:
                 ProductExporter._clear_shopify_media_ids(ordered_odoo_images, local_media_identifiers)
@@ -223,14 +262,9 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
                 odoo_product.shopify_next_export = True
             return
 
-        remote_media_identifiers = {
-            parse_shopify_id_from_gid(node.id)
-            for node in shopify_image_nodes
-        }
+        remote_media_identifiers = {parse_shopify_id_from_gid(node.id) for node in shopify_image_nodes}
         failed_media_identifiers = {
-            parse_shopify_id_from_gid(node.id)
-            for node in shopify_image_nodes
-            if node.status == MediaStatus.FAILED
+            parse_shopify_id_from_gid(node.id) for node in shopify_image_nodes if node.status == MediaStatus.FAILED
         }
         missing_media_identifiers = local_media_identifiers - remote_media_identifiers
         if failed_media_identifiers or missing_media_identifiers:
@@ -284,19 +318,20 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
 
         if not page.nodes:
             _logger.warning(
-                "Shopify product %s missing during reorder verification. Scheduling re-export.",
+                "Shopify product %s missing during reorder verification. "
+                "Scheduling media reupload and preserving product mappings.",
                 shopify_product_id,
             )
-            self._schedule_media_reupload(odoo_product, ordered_odoo_images, reason="missing remote product")
+            self._schedule_media_reupload(
+                odoo_product,
+                ordered_odoo_images,
+                reason="missing remote product during reorder verification",
+            )
             return False
 
         shopify_product = page.nodes[0]
         shopify_media_nodes = shopify_product.media.nodes
-        shopify_image_nodes = [
-            node
-            for node in shopify_media_nodes
-            if getattr(node, "typename__", None) == "MediaImage"
-        ]
+        shopify_image_nodes = [node for node in shopify_media_nodes if getattr(node, "typename__", None) == "MediaImage"]
         if not shopify_image_nodes:
             _logger.warning(
                 "Shopify product %s has no media during reorder verification. Scheduling re-export.",
@@ -305,19 +340,11 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
             self._schedule_media_reupload(odoo_product, ordered_odoo_images, reason="missing remote media")
             return False
 
-        remote_media_identifiers = {
-            parse_shopify_id_from_gid(node.id)
-            for node in shopify_image_nodes
-        }
+        remote_media_identifiers = {parse_shopify_id_from_gid(node.id) for node in shopify_image_nodes}
         failed_media_identifiers = {
-            parse_shopify_id_from_gid(node.id)
-            for node in shopify_image_nodes
-            if node.status == MediaStatus.FAILED
+            parse_shopify_id_from_gid(node.id) for node in shopify_image_nodes if node.status == MediaStatus.FAILED
         }
-        has_pending_media = any(
-            node.status in (MediaStatus.PROCESSING, MediaStatus.UPLOADED)
-            for node in shopify_image_nodes
-        )
+        has_pending_media = any(node.status in (MediaStatus.PROCESSING, MediaStatus.UPLOADED) for node in shopify_image_nodes)
         local_media_identifiers = {
             image.get_external_system_id("shopify", "media")
             for image in ordered_odoo_images
@@ -367,6 +394,64 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
             reason,
         )
         odoo_product.shopify_next_export = True
+
+    def _schedule_product_recreation(
+        self,
+        odoo_product: "odoo.model.product_product",
+        ordered_odoo_images: "odoo.model.product_image",
+        *,
+        reason: str,
+    ) -> None:
+        self._schedule_media_reupload(odoo_product, ordered_odoo_images, reason=reason)
+        for resource in PRODUCT_EXTERNAL_ID_RESOURCES:
+            upsert_external_id(
+                odoo_product,
+                system_code="shopify",
+                resource=resource,
+                external_id_value=None,
+            )
+
+    @staticmethod
+    def _collect_shopify_user_error_messages(
+        user_errors: list[object],
+    ) -> list[str]:
+        messages: list[str] = []
+        for user_error in user_errors or []:
+            if isinstance(user_error, dict):
+                message = str(user_error.get("message", "") or "").strip()
+            else:
+                message = str(getattr(user_error, "message", "") or "").strip()
+            if message:
+                messages.append(message)
+        return messages
+
+    @classmethod
+    def _all_user_errors_indicate_missing_product(cls, user_error_messages: list[str]) -> bool:
+        if not user_error_messages:
+            return False
+        return all(cls._is_missing_product_user_error(message) for message in user_error_messages)
+
+    @classmethod
+    def _is_missing_product_user_error(cls, message: str) -> bool:
+        normalized_message = message.lower()
+        if not normalized_message:
+            return False
+
+        if "resource matching the identifier was not found" in normalized_message:
+            return True
+
+        has_not_found_term = any(keyword in normalized_message for keyword in cls._PRODUCT_MISSING_USER_ERROR_KEYWORDS)
+        if not has_not_found_term:
+            return False
+
+        targets = (
+            "product",
+            "variant",
+            "media",
+            "image",
+            "metafield",
+        )
+        return any(target in normalized_message for target in targets)
 
     @staticmethod
     def _clear_shopify_media_ids(
@@ -467,9 +552,7 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
 
         image_records = odoo_product.images
         should_upload_media = bool(image_records) and (
-            not odoo_product.get_external_system_id("shopify", "product")
-            or images_need_update
-            or force_media_upload
+            not odoo_product.get_external_system_id("shopify", "product") or images_need_update or force_media_upload
         )
         if should_upload_media:
             image_source_base_url = self.odoo_base_url.rstrip("/")

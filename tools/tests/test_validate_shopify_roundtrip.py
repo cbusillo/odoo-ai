@@ -14,7 +14,6 @@ from tools.validate import shopify_roundtrip
 class ShopifyRoundtripValidationTests(unittest.TestCase):
     def test_load_settings_reads_scoped_environment_values(self) -> None:
         fake_environment_values = {
-            "ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL": "https://opw-testing.example.com",
             "ODOO_DB_NAME": "custom-opw-db",
             "ODOO_KEY": "secret-key",
             "ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY": "test-store",
@@ -22,7 +21,16 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
             "ENV_OVERRIDE_SHOPIFY__API_VERSION": "2026-01",
         }
 
-        with mock.patch.object(shopify_roundtrip, "load_environment", return_value=(Path("/tmp/.env"), fake_environment_values)):
+        with (
+            mock.patch.object(shopify_roundtrip, "load_environment", return_value=(Path("/tmp/.env"), fake_environment_values)),
+            mock.patch.object(shopify_roundtrip, "load_dokploy_source_of_truth", return_value=mock.sentinel.source_of_truth),
+            mock.patch.object(shopify_roundtrip.platform_dokploy, "find_dokploy_target_definition", return_value=mock.sentinel.target),
+            mock.patch.object(
+                shopify_roundtrip.platform_dokploy,
+                "resolve_healthcheck_base_urls",
+                return_value=("https://opw-testing.example.com",),
+            ),
+        ):
             settings = shopify_roundtrip.load_settings(
                 repository_root=Path("/repo"),
                 env_file=None,

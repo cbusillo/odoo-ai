@@ -10,7 +10,9 @@ from pathlib import Path
 
 import click
 
+from tools.platform import dokploy as platform_dokploy
 from tools.platform.environment import discover_repo_root, load_environment
+from tools.platform.environment import load_dokploy_source_of_truth
 
 POLL_SECONDS = 5
 SYNC_TIMEOUT_SECONDS = 8 * 60 * 60
@@ -51,7 +53,22 @@ def load_settings(
         instance_name=instance_name,
         collision_mode="error",
     )
-    odoo_url = str(environment_values["ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL"])
+    dokploy_source_file = repository_root / "platform" / "dokploy.toml"
+    dokploy_source_of_truth = load_dokploy_source_of_truth(dokploy_source_file)
+    target_definition = platform_dokploy.find_dokploy_target_definition(
+        dokploy_source_of_truth,
+        context_name=context_name,
+        instance_name=instance_name,
+    )
+    base_urls = platform_dokploy.resolve_healthcheck_base_urls(
+        target_definition=target_definition,
+        environment_values=environment_values,
+    )
+    if not base_urls:
+        raise click.ClickException(
+            f"Could not resolve base URL for {context_name}/{instance_name}. Configure platform/dokploy.toml domains or ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL."
+        )
+    odoo_url = base_urls[0]
     odoo_key = str(environment_values["ODOO_KEY"])
     database_name = str(environment_values.get("ODOO_DB_NAME", context_name)).strip()
     if not database_name:

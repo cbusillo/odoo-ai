@@ -214,7 +214,7 @@ class TestProductExporter(IntegrationTestCase):
         self.assertFalse(image.get_external_system_id("shopify", "media"))
         self.assertTrue(product.shopify_next_export)
 
-    def test_export_one_requeues_missing_remote_product_instead_of_raising(self) -> None:
+    def test_export_one_raises_for_missing_remote_product_and_preserves_mappings(self) -> None:
         from ..fixtures.factories import ProductFactory
 
         product = ProductFactory.create(
@@ -233,13 +233,14 @@ class TestProductExporter(IntegrationTestCase):
         self.exporter.service._client = common.MagicMock()
         self.exporter.service.client.product_set.return_value = shopify_response
 
-        self.exporter._export_one(product)
+        with self.assertRaises(ShopifyApiError):
+            self.exporter._export_one(product)
 
-        self.assertFalse(product.get_external_system_id("shopify", "product"))
-        self.assertFalse(product.get_external_system_id("shopify", "variant"))
-        self.assertFalse(product.get_external_system_id("shopify", "condition"))
-        self.assertFalse(product.get_external_system_id("shopify", "ebay_category"))
-        self.assertTrue(product.shopify_next_export)
+        self.assertEqual(product.get_external_system_id("shopify", "product"), "555")
+        self.assertEqual(product.get_external_system_id("shopify", "variant"), "556")
+        self.assertEqual(product.get_external_system_id("shopify", "condition"), "557")
+        self.assertEqual(product.get_external_system_id("shopify", "ebay_category"), "558")
+        self.assertFalse(product.shopify_next_export)
 
     def test_export_one_raises_for_unconfirmed_missing_remote_product(self) -> None:
         from ..fixtures.factories import ProductFactory
@@ -267,6 +268,7 @@ class TestProductExporter(IntegrationTestCase):
         self.assertEqual(product.get_external_system_id("shopify", "variant"), "556")
         self.assertEqual(product.get_external_system_id("shopify", "condition"), "557")
         self.assertEqual(product.get_external_system_id("shopify", "ebay_category"), "558")
+        self.assertFalse(product.shopify_next_export)
 
     def test_export_one_raises_for_mixed_product_set_user_errors(self) -> None:
         from ..fixtures.factories import ProductFactory
@@ -296,6 +298,7 @@ class TestProductExporter(IntegrationTestCase):
         self.assertEqual(product.get_external_system_id("shopify", "variant"), "556")
         self.assertEqual(product.get_external_system_id("shopify", "condition"), "557")
         self.assertEqual(product.get_external_system_id("shopify", "ebay_category"), "558")
+        self.assertFalse(product.shopify_next_export)
 
     def test_export_one_raises_when_missing_product_has_no_user_errors(self) -> None:
         from ..fixtures.factories import ProductFactory

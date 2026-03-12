@@ -44,16 +44,8 @@ from ..base import ShopifyBaseExporter
 
 _logger = logging.getLogger(__name__)
 
-PRODUCT_EXTERNAL_ID_RESOURCES = ("product", "variant", "condition", "ebay_category")
-
 
 class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
-    _PRODUCT_MISSING_USER_ERROR_KEYWORDS: tuple[str, ...] = (
-        "does not exist",
-        "doesn't exist",
-        "not found",
-    )
-
     def __init__(self, env: Environment, sync_record: "odoo.model.shopify_sync") -> None:
         super().__init__(env, sync_record)
         self.odoo_base_url = env["ir.config_parameter"].sudo().get_param("web.base.url")
@@ -155,48 +147,19 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
             _logger.error(exception)
             raise exception from error
 
-        shopify_product = shopify_response.product
+        shopify_product = shopify_response.product if shopify_response else None
         if not shopify_product:
-            if shopify_product_id:
-                user_error_messages = self._collect_shopify_user_error_messages(
-                    getattr(shopify_response, "user_errors", [])
+            user_error_messages = []
+            for user_error in shopify_response.user_errors if shopify_response else []:
+                message = str(user_error.message or "").strip()
+                if message:
+                    user_error_messages.append(message)
+            if user_error_messages:
+                _logger.error(
+                    "Shopify product_set returned no product for Odoo product %s. User errors: %s",
+                    odoo_product.id,
+                    "; ".join(user_error_messages),
                 )
-                if self._all_user_errors_indicate_missing_product(user_error_messages):
-                    _logger.warning(
-                        "Shopify product %s missing from productSet response for Odoo product %s. "
-                        "User errors: %s. Scheduling recreation.",
-                        shopify_product_id,
-                        odoo_product.id,
-                        "; ".join(user_error_messages),
-                    )
-                    self._schedule_product_recreation(
-                        odoo_product,
-                        image_records.sorted(key=image_order_key),
-                        reason="missing remote product after export",
-                    )
-                    return
-
-                if user_error_messages:
-                    _logger.error(
-                        "Shopify product_set returned no product for Odoo product %s. "
-                        "User errors: %s",
-                        odoo_product.id,
-                        "; ".join(user_error_messages),
-                    )
-                else:
-                    _logger.error(
-                        "Shopify product %s missing from productSet response for Odoo product %s without clear cause.",
-                        shopify_product_id,
-                        odoo_product.id,
-                    )
-                exception = ShopifyApiError(
-                    "Shopify product not found in the response",
-                    shopify_record=shopify_response,
-                    odoo_record=odoo_product,
-                    shopify_input=shopify_product_set_input,
-                )
-                _logger.error(exception)
-                raise exception
             exception = ShopifyApiError(
                 "Shopify product not found in the response",
                 shopify_record=shopify_response,
@@ -394,64 +357,6 @@ class ProductExporter(ShopifyBaseExporter["odoo.model.product_product"]):
             reason,
         )
         odoo_product.shopify_next_export = True
-
-    def _schedule_product_recreation(
-        self,
-        odoo_product: "odoo.model.product_product",
-        ordered_odoo_images: "odoo.model.product_image",
-        *,
-        reason: str,
-    ) -> None:
-        self._schedule_media_reupload(odoo_product, ordered_odoo_images, reason=reason)
-        for resource in PRODUCT_EXTERNAL_ID_RESOURCES:
-            upsert_external_id(
-                odoo_product,
-                system_code="shopify",
-                resource=resource,
-                external_id_value=None,
-            )
-
-    @staticmethod
-    def _collect_shopify_user_error_messages(
-        user_errors: list[object],
-    ) -> list[str]:
-        messages: list[str] = []
-        for user_error in user_errors or []:
-            if isinstance(user_error, dict):
-                message = str(user_error.get("message", "") or "").strip()
-            else:
-                message = str(getattr(user_error, "message", "") or "").strip()
-            if message:
-                messages.append(message)
-        return messages
-
-    @classmethod
-    def _all_user_errors_indicate_missing_product(cls, user_error_messages: list[str]) -> bool:
-        if not user_error_messages:
-            return False
-        return all(cls._is_missing_product_user_error(message) for message in user_error_messages)
-
-    @classmethod
-    def _is_missing_product_user_error(cls, message: str) -> bool:
-        normalized_message = message.lower()
-        if not normalized_message:
-            return False
-
-        if "resource matching the identifier was not found" in normalized_message:
-            return True
-
-        has_not_found_term = any(keyword in normalized_message for keyword in cls._PRODUCT_MISSING_USER_ERROR_KEYWORDS)
-        if not has_not_found_term:
-            return False
-
-        targets = (
-            "product",
-            "variant",
-            "media",
-            "image",
-            "metafield",
-        )
-        return any(target in normalized_message for target in targets)
 
     @staticmethod
     def _clear_shopify_media_ids(

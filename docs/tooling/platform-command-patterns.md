@@ -63,7 +63,7 @@ Quick Start
   example:
 
   ```bash
-  uv run validate-shopify-roundtrip --context opw --instance testing
+  uv run python tools/validate/shopify_roundtrip.py --context opw --instance testing
   ```
 
 Local Workflow Patterns

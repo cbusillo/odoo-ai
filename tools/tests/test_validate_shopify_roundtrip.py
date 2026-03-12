@@ -15,6 +15,7 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
     def test_load_settings_reads_scoped_environment_values(self) -> None:
         fake_environment_values = {
             "ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL": "https://opw-testing.example.com",
+            "ODOO_DB_NAME": "custom-opw-db",
             "ODOO_KEY": "secret-key",
             "ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY": "test-store",
             "ENV_OVERRIDE_SHOPIFY__API_TOKEN": "token-123",
@@ -31,7 +32,7 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
             )
 
         self.assertEqual(settings.odoo_url, "https://opw-testing.example.com")
-        self.assertEqual(settings.database_name, "opw")
+        self.assertEqual(settings.database_name, "custom-opw-db")
         self.assertEqual(settings.odoo_password, "secret-key")
         self.assertEqual(settings.remote_login, "gpt-admin")
         self.assertEqual(settings.shop_url_key, "test-store")
@@ -50,6 +51,7 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
 
     def test_create_sync_falls_back_to_existing_running_sync(self) -> None:
         client = mock.Mock()
+        client.uid = 99
         client.execute.side_effect = [
             {"unexpected": True},
             [{"id": 42}],

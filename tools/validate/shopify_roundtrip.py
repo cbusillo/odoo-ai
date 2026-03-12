@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 import time
 import urllib.request
 import xmlrpc.client
@@ -12,8 +13,9 @@ import click
 from tools.platform.environment import discover_repo_root, load_environment
 
 POLL_SECONDS = 5
-SYNC_TIMEOUT_SECONDS = 900
+SYNC_TIMEOUT_SECONDS = 8 * 60 * 60
 TITLE_TIMEOUT_SECONDS = 180
+SYNC_SEARCH_CUTOFF_SECONDS = 300
 DEFAULT_REMOTE_LOGIN = "gpt-admin"
 SUPPORTED_REMOTE_INSTANCES = ("dev", "testing", "prod")
 
@@ -51,9 +53,12 @@ def load_settings(
     )
     odoo_url = str(environment_values["ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL"])
     odoo_key = str(environment_values["ODOO_KEY"])
+    database_name = str(environment_values.get("ODOO_DB_NAME", context_name)).strip()
+    if not database_name:
+        database_name = context_name
     return RemoteShopifySettings(
         odoo_url=odoo_url,
-        database_name=context_name,
+        database_name=database_name,
         odoo_password=odoo_key,
         remote_login=remote_login,
         shop_url_key=str(environment_values["ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY"]),
@@ -180,24 +185,49 @@ def read_product_name(client: RemoteOdooClient, product_id: int) -> str:
     return str(result[0].get("name") or "")
 
 
+def _correlate_sync_timestamp() -> str:
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+
+
+def _fallback_sync_window_start() -> str:
+    return time.strftime(
+        "%Y-%m-%d %H:%M:%S",
+        time.gmtime(time.time() - SYNC_SEARCH_CUTOFF_SECONDS),
+    )
+
+
 def create_sync(client: RemoteOdooClient, mode: str, extra_values: dict[str, object] | None = None) -> int:
     values: dict[str, object] = {"mode": mode}
     if extra_values:
         values.update(extra_values)
-    sync_record = client.execute("shopify.sync", "create_and_run_async", [[], values])
+
+    timestamped_values = dict(values)
+    sync_timestamp = None
+    if "datetime_to_sync" not in timestamped_values:
+        sync_timestamp = _correlate_sync_timestamp()
+        timestamped_values["datetime_to_sync"] = sync_timestamp
+
+    sync_record = client.execute("shopify.sync", "create_and_run_async", [[], timestamped_values])
     if isinstance(sync_record, list) and sync_record and isinstance(sync_record[0], int):
         return sync_record[0]
     if isinstance(sync_record, int):
         return sync_record
+
+    sync_candidate_domain = [
+        ["mode", "=", mode],
+        ["state", "in", ["queued", "running"]],
+        ["user", "=", client.uid],
+    ]
+    if sync_timestamp is not None:
+        sync_candidate_domain.append(["datetime_to_sync", "=", sync_timestamp])
+    sync_candidate_domain.append(["create_date", ">=", _fallback_sync_window_start()])
+    if "shopify_product_id_to_sync" in timestamped_values:
+        sync_candidate_domain.append(["shopify_product_id_to_sync", "=", timestamped_values["shopify_product_id_to_sync"]])
+
     existing_syncs = client.execute(
         "shopify.sync",
         "search_read",
-        [
-            [
-                ["mode", "=", mode],
-                ["state", "in", ["queued", "running"]],
-            ]
-        ],
+        [sync_candidate_domain],
         {"fields": ["id"], "limit": 1, "order": "id desc"},
     )
     if isinstance(existing_syncs, list) and existing_syncs and isinstance(existing_syncs[0], dict):
@@ -330,3 +360,7 @@ def main(context_name: str, instance_name: str, env_file: Path | None, remote_lo
     )
     results = run_roundtrip(settings)
     print(json.dumps(results, indent=2, sort_keys=True))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main.main(args=sys.argv[1:], prog_name="shopify-roundtrip", standalone_mode=True))

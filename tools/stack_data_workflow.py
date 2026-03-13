@@ -20,8 +20,8 @@ from tools.platform.dokploy import (
     deployment_status,
     dokploy_request,
     fetch_dokploy_target_payload,
-    find_matching_dokploy_schedule,
     find_dokploy_target_definition,
+    find_matching_dokploy_schedule,
     latest_deployment_for_compose,
     latest_deployment_for_schedule,
     load_dokploy_source_of_truth_if_present,
@@ -327,6 +327,7 @@ set -euo pipefail
 compose_project={shlex.quote(compose_app_name)}
 database_name={shlex.quote(database_name)}
 filestore_root={shlex.quote(normalized_filestore_path)}
+workflow_ssh_dir=/tmp/platform-data-workflow-ssh
 {workflow_argument_line}
 {clear_stale_lock_line}
 data_workflow_lock_path={shlex.quote(data_workflow_lock_path)}
@@ -370,6 +371,8 @@ web_container_id=$(resolve_container_id "web")
 
 ensure_running "${{database_container_id}}" "database"
 ensure_running "${{script_runner_container_id}}" "script-runner"
+workflow_uid=$(docker exec "${{script_runner_container_id}}" id -u)
+workflow_gid=$(docker exec "${{script_runner_container_id}}" id -g)
 
 if [ "${{clear_stale_lock}}" = "1" ]; then
     echo "Clearing stale data workflow lock ${{data_workflow_lock_path}}"
@@ -388,6 +391,11 @@ echo "Normalizing filestore ownership for ${{database_name}}"
 docker exec -u root \
     -e ODOO_DATABASE_NAME="${{database_name}}" \
     -e ODOO_FILESTORE_ROOT="${{filestore_root}}" \
+    -e DATA_WORKFLOW_SSH_DIR="${{DATA_WORKFLOW_SSH_DIR:-/root/.ssh}}" \
+    -e DATA_WORKFLOW_SSH_KEY="${{DATA_WORKFLOW_SSH_KEY:-}}" \
+    -e WORKFLOW_UID="${{workflow_uid}}" \
+    -e WORKFLOW_GID="${{workflow_gid}}" \
+    -e WORKFLOW_SSH_DIR="${{workflow_ssh_dir}}" \
     "${{script_runner_container_id}}" \
     /bin/bash -lc '
         set -euo pipefail
@@ -399,10 +407,30 @@ docker exec -u root \
         mkdir -p "$ODOO_FILESTORE_ROOT" "$filestore_database_path"
         chown -R "$target_owner" "$filestore_database_path"
         chmod -R ug+rwX "$filestore_database_path"
+
+        rm -rf "$WORKFLOW_SSH_DIR"
+        install -d -m 700 -o "$WORKFLOW_UID" -g "$WORKFLOW_GID" "$WORKFLOW_SSH_DIR"
+
+        if [ -f "$DATA_WORKFLOW_SSH_DIR/known_hosts" ]; then
+            install -m 600 -o "$WORKFLOW_UID" -g "$WORKFLOW_GID" \
+                "$DATA_WORKFLOW_SSH_DIR/known_hosts" "$WORKFLOW_SSH_DIR/known_hosts"
+        fi
+
+        source_key_path="$DATA_WORKFLOW_SSH_KEY"
+        if [ -z "$source_key_path" ] && [ -f "$DATA_WORKFLOW_SSH_DIR/id_rsa" ]; then
+            source_key_path="$DATA_WORKFLOW_SSH_DIR/id_rsa"
+        fi
+        if [ -n "$source_key_path" ] && [ -f "$source_key_path" ]; then
+            install -m 600 -o "$WORKFLOW_UID" -g "$WORKFLOW_GID" \
+                "$source_key_path" "$WORKFLOW_SSH_DIR/$(basename "$source_key_path")"
+        fi
     '
 
 echo "Running platform data workflow in container ${{script_runner_container_id}}"
-docker exec "${{script_runner_container_id}}" \
+docker exec \
+    -e DATA_WORKFLOW_SSH_DIR="${{workflow_ssh_dir}}" \
+    -e DATA_WORKFLOW_SSH_KEY="${{workflow_ssh_dir}}/id_rsa" \
+    "${{script_runner_container_id}}" \
     python3 -u {shlex.quote(DATA_WORKFLOW_SCRIPT)} "${{workflow_arguments[@]}}"
 
 start_web_container

@@ -462,6 +462,25 @@ class OdooDataWorkflowRunner:
 
         return None
 
+    def _resolve_data_workflow_known_hosts_path(self) -> Path | None:
+        candidates: list[Path] = []
+
+        env_dir = self.local.data_workflow_ssh_dir
+        if env_dir:
+            candidates.append(Path(env_dir) / "known_hosts")
+
+        candidates.extend([Path("/home/ubuntu/.ssh/known_hosts"), Path("/root/.ssh/known_hosts")])
+
+        for candidate in candidates:
+            expanded = Path(os.path.expanduser(os.path.expandvars(str(candidate))))
+            if expanded.exists():
+                return expanded
+
+        if env_dir:
+            return Path(os.path.expanduser(os.path.expandvars(str(Path(env_dir) / "known_hosts"))))
+
+        return None
+
     def _require_upstream(self) -> UpstreamServerSettings:
         if not self.upstream:
             raise OdooRestorerError("Upstream settings are not configured; cannot perform restore.")
@@ -469,6 +488,9 @@ class OdooDataWorkflowRunner:
 
     def _build_ssh_command(self) -> list[str]:
         parts = ["ssh", "-o", "StrictHostKeyChecking=yes"]
+        known_hosts_path = self._resolve_data_workflow_known_hosts_path()
+        if known_hosts_path is not None:
+            parts.extend(["-o", f"UserKnownHostsFile={known_hosts_path}"])
         if self._ssh_identity:
             parts.extend(["-i", str(self._ssh_identity)])
         elif self.local.data_workflow_ssh_key:

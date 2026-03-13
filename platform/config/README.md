@@ -60,4 +60,6 @@ docker-compose.yml
   repo for live-editing (see `docs/workflows/multi-project.md`).
 - Restore runs (`uv run platform restore --context <target> --instance local`)
   rely on `DATA_WORKFLOW_SSH_DIR` being set so the base compose mounts the SSH
-  directory for upstream access.
+  directory for upstream access. Ensure that directory includes both the
+  private key and a trusted `known_hosts` entry for the upstream host when
+  strict host checking is enabled.

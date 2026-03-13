@@ -53,6 +53,8 @@ Use explicit context/instance flags in command invocations (for example
 - Data workflows rely on `DATA_WORKFLOW_SSH_DIR` so the base compose mounts
   the SSH directory for upstream access during
   `uv run platform restore --context <target> --instance local`.
+- That SSH directory must include both the private key and trusted
+  `known_hosts` entries needed for upstream access.
 
 ## Local deploy/restore
 

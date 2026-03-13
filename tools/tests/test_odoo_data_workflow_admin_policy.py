@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+import tempfile
 import types
 import unittest
 from pathlib import Path
@@ -146,6 +147,36 @@ class DataWorkflowAdminPolicyTests(unittest.TestCase):
 
         hardening_script = next(script for label, script in executed_scripts if label == "admin hardening")
         self.assertIn("write({'password': payload['password']})", hardening_script)
+
+    def test_build_ssh_command_uses_explicit_known_hosts_from_configured_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory_name:
+            ssh_directory = Path(temporary_directory_name)
+            known_hosts_path = ssh_directory / "known_hosts"
+            known_hosts_path.write_text("opw-prod ssh-ed25519 AAAA\n", encoding="utf-8")
+            identity_path = ssh_directory / "id_rsa"
+            identity_path.write_text("private-key", encoding="utf-8")
+
+            workflow_runner = odoo_data_workflow.OdooDataWorkflowRunner.__new__(odoo_data_workflow.OdooDataWorkflowRunner)
+            workflow_runner.local = SimpleNamespace(
+                data_workflow_ssh_dir=ssh_directory,
+                data_workflow_ssh_key=Path("/root/.ssh/id_rsa"),
+            )
+            workflow_runner._ssh_identity = identity_path
+
+            ssh_command = workflow_runner._build_ssh_command()
+
+        self.assertEqual(
+            ssh_command,
+            [
+                "ssh",
+                "-o",
+                "StrictHostKeyChecking=yes",
+                "-o",
+                f"UserKnownHostsFile={known_hosts_path}",
+                "-i",
+                str(identity_path),
+            ],
+        )
 
 
 if __name__ == "__main__":

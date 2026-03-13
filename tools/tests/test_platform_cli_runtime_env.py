@@ -10,9 +10,9 @@ from tools.platform.cli import (
     _assert_prod_data_workflow_allowed,
     _assert_promote_path_allowed,
     _build_runtime_env_values,
-    _command_execution_env,
     _collect_dirty_tracked_files,
     _collect_environment_gate_results,
+    _command_execution_env,
     _compose_base_command,
     _dokploy_request,
     _load_environment,
@@ -210,7 +210,7 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
         )
         self.assertEqual(runtime_values.get("ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS"), "7200")
 
-    def test_runtime_env_defaults_remote_data_workflow_ssh_dir_to_root_ssh(self) -> None:
+    def test_runtime_env_defaults_remote_data_workflow_ssh_dir_to_ubuntu_ssh(self) -> None:
         remote_runtime_selection = replace(
             _sample_runtime_selection(),
             instance_name="testing",
@@ -221,7 +221,7 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
             runtime_selection=remote_runtime_selection,
         )
 
-        self.assertEqual(runtime_values.get("DATA_WORKFLOW_SSH_DIR"), "/root/.ssh")
+        self.assertEqual(runtime_values.get("DATA_WORKFLOW_SSH_DIR"), "/home/ubuntu/.ssh")
 
     def test_runtime_env_adds_openupgrade_repo_when_enabled(self) -> None:
         runtime_values = self._build_runtime_values(

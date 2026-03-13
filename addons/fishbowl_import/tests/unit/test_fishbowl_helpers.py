@@ -6,6 +6,10 @@ from ...models.fishbowl_import_constants import (
     LEGACY_BUCKET_FEE,
     LEGACY_BUCKET_MISC,
     LEGACY_BUCKET_SHIPPING,
+    RESOURCE_PURCHASE_ORDER,
+    RESOURCE_PURCHASE_ORDER_LINE,
+    RESOURCE_SALES_ORDER,
+    RESOURCE_SALES_ORDER_LINE,
 )
 from ..common_imports import common
 from ..fixtures.base import UnitTestCase
@@ -200,3 +204,103 @@ class TestFishbowlHelpers(UnitTestCase):
         self.assertTrue(external_id_record.active)
         self.assertEqual(external_id_record.res_model, "sale.order.line")
         self.assertEqual(external_id_record.res_id, partner.id + 1)
+
+    def test_resume_state_advances_tail_phases(self) -> None:
+        importer_model = self.env["fishbowl.importer"]
+
+        self.assertEqual(importer_model._phase_names_from_state(importer_model._get_resume_state()), ("orders", "shipments", "receipts", "on_hand"))
+
+        importer_model._set_resume_phase("shipments")
+        self.assertEqual(importer_model._phase_names_from_state(importer_model._get_resume_state()), ("shipments", "receipts", "on_hand"))
+
+        importer_model._advance_resume_state("shipments")
+        self.assertEqual(importer_model._get_resume_state()["phase"], "receipts")
+
+        importer_model._advance_resume_state("on_hand")
+        self.assertEqual(importer_model._get_resume_state()["phase"], "orders")
+
+    def test_get_resume_state_clears_invalid_payload(self) -> None:
+        importer_model = self.env["fishbowl.importer"]
+        parameter_model = self.env["ir.config_parameter"].sudo()
+        parameter_model.set_param("fishbowl.resume_state", '{"phase":"bogus"}')
+
+        resume_state = importer_model._get_resume_state()
+
+        self.assertEqual(resume_state["phase"], "orders")
+        self.assertFalse(parameter_model.get_param("fishbowl.resume_state"))
+
+    def test_load_existing_order_maps_uses_active_numeric_external_ids(self) -> None:
+        importer_model = self.env["fishbowl.importer"]
+        system = self.env["external.system"].ensure_system(
+            code=EXTERNAL_SYSTEM_CODE,
+            name="Fishbowl",
+            applicable_model_xml_ids=(),
+        )
+        external_id_model = self.env["external.id"].sudo()
+        external_id_model.create(
+            {
+                "res_model": "sale.order",
+                "res_id": 101,
+                "system_id": system.id,
+                "resource": RESOURCE_SALES_ORDER,
+                "external_id": "11",
+                "active": True,
+            }
+        )
+        external_id_model.create(
+            {
+                "res_model": "sale.order.line",
+                "res_id": 202,
+                "system_id": system.id,
+                "resource": RESOURCE_SALES_ORDER_LINE,
+                "external_id": "22",
+                "active": True,
+            }
+        )
+        external_id_model.create(
+            {
+                "res_model": "purchase.order",
+                "res_id": 303,
+                "system_id": system.id,
+                "resource": RESOURCE_PURCHASE_ORDER,
+                "external_id": "33",
+                "active": True,
+            }
+        )
+        external_id_model.create(
+            {
+                "res_model": "purchase.order.line",
+                "res_id": 404,
+                "system_id": system.id,
+                "resource": RESOURCE_PURCHASE_ORDER_LINE,
+                "external_id": "44",
+                "active": True,
+            }
+        )
+        external_id_model.create(
+            {
+                "res_model": "sale.order",
+                "res_id": 999,
+                "system_id": system.id,
+                "resource": RESOURCE_SALES_ORDER,
+                "external_id": "not-a-number",
+                "active": True,
+            }
+        )
+        external_id_model.create(
+            {
+                "res_model": "sale.order.line",
+                "res_id": 888,
+                "system_id": system.id,
+                "resource": RESOURCE_SALES_ORDER_LINE,
+                "external_id": "55",
+                "active": False,
+            }
+        )
+
+        order_maps = importer_model._load_existing_order_maps(system.id)
+
+        self.assertEqual(order_maps["sales_order"], {11: 101})
+        self.assertEqual(order_maps["sales_line"], {22: 202})
+        self.assertEqual(order_maps["purchase_order"], {33: 303})
+        self.assertEqual(order_maps["purchase_line"], {44: 404})

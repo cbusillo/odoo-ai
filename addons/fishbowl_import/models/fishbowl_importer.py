@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import time
@@ -22,9 +23,26 @@ from .fishbowl_import_constants import (
     LEGACY_BUCKET_FEE,
     LEGACY_BUCKET_MISC,
     LEGACY_BUCKET_SHIPPING,
+    RESOURCE_PURCHASE_ORDER,
+    RESOURCE_PURCHASE_ORDER_LINE,
+    RESOURCE_SALES_ORDER,
+    RESOURCE_SALES_ORDER_LINE,
 )
 
 _logger = logging.getLogger(__name__)
+
+FISHBOWL_RESUME_STATE_PARAM = "fishbowl.resume_state"
+FISHBOWL_RESUME_STATE_VERSION = 1
+FISHBOWL_PHASE_ORDERS = "orders"
+FISHBOWL_PHASE_SHIPMENTS = "shipments"
+FISHBOWL_PHASE_RECEIPTS = "receipts"
+FISHBOWL_PHASE_ON_HAND = "on_hand"
+FISHBOWL_PHASE_SEQUENCE = (
+    FISHBOWL_PHASE_ORDERS,
+    FISHBOWL_PHASE_SHIPMENTS,
+    FISHBOWL_PHASE_RECEIPTS,
+    FISHBOWL_PHASE_ON_HAND,
+)
 
 RowParser = Callable[[list[dict[str, object]]], list[Any]] | TypeAdapter[list[Any]]
 
@@ -63,41 +81,46 @@ class FishbowlImporter(models.Model):
                 fishbowl_system = self._get_fishbowl_system()
                 with FishbowlClient(fishbowl_settings) as client:
                     total_started_at = time.monotonic()
-                    phase_started_at = time.monotonic()
-                    self._import_units_of_measure(client, fishbowl_system, sync_started_at)
-                    _logger.info("Fishbowl import: units in %.2fs", time.monotonic() - phase_started_at)
-                    phase_started_at = time.monotonic()
-                    partner_maps = self._import_partners(client, fishbowl_system, sync_started_at)
-                    _logger.info("Fishbowl import: partners in %.2fs", time.monotonic() - phase_started_at)
-                    phase_started_at = time.monotonic()
-                    product_maps = self._import_products(client, fishbowl_system, sync_started_at)
-                    _logger.info("Fishbowl import: products in %.2fs", time.monotonic() - phase_started_at)
-                    phase_started_at = time.monotonic()
-                    order_maps = self._import_orders(
-                        client,
-                        partner_maps,
-                        product_maps,
-                        start_datetime,
-                        fishbowl_system,
-                        sync_started_at,
-                    )
-                    _logger.info("Fishbowl import: orders in %.2fs", time.monotonic() - phase_started_at)
-                    phase_started_at = time.monotonic()
-                    self._import_shipments(client, order_maps, start_datetime, fishbowl_system, sync_started_at)
-                    _logger.info("Fishbowl import: shipments in %.2fs", time.monotonic() - phase_started_at)
-                    phase_started_at = time.monotonic()
-                    self._import_receipts(
-                        client,
-                        order_maps,
-                        product_maps,
-                        start_datetime,
-                        fishbowl_system,
-                        sync_started_at,
-                    )
-                    _logger.info("Fishbowl import: receipts in %.2fs", time.monotonic() - phase_started_at)
-                    phase_started_at = time.monotonic()
-                    self._import_on_hand(client, product_maps)
-                    _logger.info("Fishbowl import: on-hand in %.2fs", time.monotonic() - phase_started_at)
+                    partner_maps, product_maps = self._run_setup_phases(client, fishbowl_system, sync_started_at)
+                    resume_state = self._get_resume_state()
+                    order_maps: dict[str, dict[int, int]] | None = None
+                    for phase_name in self._phase_names_from_state(resume_state):
+                        _logger.info("Fishbowl import: starting phase '%s'", phase_name)
+                        self._set_resume_phase(phase_name)
+                        phase_started_at = time.monotonic()
+                        if phase_name == FISHBOWL_PHASE_ORDERS:
+                            order_maps = self._import_orders(
+                                client,
+                                partner_maps,
+                                product_maps,
+                                start_datetime,
+                                fishbowl_system,
+                                sync_started_at,
+                            )
+                            _logger.info("Fishbowl import: orders in %.2fs", time.monotonic() - phase_started_at)
+                        elif phase_name == FISHBOWL_PHASE_SHIPMENTS:
+                            if order_maps is None:
+                                order_maps = self._load_existing_order_maps(fishbowl_system.id)
+                            self._import_shipments(client, order_maps, start_datetime, fishbowl_system, sync_started_at)
+                            _logger.info("Fishbowl import: shipments in %.2fs", time.monotonic() - phase_started_at)
+                        elif phase_name == FISHBOWL_PHASE_RECEIPTS:
+                            if order_maps is None:
+                                order_maps = self._load_existing_order_maps(fishbowl_system.id)
+                            self._import_receipts(
+                                client,
+                                order_maps,
+                                product_maps,
+                                start_datetime,
+                                fishbowl_system,
+                                sync_started_at,
+                            )
+                            _logger.info("Fishbowl import: receipts in %.2fs", time.monotonic() - phase_started_at)
+                        elif phase_name == FISHBOWL_PHASE_ON_HAND:
+                            self._import_on_hand(client, product_maps)
+                            _logger.info("Fishbowl import: on-hand in %.2fs", time.monotonic() - phase_started_at)
+                        else:
+                            raise ValueError(f"Unsupported Fishbowl phase: {phase_name}")
+                        resume_state = self._advance_resume_state(phase_name)
                     _logger.info("Fishbowl import: total in %.2fs", time.monotonic() - total_started_at)
                 break
             except psycopg2_errors.SerializationFailure as exc:
@@ -126,9 +149,117 @@ class FishbowlImporter(models.Model):
                 _logger.exception("Fishbowl import failed")
                 self._record_last_run("failed", str(exc))
                 raise
+        self._clear_resume_state()
         self._record_last_run("success", "")
         if update_last_sync and use_last_sync_at:
             self._set_last_sync_at(sync_started_at)
+
+    def _run_setup_phases(
+        self,
+        client: FishbowlClient,
+        fishbowl_system: "odoo.model.external_system",
+        sync_started_at: datetime,
+    ) -> tuple[dict[str, dict[int, int]], dict[str, dict[int, int]]]:
+        phase_started_at = time.monotonic()
+        self._import_units_of_measure(client, fishbowl_system, sync_started_at)
+        _logger.info("Fishbowl import: units in %.2fs", time.monotonic() - phase_started_at)
+        phase_started_at = time.monotonic()
+        partner_maps = self._import_partners(client, fishbowl_system, sync_started_at)
+        _logger.info("Fishbowl import: partners in %.2fs", time.monotonic() - phase_started_at)
+        phase_started_at = time.monotonic()
+        product_maps = self._import_products(client, fishbowl_system, sync_started_at)
+        _logger.info("Fishbowl import: products in %.2fs", time.monotonic() - phase_started_at)
+        return partner_maps, product_maps
+
+    def _default_resume_state(self) -> dict[str, int | str | None]:
+        return {
+            "version": FISHBOWL_RESUME_STATE_VERSION,
+            "phase": FISHBOWL_PHASE_ORDERS,
+        }
+
+    def _get_resume_state(self) -> dict[str, int | str | None]:
+        parameter_model = self.env["ir.config_parameter"].sudo()
+        raw_state = parameter_model.get_param(FISHBOWL_RESUME_STATE_PARAM)
+        default_state = self._default_resume_state()
+        if not raw_state:
+            return default_state
+        try:
+            loaded_state = json.loads(raw_state)
+        except json.JSONDecodeError:
+            self._clear_resume_state()
+            return default_state
+        if not isinstance(loaded_state, dict):
+            self._clear_resume_state()
+            return default_state
+        if loaded_state.get("version") != FISHBOWL_RESUME_STATE_VERSION:
+            self._clear_resume_state()
+            return default_state
+        phase_name = loaded_state.get("phase")
+        if phase_name not in FISHBOWL_PHASE_SEQUENCE:
+            self._clear_resume_state()
+            return default_state
+        return {
+            "version": FISHBOWL_RESUME_STATE_VERSION,
+            "phase": phase_name,
+        }
+
+    def _set_resume_state(self, state: dict[str, int | str | None]) -> None:
+        self.env["ir.config_parameter"].sudo().set_param(FISHBOWL_RESUME_STATE_PARAM, json.dumps(state, sort_keys=True))
+
+    def _clear_resume_state(self) -> None:
+        self.env["ir.config_parameter"].sudo().set_param(FISHBOWL_RESUME_STATE_PARAM, "")
+
+    def _set_resume_phase(self, phase_name: str) -> None:
+        state = self._get_resume_state()
+        state["phase"] = phase_name
+        self._set_resume_state(state)
+
+    def _advance_resume_state(self, phase_name: str) -> dict[str, int | str | None]:
+        state = self._get_resume_state()
+        current_phase_index = FISHBOWL_PHASE_SEQUENCE.index(phase_name)
+        if current_phase_index + 1 >= len(FISHBOWL_PHASE_SEQUENCE):
+            self._clear_resume_state()
+            return self._default_resume_state()
+        state["phase"] = FISHBOWL_PHASE_SEQUENCE[current_phase_index + 1]
+        self._set_resume_state(state)
+        return state
+
+    def _phase_names_from_state(self, state: dict[str, int | str | None]) -> tuple[str, ...]:
+        start_phase = str(state.get("phase") or FISHBOWL_PHASE_ORDERS)
+        start_index = FISHBOWL_PHASE_SEQUENCE.index(start_phase)
+        return FISHBOWL_PHASE_SEQUENCE[start_index:]
+
+    def _load_existing_order_maps(self, system_id: int) -> dict[str, dict[int, int]]:
+        return {
+            "sales_order": self._load_existing_external_id_map(system_id, RESOURCE_SALES_ORDER, "sale.order"),
+            "sales_line": self._load_existing_external_id_map(system_id, RESOURCE_SALES_ORDER_LINE, "sale.order.line"),
+            "purchase_order": self._load_existing_external_id_map(system_id, RESOURCE_PURCHASE_ORDER, "purchase.order"),
+            "purchase_line": self._load_existing_external_id_map(
+                system_id,
+                RESOURCE_PURCHASE_ORDER_LINE,
+                "purchase.order.line",
+            ),
+        }
+
+    def _load_existing_external_id_map(self, system_id: int, resource: str, res_model: str) -> dict[int, int]:
+        external_id_records = self.env["external.id"].sudo().search(
+            [
+                ("system_id", "=", system_id),
+                ("resource", "=", resource),
+                ("res_model", "=", res_model),
+                ("res_id", "!=", False),
+            ]
+        )
+        existing_map: dict[int, int] = {}
+        for external_id_record in external_id_records:
+            try:
+                fishbowl_id = int(external_id_record.external_id)
+            except (TypeError, ValueError):
+                continue
+            if fishbowl_id <= 0:
+                continue
+            existing_map[fishbowl_id] = external_id_record.res_id
+        return existing_map
 
     def _commit_and_clear(self) -> None:
         self.env.cr.execute("SET LOCAL synchronous_commit TO OFF")

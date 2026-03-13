@@ -1223,12 +1223,23 @@ def validate() -> None:
 )
 @click.option("--env-file", type=click.Path(path_type=Path), default=None)
 @click.option("--remote-login", default=validate_shopify_roundtrip.DEFAULT_REMOTE_LOGIN, show_default=True)
+@click.option(
+    "--profile",
+    type=click.Choice(validate_shopify_roundtrip.VALIDATION_PROFILES, case_sensitive=False),
+    default="full",
+    show_default=True,
+)
+@click.option("--sample-size", type=int, default=validate_shopify_roundtrip.DEFAULT_SAMPLE_SIZE, show_default=True)
+@click.option("--clear-conflicting-syncs", is_flag=True, default=False)
 @click.option("--start-after-export", is_flag=True, default=False)
 def validate_shopify_roundtrip_command(
     context_name: str,
     instance_name: str,
     env_file: Path | None,
     remote_login: str,
+    profile: str,
+    sample_size: int,
+    clear_conflicting_syncs: bool,
     start_after_export: bool,
 ) -> None:
     results = validate_shopify_roundtrip.run_validation_command(
@@ -1236,6 +1247,9 @@ def validate_shopify_roundtrip_command(
         instance_name=instance_name,
         env_file=env_file,
         remote_login=remote_login,
+        profile=profile,
+        sample_size=sample_size,
+        clear_conflicting_syncs=clear_conflicting_syncs,
         start_after_export=start_after_export,
         repository_root=_discover_repo_root(Path.cwd()),
     )

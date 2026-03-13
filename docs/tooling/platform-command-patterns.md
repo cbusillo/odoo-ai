@@ -51,8 +51,16 @@ Quick Start
 - Run tracked environment validation scenarios through `platform validate`:
 
   ```bash
-  uv run platform validate shopify-roundtrip --context opw --instance testing
+  uv run platform validate shopify-roundtrip --context opw --instance testing \
+    --profile smoke --sample-size 5
   ```
+
+- Prefer explicit profiles for long-running scenarios. For Shopify validation,
+  `--profile smoke` resets Shopify and re-exports a bounded sample before the
+  round-trip checks, while `--profile full` keeps the same checks but prepares
+  with a full export.
+- `shopify-roundtrip` is disabled on `prod`; use it only on non-production
+  instances where destructive round-trip validation is appropriate.
 
 Local Workflow Patterns
 

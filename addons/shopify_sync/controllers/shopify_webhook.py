@@ -38,6 +38,8 @@ class ShopifyWebhook(http.Controller):
             )
             raise exception
         env = http.request.env(user=shopify_user.id)
+        if env["ir.config_parameter"].sudo().get_param("shopify.pause_webhook_processing") == "1":
+            return http.Response(json.dumps({"status": "paused"}), content_type="application/json")
 
         topic = http.request.httprequest.headers.get("X-Shopify-Topic", "")
         try:

@@ -65,7 +65,17 @@ Notes
   through platform-managed entry points so stack selection, env loading, and
   logs stay reproducible.
 - Example: the tracked Shopify remote round-trip scenario now runs as
-  `uv run platform validate shopify-roundtrip --context opw --instance testing`.
+  `uv run platform validate shopify-roundtrip --context opw --instance testing`
+  `--profile smoke --sample-size 5` for fast reset-plus-sample validation, or
+  `--profile full` for a full export.
+- `shopify-roundtrip` is intentionally disabled on `prod` because it performs
+  destructive and mutating validation against both Odoo and Shopify.
+- `shopify-roundtrip` supports `--start-after-export` when reset/export has
+  already completed and you only need to rerun the round-trip checks.
+- The Shopify validation scenario temporarily pauses the Shopify dispatcher on
+  the target instance while it runs, then restores the original cron state at
+  the end. That keeps background changed-item churn from interfering with the
+  validator's own reset/export phases.
 - Use precise language in docs and commits: `validation scenario`,
   `environment-level validation`, or `round-trip validation` are better fits
   than `end-to-end test` when the workflow is stateful and intentionally runs

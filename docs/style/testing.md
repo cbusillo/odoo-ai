@@ -38,6 +38,10 @@ Environment Validation Scenarios
   `uv run platform validate <scenario> ...` for tracked environment validation
   scenarios and keep local Odoo-shell helpers or remote RPC helpers behind that
   operator surface rather than ad hoc shell snippets.
+- When a scenario needs both fast and high-confidence modes, prefer explicit
+  profiles such as `smoke` and `full` instead of separate one-off scripts. For
+  destructive external-sync scenarios, keep the fast mode bounded by a sampled
+  dataset and document exactly what it resets, exports, and verifies.
 
 Recorded Tours
 

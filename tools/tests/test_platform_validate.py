@@ -38,6 +38,11 @@ class PlatformValidateCliTests(unittest.TestCase):
                         "opw",
                         "--instance",
                         "testing",
+                        "--profile",
+                        "smoke",
+                        "--sample-size",
+                        "7",
+                        "--clear-conflicting-syncs",
                         "--start-after-export",
                     ],
                 )
@@ -49,6 +54,9 @@ class PlatformValidateCliTests(unittest.TestCase):
             instance_name="testing",
             env_file=None,
             remote_login="gpt-admin",
+            profile="smoke",
+            sample_size=7,
+            clear_conflicting_syncs=True,
             start_after_export=True,
             repository_root=repository_root,
         )

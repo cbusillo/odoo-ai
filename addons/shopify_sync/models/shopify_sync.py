@@ -324,6 +324,10 @@ class ShopifySync(models.TransientModel):
             _logger.debug("Another sync is running; exiting dispatcher.")
             return
 
+        if self.env["ir.config_parameter"].sudo().get_param("shopify.pause_sync_autoschedule") == "1":
+            _logger.debug("Shopify autoschedule is paused; exiting dispatcher without creating health-check syncs.")
+            return
+
         now = fields.Datetime.now()
         cutoff = fields.Datetime.subtract(now, seconds=self.IMPORT_EXPORT_CRON_TIME)
 
@@ -368,6 +372,12 @@ class ShopifySync(models.TransientModel):
         if sync_jobs:
             sync_jobs.run_async()
         return sync_jobs
+
+    @api.model
+    def dispatch_pending_syncs_for_validation(self) -> int:
+        pending_count = self.search_count([("state", "in", ["queued", "running"])])
+        self._cron_dispatch_next()
+        return pending_count
 
     def duplicate_and_run_async(self) -> "odoo.model.shopify_sync":
         new_syncs = self.duplicate()

@@ -554,8 +554,6 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
                         ["website_description", "!=", False],
                         ["website_description", "!=", ""],
                         ["type", "=", "consu"],
-                        ["external_ids.system_id.code", "=", "shopify"],
-                        ["external_ids.resource", "=", "product"],
                         ["id", "not in", [1, 4]],
                     ]],
                 ),

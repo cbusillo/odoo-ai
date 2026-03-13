@@ -287,6 +287,12 @@ def _export_candidate_domain() -> list[list[object]]:
         ["website_description", "!=", False],
         ["website_description", "!=", ""],
         ["type", "=", "consu"],
+    ]
+
+
+def _shopify_linked_export_candidate_domain() -> list[list[object]]:
+    return [
+        *_export_candidate_domain(),
         ["external_ids.system_id.code", "=", "shopify"],
         ["external_ids.resource", "=", "product"],
     ]
@@ -573,7 +579,7 @@ def search_export_candidate(client: RemoteOdooClient) -> dict[str, object]:
 
 
 def search_export_candidates(client: RemoteOdooClient) -> list[dict[str, object]]:
-    domain = _export_candidate_domain()
+    domain = _shopify_linked_export_candidate_domain()
     result = client.execute(
         "product.product",
         "search_read",

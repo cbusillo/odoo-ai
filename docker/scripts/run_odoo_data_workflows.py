@@ -257,6 +257,12 @@ def _normalize_path(value: object) -> Path | None:
     return Path(expanded)
 
 
+def _path_exists_safely(candidate: Path) -> bool:
+    with suppress(OSError):
+        return candidate.exists()
+    return False
+
+
 
 
 class LocalServerSettings(BaseSettings):
@@ -453,31 +459,28 @@ class OdooDataWorkflowRunner:
 
         for candidate in candidates:
             expanded = Path(os.path.expanduser(os.path.expandvars(str(candidate))))
-            if expanded.exists():
+            if _path_exists_safely(expanded):
                 return expanded
 
         fallback = Path(os.path.expanduser(os.path.expandvars(str(base_path))))
-        if fallback.exists():
+        if _path_exists_safely(fallback):
             return fallback
 
         return None
 
     def _resolve_data_workflow_known_hosts_path(self) -> Path | None:
-        candidates: list[Path] = []
-
         env_dir = self.local.data_workflow_ssh_dir
         if env_dir:
-            candidates.append(Path(env_dir) / "known_hosts")
+            return Path(os.path.expanduser(os.path.expandvars(str(Path(env_dir) / "known_hosts"))))
+
+        candidates: list[Path] = []
 
         candidates.extend([Path("/home/ubuntu/.ssh/known_hosts"), Path("/root/.ssh/known_hosts")])
 
         for candidate in candidates:
             expanded = Path(os.path.expanduser(os.path.expandvars(str(candidate))))
-            if expanded.exists():
+            if _path_exists_safely(expanded):
                 return expanded
-
-        if env_dir:
-            return Path(os.path.expanduser(os.path.expandvars(str(Path(env_dir) / "known_hosts"))))
 
         return None
 

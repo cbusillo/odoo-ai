@@ -677,33 +677,40 @@ def create_sync(client: RemoteOdooClient, mode: str, extra_values: dict[str, obj
         timestamped_values["datetime_to_sync"] = sync_timestamp
 
     sync_record = client.execute("shopify.sync", "create_and_run_async", [[], timestamped_values])
+    sync_id: int | None = None
     if isinstance(sync_record, list) and sync_record and isinstance(sync_record[0], int):
-        return sync_record[0]
-    if isinstance(sync_record, int):
-        return sync_record
+        sync_id = sync_record[0]
+    elif isinstance(sync_record, int):
+        sync_id = sync_record
 
-    sync_candidate_domain = [
-        ["mode", "=", mode],
-        ["state", "in", ["queued", "running"]],
-        ["user", "=", client.uid],
-    ]
-    if sync_timestamp is not None:
-        sync_candidate_domain.append(["datetime_to_sync", "=", sync_timestamp])
-    sync_candidate_domain.append(["create_date", ">=", _fallback_sync_window_start()])
-    if "shopify_product_id_to_sync" in timestamped_values:
-        sync_candidate_domain.append(["shopify_product_id_to_sync", "=", timestamped_values["shopify_product_id_to_sync"]])
+    if sync_id is None:
+        sync_candidate_domain = [
+            ["mode", "=", mode],
+            ["state", "in", ["queued", "running"]],
+            ["user", "=", client.uid],
+        ]
+        if sync_timestamp is not None:
+            sync_candidate_domain.append(["datetime_to_sync", "=", sync_timestamp])
+        sync_candidate_domain.append(["create_date", ">=", _fallback_sync_window_start()])
+        if "shopify_product_id_to_sync" in timestamped_values:
+            sync_candidate_domain.append(["shopify_product_id_to_sync", "=", timestamped_values["shopify_product_id_to_sync"]])
 
-    existing_syncs = client.execute(
-        "shopify.sync",
-        "search_read",
-        [sync_candidate_domain],
-        {"fields": ["id"], "limit": 1, "order": "id desc"},
-    )
-    if isinstance(existing_syncs, list) and existing_syncs and isinstance(existing_syncs[0], dict):
-        existing_sync_id = existing_syncs[0].get("id")
-        if isinstance(existing_sync_id, int):
-            return existing_sync_id
-    raise RuntimeError(f"Failed to create or resolve remote Shopify sync for mode {mode}: {sync_record!r}")
+        existing_syncs = client.execute(
+            "shopify.sync",
+            "search_read",
+            [sync_candidate_domain],
+            {"fields": ["id"], "limit": 1, "order": "id desc"},
+        )
+        if isinstance(existing_syncs, list) and existing_syncs and isinstance(existing_syncs[0], dict):
+            existing_sync_id = existing_syncs[0].get("id")
+            if isinstance(existing_sync_id, int):
+                sync_id = existing_sync_id
+
+    if sync_id is None:
+        raise RuntimeError(f"Failed to create or resolve remote Shopify sync for mode {mode}: {sync_record!r}")
+
+    client.execute("shopify.sync", "dispatch_pending_syncs_for_validation", [])
+    return sync_id
 
 
 def read_sync_state(client: RemoteOdooClient, sync_id: int) -> dict[str, object]:

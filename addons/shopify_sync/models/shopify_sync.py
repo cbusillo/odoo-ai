@@ -373,6 +373,12 @@ class ShopifySync(models.TransientModel):
             sync_jobs.run_async()
         return sync_jobs
 
+    @api.model
+    def dispatch_pending_syncs_for_validation(self) -> int:
+        pending_count = self.search_count([("state", "in", ["queued", "running"])])
+        self._cron_dispatch_next()
+        return pending_count
+
     def duplicate_and_run_async(self) -> "odoo.model.shopify_sync":
         new_syncs = self.duplicate()
         new_syncs.run_async()

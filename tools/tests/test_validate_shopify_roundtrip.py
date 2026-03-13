@@ -63,6 +63,7 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
         client.execute.side_effect = [
             {"unexpected": True},
             [{"id": 42}],
+            1,
         ]
 
         sync_id = shopify_roundtrip.create_sync(client, "export_all_products")
@@ -70,6 +71,7 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
         self.assertEqual(sync_id, 42)
         self.assertEqual(client.execute.call_args_list[0].args[0:2], ("shopify.sync", "create_and_run_async"))
         self.assertEqual(client.execute.call_args_list[1].args[0:2], ("shopify.sync", "search_read"))
+        self.assertEqual(client.execute.call_args_list[2].args[0:2], ("shopify.sync", "dispatch_pending_syncs_for_validation"))
 
     def test_run_validation_command_forwards_start_after_export(self) -> None:
         fake_settings = mock.sentinel.settings

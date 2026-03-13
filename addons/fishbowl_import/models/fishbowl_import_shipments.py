@@ -1,6 +1,7 @@
 import logging
 import time
 from datetime import datetime
+
 from odoo import models
 
 from ..services.fishbowl_client import FishbowlClient
@@ -133,63 +134,66 @@ class FishbowlImporterShipments(models.Model):
 
         if not shipment_map:
             return
-        shipment_item_rows = self._fetch_rows_by_ids(
-            client,
-            "shipitem",
-            "shipId",
-            list(shipment_map.keys()),
-            select_columns="id, shipId, soItemId, xoItemId, itemId, qtyShipped, uomId",
-            row_parser=fishbowl_rows.SHIPMENT_LINE_ROWS_ADAPTER.validate_python,
-        )
-        missing_sales_line_ids = {
-            row.soItemId for row in shipment_item_rows if row.soItemId is not None and row.soItemId not in order_maps["sales_line"]
-        }
-        sales_line_external_map: dict[int, int] = {}
-        if missing_sales_line_ids:
-            external_id_records = (
-                self.env["external.id"]
-                .sudo()
-                .search(
-                    [
-                        ("system_id", "=", fishbowl_system.id),
-                        ("resource", "=", RESOURCE_SALES_ORDER_LINE),
-                        ("res_model", "=", "sale.order.line"),
-                        ("active", "=", True),
-                        ("external_id", "in", [str(value) for value in missing_sales_line_ids]),
-                    ]
-                )
-            )
-            for record in external_id_records:
-                try:
-                    sales_line_external_map[int(record.external_id)] = record.res_id
-                except (TypeError, ValueError):
-                    _logger.warning("Invalid Fishbowl sales line external id '%s'", record.external_id)
-        transfer_order_product_map = self._load_transfer_order_product_map(
-            client,
-            shipment_item_rows,
-            fishbowl_system.id,
-        )
-        shipment_part_ids = [
-            shipment_item_row.itemId
-            for shipment_item_row in shipment_item_rows
-            if shipment_item_row.itemId is not None
-        ]
-        shipment_part_product_map = self._load_part_product_map(fishbowl_system.id, shipment_part_ids)
         unit_map = self._load_unit_map()
         shipment_line_processed = 0
         shipment_line_log_every = 10000
         shipment_line_log_threshold = shipment_line_log_every
         shipment_line_started_at = time.monotonic()
         shipment_line_batch_size = 500
-        shipment_line_totals: dict[int, int] = {}
+        shipment_line_totals = self._count_grouped_rows_by_ids(
+            client,
+            "shipitem",
+            "shipId",
+            "shipId",
+            list(shipment_map.keys()),
+            batch_size=shipment_line_batch_size,
+        )
         shipment_line_success: dict[int, int] = {}
-        for row in shipment_item_rows:
-            ship_id = row.shipId
-            if ship_id is None:
-                continue
-            shipment_line_totals[ship_id] = shipment_line_totals.get(ship_id, 0) + 1
-        for start_index in range(0, len(shipment_item_rows), shipment_line_batch_size):
-            batch_rows = shipment_item_rows[start_index : start_index + shipment_line_batch_size]
+        for batch_rows in self._stream_rows_by_ids(
+            client,
+            "shipitem",
+            "shipId",
+            list(shipment_map.keys()),
+            select_columns="id, shipId, soItemId, xoItemId, itemId, qtyShipped, uomId",
+            batch_size=shipment_line_batch_size,
+            row_parser=fishbowl_rows.SHIPMENT_LINE_ROWS_ADAPTER.validate_python,
+        ):
+            missing_sales_line_ids = {
+                row.soItemId
+                for row in batch_rows
+                if row.soItemId is not None and row.soItemId not in order_maps["sales_line"]
+            }
+            sales_line_external_map: dict[int, int] = {}
+            if missing_sales_line_ids:
+                external_id_records = (
+                    self.env["external.id"]
+                    .sudo()
+                    .search(
+                        [
+                            ("system_id", "=", fishbowl_system.id),
+                            ("resource", "=", RESOURCE_SALES_ORDER_LINE),
+                            ("res_model", "=", "sale.order.line"),
+                            ("active", "=", True),
+                            ("external_id", "in", [str(value) for value in missing_sales_line_ids]),
+                        ]
+                    )
+                )
+                for record in external_id_records:
+                    try:
+                        sales_line_external_map[int(record.external_id)] = record.res_id
+                    except (TypeError, ValueError):
+                        _logger.warning("Invalid Fishbowl sales line external id '%s'", record.external_id)
+            transfer_order_product_map = self._load_transfer_order_product_map(
+                client,
+                batch_rows,
+                fishbowl_system.id,
+            )
+            shipment_part_ids = [
+                shipment_item_row.itemId
+                for shipment_item_row in batch_rows
+                if shipment_item_row.itemId is not None
+            ]
+            shipment_part_product_map = self._load_part_product_map(fishbowl_system.id, shipment_part_ids)
             (
                 existing_map,
                 stale_map,
@@ -313,7 +317,7 @@ class FishbowlImporterShipments(models.Model):
                 shipment_line_log_threshold += shipment_line_log_every
             self._commit_and_clear()
 
-        if shipment_item_rows:
+        if shipment_line_processed:
             shipment_elapsed = time.monotonic() - shipment_line_started_at
             _logger.info("Fishbowl import: shipment lines complete in %.2fs", shipment_elapsed)
 

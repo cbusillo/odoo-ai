@@ -6,8 +6,8 @@ from datetime import datetime
 from typing import Any, Protocol
 
 from odoo import api, fields, models
-from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.addons.transaction_utilities.models.cron_budget_mixin import CronRuntimeBudgetExceeded
+from odoo.exceptions import AccessError, UserError, ValidationError
 from psycopg2 import errors as psycopg2_errors
 from pydantic import TypeAdapter
 
@@ -783,6 +783,78 @@ class FishbowlImporter(models.Model):
         if row_parser:
             return FishbowlImporter._parse_rows(row_parser, results)
         return results
+
+    @staticmethod
+    def _stream_rows_by_ids(
+        client: FishbowlClient,
+        table: str,
+        id_column: str,
+        record_ids: list[int],
+        *,
+        select_columns: str | None = None,
+        batch_size: int = 500,
+        extra_where: str | None = None,
+        extra_params: list[Any] | None = None,
+        row_parser: RowParser | None = None,
+    ) -> Iterator[list[Any]]:
+        if not record_ids:
+            return
+        columns = select_columns or "*"
+        deduped_ids = sorted(set(record_ids))
+        for start_index in range(0, len(deduped_ids), batch_size):
+            batch_ids = deduped_ids[start_index : start_index + batch_size]
+            placeholders = ", ".join(["%s"] * len(batch_ids))
+            query = f"SELECT {columns} FROM {table} WHERE {id_column} IN ({placeholders})"
+            params: list[Any] = list(batch_ids)
+            if extra_where:
+                query = f"{query} AND {extra_where}"
+                if extra_params:
+                    params.extend(extra_params)
+            query = f"{query} ORDER BY id"
+            rows = client.fetch_all(query, params)
+            if not rows:
+                continue
+            if row_parser:
+                yield FishbowlImporter._parse_rows(row_parser, rows)
+                continue
+            yield rows
+
+    @staticmethod
+    def _count_grouped_rows_by_ids(
+        client: FishbowlClient,
+        table: str,
+        id_column: str,
+        group_column: str,
+        record_ids: list[int],
+        *,
+        batch_size: int = 500,
+        extra_where: str | None = None,
+        extra_params: list[Any] | None = None,
+    ) -> dict[int, int]:
+        if not record_ids:
+            return {}
+        grouped_counts: dict[int, int] = {}
+        deduped_ids = sorted(set(record_ids))
+        for start_index in range(0, len(deduped_ids), batch_size):
+            batch_ids = deduped_ids[start_index : start_index + batch_size]
+            placeholders = ", ".join(["%s"] * len(batch_ids))
+            query = (
+                f"SELECT {group_column} AS group_id, COUNT(*) AS total FROM {table} "
+                f"WHERE {id_column} IN ({placeholders})"
+            )
+            params: list[Any] = list(batch_ids)
+            if extra_where:
+                query = f"{query} AND {extra_where}"
+                if extra_params:
+                    params.extend(extra_params)
+            query = f"{query} GROUP BY {group_column}"
+            for row in client.fetch_all(query, params):
+                group_id = row.get("group_id")
+                total = row.get("total")
+                if not isinstance(group_id, int):
+                    continue
+                grouped_counts[group_id] = grouped_counts.get(group_id, 0) + int(total or 0)
+        return grouped_counts
 
     # noinspection DuplicatedCode
     def _resolve_product_from_sales_row(

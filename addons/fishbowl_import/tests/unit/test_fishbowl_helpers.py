@@ -10,6 +10,16 @@ from ..common_imports import common
 from ..fixtures.base import UnitTestCase
 
 
+class _FetchAllClientStub:
+    def __init__(self, responses: list[list[dict[str, object]]]) -> None:
+        self._responses = responses
+        self.calls: list[tuple[str, list[object] | None]] = []
+
+    def fetch_all(self, query: str, params: list[object] | None = None) -> list[dict[str, object]]:
+        self.calls.append((query, list(params) if params is not None else None))
+        return self._responses.pop(0)
+
+
 @common.tagged(*common.UNIT_TAGS)
 class TestFishbowlHelpers(UnitTestCase):
     def test_to_bool(self) -> None:
@@ -75,3 +85,50 @@ class TestFishbowlHelpers(UnitTestCase):
         product_id = importer_model._resolve_product_from_sales_row(row, product_maps)
 
         self.assertIsNone(product_id)
+
+    def test_stream_rows_by_ids_yields_parsed_batches(self) -> None:
+        importer_model = self.env["fishbowl.importer"]
+        client = _FetchAllClientStub(
+            [
+                [{"id": 10}, {"id": 11}],
+                [{"id": 12}],
+            ]
+        )
+
+        batches = list(
+            importer_model._stream_rows_by_ids(
+                client,
+                "shipitem",
+                "shipId",
+                [4, 2, 4, 1],
+                select_columns="id",
+                batch_size=2,
+                row_parser=fishbowl_rows.SHIPMENT_LINE_ROWS_ADAPTER.validate_python,
+            )
+        )
+
+        self.assertEqual([[row.id for row in batch] for batch in batches], [[10, 11], [12]])
+        self.assertEqual(client.calls[0][1], [1, 2])
+        self.assertEqual(client.calls[1][1], [4])
+
+    def test_count_grouped_rows_by_ids_aggregates_batches(self) -> None:
+        importer_model = self.env["fishbowl.importer"]
+        client = _FetchAllClientStub(
+            [
+                [{"group_id": 1, "total": 2}, {"group_id": 2, "total": 3}],
+                [{"group_id": 3, "total": 4}],
+            ]
+        )
+
+        grouped_counts = importer_model._count_grouped_rows_by_ids(
+            client,
+            "shipitem",
+            "shipId",
+            "shipId",
+            [2, 1, 3, 2],
+            batch_size=2,
+        )
+
+        self.assertEqual(grouped_counts, {1: 2, 2: 3, 3: 4})
+        self.assertEqual(client.calls[0][1], [1, 2])
+        self.assertEqual(client.calls[1][1], [3])

@@ -534,6 +534,8 @@ class RepairshoprSyncClient:
                     base_parameters[0] = last_seen_updated_at
                     base_parameters[1] = last_seen_updated_at
                 base_parameters[2] = last_seen_id
+            else:
+                base_parameters[0] = last_seen_id
 
     def _fetch_contacts(self, customer_ids: Sequence[int]) -> dict[int, list[repairshopr_models.Contact]]:
         contacts_by_customer: dict[int, list[repairshopr_models.Contact]] = defaultdict(list)

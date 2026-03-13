@@ -109,6 +109,7 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
             ) as get_external_system_id_mock,
             mock.patch.object(shopify_roundtrip, "create_sync", side_effect=[101, 102]),
             mock.patch.object(shopify_roundtrip, "wait_for_sync", side_effect=[{"id": 101}, {"id": 102}]),
+            mock.patch.object(shopify_roundtrip, "wait_for_related_syncs_to_quiet"),
             mock.patch.object(
                 shopify_roundtrip,
                 "_run_roundtrip_for_product",
@@ -125,6 +126,54 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
             product_id=77,
             original_title="Example",
             shopify_product_id="new-product-id",
+        )
+
+    def test_run_roundtrip_waits_for_prepare_related_syncs_to_quiet(self) -> None:
+        fake_settings = mock.sentinel.settings
+        fake_client = mock.sentinel.client
+
+        with (
+            mock.patch.object(shopify_roundtrip, "RemoteOdooClient", return_value=fake_client),
+            mock.patch.object(shopify_roundtrip, "_select_roundtrip_product", return_value=(77, "Example", "old-product-id")),
+            mock.patch.object(shopify_roundtrip, "_current_utc_timestamp", return_value="2026-03-13 15:50:18"),
+            mock.patch.object(shopify_roundtrip, "create_sync", side_effect=[101, 102]),
+            mock.patch.object(shopify_roundtrip, "wait_for_sync", side_effect=[{"id": 101}, {"id": 102}]),
+            mock.patch.object(shopify_roundtrip, "get_external_system_id", return_value="new-product-id"),
+            mock.patch.object(shopify_roundtrip, "wait_for_related_syncs_to_quiet") as wait_for_related_syncs_to_quiet_mock,
+            mock.patch.object(shopify_roundtrip, "_run_roundtrip_for_product", return_value={"shopify_product_id": "new-product-id"}),
+        ):
+            results = shopify_roundtrip.run_roundtrip(fake_settings, start_after_export=False)
+
+        self.assertEqual(results["start_mode"], "full")
+        wait_for_related_syncs_to_quiet_mock.assert_called_once_with(
+            fake_client,
+            since_timestamp="2026-03-13 15:50:18",
+            modes=shopify_roundtrip.PREPARE_SYNC_MODES,
+            label="post prepare settle",
+        )
+
+    def test_run_roundtrip_resume_mode_skips_prepare_and_marks_start_mode(self) -> None:
+        fake_settings = mock.sentinel.settings
+        fake_client = mock.sentinel.client
+
+        with (
+            mock.patch.object(shopify_roundtrip, "RemoteOdooClient", return_value=fake_client),
+            mock.patch.object(shopify_roundtrip, "_select_roundtrip_product", return_value=(77, "Example", "product-id")),
+            mock.patch.object(
+                shopify_roundtrip,
+                "_run_roundtrip_for_product",
+                return_value={"shopify_product_id": "product-id"},
+            ) as run_roundtrip_for_product_mock,
+        ):
+            results = shopify_roundtrip.run_roundtrip(fake_settings, start_after_export=True)
+
+        self.assertEqual(results["start_mode"], "after_export")
+        run_roundtrip_for_product_mock.assert_called_once_with(
+            fake_client,
+            fake_settings,
+            product_id=77,
+            original_title="Example",
+            shopify_product_id="product-id",
         )
 
 

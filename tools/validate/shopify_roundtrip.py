@@ -6,6 +6,7 @@ import time
 import urllib.request
 import xmlrpc.client
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 import click
@@ -17,8 +18,12 @@ POLL_SECONDS = 5
 SYNC_TIMEOUT_SECONDS = 8 * 60 * 60
 TITLE_TIMEOUT_SECONDS = 180
 SYNC_SEARCH_CUTOFF_SECONDS = 300
+SYNC_SETTLE_TIMEOUT_SECONDS = 300
+SYNC_SETTLE_QUIET_SECONDS = 15
 DEFAULT_REMOTE_LOGIN = "gpt-admin"
 SUPPORTED_REMOTE_INSTANCES = ("dev", "testing", "prod")
+PREPARE_SYNC_MODES = ("reset_shopify", "export_all_products", "import_then_export_products", "export_changed_products", "export_batch_products")
+ROUNDTRIP_SYNC_MODES = ("import_then_export_products", "export_changed_products", "import_one_product", "export_batch_products")
 
 
 @dataclass(frozen=True)
@@ -212,6 +217,16 @@ def _fallback_sync_window_start() -> str:
     )
 
 
+def _current_utc_timestamp() -> str:
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+
+
+def _parse_odoo_utc_timestamp(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    return datetime.strptime(value, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
+
+
 def create_sync(client: RemoteOdooClient, mode: str, extra_values: dict[str, object] | None = None) -> int:
     values: dict[str, object] = {"mode": mode}
     if extra_values:
@@ -280,6 +295,72 @@ def wait_for_sync(client: RemoteOdooClient, sync_id: int, label: str) -> dict[st
     raise RuntimeError(f"Timed out waiting for remote sync {sync_id} during {label}")
 
 
+def wait_for_related_syncs_to_quiet(
+    client: RemoteOdooClient,
+    *,
+    since_timestamp: str,
+    modes: tuple[str, ...],
+    label: str,
+) -> list[dict[str, object]]:
+    deadline = time.time() + SYNC_SETTLE_TIMEOUT_SECONDS
+    since_datetime = _parse_odoo_utc_timestamp(since_timestamp)
+    if since_datetime is None:
+        raise RuntimeError(f"Invalid settle timestamp for {label}: {since_timestamp!r}")
+
+    while time.time() < deadline:
+        result = client.execute(
+            "shopify.sync",
+            "search_read",
+            [[["create_date", ">=", since_timestamp], ["mode", "in", list(modes)]]],
+            {
+                "fields": ["id", "mode", "state", "create_date", "write_date", "error_message"],
+                "limit": 50,
+                "order": "id asc",
+            },
+        )
+        if not isinstance(result, list):
+            raise RuntimeError(f"Unexpected sync payload while waiting for settle during {label}: {result!r}")
+
+        sync_rows = [row for row in result if isinstance(row, dict)]
+        active_rows = [row for row in sync_rows if str(row.get("state") or "") in {"queued", "running"}]
+
+        latest_activity = since_datetime
+        for row in sync_rows:
+            for field_name in ("write_date", "create_date"):
+                parsed_value = _parse_odoo_utc_timestamp(row.get(field_name))
+                if parsed_value and parsed_value > latest_activity:
+                    latest_activity = parsed_value
+
+        quiet_seconds = (datetime.now(tz=UTC) - latest_activity).total_seconds()
+        print(
+            json.dumps(
+                {
+                    "label": label,
+                    "active_sync_count": len(active_rows),
+                    "recent_sync_count": len(sync_rows),
+                    "quiet_seconds": round(quiet_seconds, 1),
+                },
+                sort_keys=True,
+            ),
+            flush=True,
+        )
+
+        if active_rows:
+            time.sleep(POLL_SECONDS)
+            continue
+
+        if quiet_seconds < SYNC_SETTLE_QUIET_SECONDS:
+            time.sleep(POLL_SECONDS)
+            continue
+
+        failed_rows = [row for row in sync_rows if str(row.get("state") or "") in {"failed", "canceled"}]
+        if failed_rows:
+            raise RuntimeError(f"Related Shopify syncs failed during {label}: {failed_rows[-1]}")
+        return sync_rows
+
+    raise RuntimeError(f"Timed out waiting for related Shopify syncs to quiet during {label}")
+
+
 def wait_for_shopify_title(settings: RemoteShopifySettings, shopify_product_id: str, expected_title: str, label: str) -> None:
     deadline = time.time() + TITLE_TIMEOUT_SECONDS
     while time.time() < deadline:
@@ -310,6 +391,7 @@ def _run_roundtrip_for_product(
     original_title: str,
     shopify_product_id: str,
 ) -> dict[str, object]:
+    odoo_to_shopify_marker = _current_utc_timestamp()
     timestamp = int(time.time())
     odoo_title = f"{original_title} [Odoo RPC {timestamp}]"
     shopify_title = f"{original_title} [Shopify RPC {timestamp}]"
@@ -318,16 +400,36 @@ def _run_roundtrip_for_product(
     export_changed_sync_id = create_sync(client, "export_changed_products")
     export_changed_sync = wait_for_sync(client, export_changed_sync_id, "remote export_changed_products")
     wait_for_shopify_title(settings, shopify_product_id, odoo_title, "odoo-to-shopify")
+    wait_for_related_syncs_to_quiet(
+        client,
+        since_timestamp=odoo_to_shopify_marker,
+        modes=ROUNDTRIP_SYNC_MODES,
+        label="post odoo-to-shopify settle",
+    )
 
+    shopify_to_odoo_marker = _current_utc_timestamp()
     set_shopify_title(settings, shopify_product_id, shopify_title)
     import_sync_id = create_sync(client, "import_one_product", {"shopify_product_id_to_sync": shopify_product_id})
     import_sync = wait_for_sync(client, import_sync_id, "remote import_one_product")
     wait_for_odoo_title(client, product_id, shopify_title, "shopify-to-odoo")
+    wait_for_related_syncs_to_quiet(
+        client,
+        since_timestamp=shopify_to_odoo_marker,
+        modes=ROUNDTRIP_SYNC_MODES,
+        label="post shopify-to-odoo settle",
+    )
 
+    restore_marker = _current_utc_timestamp()
     client.execute("product.product", "write", [[product_id], {"name": original_title}])
     restore_sync_id = create_sync(client, "export_changed_products")
     restore_sync = wait_for_sync(client, restore_sync_id, "remote restore original title")
     wait_for_shopify_title(settings, shopify_product_id, original_title, "restore original title")
+    wait_for_related_syncs_to_quiet(
+        client,
+        since_timestamp=restore_marker,
+        modes=ROUNDTRIP_SYNC_MODES,
+        label="post restore settle",
+    )
 
     return {
         "candidate_product_id": product_id,
@@ -368,10 +470,17 @@ def run_roundtrip(settings: RemoteShopifySettings, *, start_after_export: bool =
 
     product_id, original_title, shopify_product_id = _select_roundtrip_product(client)
 
+    prepare_marker = _current_utc_timestamp()
     reset_sync_id = create_sync(client, "reset_shopify")
     reset_sync = wait_for_sync(client, reset_sync_id, "remote reset_shopify")
     export_sync_id = create_sync(client, "export_all_products")
     export_sync = wait_for_sync(client, export_sync_id, "remote export_all_products")
+    wait_for_related_syncs_to_quiet(
+        client,
+        since_timestamp=prepare_marker,
+        modes=PREPARE_SYNC_MODES,
+        label="post prepare settle",
+    )
     updated_shopify_product_id = get_external_system_id(client, product_id, "product")
     if updated_shopify_product_id:
         shopify_product_id = updated_shopify_product_id

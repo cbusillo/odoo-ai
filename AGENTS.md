@@ -146,8 +146,11 @@ the linked docs, then keep prompts lean.
 - Addons live directly in this repo under `./addons/` (no submodules). If an
   addon needs to be shared externally, mirror or export it from this repo
   instead of embedding a submodule.
-- Compose already maps host `./addons` to `/volumes/addons`; no extra container
-  wiring required.
+- Local compose bind-mounts `./addons` to `/volumes/addons`, so running
+  containers see the checkout they were started from. Prefer a separate
+  worktree for isolated edits, then bring ready commits/patches back to the
+  main checkout for stack-backed validation; worktrees usually do not carry the
+  operator's local secrets/env files by default.
 
 ## Research & Citations
 

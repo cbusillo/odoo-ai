@@ -148,9 +148,12 @@ the linked docs, then keep prompts lean.
   instead of embedding a submodule.
 - Local compose bind-mounts `./addons` to `/volumes/addons`, so running
   containers see the checkout they were started from. Prefer a separate
-  worktree for isolated edits, then bring ready commits/patches back to the
-  main checkout for stack-backed validation; worktrees usually do not carry the
-  operator's local secrets/env files by default.
+  worktree for isolated edits and commits, then bring ready commits/patches
+  back to the main checkout for Docker-backed or local-stack validation.
+  Worktrees usually do not carry the operator's local `.env`, generated
+  `.platform/env/...` files, or local compose overrides by default. Only run a
+  stack directly from a worktree when you intentionally provision that runtime
+  as a separate parallel environment.
 
 ## Research & Citations
 

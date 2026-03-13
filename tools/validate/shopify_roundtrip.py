@@ -16,6 +16,8 @@ from tools.platform import dokploy as platform_dokploy
 from tools.platform.environment import discover_repo_root, load_dokploy_source_of_truth, load_environment
 
 POLL_SECONDS = 5
+CRON_PAUSE_RETRY_SECONDS = 5
+CRON_PAUSE_RETRY_ATTEMPTS = 12
 SYNC_TIMEOUT_SECONDS = 8 * 60 * 60
 TITLE_TIMEOUT_SECONDS = 180
 FIELD_TIMEOUT_SECONDS = 180
@@ -166,7 +168,29 @@ def set_dispatcher_cron_active(client: RemoteOdooClient, *, active: bool, label:
     if not isinstance(cron_id, int):
         raise RuntimeError(f"Unexpected dispatcher cron payload: {cron_row!r}")
     if bool(cron_row.get("active")) != active:
-        client.execute("ir.cron", "write", [[cron_id], {"active": active}])
+        for attempt in range(CRON_PAUSE_RETRY_ATTEMPTS):
+            try:
+                client.execute("ir.cron", "write", [[cron_id], {"active": active}])
+                break
+            except xmlrpc.client.Fault as error:
+                error_text = str(error.faultString or error)
+                cron_is_busy = "currently being executed" in error_text
+                last_attempt = attempt == CRON_PAUSE_RETRY_ATTEMPTS - 1
+                if not cron_is_busy or last_attempt:
+                    raise
+                print(
+                    json.dumps(
+                        {
+                            "label": label,
+                            "retry_reason": "dispatcher cron busy",
+                            "attempt": attempt + 1,
+                            "retry_in_seconds": CRON_PAUSE_RETRY_SECONDS,
+                        },
+                        sort_keys=True,
+                    ),
+                    flush=True,
+                )
+                time.sleep(CRON_PAUSE_RETRY_SECONDS)
         cron_row = read_dispatcher_cron(client)
     print(json.dumps({"label": label, "dispatcher_cron": cron_row}, sort_keys=True), flush=True)
     return cron_row
@@ -216,6 +240,14 @@ def _build_operator_summary(
     runtime_state: dict[str, object],
     sample_size: int,
 ) -> dict[str, object]:
+    def _sync_id(key: str) -> int | None:
+        value = results.get(key)
+        if isinstance(value, dict):
+            sync_id = value.get("id")
+            if isinstance(sync_id, int):
+                return sync_id
+        return None
+
     checks_completed = [
         "prepare reset/export",
         "odoo_to_shopify title/description/metafield",
@@ -237,6 +269,11 @@ def _build_operator_summary(
         "shopify_product_id": results.get("shopify_product_id"),
         "export_sample_count": export_sample_count,
         "prepare_sync_mode": results.get("prepare_sync_mode"),
+        "reset_sync_id": _sync_id("reset_sync"),
+        "prepare_sync_id": _sync_id("export_all_sync"),
+        "odoo_to_shopify_sync_id": _sync_id("export_changed_sync"),
+        "shopify_to_odoo_sync_id": _sync_id("import_one_sync"),
+        "restore_sync_id": _sync_id("restore_sync"),
         "checks_completed": checks_completed,
         "post_validation_active_sync_count": active_sync_count,
     }
@@ -1233,7 +1270,7 @@ def run_roundtrip(
     )
     resumed_results["reset_sync"] = reset_sync
     resumed_results["export_all_sync"] = export_sync
-    resumed_results["start_mode"] = "full"
+    resumed_results["start_mode"] = "prepared"
     resumed_results["profile"] = profile
     resumed_results["prepare_sync_mode"] = prepare_sync_mode
     if profile == "smoke":

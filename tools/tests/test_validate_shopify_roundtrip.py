@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import unittest
+import xmlrpc.client
 from pathlib import Path
 from unittest import mock
 
@@ -248,6 +249,27 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
 
         self.assertTrue(was_active)
         client.execute.assert_called_once_with("ir.cron", "write", [[101], {"active": False}])
+
+    def test_pause_dispatcher_cron_retries_busy_cron_write(self) -> None:
+        client = mock.Mock()
+        client.execute.side_effect = [
+            xmlrpc.client.Fault(2, "Record cannot be modified right now: This cron task is currently being executed and may not be modified Please try again in a few minutes"),
+            None,
+        ]
+
+        with (
+            mock.patch.object(
+                shopify_roundtrip,
+                "read_dispatcher_cron",
+                side_effect=[{"id": 101, "active": True}, {"id": 101, "active": True}, {"id": 101, "active": False}],
+            ),
+            mock.patch.object(shopify_roundtrip.time, "sleep") as sleep_mock,
+        ):
+            was_active = shopify_roundtrip.pause_dispatcher_cron(client)
+
+        self.assertTrue(was_active)
+        self.assertEqual(client.execute.call_count, 2)
+        sleep_mock.assert_called_once_with(shopify_roundtrip.CRON_PAUSE_RETRY_SECONDS)
 
     def test_restore_dispatcher_cron_restores_original_state(self) -> None:
         client = mock.Mock()
@@ -601,7 +623,7 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
         ):
             results = shopify_roundtrip.run_roundtrip(fake_settings, profile="full", sample_size=shopify_roundtrip.DEFAULT_SAMPLE_SIZE, start_after_export=False)
 
-        self.assertEqual(results["start_mode"], "full")
+        self.assertEqual(results["start_mode"], "prepared")
         wait_for_related_syncs_to_quiet_mock.assert_called_once_with(
             fake_client,
             since_timestamp="2026-03-13 15:50:18",

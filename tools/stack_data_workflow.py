@@ -388,7 +388,7 @@ if [ "${{web_status}}" = "running" ]; then
 fi
 
 echo "Normalizing filestore ownership for ${{database_name}}"
-docker exec -u root \
+workflow_identity_key=$(docker exec -u root \
     -e ODOO_DATABASE_NAME="${{database_name}}" \
     -e ODOO_FILESTORE_ROOT="${{filestore_root}}" \
     -e DATA_WORKFLOW_SSH_DIR="${{DATA_WORKFLOW_SSH_DIR:-/root/.ssh}}" \
@@ -417,19 +417,27 @@ docker exec -u root \
         fi
 
         source_key_path="$DATA_WORKFLOW_SSH_KEY"
-        if [ -z "$source_key_path" ] && [ -f "$DATA_WORKFLOW_SSH_DIR/id_rsa" ]; then
-            source_key_path="$DATA_WORKFLOW_SSH_DIR/id_rsa"
+        if [ -z "$source_key_path" ]; then
+            for candidate_key in id_ed25519 id_ecdsa id_rsa id_dsa; do
+                if [ -f "$DATA_WORKFLOW_SSH_DIR/$candidate_key" ]; then
+                    source_key_path="$DATA_WORKFLOW_SSH_DIR/$candidate_key"
+                    break
+                fi
+            done
         fi
+        workflow_identity_key=""
         if [ -n "$source_key_path" ] && [ -f "$source_key_path" ]; then
+            workflow_identity_key="$WORKFLOW_SSH_DIR/$(basename "$source_key_path")"
             install -m 600 -o "$WORKFLOW_UID" -g "$WORKFLOW_GID" \
-                "$source_key_path" "$WORKFLOW_SSH_DIR/$(basename "$source_key_path")"
+                "$source_key_path" "$workflow_identity_key"
         fi
-    '
+        printf "%s" "$workflow_identity_key"
+    ')
 
 echo "Running platform data workflow in container ${{script_runner_container_id}}"
 docker exec \
     -e DATA_WORKFLOW_SSH_DIR="${{workflow_ssh_dir}}" \
-    -e DATA_WORKFLOW_SSH_KEY="${{workflow_ssh_dir}}/id_rsa" \
+    -e DATA_WORKFLOW_SSH_KEY="$workflow_identity_key" \
     "${{script_runner_container_id}}" \
     python3 -u {shlex.quote(DATA_WORKFLOW_SCRIPT)} "${{workflow_arguments[@]}}"
 

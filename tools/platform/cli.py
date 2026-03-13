@@ -1223,17 +1223,20 @@ def validate() -> None:
 )
 @click.option("--env-file", type=click.Path(path_type=Path), default=None)
 @click.option("--remote-login", default=validate_shopify_roundtrip.DEFAULT_REMOTE_LOGIN, show_default=True)
+@click.option("--start-after-export", is_flag=True, default=False)
 def validate_shopify_roundtrip_command(
     context_name: str,
     instance_name: str,
     env_file: Path | None,
     remote_login: str,
+    start_after_export: bool,
 ) -> None:
     results = validate_shopify_roundtrip.run_validation_command(
         context_name=context_name,
         instance_name=instance_name,
         env_file=env_file,
         remote_login=remote_login,
+        start_after_export=start_after_export,
         repository_root=_discover_repo_root(Path.cwd()),
     )
     click.echo(json.dumps(results, indent=2, sort_keys=True))

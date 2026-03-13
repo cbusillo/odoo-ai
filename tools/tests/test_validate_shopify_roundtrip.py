@@ -71,6 +71,62 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
         self.assertEqual(client.execute.call_args_list[0].args[0:2], ("shopify.sync", "create_and_run_async"))
         self.assertEqual(client.execute.call_args_list[1].args[0:2], ("shopify.sync", "search_read"))
 
+    def test_run_validation_command_forwards_start_after_export(self) -> None:
+        fake_settings = mock.sentinel.settings
+
+        with (
+            mock.patch.object(shopify_roundtrip, "load_settings", return_value=fake_settings) as load_settings_mock,
+            mock.patch.object(
+                shopify_roundtrip,
+                "run_roundtrip",
+                return_value={"start_mode": "after_export"},
+            ) as run_roundtrip_mock,
+        ):
+            results = shopify_roundtrip.run_validation_command(
+                context_name="opw",
+                instance_name="testing",
+                env_file=None,
+                remote_login="gpt-admin",
+                start_after_export=True,
+                repository_root=Path("/repo"),
+            )
+
+        self.assertEqual(results, {"start_mode": "after_export"})
+        load_settings_mock.assert_called_once()
+        run_roundtrip_mock.assert_called_once_with(fake_settings, start_after_export=True)
+
+    def test_run_roundtrip_rechecks_same_product_external_id_after_prepare(self) -> None:
+        fake_settings = mock.sentinel.settings
+        fake_client = mock.sentinel.client
+
+        with (
+            mock.patch.object(shopify_roundtrip, "RemoteOdooClient", return_value=fake_client),
+            mock.patch.object(shopify_roundtrip, "search_export_candidate", return_value={"id": 77, "name": "Example"}),
+            mock.patch.object(
+                shopify_roundtrip,
+                "get_external_system_id",
+                side_effect=["old-product-id", "new-product-id"],
+            ) as get_external_system_id_mock,
+            mock.patch.object(shopify_roundtrip, "create_sync", side_effect=[101, 102]),
+            mock.patch.object(shopify_roundtrip, "wait_for_sync", side_effect=[{"id": 101}, {"id": 102}]),
+            mock.patch.object(
+                shopify_roundtrip,
+                "_run_roundtrip_for_product",
+                return_value={"shopify_product_id": "new-product-id"},
+            ) as run_for_product_mock,
+        ):
+            results = shopify_roundtrip.run_roundtrip(fake_settings, start_after_export=False)
+
+        self.assertEqual(results["shopify_product_id"], "new-product-id")
+        self.assertEqual(get_external_system_id_mock.call_count, 2)
+        run_for_product_mock.assert_called_once_with(
+            fake_client,
+            fake_settings,
+            product_id=77,
+            original_title="Example",
+            shopify_product_id="new-product-id",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

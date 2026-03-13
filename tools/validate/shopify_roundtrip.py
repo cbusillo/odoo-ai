@@ -302,26 +302,14 @@ def wait_for_odoo_title(client: RemoteOdooClient, product_id: int, expected_titl
     raise RuntimeError(f"Timed out waiting for Odoo title during {label}")
 
 
-def run_roundtrip(settings: RemoteShopifySettings) -> dict[str, object]:
-    client = RemoteOdooClient(settings)
-    candidate = search_export_candidate(client)
-    product_id_value = candidate.get("id")
-    original_title_value = candidate.get("name")
-    if not isinstance(product_id_value, int):
-        raise RuntimeError(f"Unexpected candidate product id payload: {candidate!r}")
-    product_id = product_id_value
-    original_title = str(original_title_value or "")
-    shopify_product_id = get_external_system_id(client, product_id, "product")
-
-    reset_sync_id = create_sync(client, "reset_shopify")
-    reset_sync = wait_for_sync(client, reset_sync_id, "remote reset_shopify")
-    export_sync_id = create_sync(client, "export_all_products")
-    export_sync = wait_for_sync(client, export_sync_id, "remote export_all_products")
-
-    updated_shopify_product_id = get_external_system_id(client, product_id, "product")
-    if updated_shopify_product_id != shopify_product_id:
-        shopify_product_id = updated_shopify_product_id
-
+def _run_roundtrip_for_product(
+    client: RemoteOdooClient,
+    settings: RemoteShopifySettings,
+    *,
+    product_id: int,
+    original_title: str,
+    shopify_product_id: str,
+) -> dict[str, object]:
     timestamp = int(time.time())
     odoo_title = f"{original_title} [Odoo RPC {timestamp}]"
     shopify_title = f"{original_title} [Shopify RPC {timestamp}]"
@@ -345,13 +333,59 @@ def run_roundtrip(settings: RemoteShopifySettings) -> dict[str, object]:
         "candidate_product_id": product_id,
         "shopify_product_id": shopify_product_id,
         "original_title": original_title,
-        "reset_sync": reset_sync,
-        "export_all_sync": export_sync,
         "export_changed_sync": export_changed_sync,
         "import_one_sync": import_sync,
         "restore_sync": restore_sync,
         "remote_odoo_url": settings.odoo_url,
     }
+
+
+def _select_roundtrip_product(client: RemoteOdooClient) -> tuple[int, str, str]:
+    candidate = search_export_candidate(client)
+    product_id_value = candidate.get("id")
+    original_title_value = candidate.get("name")
+    if not isinstance(product_id_value, int):
+        raise RuntimeError(f"Unexpected candidate product id payload: {candidate!r}")
+    product_id = product_id_value
+    original_title = str(original_title_value or "")
+    shopify_product_id = get_external_system_id(client, product_id, "product")
+    return product_id, original_title, shopify_product_id
+
+
+def run_roundtrip(settings: RemoteShopifySettings, *, start_after_export: bool = False) -> dict[str, object]:
+    client = RemoteOdooClient(settings)
+    if start_after_export:
+        product_id, original_title, shopify_product_id = _select_roundtrip_product(client)
+        resumed_results = _run_roundtrip_for_product(
+            client,
+            settings,
+            product_id=product_id,
+            original_title=original_title,
+            shopify_product_id=shopify_product_id,
+        )
+        resumed_results["start_mode"] = "after_export"
+        return resumed_results
+
+    product_id, original_title, shopify_product_id = _select_roundtrip_product(client)
+
+    reset_sync_id = create_sync(client, "reset_shopify")
+    reset_sync = wait_for_sync(client, reset_sync_id, "remote reset_shopify")
+    export_sync_id = create_sync(client, "export_all_products")
+    export_sync = wait_for_sync(client, export_sync_id, "remote export_all_products")
+    updated_shopify_product_id = get_external_system_id(client, product_id, "product")
+    if updated_shopify_product_id:
+        shopify_product_id = updated_shopify_product_id
+    resumed_results = _run_roundtrip_for_product(
+        client,
+        settings,
+        product_id=product_id,
+        original_title=original_title,
+        shopify_product_id=shopify_product_id,
+    )
+    resumed_results["reset_sync"] = reset_sync
+    resumed_results["export_all_sync"] = export_sync
+    resumed_results["start_mode"] = "full"
+    return resumed_results
 
 
 def run_validation_command(
@@ -360,6 +394,7 @@ def run_validation_command(
     instance_name: str,
     env_file: Path | None,
     remote_login: str,
+    start_after_export: bool = False,
     repository_root: Path | None = None,
 ) -> dict[str, object]:
     effective_repository_root = repository_root or discover_repo_root(Path.cwd())
@@ -370,7 +405,7 @@ def run_validation_command(
         instance_name=instance_name,
         remote_login=remote_login,
     )
-    return run_roundtrip(settings)
+    return run_roundtrip(settings, start_after_export=start_after_export)
 
 
 @click.command()
@@ -384,12 +419,20 @@ def run_validation_command(
 )
 @click.option("--env-file", type=click.Path(path_type=Path), default=None)
 @click.option("--remote-login", default=DEFAULT_REMOTE_LOGIN, show_default=True)
-def main(context_name: str, instance_name: str, env_file: Path | None, remote_login: str) -> None:
+@click.option("--start-after-export", is_flag=True, default=False)
+def main(
+    context_name: str,
+    instance_name: str,
+    env_file: Path | None,
+    remote_login: str,
+    start_after_export: bool,
+) -> None:
     results = run_validation_command(
         context_name=context_name,
         instance_name=instance_name,
         env_file=env_file,
         remote_login=remote_login,
+        start_after_export=start_after_export,
     )
     print(json.dumps(results, indent=2, sort_keys=True))
 

@@ -31,7 +31,15 @@ class PlatformValidateCliTests(unittest.TestCase):
             ):
                 result = runner.invoke(
                     platform_cli_command,
-                    ["validate", "shopify-roundtrip", "--context", "opw", "--instance", "testing"],
+                    [
+                        "validate",
+                        "shopify-roundtrip",
+                        "--context",
+                        "opw",
+                        "--instance",
+                        "testing",
+                        "--start-after-export",
+                    ],
                 )
 
         self.assertEqual(result.exit_code, 0, msg=result.output)
@@ -41,6 +49,7 @@ class PlatformValidateCliTests(unittest.TestCase):
             instance_name="testing",
             env_file=None,
             remote_login="gpt-admin",
+            start_after_export=True,
             repository_root=repository_root,
         )
 

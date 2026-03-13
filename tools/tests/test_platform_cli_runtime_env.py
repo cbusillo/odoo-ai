@@ -210,7 +210,7 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
         )
         self.assertEqual(runtime_values.get("ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS"), "7200")
 
-    def test_runtime_env_defaults_remote_data_workflow_ssh_dir_to_ubuntu_ssh(self) -> None:
+    def test_runtime_env_defaults_remote_data_workflow_ssh_dir_to_root_ssh(self) -> None:
         remote_runtime_selection = replace(
             _sample_runtime_selection(),
             instance_name="testing",
@@ -221,7 +221,7 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
             runtime_selection=remote_runtime_selection,
         )
 
-        self.assertEqual(runtime_values.get("DATA_WORKFLOW_SSH_DIR"), "/home/ubuntu/.ssh")
+        self.assertEqual(runtime_values.get("DATA_WORKFLOW_SSH_DIR"), "/root/.ssh")
 
     def test_runtime_env_adds_openupgrade_repo_when_enabled(self) -> None:
         runtime_values = self._build_runtime_values(

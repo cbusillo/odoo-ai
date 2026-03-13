@@ -178,6 +178,28 @@ class DataWorkflowAdminPolicyTests(unittest.TestCase):
             ],
         )
 
+    def test_build_ssh_command_prefers_non_root_mirrored_known_hosts_path(self) -> None:
+        workflow_runner = odoo_data_workflow.OdooDataWorkflowRunner.__new__(odoo_data_workflow.OdooDataWorkflowRunner)
+        workflow_runner.local = SimpleNamespace(
+            data_workflow_ssh_dir=Path("/root/.ssh"),
+            data_workflow_ssh_key=None,
+        )
+        workflow_runner._ssh_identity = None
+
+        with patch.object(odoo_data_workflow, "_path_exists_safely", side_effect=lambda path: str(path) == "/home/ubuntu/.ssh/known_hosts"):
+            ssh_command = workflow_runner._build_ssh_command()
+
+        self.assertEqual(
+            ssh_command,
+            [
+                "ssh",
+                "-o",
+                "StrictHostKeyChecking=yes",
+                "-o",
+                "UserKnownHostsFile=/home/ubuntu/.ssh/known_hosts",
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

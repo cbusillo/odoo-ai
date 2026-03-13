@@ -286,7 +286,7 @@ def _build_runtime_env_values(
         "ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS": source_environment.get("ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS", "7200"),
         "DATA_WORKFLOW_SSH_DIR": source_environment.get(
             "DATA_WORKFLOW_SSH_DIR",
-            str(Path.home() / ".ssh") if runtime_selection.instance_name == "local" else "/home/ubuntu/.ssh",
+            str(Path.home() / ".ssh") if runtime_selection.instance_name == "local" else "/root/.ssh",
         ),
         "OPENUPGRADE_ENABLED": openupgrade_environment.get("OPENUPGRADE_ENABLED", "False"),
         "OPENUPGRADE_ADDON_REPOSITORY": openupgrade_environment.get("OPENUPGRADE_ADDON_REPOSITORY", ""),

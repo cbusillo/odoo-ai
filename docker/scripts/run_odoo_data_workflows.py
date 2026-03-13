@@ -263,6 +263,18 @@ def _path_exists_safely(candidate: Path) -> bool:
     return False
 
 
+def _dedupe_paths(candidates: Sequence[Path]) -> tuple[Path, ...]:
+    unique_candidates: list[Path] = []
+    seen_paths: set[str] = set()
+    for candidate in candidates:
+        normalized_candidate = str(candidate)
+        if normalized_candidate in seen_paths:
+            continue
+        seen_paths.add(normalized_candidate)
+        unique_candidates.append(candidate)
+    return tuple(unique_candidates)
+
+
 
 
 class LocalServerSettings(BaseSettings):
@@ -449,13 +461,8 @@ class OdooDataWorkflowRunner:
             return None
 
         base_path = Path(str(key))
-        candidates: list[Path] = [base_path]
-
-        env_dir = self.local.data_workflow_ssh_dir
-        if env_dir:
-            candidates.append(Path(env_dir) / base_path.name)
-
-        candidates.extend([Path("/root/.ssh") / base_path.name, Path("/home/ubuntu/.ssh") / base_path.name])
+        candidates = [base_path]
+        candidates.extend(self._container_ssh_dir_candidates(base_path.name))
 
         for candidate in candidates:
             expanded = Path(os.path.expanduser(os.path.expandvars(str(candidate))))
@@ -468,21 +475,33 @@ class OdooDataWorkflowRunner:
 
         return None
 
-    def _resolve_data_workflow_known_hosts_path(self) -> Path | None:
-        env_dir = self.local.data_workflow_ssh_dir
-        if env_dir:
-            return Path(os.path.expanduser(os.path.expandvars(str(Path(env_dir) / "known_hosts"))))
-
+    def _container_ssh_dir_candidates(self, leaf_name: str | None = None) -> tuple[Path, ...]:
         candidates: list[Path] = []
 
-        candidates.extend([Path("/home/ubuntu/.ssh/known_hosts"), Path("/root/.ssh/known_hosts")])
+        env_dir = self.local.data_workflow_ssh_dir
+        if env_dir:
+            expanded_env_dir = Path(os.path.expanduser(os.path.expandvars(str(env_dir))))
+            candidates.append(expanded_env_dir / leaf_name if leaf_name else expanded_env_dir)
+
+        # Compose mounts the same host SSH directory into both locations.
+        # Prefer the non-root path first so the workflow can read it safely.
+        mirrored_dirs = (Path("/home/ubuntu/.ssh"), Path("/root/.ssh"))
+        for mirrored_dir in mirrored_dirs:
+            candidates.append(mirrored_dir / leaf_name if leaf_name else mirrored_dir)
+
+        return _dedupe_paths(candidates)
+
+    def _resolve_data_workflow_known_hosts_path(self) -> Path | None:
+        candidates = self._container_ssh_dir_candidates("known_hosts")
 
         for candidate in candidates:
             expanded = Path(os.path.expanduser(os.path.expandvars(str(candidate))))
             if _path_exists_safely(expanded):
                 return expanded
 
-        return None
+        # Fall closed on the non-root path so SSH does not fall back to an
+        # inaccessible home directory under `/root`.
+        return Path("/home/ubuntu/.ssh/known_hosts")
 
     def _require_upstream(self) -> UpstreamServerSettings:
         if not self.upstream:

@@ -120,7 +120,7 @@ class FishbowlImporter(models.Model):
                             _logger.info("Fishbowl import: on-hand in %.2fs", time.monotonic() - phase_started_at)
                         else:
                             raise ValueError(f"Unsupported Fishbowl phase: {phase_name}")
-                        resume_state = self._advance_resume_state(phase_name)
+                        self._advance_resume_state(phase_name)
                     _logger.info("Fishbowl import: total in %.2fs", time.monotonic() - total_started_at)
                 break
             except psycopg2_errors.SerializationFailure as exc:
@@ -130,6 +130,7 @@ class FishbowlImporter(models.Model):
                 if attempt > max_retries:
                     _logger.exception("Fishbowl import failed after %s serialization retries", max_retries)
                     self._record_last_run("failed", str(exc))
+                    self._commit_runtime_state()
                     raise
                 sleep_for = retry_sleep * attempt
                 _logger.warning(
@@ -144,15 +145,20 @@ class FishbowlImporter(models.Model):
                 message = str(exception)
                 _logger.info(message)
                 self._record_last_run("partial", message)
+                self._commit_runtime_state()
                 return
             except Exception as exc:
+                self.env.cr.rollback()
+                self.env.clear()
                 _logger.exception("Fishbowl import failed")
                 self._record_last_run("failed", str(exc))
+                self._commit_runtime_state()
                 raise
         self._clear_resume_state()
         self._record_last_run("success", "")
         if update_last_sync and use_last_sync_at:
             self._set_last_sync_at(sync_started_at)
+        self._commit_runtime_state()
 
     def _run_setup_phases(
         self,
@@ -266,6 +272,11 @@ class FishbowlImporter(models.Model):
         self.env.cr.commit()
         self.env.clear()
         self._raise_if_cron_runtime_budget_exhausted(job_name="Fishbowl Import")
+
+    def _commit_runtime_state(self) -> None:
+        self.env.cr.execute("SET LOCAL synchronous_commit TO OFF")
+        self.env.cr.commit()
+        self.env.clear()
 
     def _get_external_id_record(
         self,

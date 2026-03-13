@@ -180,15 +180,20 @@ class CmDataImporter(models.Model):
             message = str(exception)
             _logger.info(message)
             self._record_last_run("partial", message)
+            self._commit_runtime_state()
             return
         except Exception as exc:
+            self.env.cr.rollback()
+            self.env.clear()
             _logger.exception("CM data import failed")
             self._record_last_run("failed", str(exc))
+            self._commit_runtime_state()
             raise
 
         self._record_last_run("success", "")
         if update_last_sync and use_last_sync_at:
             self._set_last_sync_at(sync_started_at)
+        self._commit_runtime_state()
 
     def _get_connection_settings(self) -> CmDataConnectionSettings:
         host = self._get_config_value(
@@ -2038,6 +2043,11 @@ class CmDataImporter(models.Model):
         parameter_model.set_param("cm_data.last_run_status", status)
         parameter_model.set_param("cm_data.last_run_message", message)
         parameter_model.set_param("cm_data.last_run_at", fields.Datetime.to_string(fields.Datetime.now()))
+
+    def _commit_runtime_state(self) -> None:
+        self.env.cr.execute("SET LOCAL synchronous_commit TO OFF")
+        self.env.cr.commit()
+        self.env.clear()
 
     def _get_config_value(
         self,

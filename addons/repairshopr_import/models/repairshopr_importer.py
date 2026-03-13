@@ -178,6 +178,7 @@ class RepairshoprImporter(models.Model):
                     if attempt > max_retries:
                         _logger.exception("RepairShopr import failed after %s serialization retries", max_retries)
                         self._record_last_run("failed", str(exc))
+                        self._commit_runtime_state()
                         raise
                     sleep_for = retry_sleep * attempt
                     _logger.warning(
@@ -192,12 +193,14 @@ class RepairshoprImporter(models.Model):
                     message = str(exception)
                     _logger.info(message)
                     self._record_last_run("partial", message)
+                    self._commit_runtime_state()
                     return
                 except Exception as exc:
                     self.env.cr.rollback()
                     self.env.clear()
                     _logger.exception("RepairShopr import failed")
                     self._record_last_run("failed", str(exc))
+                    self._commit_runtime_state()
                     raise
         finally:
             repairshopr_client.clear_cache()
@@ -206,6 +209,7 @@ class RepairshoprImporter(models.Model):
         self._record_last_run("success", "")
         if update_last_sync and use_last_sync_at:
             self._set_last_sync_at(sync_started_at)
+        self._commit_runtime_state()
 
     def _default_resume_state(self) -> dict[str, int | str | None]:
         return {
@@ -473,6 +477,11 @@ class RepairshoprImporter(models.Model):
         self.env.cr.commit()
         self.env.clear()
         self._raise_if_cron_runtime_budget_exhausted(job_name="RepairShopr Import")
+
+    def _commit_runtime_state(self) -> None:
+        self.env.cr.execute("SET LOCAL synchronous_commit TO OFF")
+        self.env.cr.commit()
+        self.env.clear()
 
     def _get_commit_interval(self) -> int:
         return self._get_config_int(

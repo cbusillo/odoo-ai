@@ -162,3 +162,41 @@ class TestFishbowlHelpers(UnitTestCase):
         self.assertEqual(existing_map, {})
         self.assertIn("123", stale_map)
         self.assertEqual(blocked_ids, set())
+
+    def test_upsert_external_id_payloads_reuses_inactive_record(self) -> None:
+        importer_model = self.env["fishbowl.importer"]
+        system = self.env["external.system"].ensure_system(
+            code=EXTERNAL_SYSTEM_CODE,
+            name="Fishbowl",
+            applicable_model_xml_ids=(),
+        )
+        partner = self.env["res.partner"].create({"name": "Reuse Mapping"})
+        external_id_record = self.env["external.id"].sudo().create(
+            {
+                "res_model": "sale.order.line",
+                "res_id": partner.id,
+                "system_id": system.id,
+                "resource": "salesorderitem",
+                "external_id": "456",
+                "active": False,
+            }
+        )
+
+        importer_model._upsert_external_id_payloads(
+            [
+                {
+                    "res_model": "sale.order.line",
+                    "res_id": partner.id + 1,
+                    "system_id": system.id,
+                    "resource": "salesorderitem",
+                    "external_id": "456",
+                    "active": True,
+                }
+            ],
+            expected_model="sale.order.line",
+        )
+
+        external_id_record.invalidate_recordset()
+        self.assertTrue(external_id_record.active)
+        self.assertEqual(external_id_record.res_model, "sale.order.line")
+        self.assertEqual(external_id_record.res_id, partner.id + 1)

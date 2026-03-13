@@ -233,6 +233,49 @@ class FishbowlImporter(models.Model):
             self.env["external.id"].sudo().create(external_id_payloads)
         return created_map
 
+    def _upsert_external_id_payloads(
+        self,
+        external_id_payloads: list["odoo.values.external_id"],
+        *,
+        expected_model: str,
+    ) -> None:
+        if not external_id_payloads:
+            return
+        external_id_model = self.env["external.id"].sudo().with_context(active_test=False)
+        external_id_values = [str(payload["external_id"]) for payload in external_id_payloads]
+        system_ids = sorted({int(payload["system_id"]) for payload in external_id_payloads})
+        resources = sorted({str(payload["resource"]) for payload in external_id_payloads})
+        existing_records = external_id_model.search(
+            [
+                ("system_id", "in", system_ids),
+                ("resource", "in", resources),
+                ("external_id", "in", external_id_values),
+            ]
+        )
+        existing_by_key = {
+            (int(record.system_id.id), str(record.resource), str(record.external_id)): record for record in existing_records
+        }
+        pending_payloads: list["odoo.values.external_id"] = []
+        for payload in external_id_payloads:
+            key = (int(payload["system_id"]), str(payload["resource"]), str(payload["external_id"]))
+            existing_record = existing_by_key.get(key)
+            if not existing_record:
+                pending_payloads.append(payload)
+                continue
+            if existing_record.res_model and existing_record.res_model != expected_model:
+                raise ValidationError(
+                    f"External ID '{payload['external_id']}' already belongs to {existing_record.res_model}"
+                )
+            existing_record.write(
+                {
+                    "res_model": expected_model,
+                    "res_id": payload["res_id"],
+                    "active": True,
+                }
+            )
+        if pending_payloads:
+            external_id_model.create(pending_payloads)
+
     @staticmethod
     def _init_stock_move_batch() -> tuple[
         list["odoo.values.stock_move"],

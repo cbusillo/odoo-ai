@@ -281,7 +281,7 @@ class FishbowlImporterOrders(models.Model):
                         }
                     )
                 if external_id_payloads:
-                    self.env["external.id"].sudo().create(external_id_payloads)
+                    self._upsert_external_id_payloads(external_id_payloads, expected_model="sale.order.line")
             if processed_external_ids:
                 self._mark_external_ids_synced(
                     fishbowl_system.id,
@@ -476,7 +476,7 @@ class FishbowlImporterOrders(models.Model):
                         }
                     )
                 if external_id_payloads:
-                    self.env["external.id"].sudo().create(external_id_payloads)
+                    self._upsert_external_id_payloads(external_id_payloads, expected_model="purchase.order.line")
             if processed_external_ids:
                 self._mark_external_ids_synced(
                     fishbowl_system.id,

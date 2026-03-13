@@ -1,5 +1,6 @@
 from ...models import fishbowl_rows
 from ...models.fishbowl_import_constants import (
+    EXTERNAL_SYSTEM_CODE,
     LEGACY_BUCKET_ADHOC,
     LEGACY_BUCKET_DISCOUNT,
     LEGACY_BUCKET_FEE,
@@ -132,3 +133,32 @@ class TestFishbowlHelpers(UnitTestCase):
         self.assertEqual(grouped_counts, {1: 2, 2: 3, 3: 4})
         self.assertEqual(client.calls[0][1], [1, 2])
         self.assertEqual(client.calls[1][1], [3])
+
+    def test_prefetch_external_id_records_full_includes_inactive_records(self) -> None:
+        importer_model = self.env["fishbowl.importer"]
+        system = self.env["external.system"].ensure_system(
+            code=EXTERNAL_SYSTEM_CODE,
+            name="Fishbowl",
+            applicable_model_xml_ids=(),
+        )
+        partner = self.env["res.partner"].create({"name": "Inactive Mapping"})
+        self.env["external.id"].sudo().create(
+            {
+                "res_model": "sale.order.line",
+                "res_id": partner.id,
+                "system_id": system.id,
+                "resource": "salesorderitem",
+                "external_id": "123",
+                "active": False,
+            }
+        )
+
+        existing_map, stale_map, blocked_ids = importer_model._prefetch_external_id_records_full(
+            system.id,
+            "salesorderitem",
+            "sale.order.line",
+        )
+
+        self.assertEqual(existing_map, {})
+        self.assertIn("123", stale_map)
+        self.assertEqual(blocked_ids, set())

@@ -187,7 +187,7 @@ class FishbowlImporter(models.Model):
         if not external_ids:
             return
         unique_ids = sorted(set(external_ids))
-        external_id_model = self.env["external.id"].sudo()
+        external_id_model = self.env["external.id"].sudo().with_context(active_test=False)
         records = external_id_model.search(
             [
                 ("system_id", "=", system_id),
@@ -556,7 +556,7 @@ class FishbowlImporter(models.Model):
 
     def _load_unit_map(self) -> dict[int, int]:
         unit_map: dict[int, int] = {}
-        external_id_model = self.env["external.id"].sudo()
+        external_id_model = self.env["external.id"].sudo().with_context(active_test=False)
         fishbowl_system = self._get_fishbowl_system()
         unit_records = external_id_model.search(
             [

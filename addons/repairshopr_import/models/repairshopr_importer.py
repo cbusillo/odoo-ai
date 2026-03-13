@@ -2,12 +2,14 @@ import json
 import logging
 import os
 import re
+import time
 from datetime import datetime, timedelta
 from typing import TypedDict, cast
 
 from odoo import api, fields, models
 from odoo.addons.transaction_utilities.models.cron_budget_mixin import CronRuntimeBudgetExceeded
 from odoo.exceptions import UserError
+from psycopg2 import errors as psycopg2_errors
 
 from ..services.repairshopr_sync_client import RepairshoprImportClient, RepairshoprSyncClient, RepairshoprSyncConnectionSettings
 
@@ -121,54 +123,79 @@ class RepairshoprImporter(models.Model):
         start_datetime = self._get_last_sync_at() if update_last_sync and use_last_sync_at else None
         transaction_start_datetime = self._apply_transaction_cutoff(start_datetime)
         repairshopr_client = cast(RepairshoprImportClient, cast(object, self._build_client()))
+        max_retries = int(os.environ.get("REPAIRSHOPR_IMPORT_SERIALIZATION_RETRIES", "3"))
+        retry_sleep = float(os.environ.get("REPAIRSHOPR_IMPORT_SERIALIZATION_SLEEP", "5"))
+        attempt = 0
         try:
-            system = self._get_repairshopr_system()
-            resume_state = self._get_resume_state()
-            for phase_name in self._phase_names_from_state(resume_state):
-                _logger.info("RepairShopr import: starting phase '%s'", phase_name)
-                self._set_resume_phase(phase_name)
-                if phase_name == REPAIRSHOPR_PHASE_CUSTOMERS:
-                    self._import_customers(repairshopr_client, start_datetime, system, sync_started_at)
-                elif phase_name == REPAIRSHOPR_PHASE_PRODUCTS:
-                    self._import_products(repairshopr_client, start_datetime, system, sync_started_at)
-                elif phase_name == REPAIRSHOPR_PHASE_TICKETS:
-                    self._import_tickets(
-                        repairshopr_client,
-                        transaction_start_datetime,
-                        system,
-                        sync_started_at,
-                        resume_after_id=resume_state.get("ticket_after_id"),
+            while True:
+                try:
+                    system = self._get_repairshopr_system()
+                    resume_state = self._get_resume_state()
+                    for phase_name in self._phase_names_from_state(resume_state):
+                        _logger.info("RepairShopr import: starting phase '%s'", phase_name)
+                        self._set_resume_phase(phase_name)
+                        if phase_name == REPAIRSHOPR_PHASE_CUSTOMERS:
+                            self._import_customers(repairshopr_client, start_datetime, system, sync_started_at)
+                        elif phase_name == REPAIRSHOPR_PHASE_PRODUCTS:
+                            self._import_products(repairshopr_client, start_datetime, system, sync_started_at)
+                        elif phase_name == REPAIRSHOPR_PHASE_TICKETS:
+                            self._import_tickets(
+                                repairshopr_client,
+                                transaction_start_datetime,
+                                system,
+                                sync_started_at,
+                                resume_after_id=resume_state.get("ticket_after_id"),
+                            )
+                        elif phase_name == REPAIRSHOPR_PHASE_ESTIMATES:
+                            self._import_estimates(
+                                repairshopr_client,
+                                transaction_start_datetime,
+                                system,
+                                sync_started_at,
+                                resume_after_id=resume_state.get("estimate_after_id"),
+                            )
+                        elif phase_name == REPAIRSHOPR_PHASE_INVOICES:
+                            self._import_invoices(
+                                repairshopr_client,
+                                transaction_start_datetime,
+                                system,
+                                sync_started_at,
+                                resume_after_id=resume_state.get("invoice_after_id"),
+                            )
+                        elif phase_name == REPAIRSHOPR_PHASE_TRANSPORT_BACKFILL:
+                            self._backfill_transport_order_devices()
+                        else:
+                            raise ValueError(f"Unsupported RepairShopr phase: {phase_name}")
+                        resume_state = self._advance_resume_state(phase_name)
+                    break
+                except psycopg2_errors.SerializationFailure as exc:
+                    attempt += 1
+                    self.env.cr.rollback()
+                    self.env.clear()
+                    if attempt > max_retries:
+                        _logger.exception("RepairShopr import failed after %s serialization retries", max_retries)
+                        self._record_last_run("failed", str(exc))
+                        raise
+                    sleep_for = retry_sleep * attempt
+                    _logger.warning(
+                        "RepairShopr import serialization failure; retrying %s/%s in %.1fs",
+                        attempt,
+                        max_retries,
+                        sleep_for,
                     )
-                elif phase_name == REPAIRSHOPR_PHASE_ESTIMATES:
-                    self._import_estimates(
-                        repairshopr_client,
-                        transaction_start_datetime,
-                        system,
-                        sync_started_at,
-                        resume_after_id=resume_state.get("estimate_after_id"),
-                    )
-                elif phase_name == REPAIRSHOPR_PHASE_INVOICES:
-                    self._import_invoices(
-                        repairshopr_client,
-                        transaction_start_datetime,
-                        system,
-                        sync_started_at,
-                        resume_after_id=resume_state.get("invoice_after_id"),
-                    )
-                elif phase_name == REPAIRSHOPR_PHASE_TRANSPORT_BACKFILL:
-                    self._backfill_transport_order_devices()
-                else:
-                    raise ValueError(f"Unsupported RepairShopr phase: {phase_name}")
-                resume_state = self._advance_resume_state(phase_name)
-        except CronRuntimeBudgetExceeded as exception:
-            message = str(exception)
-            _logger.info(message)
-            self._record_last_run("partial", message)
-            return
-        except Exception as exc:
-            _logger.exception("RepairShopr import failed")
-            self._record_last_run("failed", str(exc))
-            raise
+                    time.sleep(sleep_for)
+                    continue
+                except CronRuntimeBudgetExceeded as exception:
+                    message = str(exception)
+                    _logger.info(message)
+                    self._record_last_run("partial", message)
+                    return
+                except Exception as exc:
+                    self.env.cr.rollback()
+                    self.env.clear()
+                    _logger.exception("RepairShopr import failed")
+                    self._record_last_run("failed", str(exc))
+                    raise
         finally:
             repairshopr_client.clear_cache()
 

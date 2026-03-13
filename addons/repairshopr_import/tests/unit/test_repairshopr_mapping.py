@@ -37,9 +37,11 @@ class ProductImportClientStub:
         *,
         updated_at: datetime | None = None,
         after_id: int | None = None,
+        resume_after_updated_at: datetime | str | None = None,
     ) -> list[repairshopr_models.Product]:
         _ = updated_at
         _ = after_id
+        _ = resume_after_updated_at
         return self._products
 
 
@@ -53,9 +55,11 @@ class EstimateImportClientStub:
         *,
         updated_at: datetime | None = None,
         after_id: int | None = None,
+        resume_after_updated_at: datetime | str | None = None,
     ) -> list[repairshopr_models.Estimate]:
         _ = updated_at
         _ = after_id
+        _ = resume_after_updated_at
         return self._estimates
 
     @staticmethod

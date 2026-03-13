@@ -48,6 +48,7 @@ class RepairshoprImportClient(Protocol):
         *,
         updated_at: datetime | None = None,
         after_id: int | None = None,
+        resume_after_updated_at: datetime | str | None = None,
     ) -> Iterable[repairshopr_models.Customer]:
         ...
 
@@ -58,6 +59,7 @@ class RepairshoprImportClient(Protocol):
         *,
         updated_at: datetime | None = None,
         after_id: int | None = None,
+        resume_after_updated_at: datetime | str | None = None,
     ) -> Iterable[repairshopr_models.Product]:
         ...
 
@@ -68,6 +70,7 @@ class RepairshoprImportClient(Protocol):
         *,
         updated_at: datetime | None = None,
         after_id: int | None = None,
+        resume_after_updated_at: datetime | str | None = None,
     ) -> Iterable[repairshopr_models.Ticket]:
         ...
 
@@ -78,6 +81,7 @@ class RepairshoprImportClient(Protocol):
         *,
         updated_at: datetime | None = None,
         after_id: int | None = None,
+        resume_after_updated_at: datetime | str | None = None,
     ) -> Iterable[repairshopr_models.Estimate]:
         ...
 
@@ -88,10 +92,18 @@ class RepairshoprImportClient(Protocol):
         *,
         updated_at: datetime | None = None,
         after_id: int | None = None,
+        resume_after_updated_at: datetime | str | None = None,
     ) -> Iterable[repairshopr_models.Invoice]:
         ...
 
-    def get_model(self, model_type: type[object], *, updated_at: datetime | None = None, after_id: int | None = None) -> Iterable[object]:
+    def get_model(
+        self,
+        model_type: type[object],
+        *,
+        updated_at: datetime | None = None,
+        after_id: int | None = None,
+        resume_after_updated_at: datetime | str | None = None,
+    ) -> Iterable[object]:
         ...
 
     def fetch_line_items(
@@ -150,6 +162,7 @@ class RepairshoprSyncClient:
         *,
         updated_at: datetime | None = None,
         after_id: int | None = None,
+        resume_after_updated_at: datetime | str | None = None,
     ) -> Iterable[repairshopr_models.Customer]:
         ...
 
@@ -160,6 +173,7 @@ class RepairshoprSyncClient:
         *,
         updated_at: datetime | None = None,
         after_id: int | None = None,
+        resume_after_updated_at: datetime | str | None = None,
     ) -> Iterable[repairshopr_models.Product]:
         ...
 
@@ -170,6 +184,7 @@ class RepairshoprSyncClient:
         *,
         updated_at: datetime | None = None,
         after_id: int | None = None,
+        resume_after_updated_at: datetime | str | None = None,
     ) -> Iterable[repairshopr_models.Ticket]:
         ...
 
@@ -180,6 +195,7 @@ class RepairshoprSyncClient:
         *,
         updated_at: datetime | None = None,
         after_id: int | None = None,
+        resume_after_updated_at: datetime | str | None = None,
     ) -> Iterable[repairshopr_models.Estimate]:
         ...
 
@@ -190,20 +206,48 @@ class RepairshoprSyncClient:
         *,
         updated_at: datetime | None = None,
         after_id: int | None = None,
+        resume_after_updated_at: datetime | str | None = None,
     ) -> Iterable[repairshopr_models.Invoice]:
         ...
 
-    def get_model(self, model_type: type[object], *, updated_at: datetime | None = None, after_id: int | None = None) -> Iterable[object]:
+    def get_model(
+        self,
+        model_type: type[object],
+        *,
+        updated_at: datetime | None = None,
+        after_id: int | None = None,
+        resume_after_updated_at: datetime | str | None = None,
+    ) -> Iterable[object]:
         if model_type is repairshopr_models.Customer:
-            return self._iter_customers(updated_at, after_id=after_id)
+            return self._iter_customers(
+                updated_at,
+                after_id=after_id,
+                resume_after_updated_at=resume_after_updated_at,
+            )
         if model_type is repairshopr_models.Product:
-            return self._iter_products(updated_at, after_id=after_id)
+            return self._iter_products(
+                updated_at,
+                after_id=after_id,
+                resume_after_updated_at=resume_after_updated_at,
+            )
         if model_type is repairshopr_models.Ticket:
-            return self._iter_tickets(updated_at, after_id=after_id)
+            return self._iter_tickets(
+                updated_at,
+                after_id=after_id,
+                resume_after_updated_at=resume_after_updated_at,
+            )
         if model_type is repairshopr_models.Estimate:
-            return self._iter_estimates(updated_at, after_id=after_id)
+            return self._iter_estimates(
+                updated_at,
+                after_id=after_id,
+                resume_after_updated_at=resume_after_updated_at,
+            )
         if model_type is repairshopr_models.Invoice:
-            return self._iter_invoices(updated_at, after_id=after_id)
+            return self._iter_invoices(
+                updated_at,
+                after_id=after_id,
+                resume_after_updated_at=resume_after_updated_at,
+            )
         raise ValueError(f"Unsupported model type: {model_type}")
 
     def fetch_line_items(
@@ -238,7 +282,13 @@ class RepairshoprSyncClient:
             parent_id_values=invoice_id_values,
         )
 
-    def _iter_customers(self, updated_at: datetime | None, *, after_id: int | None = None) -> Iterator[repairshopr_models.Customer]:
+    def _iter_customers(
+        self,
+        updated_at: datetime | None,
+        *,
+        after_id: int | None = None,
+        resume_after_updated_at: datetime | str | None = None,
+    ) -> Iterator[repairshopr_models.Customer]:
         for rows in self._iter_batches(
             CUSTOMER_TABLE,
             [
@@ -264,6 +314,7 @@ class RepairshoprSyncClient:
             updated_column="updated_at",
             created_column="created_at",
             after_id=after_id,
+            resume_after_updated_at=resume_after_updated_at,
         ):
             customer_ids = [
                 customer_id
@@ -279,7 +330,13 @@ class RepairshoprSyncClient:
                     contacts = contacts_by_customer.get(customer_id, [])
                 yield self._build_customer(row, contacts)
 
-    def _iter_products(self, updated_at: datetime | None, *, after_id: int | None = None) -> Iterator[repairshopr_models.Product]:
+    def _iter_products(
+        self,
+        updated_at: datetime | None,
+        *,
+        after_id: int | None = None,
+        resume_after_updated_at: datetime | str | None = None,
+    ) -> Iterator[repairshopr_models.Product]:
         if updated_at is not None:
             _logger.info("RepairShopr product sync rows do not track updated_at; ignoring filter.")
         if after_id is not None:
@@ -302,11 +359,18 @@ class RepairshoprSyncClient:
             updated_column=None,
             created_column=None,
             after_id=None,
+            resume_after_updated_at=resume_after_updated_at,
         ):
             for row in rows:
                 yield self._build_product(row)
 
-    def _iter_tickets(self, updated_at: datetime | None, *, after_id: int | None = None) -> Iterator[repairshopr_models.Ticket]:
+    def _iter_tickets(
+        self,
+        updated_at: datetime | None,
+        *,
+        after_id: int | None = None,
+        resume_after_updated_at: datetime | str | None = None,
+    ) -> Iterator[repairshopr_models.Ticket]:
         updated_value = self._format_updated_at(updated_at, treat_as_text=True)
         for rows in self._iter_batches(
             TICKET_TABLE,
@@ -327,6 +391,7 @@ class RepairshoprSyncClient:
             updated_column="updated_at",
             created_column="created_at",
             after_id=after_id,
+            resume_after_updated_at=resume_after_updated_at,
         ):
             ticket_ids = [
                 ticket_id
@@ -351,7 +416,13 @@ class RepairshoprSyncClient:
                 yield self._build_ticket(row, properties, comments)
 
 
-    def _iter_estimates(self, updated_at: datetime | None, *, after_id: int | None = None) -> Iterator[repairshopr_models.Estimate]:
+    def _iter_estimates(
+        self,
+        updated_at: datetime | None,
+        *,
+        after_id: int | None = None,
+        resume_after_updated_at: datetime | str | None = None,
+    ) -> Iterator[repairshopr_models.Estimate]:
         for rows in self._iter_batches(
             ESTIMATE_TABLE,
             [
@@ -369,11 +440,18 @@ class RepairshoprSyncClient:
             updated_column="updated_at",
             created_column="created_at",
             after_id=after_id,
+            resume_after_updated_at=resume_after_updated_at,
         ):
             for row in rows:
                 yield self._build_estimate(row)
 
-    def _iter_invoices(self, updated_at: datetime | None, *, after_id: int | None = None) -> Iterator[repairshopr_models.Invoice]:
+    def _iter_invoices(
+        self,
+        updated_at: datetime | None,
+        *,
+        after_id: int | None = None,
+        resume_after_updated_at: datetime | str | None = None,
+    ) -> Iterator[repairshopr_models.Invoice]:
         for rows in self._iter_batches(
             INVOICE_TABLE,
             [
@@ -392,6 +470,7 @@ class RepairshoprSyncClient:
             updated_column="updated_at",
             created_column="created_at",
             after_id=after_id,
+            resume_after_updated_at=resume_after_updated_at,
         ):
             for row in rows:
                 yield self._build_invoice(row)
@@ -405,23 +484,37 @@ class RepairshoprSyncClient:
         updated_column: str | None,
         created_column: str | None,
         after_id: int | None,
+        resume_after_updated_at: datetime | str | None,
     ) -> Iterator[list[dict[str, object]]]:
         last_seen_id = after_id or 0
-        while True:
+        resume_token = resume_after_updated_at
+        if resume_after_updated_at is not None and updated_at is not None and updated_column:
+            if created_column:
+                resume_column = f"GREATEST({updated_column}, {created_column})"
+            else:
+                resume_column = updated_column
+            order_by_clause = f"{resume_column}, id"
+            where_fragments = [f"({resume_column} > %s OR ({resume_column} = %s AND id > %s))"]
+            base_parameters: list[object] = [resume_token, resume_token, last_seen_id]
+        else:
+            order_by_clause = "id"
             where_fragments = ["id > %s"]
-            parameters = [last_seen_id]
+            base_parameters = [last_seen_id]
+        while True:
+            where_fragments_for_query = list(where_fragments)
+            parameters = list(base_parameters)
             if updated_at is not None and updated_column:
                 if created_column:
-                    where_fragments.append(f"({updated_column} >= %s OR {created_column} >= %s)")
+                    where_fragments_for_query.append(f"({updated_column} >= %s OR {created_column} >= %s)")
                     parameters.extend([updated_at, updated_at])
                 else:
-                    where_fragments.append(f"{updated_column} >= %s")
+                    where_fragments_for_query.append(f"{updated_column} >= %s")
                     parameters.append(updated_at)
-            where_clause = " AND ".join(where_fragments)
+            where_clause = " AND ".join(where_fragments_for_query)
             column_clause = ", ".join(columns)
             query = (
                 f"SELECT {column_clause} FROM {table} "
-                f"WHERE {where_clause} ORDER BY id LIMIT %s"
+                f"WHERE {where_clause} ORDER BY {order_by_clause} LIMIT %s"
             )
             parameters.append(self._settings.batch_size)
             rows = self._fetch_rows(query, parameters)
@@ -429,6 +522,18 @@ class RepairshoprSyncClient:
                 break
             yield rows
             last_seen_id = rows[-1]["id"]
+            if resume_token is not None and updated_at is not None and updated_column:
+                last_seen_updated_at = rows[-1][updated_column]
+                if created_column:
+                    last_created_at = rows[-1][created_column]
+                    if last_seen_updated_at is None:
+                        last_seen_updated_at = last_created_at
+                    elif last_created_at is not None and last_created_at > last_seen_updated_at:
+                        last_seen_updated_at = last_created_at
+                if last_seen_updated_at is not None:
+                    base_parameters[0] = last_seen_updated_at
+                    base_parameters[1] = last_seen_updated_at
+                base_parameters[2] = last_seen_id
 
     def _fetch_contacts(self, customer_ids: Sequence[int]) -> dict[int, list[repairshopr_models.Contact]]:
         contacts_by_customer: dict[int, list[repairshopr_models.Contact]] = defaultdict(list)

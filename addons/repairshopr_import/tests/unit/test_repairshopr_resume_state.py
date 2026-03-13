@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from unittest.mock import patch
 
 from ...models.repairshopr_importer import (
@@ -48,8 +49,11 @@ class TestRepairshoprResumeState(UnitTestCase):
                 "version": REPAIRSHOPR_RESUME_STATE_VERSION,
                 "phase": REPAIRSHOPR_PHASE_TICKETS,
                 "ticket_after_id": 321,
+                "ticket_after_updated_at": "2026-01-01T12:00:00",
                 "estimate_after_id": 654,
+                "estimate_after_updated_at": "2026-01-02T08:00:00",
                 "invoice_after_id": 987,
+                "invoice_after_updated_at": None,
             }
         )
 
@@ -57,7 +61,9 @@ class TestRepairshoprResumeState(UnitTestCase):
 
         self.assertEqual(state["phase"], REPAIRSHOPR_PHASE_ESTIMATES)
         self.assertIsNone(state["ticket_after_id"])
+        self.assertIsNone(state["ticket_after_updated_at"])
         self.assertEqual(state["estimate_after_id"], 654)
+        self.assertEqual(state["estimate_after_updated_at"], "2026-01-02T08:00:00")
         self.assertEqual(state["invoice_after_id"], 987)
 
     def test_run_import_resumes_from_saved_phase(self) -> None:
@@ -66,8 +72,11 @@ class TestRepairshoprResumeState(UnitTestCase):
                 "version": REPAIRSHOPR_RESUME_STATE_VERSION,
                 "phase": REPAIRSHOPR_PHASE_ESTIMATES,
                 "ticket_after_id": 321,
+                "ticket_after_updated_at": "2026-01-01T12:00:00",
                 "estimate_after_id": 654,
+                "estimate_after_updated_at": "2026-01-02T08:00:00",
                 "invoice_after_id": 987,
+                "invoice_after_updated_at": None,
             }
         )
         importer_class = type(self.importer)
@@ -91,5 +100,23 @@ class TestRepairshoprResumeState(UnitTestCase):
         transport_backfill.assert_called_once()
 
         self.assertEqual(import_estimates.call_args.kwargs["resume_after_id"], 654)
+        self.assertEqual(import_estimates.call_args.kwargs["resume_after_updated_at"], "2026-01-02T08:00:00")
         self.assertEqual(import_invoices.call_args.kwargs["resume_after_id"], 987)
+        self.assertIsNone(import_invoices.call_args.kwargs["resume_after_updated_at"])
         self.assertFalse(self.parameter_model.get_param(REPAIRSHOPR_RESUME_STATE_PARAM))
+
+    def test_get_resume_marker_timestamp_uses_latest_created_or_updated_value(self) -> None:
+        resume_marker = self.importer._get_resume_marker_timestamp(
+            updated_at=datetime(2026, 1, 3, 9, 15, 0),
+            created_at=datetime(2026, 1, 3, 9, 20, 0),
+        )
+
+        self.assertEqual(resume_marker, "2026-01-03T09:20:00")
+
+    def test_get_resume_marker_timestamp_falls_back_to_created_value(self) -> None:
+        resume_marker = self.importer._get_resume_marker_timestamp(
+            updated_at=None,
+            created_at=datetime(2026, 1, 4, 7, 45, 0),
+        )
+
+        self.assertEqual(resume_marker, "2026-01-04T07:45:00")

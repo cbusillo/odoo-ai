@@ -145,6 +145,7 @@ class RepairshoprImporter(models.Model):
                                 system,
                                 sync_started_at,
                                 resume_after_id=resume_state.get("ticket_after_id"),
+                                resume_after_updated_at=resume_state.get("ticket_after_updated_at"),
                             )
                         elif phase_name == REPAIRSHOPR_PHASE_ESTIMATES:
                             self._import_estimates(
@@ -153,6 +154,7 @@ class RepairshoprImporter(models.Model):
                                 system,
                                 sync_started_at,
                                 resume_after_id=resume_state.get("estimate_after_id"),
+                                resume_after_updated_at=resume_state.get("estimate_after_updated_at"),
                             )
                         elif phase_name == REPAIRSHOPR_PHASE_INVOICES:
                             self._import_invoices(
@@ -161,6 +163,7 @@ class RepairshoprImporter(models.Model):
                                 system,
                                 sync_started_at,
                                 resume_after_id=resume_state.get("invoice_after_id"),
+                                resume_after_updated_at=resume_state.get("invoice_after_updated_at"),
                             )
                         elif phase_name == REPAIRSHOPR_PHASE_TRANSPORT_BACKFILL:
                             self._backfill_transport_order_devices()
@@ -168,7 +171,7 @@ class RepairshoprImporter(models.Model):
                             raise ValueError(f"Unsupported RepairShopr phase: {phase_name}")
                         resume_state = self._advance_resume_state(phase_name)
                     break
-                except psycopg2_errors.SerializationFailure as exc:
+                except (psycopg2_errors.SerializationFailure, psycopg2_errors.DeadlockDetected) as exc:
                     attempt += 1
                     self.env.cr.rollback()
                     self.env.clear()
@@ -209,8 +212,11 @@ class RepairshoprImporter(models.Model):
             "version": REPAIRSHOPR_RESUME_STATE_VERSION,
             "phase": REPAIRSHOPR_PHASE_CUSTOMERS,
             "ticket_after_id": None,
+            "ticket_after_updated_at": None,
             "estimate_after_id": None,
+            "estimate_after_updated_at": None,
             "invoice_after_id": None,
+            "invoice_after_updated_at": None,
         }
 
     def _get_resume_state(self) -> dict[str, int | str | None]:
@@ -239,8 +245,13 @@ class RepairshoprImporter(models.Model):
             {
                 "phase": phase_name,
                 "ticket_after_id": self._coerce_resume_cursor(loaded_state.get("ticket_after_id")),
+                "ticket_after_updated_at": self._coerce_resume_timestamp(loaded_state.get("ticket_after_updated_at")),
                 "estimate_after_id": self._coerce_resume_cursor(loaded_state.get("estimate_after_id")),
+                "estimate_after_updated_at": self._coerce_resume_timestamp(
+                    loaded_state.get("estimate_after_updated_at")
+                ),
                 "invoice_after_id": self._coerce_resume_cursor(loaded_state.get("invoice_after_id")),
+                "invoice_after_updated_at": self._coerce_resume_timestamp(loaded_state.get("invoice_after_updated_at")),
             }
         )
         return state
@@ -249,11 +260,61 @@ class RepairshoprImporter(models.Model):
     def _coerce_resume_cursor(value: object) -> int | None:
         if value in {None, False, ""}:
             return None
-        try:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            coerced_value = value
+        elif isinstance(value, float):
+            if not value.is_integer():
+                return None
             coerced_value = int(value)
-        except (TypeError, ValueError):
+        elif isinstance(value, str):
+            try:
+                coerced_value = int(value)
+            except ValueError:
+                return None
+        else:
             return None
         return coerced_value if coerced_value > 0 else None
+
+    @staticmethod
+    def _coerce_resume_timestamp(value: object) -> str | None:
+        if value in {None, False, ""}:
+            return None
+        if isinstance(value, datetime):
+            return value.replace(microsecond=0).isoformat()
+        if not isinstance(value, str):
+            return None
+        try:
+            coerced_value = datetime.fromisoformat(value)
+        except ValueError:
+            return None
+        return coerced_value.replace(microsecond=0).isoformat()
+
+    @staticmethod
+    def _serialize_resume_timestamp(value: datetime | str | None) -> str | None:
+        if value in {None, False, ""}:
+            return None
+        if isinstance(value, str):
+            try:
+                return datetime.fromisoformat(value).replace(microsecond=0).isoformat()
+            except ValueError:
+                return None
+        if isinstance(value, datetime):
+            return value.replace(microsecond=0).isoformat()
+        return None
+
+    @staticmethod
+    def _get_resume_marker_timestamp(
+        *,
+        updated_at: datetime | str | None,
+        created_at: datetime | str | None,
+    ) -> str | None:
+        updated_marker = RepairshoprImporter._serialize_resume_timestamp(updated_at)
+        created_marker = RepairshoprImporter._serialize_resume_timestamp(created_at)
+        if updated_marker and created_marker:
+            return max(updated_marker, created_marker)
+        return updated_marker or created_marker
 
     def _set_resume_state(self, state: dict[str, int | str | None]) -> None:
         self.env["ir.config_parameter"].sudo().set_param(REPAIRSHOPR_RESUME_STATE_PARAM, json.dumps(state, sort_keys=True))
@@ -266,25 +327,37 @@ class RepairshoprImporter(models.Model):
         state["phase"] = phase_name
         self._set_resume_state(state)
 
-    def _save_resume_progress(self, phase_name: str, last_processed_id: int) -> None:
+    def _save_resume_progress(
+        self,
+        phase_name: str,
+        last_processed_id: int,
+        *,
+        last_processed_updated_at: datetime | str | None = None,
+    ) -> None:
         state = self._get_resume_state()
         state["phase"] = phase_name
         if phase_name == REPAIRSHOPR_PHASE_TICKETS:
             state["ticket_after_id"] = last_processed_id
+            state["ticket_after_updated_at"] = self._serialize_resume_timestamp(last_processed_updated_at)
         elif phase_name == REPAIRSHOPR_PHASE_ESTIMATES:
             state["estimate_after_id"] = last_processed_id
+            state["estimate_after_updated_at"] = self._serialize_resume_timestamp(last_processed_updated_at)
         elif phase_name == REPAIRSHOPR_PHASE_INVOICES:
             state["invoice_after_id"] = last_processed_id
+            state["invoice_after_updated_at"] = self._serialize_resume_timestamp(last_processed_updated_at)
         self._set_resume_state(state)
 
     def _advance_resume_state(self, phase_name: str) -> dict[str, int | str | None]:
         state = self._get_resume_state()
         if phase_name == REPAIRSHOPR_PHASE_TICKETS:
             state["ticket_after_id"] = None
+            state["ticket_after_updated_at"] = None
         elif phase_name == REPAIRSHOPR_PHASE_ESTIMATES:
             state["estimate_after_id"] = None
+            state["estimate_after_updated_at"] = None
         elif phase_name == REPAIRSHOPR_PHASE_INVOICES:
             state["invoice_after_id"] = None
+            state["invoice_after_updated_at"] = None
         current_phase_index = REPAIRSHOPR_PHASE_SEQUENCE.index(phase_name)
         if current_phase_index + 1 >= len(REPAIRSHOPR_PHASE_SEQUENCE):
             self._clear_resume_state()

@@ -118,6 +118,7 @@ class RepairshoprImporter(models.Model):
         sync_started_at: datetime,
         *,
         resume_after_id: int | None = None,
+        resume_after_updated_at: str | None = None,
     ) -> None:
         commit_interval = self._get_commit_interval()
         processed_count = 0
@@ -131,6 +132,7 @@ class RepairshoprImporter(models.Model):
             repairshopr_models.Ticket,
             updated_at=start_datetime,
             after_id=resume_after_id,
+            resume_after_updated_at=resume_after_updated_at,
         )
         batch_size = max(commit_interval, 200)
         batch: list[repairshopr_models.Ticket] = []
@@ -308,7 +310,14 @@ class RepairshoprImporter(models.Model):
                 if should_commit():
                     flush_creates()
                     if resume_phase_name:
-                        self._save_resume_progress(resume_phase_name, ticket.id)
+                        self._save_resume_progress(
+                            resume_phase_name,
+                            ticket.id,
+                            last_processed_updated_at=self._get_resume_marker_timestamp(
+                                updated_at=ticket.updated_at,
+                                created_at=ticket.created_at,
+                            ),
+                        )
                     pending_commit = True
                 if pending_commit and self._maybe_commit(processed_count, commit_interval, label="ticket"):
                     ticket_model = self.env["helpdesk.ticket"].sudo().with_context(IMPORT_CONTEXT)
@@ -320,7 +329,14 @@ class RepairshoprImporter(models.Model):
             if should_commit():
                 flush_creates()
                 if resume_phase_name:
-                    self._save_resume_progress(resume_phase_name, ticket.id)
+                    self._save_resume_progress(
+                        resume_phase_name,
+                        ticket.id,
+                        last_processed_updated_at=self._get_resume_marker_timestamp(
+                            updated_at=ticket.updated_at,
+                            created_at=ticket.created_at,
+                        ),
+                    )
                 if self._maybe_commit(processed_count, commit_interval, label="ticket"):
                     ticket_model = self.env["helpdesk.ticket"].sudo().with_context(IMPORT_CONTEXT)
 

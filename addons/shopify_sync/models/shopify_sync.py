@@ -324,6 +324,10 @@ class ShopifySync(models.TransientModel):
             _logger.debug("Another sync is running; exiting dispatcher.")
             return
 
+        if self.env["ir.config_parameter"].sudo().get_param("shopify.pause_sync_autoschedule") == "1":
+            _logger.debug("Shopify autoschedule is paused; exiting dispatcher without creating health-check syncs.")
+            return
+
         now = fields.Datetime.now()
         cutoff = fields.Datetime.subtract(now, seconds=self.IMPORT_EXPORT_CRON_TIME)
 

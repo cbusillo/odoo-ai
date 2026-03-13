@@ -31,8 +31,15 @@ class ProductImportClientStub:
     def __init__(self, products: list[repairshopr_models.Product]) -> None:
         self._products = products
 
-    def get_model(self, _model: type[object], *, updated_at: datetime | None = None) -> list[repairshopr_models.Product]:
+    def get_model(
+        self,
+        _model: type[object],
+        *,
+        updated_at: datetime | None = None,
+        after_id: int | None = None,
+    ) -> list[repairshopr_models.Product]:
         _ = updated_at
+        _ = after_id
         return self._products
 
 
@@ -40,8 +47,15 @@ class EstimateImportClientStub:
     def __init__(self, estimates: list[repairshopr_models.Estimate]) -> None:
         self._estimates = estimates
 
-    def get_model(self, _model: type[object], *, updated_at: datetime | None = None) -> list[repairshopr_models.Estimate]:
+    def get_model(
+        self,
+        _model: type[object],
+        *,
+        updated_at: datetime | None = None,
+        after_id: int | None = None,
+    ) -> list[repairshopr_models.Estimate]:
         _ = updated_at
+        _ = after_id
         return self._estimates
 
     @staticmethod

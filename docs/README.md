@@ -51,6 +51,7 @@ Routing
 - Roles: [@docs/roles.md](roles.md)
 - Platform migration status: [@docs/todo/platform-migration-status.md](todo/platform-migration-status.md)
 - Odoo 19 OPW cutover: [@docs/todo/odoo-19-cutover-runbook.md](todo/odoo-19-cutover-runbook.md)
+- CM import baseline: [@docs/todo/cm-import-baseline.md](todo/cm-import-baseline.md)
 
 Notes
 

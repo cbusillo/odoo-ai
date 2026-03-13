@@ -1,9 +1,8 @@
-from datetime import datetime
 import re
-
-from psycopg2 import IntegrityError
+from datetime import datetime
 
 from odoo import models
+from psycopg2 import IntegrityError
 
 from ..services import repairshopr_sync_models as repairshopr_models
 from ..services.repairshopr_sync_client import RepairshoprImportClient
@@ -12,6 +11,7 @@ from .repairshopr_importer import (
     DEFAULT_HELPDESK_TEAM_NAME,
     EXTERNAL_SYSTEM_CODE,
     IMPORT_CONTEXT,
+    REPAIRSHOPR_PHASE_TICKETS,
     RESOURCE_TICKET,
 )
 
@@ -116,6 +116,8 @@ class RepairshoprImporter(models.Model):
         start_datetime: datetime | None,
         system: "odoo.model.external_system",
         sync_started_at: datetime,
+        *,
+        resume_after_id: int | None = None,
     ) -> None:
         commit_interval = self._get_commit_interval()
         processed_count = 0
@@ -125,7 +127,11 @@ class RepairshoprImporter(models.Model):
         tag_cache: dict[str, int] = {}
         partner_cache: dict[int, int] = {}
         billing_cache: dict[int, int | None] = {}
-        tickets = repairshopr_client.get_model(repairshopr_models.Ticket, updated_at=start_datetime)
+        tickets = repairshopr_client.get_model(
+            repairshopr_models.Ticket,
+            updated_at=start_datetime,
+            after_id=resume_after_id,
+        )
         batch_size = max(commit_interval, 200)
         batch: list[repairshopr_models.Ticket] = []
         for ticket in tickets:
@@ -141,6 +147,7 @@ class RepairshoprImporter(models.Model):
                     tag_cache,
                     partner_cache,
                     billing_cache,
+                    resume_phase_name=REPAIRSHOPR_PHASE_TICKETS,
                 )
                 batch = []
         if batch:
@@ -154,6 +161,7 @@ class RepairshoprImporter(models.Model):
                 tag_cache,
                 partner_cache,
                 billing_cache,
+                resume_phase_name=REPAIRSHOPR_PHASE_TICKETS,
             )
 
     # noinspection DuplicatedCode
@@ -169,6 +177,8 @@ class RepairshoprImporter(models.Model):
         tag_cache: dict[str, int],
         partner_cache: dict[int, int],
         billing_cache: dict[int, int | None],
+        *,
+        resume_phase_name: str | None = None,
     ) -> int:
         ticket_by_external_id: dict[str, repairshopr_models.Ticket] = {}
         for ticket in tickets:
@@ -297,6 +307,8 @@ class RepairshoprImporter(models.Model):
                 processed_count += 1
                 if should_commit():
                     flush_creates()
+                    if resume_phase_name:
+                        self._save_resume_progress(resume_phase_name, ticket.id)
                     pending_commit = True
                 if pending_commit and self._maybe_commit(processed_count, commit_interval, label="ticket"):
                     ticket_model = self.env["helpdesk.ticket"].sudo().with_context(IMPORT_CONTEXT)
@@ -307,6 +319,8 @@ class RepairshoprImporter(models.Model):
             processed_count += 1
             if should_commit():
                 flush_creates()
+                if resume_phase_name:
+                    self._save_resume_progress(resume_phase_name, ticket.id)
                 if self._maybe_commit(processed_count, commit_interval, label="ticket"):
                     ticket_model = self.env["helpdesk.ticket"].sudo().with_context(IMPORT_CONTEXT)
 

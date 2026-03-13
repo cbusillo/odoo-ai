@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -31,6 +32,22 @@ RESOURCE_INVOICE = "invoice"
 DEFAULT_HELPDESK_TEAM_NAME = "RepairShopr"
 DEFAULT_SERVICE_PRODUCT_CODE = "REPAIRSHOPR-SERVICE"
 REPAIRSHOPR_TRANSACTION_CUTOFF = datetime(2022, 1, 1)
+REPAIRSHOPR_RESUME_STATE_VERSION = 1
+REPAIRSHOPR_RESUME_STATE_PARAM = "repairshopr.resume_state"
+REPAIRSHOPR_PHASE_CUSTOMERS = "customers"
+REPAIRSHOPR_PHASE_PRODUCTS = "products"
+REPAIRSHOPR_PHASE_TICKETS = "tickets"
+REPAIRSHOPR_PHASE_ESTIMATES = "estimates"
+REPAIRSHOPR_PHASE_INVOICES = "invoices"
+REPAIRSHOPR_PHASE_TRANSPORT_BACKFILL = "transport_backfill"
+REPAIRSHOPR_PHASE_SEQUENCE = (
+    REPAIRSHOPR_PHASE_CUSTOMERS,
+    REPAIRSHOPR_PHASE_PRODUCTS,
+    REPAIRSHOPR_PHASE_TICKETS,
+    REPAIRSHOPR_PHASE_ESTIMATES,
+    REPAIRSHOPR_PHASE_INVOICES,
+    REPAIRSHOPR_PHASE_TRANSPORT_BACKFILL,
+)
 
 SERIAL_PATTERN = re.compile(
     r"\b(?:S\s*/?\s*N|SN|SERIAL(?:\s*(?:NO|NUMBER))?)\s*[:#\-]\s*(?P<serial>[A-Z0-9][A-Z0-9\- ]{4,25})\b",
@@ -106,12 +123,43 @@ class RepairshoprImporter(models.Model):
         repairshopr_client = cast(RepairshoprImportClient, cast(object, self._build_client()))
         try:
             system = self._get_repairshopr_system()
-            self._import_customers(repairshopr_client, start_datetime, system, sync_started_at)
-            self._import_products(repairshopr_client, start_datetime, system, sync_started_at)
-            self._import_tickets(repairshopr_client, transaction_start_datetime, system, sync_started_at)
-            self._import_estimates(repairshopr_client, transaction_start_datetime, system, sync_started_at)
-            self._import_invoices(repairshopr_client, transaction_start_datetime, system, sync_started_at)
-            self._backfill_transport_order_devices()
+            resume_state = self._get_resume_state()
+            for phase_name in self._phase_names_from_state(resume_state):
+                _logger.info("RepairShopr import: starting phase '%s'", phase_name)
+                self._set_resume_phase(phase_name)
+                if phase_name == REPAIRSHOPR_PHASE_CUSTOMERS:
+                    self._import_customers(repairshopr_client, start_datetime, system, sync_started_at)
+                elif phase_name == REPAIRSHOPR_PHASE_PRODUCTS:
+                    self._import_products(repairshopr_client, start_datetime, system, sync_started_at)
+                elif phase_name == REPAIRSHOPR_PHASE_TICKETS:
+                    self._import_tickets(
+                        repairshopr_client,
+                        transaction_start_datetime,
+                        system,
+                        sync_started_at,
+                        resume_after_id=resume_state.get("ticket_after_id"),
+                    )
+                elif phase_name == REPAIRSHOPR_PHASE_ESTIMATES:
+                    self._import_estimates(
+                        repairshopr_client,
+                        transaction_start_datetime,
+                        system,
+                        sync_started_at,
+                        resume_after_id=resume_state.get("estimate_after_id"),
+                    )
+                elif phase_name == REPAIRSHOPR_PHASE_INVOICES:
+                    self._import_invoices(
+                        repairshopr_client,
+                        transaction_start_datetime,
+                        system,
+                        sync_started_at,
+                        resume_after_id=resume_state.get("invoice_after_id"),
+                    )
+                elif phase_name == REPAIRSHOPR_PHASE_TRANSPORT_BACKFILL:
+                    self._backfill_transport_order_devices()
+                else:
+                    raise ValueError(f"Unsupported RepairShopr phase: {phase_name}")
+                resume_state = self._advance_resume_state(phase_name)
         except CronRuntimeBudgetExceeded as exception:
             message = str(exception)
             _logger.info(message)
@@ -124,9 +172,104 @@ class RepairshoprImporter(models.Model):
         finally:
             repairshopr_client.clear_cache()
 
+        self._clear_resume_state()
         self._record_last_run("success", "")
         if update_last_sync and use_last_sync_at:
             self._set_last_sync_at(sync_started_at)
+
+    def _default_resume_state(self) -> dict[str, int | str | None]:
+        return {
+            "version": REPAIRSHOPR_RESUME_STATE_VERSION,
+            "phase": REPAIRSHOPR_PHASE_CUSTOMERS,
+            "ticket_after_id": None,
+            "estimate_after_id": None,
+            "invoice_after_id": None,
+        }
+
+    def _get_resume_state(self) -> dict[str, int | str | None]:
+        parameter_model = self.env["ir.config_parameter"].sudo()
+        raw_state = parameter_model.get_param(REPAIRSHOPR_RESUME_STATE_PARAM)
+        default_state = self._default_resume_state()
+        if not raw_state:
+            return default_state
+        try:
+            loaded_state = json.loads(raw_state)
+        except json.JSONDecodeError:
+            self._clear_resume_state()
+            return default_state
+        if not isinstance(loaded_state, dict):
+            self._clear_resume_state()
+            return default_state
+        if loaded_state.get("version") != REPAIRSHOPR_RESUME_STATE_VERSION:
+            self._clear_resume_state()
+            return default_state
+        phase_name = loaded_state.get("phase")
+        if phase_name not in REPAIRSHOPR_PHASE_SEQUENCE:
+            self._clear_resume_state()
+            return default_state
+        state = dict(default_state)
+        state.update(
+            {
+                "phase": phase_name,
+                "ticket_after_id": self._coerce_resume_cursor(loaded_state.get("ticket_after_id")),
+                "estimate_after_id": self._coerce_resume_cursor(loaded_state.get("estimate_after_id")),
+                "invoice_after_id": self._coerce_resume_cursor(loaded_state.get("invoice_after_id")),
+            }
+        )
+        return state
+
+    @staticmethod
+    def _coerce_resume_cursor(value: object) -> int | None:
+        if value in {None, False, ""}:
+            return None
+        try:
+            coerced_value = int(value)
+        except (TypeError, ValueError):
+            return None
+        return coerced_value if coerced_value > 0 else None
+
+    def _set_resume_state(self, state: dict[str, int | str | None]) -> None:
+        self.env["ir.config_parameter"].sudo().set_param(REPAIRSHOPR_RESUME_STATE_PARAM, json.dumps(state, sort_keys=True))
+
+    def _clear_resume_state(self) -> None:
+        self.env["ir.config_parameter"].sudo().set_param(REPAIRSHOPR_RESUME_STATE_PARAM, "")
+
+    def _set_resume_phase(self, phase_name: str) -> None:
+        state = self._get_resume_state()
+        state["phase"] = phase_name
+        self._set_resume_state(state)
+
+    def _save_resume_progress(self, phase_name: str, last_processed_id: int) -> None:
+        state = self._get_resume_state()
+        state["phase"] = phase_name
+        if phase_name == REPAIRSHOPR_PHASE_TICKETS:
+            state["ticket_after_id"] = last_processed_id
+        elif phase_name == REPAIRSHOPR_PHASE_ESTIMATES:
+            state["estimate_after_id"] = last_processed_id
+        elif phase_name == REPAIRSHOPR_PHASE_INVOICES:
+            state["invoice_after_id"] = last_processed_id
+        self._set_resume_state(state)
+
+    def _advance_resume_state(self, phase_name: str) -> dict[str, int | str | None]:
+        state = self._get_resume_state()
+        if phase_name == REPAIRSHOPR_PHASE_TICKETS:
+            state["ticket_after_id"] = None
+        elif phase_name == REPAIRSHOPR_PHASE_ESTIMATES:
+            state["estimate_after_id"] = None
+        elif phase_name == REPAIRSHOPR_PHASE_INVOICES:
+            state["invoice_after_id"] = None
+        current_phase_index = REPAIRSHOPR_PHASE_SEQUENCE.index(phase_name)
+        if current_phase_index + 1 >= len(REPAIRSHOPR_PHASE_SEQUENCE):
+            self._clear_resume_state()
+            return self._default_resume_state()
+        state["phase"] = REPAIRSHOPR_PHASE_SEQUENCE[current_phase_index + 1]
+        self._set_resume_state(state)
+        return state
+
+    def _phase_names_from_state(self, state: dict[str, int | str | None]) -> tuple[str, ...]:
+        start_phase = cast(str, state.get("phase") or REPAIRSHOPR_PHASE_CUSTOMERS)
+        start_index = REPAIRSHOPR_PHASE_SEQUENCE.index(start_phase)
+        return REPAIRSHOPR_PHASE_SEQUENCE[start_index:]
 
     @staticmethod
     def _apply_transaction_cutoff(start_datetime: datetime | None) -> datetime:

@@ -20,6 +20,8 @@ from .repairshopr_importer import (
     IMEI_PATTERN,
     IMPORT_CONTEXT,
     PO_PATTERN,
+    REPAIRSHOPR_PHASE_ESTIMATES,
+    REPAIRSHOPR_PHASE_INVOICES,
     RESOURCE_ESTIMATE,
     RESOURCE_INVOICE,
     RESOURCE_TICKET,
@@ -639,12 +641,18 @@ class RepairshoprImporter(models.Model):
         start_datetime: datetime | None,
         system: "odoo.model.external_system",
         sync_started_at: datetime,
+        *,
+        resume_after_id: int | None = None,
     ) -> None:
         commit_interval = self._get_commit_interval()
         processed_count = 0
         partner_cache: dict[int, int] = {}
         billing_cache: dict[int, int | None] = {}
-        estimates = repairshopr_client.get_model(repairshopr_models.Estimate, updated_at=start_datetime)
+        estimates = repairshopr_client.get_model(
+            repairshopr_models.Estimate,
+            updated_at=start_datetime,
+            after_id=resume_after_id,
+        )
         batch_size = max(commit_interval, 100)
         batch: list[repairshopr_models.Estimate] = []
         for estimate in estimates:
@@ -658,6 +666,7 @@ class RepairshoprImporter(models.Model):
                     partner_cache,
                     billing_cache,
                     repairshopr_client,
+                    resume_phase_name=REPAIRSHOPR_PHASE_ESTIMATES,
                 )
                 batch = []
         if batch:
@@ -669,6 +678,7 @@ class RepairshoprImporter(models.Model):
                 partner_cache,
                 billing_cache,
                 repairshopr_client,
+                resume_phase_name=REPAIRSHOPR_PHASE_ESTIMATES,
             )
 
     # noinspection DuplicatedCode
@@ -679,6 +689,8 @@ class RepairshoprImporter(models.Model):
         start_datetime: datetime | None,
         system: "odoo.model.external_system",
         sync_started_at: datetime,
+        *,
+        resume_after_id: int | None = None,
     ) -> None:
         commit_interval = self._get_commit_interval()
         processed_count = 0
@@ -686,7 +698,11 @@ class RepairshoprImporter(models.Model):
         sales_journal_id = sales_journal.id
         partner_cache: dict[int, int] = {}
         billing_cache: dict[int, int | None] = {}
-        invoices = repairshopr_client.get_model(repairshopr_models.Invoice, updated_at=start_datetime)
+        invoices = repairshopr_client.get_model(
+            repairshopr_models.Invoice,
+            updated_at=start_datetime,
+            after_id=resume_after_id,
+        )
         batch_size = max(commit_interval, 100)
         batch: list[repairshopr_models.Invoice] = []
         for invoice in invoices:
@@ -701,6 +717,7 @@ class RepairshoprImporter(models.Model):
                     billing_cache,
                     repairshopr_client,
                     sales_journal_id,
+                    resume_phase_name=REPAIRSHOPR_PHASE_INVOICES,
                 )
                 batch = []
         if batch:
@@ -713,6 +730,7 @@ class RepairshoprImporter(models.Model):
                 billing_cache,
                 repairshopr_client,
                 sales_journal_id,
+                resume_phase_name=REPAIRSHOPR_PHASE_INVOICES,
             )
 
     # noinspection DuplicatedCode
@@ -726,6 +744,8 @@ class RepairshoprImporter(models.Model):
         partner_cache: dict[int, int],
         billing_cache: dict[int, int | None],
         repairshopr_client: RepairshoprImportClient,
+        *,
+        resume_phase_name: str | None = None,
     ) -> int:
         estimate_by_external_id: dict[str, repairshopr_models.Estimate] = {}
         for estimate in estimates:
@@ -977,6 +997,8 @@ class RepairshoprImporter(models.Model):
                 processed_count += 1
                 if should_commit():
                     flush_creates()
+                    if resume_phase_name:
+                        self._save_resume_progress(resume_phase_name, estimate.id)
                     pending_commit = True
                 if pending_commit and self._maybe_commit(processed_count, commit_interval, label="estimate"):
                     order_model = self.env["sale.order"].sudo().with_context(IMPORT_CONTEXT)
@@ -987,6 +1009,8 @@ class RepairshoprImporter(models.Model):
             processed_count += 1
             if should_commit():
                 flush_creates()
+                if resume_phase_name:
+                    self._save_resume_progress(resume_phase_name, estimate.id)
                 if self._maybe_commit(processed_count, commit_interval, label="estimate"):
                     order_model = self.env["sale.order"].sudo().with_context(IMPORT_CONTEXT)
 
@@ -1005,6 +1029,8 @@ class RepairshoprImporter(models.Model):
         billing_cache: dict[int, int | None],
         repairshopr_client: RepairshoprImportClient,
         sales_journal_id: int,
+        *,
+        resume_phase_name: str | None = None,
     ) -> int:
         invoice_by_external_id: dict[str, repairshopr_models.Invoice] = {}
         for invoice in invoices:
@@ -1230,6 +1256,8 @@ class RepairshoprImporter(models.Model):
                 processed_count += 1
                 if should_commit():
                     flush_creates()
+                    if resume_phase_name:
+                        self._save_resume_progress(resume_phase_name, invoice.id)
                     pending_commit = True
                 if pending_commit and self._maybe_commit(processed_count, commit_interval, label="invoice"):
                     move_model = self.env["account.move"].sudo().with_context(IMPORT_CONTEXT)
@@ -1241,6 +1269,8 @@ class RepairshoprImporter(models.Model):
             processed_count += 1
             if should_commit():
                 flush_creates()
+                if resume_phase_name:
+                    self._save_resume_progress(resume_phase_name, invoice.id)
                 if self._maybe_commit(processed_count, commit_interval, label="invoice"):
                     move_model = self.env["account.move"].sudo().with_context(IMPORT_CONTEXT)
                     sales_journal = self.env["account.journal"].browse(sales_journal_id)

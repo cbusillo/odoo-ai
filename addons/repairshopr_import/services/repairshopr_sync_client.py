@@ -47,6 +47,7 @@ class RepairshoprImportClient(Protocol):
         model_type: type[repairshopr_models.Customer],
         *,
         updated_at: datetime | None = None,
+        after_id: int | None = None,
     ) -> Iterable[repairshopr_models.Customer]:
         ...
 
@@ -56,6 +57,7 @@ class RepairshoprImportClient(Protocol):
         model_type: type[repairshopr_models.Product],
         *,
         updated_at: datetime | None = None,
+        after_id: int | None = None,
     ) -> Iterable[repairshopr_models.Product]:
         ...
 
@@ -65,6 +67,7 @@ class RepairshoprImportClient(Protocol):
         model_type: type[repairshopr_models.Ticket],
         *,
         updated_at: datetime | None = None,
+        after_id: int | None = None,
     ) -> Iterable[repairshopr_models.Ticket]:
         ...
 
@@ -74,6 +77,7 @@ class RepairshoprImportClient(Protocol):
         model_type: type[repairshopr_models.Estimate],
         *,
         updated_at: datetime | None = None,
+        after_id: int | None = None,
     ) -> Iterable[repairshopr_models.Estimate]:
         ...
 
@@ -83,10 +87,11 @@ class RepairshoprImportClient(Protocol):
         model_type: type[repairshopr_models.Invoice],
         *,
         updated_at: datetime | None = None,
+        after_id: int | None = None,
     ) -> Iterable[repairshopr_models.Invoice]:
         ...
 
-    def get_model(self, model_type: type[object], *, updated_at: datetime | None = None) -> Iterable[object]:
+    def get_model(self, model_type: type[object], *, updated_at: datetime | None = None, after_id: int | None = None) -> Iterable[object]:
         ...
 
     def fetch_line_items(
@@ -144,6 +149,7 @@ class RepairshoprSyncClient:
         model_type: type[repairshopr_models.Customer],
         *,
         updated_at: datetime | None = None,
+        after_id: int | None = None,
     ) -> Iterable[repairshopr_models.Customer]:
         ...
 
@@ -153,6 +159,7 @@ class RepairshoprSyncClient:
         model_type: type[repairshopr_models.Product],
         *,
         updated_at: datetime | None = None,
+        after_id: int | None = None,
     ) -> Iterable[repairshopr_models.Product]:
         ...
 
@@ -162,6 +169,7 @@ class RepairshoprSyncClient:
         model_type: type[repairshopr_models.Ticket],
         *,
         updated_at: datetime | None = None,
+        after_id: int | None = None,
     ) -> Iterable[repairshopr_models.Ticket]:
         ...
 
@@ -171,6 +179,7 @@ class RepairshoprSyncClient:
         model_type: type[repairshopr_models.Estimate],
         *,
         updated_at: datetime | None = None,
+        after_id: int | None = None,
     ) -> Iterable[repairshopr_models.Estimate]:
         ...
 
@@ -180,20 +189,21 @@ class RepairshoprSyncClient:
         model_type: type[repairshopr_models.Invoice],
         *,
         updated_at: datetime | None = None,
+        after_id: int | None = None,
     ) -> Iterable[repairshopr_models.Invoice]:
         ...
 
-    def get_model(self, model_type: type[object], *, updated_at: datetime | None = None) -> Iterable[object]:
+    def get_model(self, model_type: type[object], *, updated_at: datetime | None = None, after_id: int | None = None) -> Iterable[object]:
         if model_type is repairshopr_models.Customer:
-            return self._iter_customers(updated_at)
+            return self._iter_customers(updated_at, after_id=after_id)
         if model_type is repairshopr_models.Product:
-            return self._iter_products(updated_at)
+            return self._iter_products(updated_at, after_id=after_id)
         if model_type is repairshopr_models.Ticket:
-            return self._iter_tickets(updated_at)
+            return self._iter_tickets(updated_at, after_id=after_id)
         if model_type is repairshopr_models.Estimate:
-            return self._iter_estimates(updated_at)
+            return self._iter_estimates(updated_at, after_id=after_id)
         if model_type is repairshopr_models.Invoice:
-            return self._iter_invoices(updated_at)
+            return self._iter_invoices(updated_at, after_id=after_id)
         raise ValueError(f"Unsupported model type: {model_type}")
 
     def fetch_line_items(
@@ -228,7 +238,7 @@ class RepairshoprSyncClient:
             parent_id_values=invoice_id_values,
         )
 
-    def _iter_customers(self, updated_at: datetime | None) -> Iterator[repairshopr_models.Customer]:
+    def _iter_customers(self, updated_at: datetime | None, *, after_id: int | None = None) -> Iterator[repairshopr_models.Customer]:
         for rows in self._iter_batches(
             CUSTOMER_TABLE,
             [
@@ -253,6 +263,7 @@ class RepairshoprSyncClient:
             updated_at=updated_at,
             updated_column="updated_at",
             created_column="created_at",
+            after_id=after_id,
         ):
             customer_ids = [
                 customer_id
@@ -268,9 +279,11 @@ class RepairshoprSyncClient:
                     contacts = contacts_by_customer.get(customer_id, [])
                 yield self._build_customer(row, contacts)
 
-    def _iter_products(self, updated_at: datetime | None) -> Iterator[repairshopr_models.Product]:
+    def _iter_products(self, updated_at: datetime | None, *, after_id: int | None = None) -> Iterator[repairshopr_models.Product]:
         if updated_at is not None:
             _logger.info("RepairShopr product sync rows do not track updated_at; ignoring filter.")
+        if after_id is not None:
+            _logger.info("RepairShopr product sync resume cursor is unsupported; ignoring after_id=%s.", after_id)
         for rows in self._iter_batches(
             PRODUCT_TABLE,
             [
@@ -288,11 +301,12 @@ class RepairshoprSyncClient:
             updated_at=None,
             updated_column=None,
             created_column=None,
+            after_id=None,
         ):
             for row in rows:
                 yield self._build_product(row)
 
-    def _iter_tickets(self, updated_at: datetime | None) -> Iterator[repairshopr_models.Ticket]:
+    def _iter_tickets(self, updated_at: datetime | None, *, after_id: int | None = None) -> Iterator[repairshopr_models.Ticket]:
         updated_value = self._format_updated_at(updated_at, treat_as_text=True)
         for rows in self._iter_batches(
             TICKET_TABLE,
@@ -312,6 +326,7 @@ class RepairshoprSyncClient:
             updated_at=updated_value,
             updated_column="updated_at",
             created_column="created_at",
+            after_id=after_id,
         ):
             ticket_ids = [
                 ticket_id
@@ -336,7 +351,7 @@ class RepairshoprSyncClient:
                 yield self._build_ticket(row, properties, comments)
 
 
-    def _iter_estimates(self, updated_at: datetime | None) -> Iterator[repairshopr_models.Estimate]:
+    def _iter_estimates(self, updated_at: datetime | None, *, after_id: int | None = None) -> Iterator[repairshopr_models.Estimate]:
         for rows in self._iter_batches(
             ESTIMATE_TABLE,
             [
@@ -353,11 +368,12 @@ class RepairshoprSyncClient:
             updated_at=updated_at,
             updated_column="updated_at",
             created_column="created_at",
+            after_id=after_id,
         ):
             for row in rows:
                 yield self._build_estimate(row)
 
-    def _iter_invoices(self, updated_at: datetime | None) -> Iterator[repairshopr_models.Invoice]:
+    def _iter_invoices(self, updated_at: datetime | None, *, after_id: int | None = None) -> Iterator[repairshopr_models.Invoice]:
         for rows in self._iter_batches(
             INVOICE_TABLE,
             [
@@ -375,6 +391,7 @@ class RepairshoprSyncClient:
             updated_at=updated_at,
             updated_column="updated_at",
             created_column="created_at",
+            after_id=after_id,
         ):
             for row in rows:
                 yield self._build_invoice(row)
@@ -387,8 +404,9 @@ class RepairshoprSyncClient:
         updated_at: datetime | str | None,
         updated_column: str | None,
         created_column: str | None,
+        after_id: int | None,
     ) -> Iterator[list[dict[str, object]]]:
-        last_seen_id = 0
+        last_seen_id = after_id or 0
         while True:
             where_fragments = ["id > %s"]
             parameters = [last_seen_id]

@@ -3,7 +3,7 @@ import os
 import re
 from collections import Counter
 from datetime import date, datetime, time
-from typing import TypeVar
+from typing import TypedDict, TypeVar
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from odoo import api, fields, models
@@ -32,6 +32,16 @@ from ..services.cm_data_client import (
 _logger = logging.getLogger(__name__)
 
 ExternalIdRecordModel = TypeVar("ExternalIdRecordModel", bound=models.Model)
+
+
+class PlaceholderAttendanceSummary(TypedDict):
+    external_id: str
+    employee_name: str
+    active: bool
+    attendance_count: int
+    open_attendance_count: int
+    zero_hour_attendance_count: int
+
 
 EXTERNAL_SYSTEM_CODE = "cm_data"
 EXTERNAL_SYSTEM_APPLICABLE_MODEL_XMLIDS = (
@@ -2417,7 +2427,7 @@ class CmDataImporter(models.Model):
                 ("resource", "=", EMPLOYEE_TIMECLOCK_PLACEHOLDER_RESOURCE),
             ]
         )
-        placeholder_summary_by_employee_id: dict[int, dict[str, object]] = {}
+        placeholder_summary_by_employee_id: dict[int, PlaceholderAttendanceSummary] = {}
         placeholder_employee_ids: list[int] = []
         for external_id_record in placeholder_external_id_records:
             employee = employee_model.browse(external_id_record.res_id).exists()
@@ -2445,18 +2455,18 @@ class CmDataImporter(models.Model):
                 if not attendance.worked_hours:
                     employee_summary["zero_hour_attendance_count"] = int(employee_summary["zero_hour_attendance_count"]) + 1
 
-        def placeholder_sort_key(summary: dict[str, object]) -> tuple[int, str]:
-            external_id_value = str(summary["external_id"])
+        def placeholder_sort_key(summary: PlaceholderAttendanceSummary) -> tuple[int, str]:
+            external_id_value = summary["external_id"]
             try:
                 return int(external_id_value), external_id_value
             except ValueError:
                 return 0, external_id_value
 
         placeholder_employee_summaries = sorted(placeholder_summary_by_employee_id.values(), key=placeholder_sort_key)
-        total_placeholder_attendance = sum(int(summary["attendance_count"]) for summary in placeholder_employee_summaries)
-        total_open_placeholder_attendance = sum(int(summary["open_attendance_count"]) for summary in placeholder_employee_summaries)
+        total_placeholder_attendance = sum(summary["attendance_count"] for summary in placeholder_employee_summaries)
+        total_open_placeholder_attendance = sum(summary["open_attendance_count"] for summary in placeholder_employee_summaries)
         total_zero_hour_placeholder_attendance = sum(
-            int(summary["zero_hour_attendance_count"]) for summary in placeholder_employee_summaries
+            summary["zero_hour_attendance_count"] for summary in placeholder_employee_summaries
         )
         return {
             "checks": {
@@ -2471,14 +2481,13 @@ class CmDataImporter(models.Model):
                 "placeholder_open_attendance_count": total_open_placeholder_attendance,
                 "placeholder_zero_hour_attendance_count": total_zero_hour_placeholder_attendance,
                 "placeholder_attendance_counts_by_external_id": {
-                    str(summary["external_id"]): int(summary["attendance_count"]) for summary in placeholder_employee_summaries
+                    summary["external_id"]: summary["attendance_count"] for summary in placeholder_employee_summaries
                 },
                 "placeholder_open_attendance_counts_by_external_id": {
-                    str(summary["external_id"]): int(summary["open_attendance_count"]) for summary in placeholder_employee_summaries
+                    summary["external_id"]: summary["open_attendance_count"] for summary in placeholder_employee_summaries
                 },
                 "placeholder_zero_hour_attendance_counts_by_external_id": {
-                    str(summary["external_id"]): int(summary["zero_hour_attendance_count"])
-                    for summary in placeholder_employee_summaries
+                    summary["external_id"]: summary["zero_hour_attendance_count"] for summary in placeholder_employee_summaries
                 },
             },
             "samples": {

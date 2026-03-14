@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import cast
 
-from ...services.cm_data_client import CmDataContact
+from ...services.cm_data_client import CmDataClient, CmDataContact
 from ..common_imports import common
 from ..fixtures.base import UnitTestCase
 
@@ -41,15 +42,18 @@ class TestContactImport(UnitTestCase):
         account_partner = self.env["res.partner"].create({"name": "Eastern Suffolk BOCES"})
 
         importer._import_contacts(
-            _ContactClientStub(
-                [
-                    _contact_row(
-                        record_id=320,
-                        account_name="WSBOOCES",
-                        sub_name="POs",
-                        contact_notes="Penny Notarnicola - pnotarni@wsboces.org",
-                    )
-                ]
+            cast(
+                CmDataClient,
+                _ContactClientStub(
+                    [
+                        _contact_row(
+                            record_id=320,
+                            account_name="WSBOOCES",
+                            sub_name="POs",
+                            contact_notes="Penny Notarnicola - pnotarni@wsboces.org",
+                        )
+                    ]
+                ),
             ),
             None,
             {importer._normalize_key("WSBOOCES"): account_partner.id},
@@ -89,15 +93,18 @@ class TestContactImport(UnitTestCase):
         )
 
         importer._import_contacts(
-            _ContactClientStub(
-                [
-                    _contact_row(
-                        record_id=143,
-                        account_name="Buckley School, The",
-                        sub_name="Estimates, Pick Up",
-                        contact_notes="Main district contact",
-                    )
-                ]
+            cast(
+                CmDataClient,
+                _ContactClientStub(
+                    [
+                        _contact_row(
+                            record_id=143,
+                            account_name="Buckley School, The",
+                            sub_name="Estimates, Pick Up",
+                            contact_notes="Main district contact",
+                        )
+                    ]
+                ),
             ),
             None,
             {importer._normalize_key("Buckley School, The"): account_partner.id},

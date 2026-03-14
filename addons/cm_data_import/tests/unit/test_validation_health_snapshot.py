@@ -50,10 +50,10 @@ class _CmDataClientStub:
     def __exit__(self, exc_type: object, exc: object, traceback: object) -> bool:
         return False
 
-    def fetch_account_names(self, ignored_updated_at: datetime | None) -> list[CmDataAccountName]:
+    def fetch_account_names(self, _ignored_updated_at: datetime | None) -> list[CmDataAccountName]:
         return self._account_rows
 
-    def fetch_contacts(self, ignored_updated_at: datetime | None) -> list[CmDataContact]:
+    def fetch_contacts(self, _ignored_updated_at: datetime | None) -> list[CmDataContact]:
         return self._contact_rows
 
 

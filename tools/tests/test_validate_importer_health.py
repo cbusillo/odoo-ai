@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+from typing import cast
 from unittest import mock
 
 from tools.validate import importer_health
@@ -100,11 +101,14 @@ class ImporterHealthValidationTests(unittest.TestCase):
                 importers=("cm-data", "fishbowl"),
                 repository_root=Path("/repo"),
             )
+        importer_results = cast(dict[str, object], results["importers"])
+        cm_data_results = cast(dict[str, object], importer_results["cm-data"])
+        fishbowl_results = cast(dict[str, object], importer_results["fishbowl"])
 
         self.assertFalse(results["overall_ok"])
         self.assertEqual(results["failed_importers"], ["fishbowl"])
-        self.assertEqual(results["importers"]["cm-data"]["ok"], True)
-        self.assertEqual(results["importers"]["fishbowl"]["error"], "resume state is dirty")
+        self.assertEqual(cm_data_results["ok"], True)
+        self.assertEqual(fishbowl_results["error"], "resume state is dirty")
 
 
 if __name__ == "__main__":

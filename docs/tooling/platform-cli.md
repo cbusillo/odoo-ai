@@ -45,7 +45,9 @@ Operator Contract
   against a selected stack or managed target.
 - `platform validate importer-health --context cm --instance local` snapshots
   CM, Fishbowl, and RepairShopr importer run state, resume cleanliness, and
-  external-ID coverage signals without relying on scratch scripts.
+  external-ID coverage signals without relying on scratch scripts. The CM
+  snapshot also reports placeholder-employee attendance warnings so zero-hour
+  and open-placeholder punches stay visible after imports.
 - `platform validate importer-health --importer cm-data --importer fishbowl`
   scopes the importer-health scenario to a subset of importers when you only
   need to re-check one workflow after a targeted import or restore.

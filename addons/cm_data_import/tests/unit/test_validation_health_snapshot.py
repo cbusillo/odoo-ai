@@ -61,6 +61,21 @@ class _CmDataClientStub:
 
 @common.tagged(*common.UNIT_TAGS)
 class TestValidationHealthSnapshot(UnitTestCase):
+    def _create_placeholder_employee(self, *, name: str, active: bool) -> "odoo.model.hr_employee":
+        employee_model = self.env["hr.employee"]
+        employee_values: dict[str, object] = {
+            "name": name,
+            "active": active,
+        }
+        name_parts = name.split(maxsplit=1)
+        if "first_name" in employee_model._fields:
+            employee_values["first_name"] = name_parts[0]
+        if "last_name" in employee_model._fields:
+            employee_values["last_name"] = name_parts[1] if len(name_parts) > 1 else name_parts[0]
+        if "nick_name" in employee_model._fields:
+            employee_values["nick_name"] = name
+        return employee_model.create(employee_values)
+
     def test_validation_health_snapshot_reports_complete_contact_coverage(self) -> None:
         importer = self.CmDataImporter
         self.env["ir.config_parameter"].sudo().set_param("cm_data.last_run_status", "success")
@@ -105,7 +120,10 @@ class TestValidationHealthSnapshot(UnitTestCase):
         self.assertEqual(metrics["source_contact_count"], 1)
         self.assertEqual(metrics["missing_contact_external_id_count"], 0)
         self.assertEqual(metrics["distinct_unmatched_account_name_count"], 0)
+        self.assertEqual(metrics["placeholder_employee_count"], 0)
+        self.assertEqual(metrics["placeholder_zero_hour_attendance_count"], 0)
         self.assertEqual(samples["missing_contact_external_ids_sample"], [])
+        self.assertEqual(samples["placeholder_employee_attendance"], [])
 
     def test_validation_health_snapshot_reports_missing_matches_and_coverage_gaps(self) -> None:
         importer = self.CmDataImporter
@@ -137,3 +155,92 @@ class TestValidationHealthSnapshot(UnitTestCase):
         self.assertEqual(metrics["missing_contact_external_id_count"], 1)
         self.assertEqual(metrics["pricing_missing_partner_count"], 1)
         self.assertEqual(samples["top_unmatched_account_names"], [["Unknown Account", 1]])
+
+    def test_validation_health_snapshot_reports_placeholder_attendance_metrics_and_warnings(self) -> None:
+        importer = self.CmDataImporter
+        self.env["ir.config_parameter"].sudo().set_param("cm_data.last_run_status", "success")
+        system = self.env["external.system"].ensure_system(code="cm_data", name="CM Data")
+        placeholder_employee = self._create_placeholder_employee(name="Archived CM Employee 46", active=False)
+        second_placeholder_employee = self._create_placeholder_employee(name="Archived CM Employee 203", active=False)
+        self.env["external.id"].sudo().create(
+            [
+                {
+                    "system_id": system.id,
+                    "res_model": "hr.employee",
+                    "res_id": placeholder_employee.id,
+                    "resource": "employee_timeclock_placeholder",
+                    "external_id": "46",
+                },
+                {
+                    "system_id": system.id,
+                    "res_model": "hr.employee",
+                    "res_id": second_placeholder_employee.id,
+                    "resource": "employee_timeclock_placeholder",
+                    "external_id": "203",
+                },
+            ]
+        )
+        self.env["hr.attendance"].create(
+            [
+                {
+                    "employee_id": placeholder_employee.id,
+                    "check_in": datetime(2026, 3, 14, 8),
+                    "check_out": datetime(2026, 3, 14, 8),
+                },
+                {
+                    "employee_id": placeholder_employee.id,
+                    "check_in": datetime(2026, 3, 14, 9),
+                    "check_out": datetime(2026, 3, 14, 10),
+                },
+                {
+                    "employee_id": second_placeholder_employee.id,
+                    "check_in": datetime(2026, 3, 14, 11),
+                },
+            ]
+        )
+
+        with mock.patch(
+            "odoo.addons.cm_data_import.models.cm_data_importer.CmDataClient",
+            return_value=_CmDataClientStub(account_rows=[], contact_rows=[]),
+        ):
+            snapshot = importer.get_validation_health_snapshot()
+        checks = cast(dict[str, object], snapshot["checks"])
+        warnings = cast(dict[str, object], snapshot["warnings"])
+        metrics = cast(dict[str, object], snapshot["metrics"])
+        samples = cast(dict[str, object], snapshot["samples"])
+        placeholder_counts = cast(dict[str, object], metrics["placeholder_attendance_counts_by_external_id"])
+        zero_hour_counts = cast(dict[str, object], metrics["placeholder_zero_hour_attendance_counts_by_external_id"])
+        open_counts = cast(dict[str, object], metrics["placeholder_open_attendance_counts_by_external_id"])
+        placeholder_sample = cast(list[dict[str, object]], samples["placeholder_employee_attendance"])
+
+        self.assertFalse(snapshot["ok"])
+        self.assertFalse(checks["placeholder_attendance_open_clear"])
+        self.assertTrue(warnings["placeholder_zero_hour_attendance_present"])
+        self.assertEqual(metrics["placeholder_employee_count"], 2)
+        self.assertEqual(metrics["placeholder_attendance_count"], 3)
+        self.assertEqual(metrics["placeholder_open_attendance_count"], 1)
+        self.assertEqual(metrics["placeholder_zero_hour_attendance_count"], 2)
+        self.assertEqual(placeholder_counts, {"46": 2, "203": 1})
+        self.assertEqual(zero_hour_counts, {"46": 1, "203": 1})
+        self.assertEqual(open_counts, {"46": 0, "203": 1})
+        self.assertEqual(
+            placeholder_sample,
+            [
+                {
+                    "external_id": "46",
+                    "employee_name": "Archived CM Employee 46",
+                    "active": False,
+                    "attendance_count": 2,
+                    "open_attendance_count": 0,
+                    "zero_hour_attendance_count": 1,
+                },
+                {
+                    "external_id": "203",
+                    "employee_name": "Archived CM Employee 203",
+                    "active": False,
+                    "attendance_count": 1,
+                    "open_attendance_count": 1,
+                    "zero_hour_attendance_count": 1,
+                },
+            ],
+        )

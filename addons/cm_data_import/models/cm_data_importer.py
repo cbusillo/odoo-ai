@@ -94,6 +94,9 @@ STATUS_MAP = {
     "Projected Return": "ready",
 }
 
+EMAIL_PATTERN = re.compile(r"([A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)")
+CONTACT_NOTE_LABEL_PATTERN = re.compile(r"^(?:email|e-mail|contact|name)\s*[:\-]\s*", re.IGNORECASE)
+
 
 class CmDataImporter(models.Model):
     _name = "integration.cm_data.importer"
@@ -472,7 +475,8 @@ class CmDataImporter(models.Model):
             if not parent_partner_id:
                 _logger.warning("Skipping contact without matching account: %s", row.account_name)
                 continue
-            name = row.sub_name or row.account_name
+            structured_name, structured_email = self._extract_contact_note_details(row.contact_notes)
+            name = structured_name or row.sub_name or row.account_name
             values: "odoo.values.res_partner" = {
                 "name": name,
                 "parent_id": parent_partner_id,
@@ -480,6 +484,10 @@ class CmDataImporter(models.Model):
                 "cm_data_contact_notes": row.contact_notes,
                 "cm_data_contact_sort_order": row.sort_order,
             }
+            if "email" in partner_model._fields:
+                values["email"] = structured_email or False
+            if "function" in partner_model._fields:
+                values["function"] = row.sub_name if structured_name and row.sub_name and structured_name != row.sub_name else False
             self._get_or_create_by_external_id_with_sync(
                 partner_model,
                 system,
@@ -2215,14 +2223,47 @@ class CmDataImporter(models.Model):
             nick_name = first_name or last_name
         return first_name, last_name, nick_name
 
+    @classmethod
+    def _extract_contact_note_details(cls, contact_notes: str | None) -> tuple[str | None, str | None]:
+        email = cls._extract_email(contact_notes)
+        if not email:
+            return None, None
+        if not contact_notes:
+            return None, email
+        name_candidates: list[str] = []
+        for fragment in re.split(re.escape(email), contact_notes, maxsplit=1):
+            cleaned_fragment = cls._clean_contact_note_fragment(fragment)
+            if cleaned_fragment:
+                name_candidates.append(cleaned_fragment)
+        if not name_candidates:
+            return None, email
+        name_candidates.sort(key=lambda candidate: (-len(candidate), candidate.casefold()))
+        return name_candidates[0], email
+
+    @staticmethod
+    def _clean_contact_note_fragment(value: str | None) -> str | None:
+        if not value:
+            return None
+        cleaned_value = CONTACT_NOTE_LABEL_PATTERN.sub("", value)
+        cleaned_value = re.sub(r"[\[\]{}()<>]", " ", cleaned_value)
+        cleaned_value = re.sub(r"\s+", " ", cleaned_value)
+        cleaned_value = re.sub(r"^[\s,;:|/\\-]+", "", cleaned_value)
+        cleaned_value = re.sub(r"[\s,;:|/\\-]+$", "", cleaned_value)
+        if not cleaned_value or "@" in cleaned_value or not re.search(r"[A-Za-z]", cleaned_value):
+            return None
+        return cleaned_value
+
     @staticmethod
     def _extract_email(value: str | None) -> str | None:
         if not value:
             return None
         candidate = value.strip()
-        if not candidate or "@" not in candidate:
+        if not candidate:
             return None
-        return candidate
+        match = EMAIL_PATTERN.search(candidate)
+        if not match:
+            return None
+        return match.group(1)
 
     @staticmethod
     def _as_date(value: datetime | None) -> date | None:
@@ -2365,6 +2406,87 @@ class CmDataImporter(models.Model):
         self.env["ir.config_parameter"].sudo().set_param("cm_data.last_sync_at", fields.Datetime.to_string(value))
 
     @api.model
+    def _get_placeholder_attendance_health_snapshot(self) -> dict[str, object]:
+        external_id_model = self.env["external.id"].sudo().with_context(active_test=False)
+        employee_model = self.env["hr.employee"].sudo().with_context(active_test=False)
+        attendance_model = self.env["hr.attendance"].sudo().with_context(active_test=False)
+
+        placeholder_external_id_records = external_id_model.search(
+            [
+                ("system_id.code", "=", EXTERNAL_SYSTEM_CODE),
+                ("resource", "=", EMPLOYEE_TIMECLOCK_PLACEHOLDER_RESOURCE),
+            ]
+        )
+        placeholder_summary_by_employee_id: dict[int, dict[str, object]] = {}
+        placeholder_employee_ids: list[int] = []
+        for external_id_record in placeholder_external_id_records:
+            employee = employee_model.browse(external_id_record.res_id).exists()
+            if not employee:
+                continue
+            placeholder_employee_ids.append(employee.id)
+            placeholder_summary_by_employee_id[employee.id] = {
+                "external_id": str(external_id_record.external_id),
+                "employee_name": employee.name,
+                "active": bool(employee.active),
+                "attendance_count": 0,
+                "open_attendance_count": 0,
+                "zero_hour_attendance_count": 0,
+            }
+
+        if placeholder_employee_ids:
+            placeholder_attendances = attendance_model.search([("employee_id", "in", placeholder_employee_ids)])
+            for attendance in placeholder_attendances:
+                employee_summary = placeholder_summary_by_employee_id.get(attendance.employee_id.id)
+                if not employee_summary:
+                    continue
+                employee_summary["attendance_count"] = int(employee_summary["attendance_count"]) + 1
+                if not attendance.check_out:
+                    employee_summary["open_attendance_count"] = int(employee_summary["open_attendance_count"]) + 1
+                if not attendance.worked_hours:
+                    employee_summary["zero_hour_attendance_count"] = int(employee_summary["zero_hour_attendance_count"]) + 1
+
+        def placeholder_sort_key(summary: dict[str, object]) -> tuple[int, str]:
+            external_id_value = str(summary["external_id"])
+            try:
+                return int(external_id_value), external_id_value
+            except ValueError:
+                return 0, external_id_value
+
+        placeholder_employee_summaries = sorted(placeholder_summary_by_employee_id.values(), key=placeholder_sort_key)
+        total_placeholder_attendance = sum(int(summary["attendance_count"]) for summary in placeholder_employee_summaries)
+        total_open_placeholder_attendance = sum(int(summary["open_attendance_count"]) for summary in placeholder_employee_summaries)
+        total_zero_hour_placeholder_attendance = sum(
+            int(summary["zero_hour_attendance_count"]) for summary in placeholder_employee_summaries
+        )
+        return {
+            "checks": {
+                "placeholder_attendance_open_clear": total_open_placeholder_attendance == 0,
+            },
+            "warnings": {
+                "placeholder_zero_hour_attendance_present": total_zero_hour_placeholder_attendance > 0,
+            },
+            "metrics": {
+                "placeholder_employee_count": len(placeholder_employee_summaries),
+                "placeholder_attendance_count": total_placeholder_attendance,
+                "placeholder_open_attendance_count": total_open_placeholder_attendance,
+                "placeholder_zero_hour_attendance_count": total_zero_hour_placeholder_attendance,
+                "placeholder_attendance_counts_by_external_id": {
+                    str(summary["external_id"]): int(summary["attendance_count"]) for summary in placeholder_employee_summaries
+                },
+                "placeholder_open_attendance_counts_by_external_id": {
+                    str(summary["external_id"]): int(summary["open_attendance_count"]) for summary in placeholder_employee_summaries
+                },
+                "placeholder_zero_hour_attendance_counts_by_external_id": {
+                    str(summary["external_id"]): int(summary["zero_hour_attendance_count"])
+                    for summary in placeholder_employee_summaries
+                },
+            },
+            "samples": {
+                "placeholder_employee_attendance": placeholder_employee_summaries[:25],
+            },
+        }
+
+    @api.model
     def get_validation_health_snapshot(self) -> dict[str, object]:
         parameter_model = self.env["ir.config_parameter"].sudo()
         audit_model = self.env["integration.cm_data.pricing.audit"].sudo().with_context(active_test=False)
@@ -2407,17 +2529,20 @@ class CmDataImporter(models.Model):
         imported_contact_ids = {str(record.external_id) for record in contact_external_id_records}
         missing_contact_ids = sorted(source_contact_ids - imported_contact_ids)
         missing_partner_total = audit_model.search_count([("issue_type", "=", "missing_partner")])
+        placeholder_snapshot = self._get_placeholder_attendance_health_snapshot()
 
         checks = {
             "last_run_success": parameter_model.get_param("cm_data.last_run_status") == "success",
             "contact_account_match_clean": not unmatched_account_names,
             "contact_external_id_coverage_complete": not missing_contact_ids,
             "pricing_missing_partner_clear": missing_partner_total == 0,
+            **placeholder_snapshot["checks"],
         }
         return {
             "importer": "cm-data",
             "ok": all(checks.values()),
             "checks": checks,
+            "warnings": placeholder_snapshot["warnings"],
             "last_run": {
                 "status": parameter_model.get_param("cm_data.last_run_status") or "",
                 "message": parameter_model.get_param("cm_data.last_run_message") or "",
@@ -2436,10 +2561,12 @@ class CmDataImporter(models.Model):
                     ),
                     "esboces": audit_model.search_count([("issue_type", "=", "missing_partner"), ("catalog_code", "=", "esboces")]),
                 },
+                **placeholder_snapshot["metrics"],
             },
             "samples": {
                 "top_unmatched_account_names": [[name, count] for name, count in unmatched_account_names.most_common(25)],
                 "missing_contact_external_ids_sample": missing_contact_ids[:10],
+                **placeholder_snapshot["samples"],
             },
         }
 

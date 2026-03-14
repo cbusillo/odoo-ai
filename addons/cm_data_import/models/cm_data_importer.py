@@ -268,8 +268,7 @@ class CmDataImporter(models.Model):
         partner_role_map = self._build_partner_role_map()
         commit_interval = self._get_commit_interval()
         processed_count = 0
-        partner_map: dict[str, int] = {}
-        token_counts = self._count_account_partner_tokens(account_rows)
+        partner_id_by_account_record_id: dict[int, int] = {}
         for row in account_rows:
             values: "odoo.values.res_partner" = {
                 "name": row.account_name,
@@ -297,12 +296,47 @@ class CmDataImporter(models.Model):
                 continue
             self._apply_partner_roles_from_labels(partner, row.label_names, partner_role_map)
             self._apply_partner_price_lists(partner, row.price_list, row.price_list_2, price_list_model)
-            self._register_account_partner_tokens(partner_map, row, partner.id, token_counts)
+            partner_id_by_account_record_id[row.record_id] = partner.id
             processed_count += 1
             if self._maybe_commit(processed_count, commit_interval, label="account"):
                 partner_model = self.env["res.partner"].sudo().with_context(IMPORT_CONTEXT)
                 price_list_model = self.env["integration.cm_data.price.list"].sudo().with_context(IMPORT_CONTEXT)
-        return partner_map
+        return self._build_account_partner_lookup_map(account_rows, partner_id_by_account_record_id)
+
+    def _build_account_partner_lookup_map(
+        self,
+        account_rows: list[CmDataAccountName],
+        partner_id_by_account_record_id: dict[int, int],
+    ) -> dict[str, int]:
+        partner_lookup_map: dict[str, int] = {}
+        exact_account_name_counts = self._count_exact_account_name_tokens(account_rows)
+        direct_token_counts = self._count_account_partner_tokens(account_rows)
+        fallback_key_counts = self._count_account_partner_fallback_keys(account_rows)
+        for row in account_rows:
+            partner_id = partner_id_by_account_record_id.get(row.record_id)
+            if not partner_id:
+                continue
+            exact_account_name = self._normalize_key(row.account_name)
+            if exact_account_name and exact_account_name_counts[exact_account_name] == 1:
+                partner_lookup_map[exact_account_name] = partner_id
+            for token in self._iter_account_partner_tokens(row):
+                if direct_token_counts[token] != 1:
+                    continue
+                partner_lookup_map.setdefault(token, partner_id)
+            for fallback_key in self._iter_account_partner_fallback_keys(row):
+                if fallback_key_counts[fallback_key] != 1:
+                    continue
+                partner_lookup_map.setdefault(fallback_key, partner_id)
+        return partner_lookup_map
+
+    def _count_exact_account_name_tokens(self, account_rows: list[CmDataAccountName]) -> Counter[str]:
+        exact_account_name_counts: Counter[str] = Counter()
+        for row in account_rows:
+            exact_account_name = self._normalize_key(row.account_name)
+            if not exact_account_name:
+                continue
+            exact_account_name_counts[exact_account_name] += 1
+        return exact_account_name_counts
 
     def _count_account_partner_tokens(self, account_rows: list[CmDataAccountName]) -> Counter[str]:
         token_counts: Counter[str] = Counter()
@@ -311,17 +345,12 @@ class CmDataImporter(models.Model):
                 token_counts[token] += 1
         return token_counts
 
-    def _register_account_partner_tokens(
-        self,
-        partner_map: dict[str, int],
-        row: CmDataAccountName,
-        partner_id: int,
-        token_counts: Counter[str],
-    ) -> None:
-        for token in self._iter_account_partner_tokens(row):
-            if token_counts[token] != 1:
-                continue
-            partner_map[token] = partner_id
+    def _count_account_partner_fallback_keys(self, account_rows: list[CmDataAccountName]) -> Counter[str]:
+        fallback_key_counts: Counter[str] = Counter()
+        for row in account_rows:
+            for fallback_key in self._iter_account_partner_fallback_keys(row):
+                fallback_key_counts[fallback_key] += 1
+        return fallback_key_counts
 
     def _iter_account_partner_tokens(self, row: CmDataAccountName) -> list[str]:
         tokens: list[str] = []
@@ -330,6 +359,63 @@ class CmDataImporter(models.Model):
             if normalized and normalized not in tokens:
                 tokens.append(normalized)
         return tokens
+
+    def _iter_account_partner_fallback_keys(self, row: CmDataAccountName) -> list[str]:
+        fallback_keys: list[str] = []
+        for raw_value in (row.account_name, row.ticket_name, row.ticket_name_report):
+            for fallback_key in self._iter_partner_label_fallback_keys(raw_value):
+                if fallback_key not in fallback_keys:
+                    fallback_keys.append(fallback_key)
+        return fallback_keys
+
+    def _resolve_account_partner_id(self, account_name: str | None, partner_map: dict[str, int]) -> int | None:
+        normalized_account_name = self._normalize_key(account_name)
+        if normalized_account_name:
+            partner_id = partner_map.get(normalized_account_name)
+            if partner_id:
+                return partner_id
+        for fallback_key in self._iter_partner_label_fallback_keys(account_name):
+            partner_id = partner_map.get(fallback_key)
+            if partner_id:
+                return partner_id
+        return None
+
+    def _iter_partner_label_fallback_keys(self, value: str | None) -> list[str]:
+        cleaned_value = (value or "").strip()
+        if not cleaned_value:
+            return []
+        normalized_value = self._normalize_key(cleaned_value)
+        fallback_keys: list[str] = []
+
+        def register_fallback_key(raw_candidate: str | None) -> None:
+            normalized_candidate = self._normalize_key(raw_candidate)
+            if not normalized_candidate or normalized_candidate == normalized_value or normalized_candidate in fallback_keys:
+                return
+            fallback_keys.append(normalized_candidate)
+
+        stripped_article_value = re.sub(r"^(?:the\s+)", "", cleaned_value, flags=re.IGNORECASE).strip()
+        if stripped_article_value != cleaned_value:
+            register_fallback_key(stripped_article_value)
+            register_fallback_key(f"{stripped_article_value}, The")
+
+        trailing_article_match = re.match(r"^(?P<base>.+?),\s*the$", cleaned_value, flags=re.IGNORECASE)
+        if trailing_article_match:
+            base_value = trailing_article_match.group("base").strip()
+            register_fallback_key(base_value)
+            register_fallback_key(f"The {base_value}")
+
+        parenthetical_base_value = re.sub(r"\s*\([^)]*\)$", "", cleaned_value).strip()
+        if parenthetical_base_value != cleaned_value:
+            register_fallback_key(parenthetical_base_value)
+
+        hyphen_base_value = re.split(r"\s*-\s*", cleaned_value, maxsplit=1)[0].strip()
+        if hyphen_base_value and hyphen_base_value != cleaned_value:
+            register_fallback_key(hyphen_base_value)
+
+        if cleaned_value.upper() == cleaned_value and any(character.isalpha() for character in cleaned_value):
+            register_fallback_key(re.sub(r"([A-Z])\1+", r"\1", cleaned_value))
+
+        return fallback_keys
 
     def _import_account_aliases(
         self,
@@ -343,7 +429,7 @@ class CmDataImporter(models.Model):
             alias_values = self._extract_aliases(row.claim_name_list)
             if not alias_values:
                 continue
-            partner_id = partner_map.get(self._normalize_key(row.account_name))
+            partner_id = self._resolve_account_partner_id(row.account_name, partner_map)
             if not partner_id:
                 continue
             for alias_value in alias_values:
@@ -382,8 +468,7 @@ class CmDataImporter(models.Model):
         commit_interval = self._get_commit_interval()
         processed_count = 0
         for row in contacts:
-            key = self._normalize_key(row.account_name)
-            parent_partner_id = partner_map.get(key)
+            parent_partner_id = self._resolve_account_partner_id(row.account_name, partner_map)
             if not parent_partner_id:
                 _logger.warning("Skipping contact without matching account: %s", row.account_name)
                 continue
@@ -424,7 +509,7 @@ class CmDataImporter(models.Model):
         commit_interval = self._get_commit_interval()
         processed_count = 0
         for row in direction_rows:
-            partner_id = partner_map.get(self._normalize_key(row.account_name))
+            partner_id = self._resolve_account_partner_id(row.account_name, partner_map)
             if not partner_id:
                 _logger.warning("Skipping direction without matching account: %s", row.account_name)
                 continue
@@ -479,7 +564,7 @@ class CmDataImporter(models.Model):
         commit_interval = self._get_commit_interval()
         processed_count = 0
         for row in instruction_rows:
-            partner_id = partner_map.get(self._normalize_key(row.account_name))
+            partner_id = self._resolve_account_partner_id(row.account_name, partner_map)
             if not partner_id:
                 _logger.warning("Skipping shipping instruction without matching account: %s", row.account_name)
                 continue
@@ -557,7 +642,7 @@ class CmDataImporter(models.Model):
         processed_count = 0
         resource = NOTE_TYPE_RESOURCES[note_type]
         for row in note_rows:
-            partner_id = partner_map.get(self._normalize_key(row.account_name))
+            partner_id = self._resolve_account_partner_id(row.account_name, partner_map)
             if not partner_id:
                 _logger.warning("Skipping %s note without matching account: %s", note_type, row.account_name)
                 continue
@@ -637,7 +722,7 @@ class CmDataImporter(models.Model):
         commit_interval = self._get_commit_interval()
         processed_count = 0
         for row in password_rows:
-            partner_id = partner_map.get(self._normalize_key(row.account_name))
+            partner_id = self._resolve_account_partner_id(row.account_name, partner_map)
             if not partner_id:
                 _logger.warning("Skipping password without matching account: %s", row.account_name)
                 continue

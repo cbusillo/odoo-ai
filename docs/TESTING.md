@@ -72,10 +72,11 @@ Notes
   destructive and mutating validation against both Odoo and Shopify.
 - `shopify-roundtrip` supports `--start-after-export` when reset/export has
   already completed and you only need to rerun the round-trip checks.
-- The Shopify validation scenario temporarily pauses the Shopify dispatcher on
-  the target instance while it runs, then restores the original cron state at
-  the end. That keeps background changed-item churn from interfering with the
-  validator's own reset/export phases.
+- The Shopify validation scenario pauses Shopify autoschedule and webhook
+  processing while it runs so background health-check sync creation and live
+  webhook noise do not interfere with the validator's own reset/export phases.
+  It intentionally leaves the dispatcher running so queued validation syncs can
+  continue to recover from transient failures during long runs.
 - Use precise language in docs and commits: `validation scenario`,
   `environment-level validation`, or `round-trip validation` are better fits
   than `end-to-end test` when the workflow is stateful and intentionally runs

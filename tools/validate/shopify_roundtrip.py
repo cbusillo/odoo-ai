@@ -16,8 +16,6 @@ from tools.platform import dokploy as platform_dokploy
 from tools.platform.environment import discover_repo_root, load_dokploy_source_of_truth, load_environment
 
 POLL_SECONDS = 5
-CRON_PAUSE_RETRY_SECONDS = 5
-CRON_PAUSE_RETRY_ATTEMPTS = 12
 SYNC_TIMEOUT_SECONDS = 8 * 60 * 60
 TITLE_TIMEOUT_SECONDS = 180
 FIELD_TIMEOUT_SECONDS = 180
@@ -29,7 +27,6 @@ SUPPORTED_REMOTE_INSTANCES = ("dev", "testing", "prod")
 VALIDATION_PROFILES = ("smoke", "full")
 DEFAULT_SAMPLE_SIZE = 25
 VALIDATION_EXPORT_MARKER_OFFSET_SECONDS = 60 * 60
-SHOPIFY_DISPATCHER_CRON_NAME = "Shopify Sync – Dispatcher"
 SHOPIFY_WEBHOOK_PAUSE_KEY = "shopify.pause_webhook_processing"
 SHOPIFY_AUTOSCHEDULE_PAUSE_KEY = "shopify.pause_sync_autoschedule"
 PREPARE_SYNC_MODES = ("reset_shopify", "export_all_products", "import_then_export_products", "export_changed_products", "export_batch_products")
@@ -150,63 +147,6 @@ def restore_sync_autoschedule(client: RemoteOdooClient, *, original_value: str |
     )
 
 
-def read_dispatcher_cron(client: RemoteOdooClient) -> dict[str, object]:
-    result = client.execute(
-        "ir.cron",
-        "search_read",
-        [[["cron_name", "=", SHOPIFY_DISPATCHER_CRON_NAME]]],
-        {"fields": ["id", "active", "nextcall", "lastcall", "failure_count"], "limit": 1, "context": {"active_test": False}},
-    )
-    if not isinstance(result, list) or not result or not isinstance(result[0], dict):
-        raise RuntimeError(f"Could not find {SHOPIFY_DISPATCHER_CRON_NAME!r} on remote Odoo")
-    return result[0]
-
-
-def set_dispatcher_cron_active(client: RemoteOdooClient, *, active: bool, label: str) -> dict[str, object]:
-    cron_row = read_dispatcher_cron(client)
-    cron_id = cron_row.get("id")
-    if not isinstance(cron_id, int):
-        raise RuntimeError(f"Unexpected dispatcher cron payload: {cron_row!r}")
-    if bool(cron_row.get("active")) != active:
-        for attempt in range(CRON_PAUSE_RETRY_ATTEMPTS):
-            try:
-                client.execute("ir.cron", "write", [[cron_id], {"active": active}])
-                break
-            except xmlrpc.client.Fault as error:
-                error_text = str(error.faultString or error)
-                cron_is_busy = "currently being executed" in error_text
-                last_attempt = attempt == CRON_PAUSE_RETRY_ATTEMPTS - 1
-                if not cron_is_busy or last_attempt:
-                    raise
-                print(
-                    json.dumps(
-                        {
-                            "label": label,
-                            "retry_reason": "dispatcher cron busy",
-                            "attempt": attempt + 1,
-                            "retry_in_seconds": CRON_PAUSE_RETRY_SECONDS,
-                        },
-                        sort_keys=True,
-                    ),
-                    flush=True,
-                )
-                time.sleep(CRON_PAUSE_RETRY_SECONDS)
-        cron_row = read_dispatcher_cron(client)
-    print(json.dumps({"label": label, "dispatcher_cron": cron_row}, sort_keys=True), flush=True)
-    return cron_row
-
-
-def pause_dispatcher_cron(client: RemoteOdooClient) -> bool:
-    cron_row = read_dispatcher_cron(client)
-    was_active = bool(cron_row.get("active"))
-    set_dispatcher_cron_active(client, active=False, label="pause dispatcher cron")
-    return was_active
-
-
-def restore_dispatcher_cron(client: RemoteOdooClient, *, originally_active: bool) -> None:
-    set_dispatcher_cron_active(client, active=originally_active, label="restore dispatcher cron")
-
-
 def list_conflicting_syncs(client: RemoteOdooClient) -> list[dict[str, object]]:
     result = client.execute(
         "shopify.sync",
@@ -225,7 +165,6 @@ def list_conflicting_syncs(client: RemoteOdooClient) -> list[dict[str, object]]:
 
 def read_validation_runtime_state(client: RemoteOdooClient) -> dict[str, object]:
     return {
-        "dispatcher_cron": read_dispatcher_cron(client),
         "autoschedule_pause": read_config_parameter(client, SHOPIFY_AUTOSCHEDULE_PAUSE_KEY),
         "webhook_pause": read_config_parameter(client, SHOPIFY_WEBHOOK_PAUSE_KEY),
         "active_syncs": list_conflicting_syncs(client),
@@ -1311,15 +1250,11 @@ def run_validation_command(
     )
     client = RemoteOdooClient(settings)
     validation_results: dict[str, object] | None = None
-    dispatcher_was_active = False
     original_webhook_pause_value: str | None = None
     original_autoschedule_pause_value: str | None = None
-    dispatcher_pause_applied = False
     webhook_pause_applied = False
     autoschedule_pause_applied = False
     try:
-        dispatcher_was_active = pause_dispatcher_cron(client)
-        dispatcher_pause_applied = True
         original_autoschedule_pause_value = pause_sync_autoschedule(client)
         autoschedule_pause_applied = True
         original_webhook_pause_value = pause_webhook_processing(client)
@@ -1337,8 +1272,6 @@ def run_validation_command(
             restore_webhook_processing(client, original_value=original_webhook_pause_value)
         if autoschedule_pause_applied:
             restore_sync_autoschedule(client, original_value=original_autoschedule_pause_value)
-        if dispatcher_pause_applied:
-            restore_dispatcher_cron(client, originally_active=dispatcher_was_active)
 
     if validation_results is None:
         raise RuntimeError("Shopify validation finished without producing a result payload")

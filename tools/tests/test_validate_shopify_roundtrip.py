@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import unittest
-import xmlrpc.client
 from pathlib import Path
 from unittest import mock
 
@@ -81,14 +80,13 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
         with (
             mock.patch.object(shopify_roundtrip, "load_settings", return_value=fake_settings) as load_settings_mock,
             mock.patch.object(shopify_roundtrip, "RemoteOdooClient", return_value=fake_client),
-            mock.patch.object(shopify_roundtrip, "pause_dispatcher_cron", return_value=True) as pause_dispatcher_cron_mock,
             mock.patch.object(shopify_roundtrip, "pause_sync_autoschedule", return_value=None) as pause_sync_autoschedule_mock,
             mock.patch.object(shopify_roundtrip, "pause_webhook_processing", return_value=None) as pause_webhook_processing_mock,
             mock.patch.object(shopify_roundtrip, "ensure_no_conflicting_syncs") as ensure_no_conflicting_syncs_mock,
             mock.patch.object(
                 shopify_roundtrip,
                 "read_validation_runtime_state",
-                return_value={"active_syncs": [], "dispatcher_cron": {"active": True}, "autoschedule_pause": None, "webhook_pause": None},
+                return_value={"active_syncs": [], "autoschedule_pause": None, "webhook_pause": None},
             ),
             mock.patch.object(
                 shopify_roundtrip,
@@ -97,7 +95,6 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
             ) as run_roundtrip_mock,
             mock.patch.object(shopify_roundtrip, "restore_sync_autoschedule") as restore_sync_autoschedule_mock,
             mock.patch.object(shopify_roundtrip, "restore_webhook_processing") as restore_webhook_processing_mock,
-            mock.patch.object(shopify_roundtrip, "restore_dispatcher_cron") as restore_dispatcher_cron_mock,
         ):
             results = shopify_roundtrip.run_validation_command(
                 context_name="opw",
@@ -115,7 +112,6 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
         self.assertIn("operator_summary", results)
         self.assertIn("post_validation_runtime_state", results)
         load_settings_mock.assert_called_once()
-        pause_dispatcher_cron_mock.assert_called_once_with(fake_client)
         pause_sync_autoschedule_mock.assert_called_once_with(fake_client)
         pause_webhook_processing_mock.assert_called_once_with(fake_client)
         ensure_no_conflicting_syncs_mock.assert_called_once_with(fake_client, clear_conflicts=True)
@@ -128,23 +124,20 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
         )
         restore_sync_autoschedule_mock.assert_called_once_with(fake_client, original_value=None)
         restore_webhook_processing_mock.assert_called_once_with(fake_client, original_value=None)
-        restore_dispatcher_cron_mock.assert_called_once_with(fake_client, originally_active=True)
 
-    def test_run_validation_command_restores_dispatcher_on_failure(self) -> None:
+    def test_run_validation_command_restores_pause_flags_on_failure(self) -> None:
         fake_settings = mock.sentinel.settings
         fake_client = mock.sentinel.client
 
         with (
             mock.patch.object(shopify_roundtrip, "load_settings", return_value=fake_settings),
             mock.patch.object(shopify_roundtrip, "RemoteOdooClient", return_value=fake_client),
-            mock.patch.object(shopify_roundtrip, "pause_dispatcher_cron", return_value=False),
             mock.patch.object(shopify_roundtrip, "pause_sync_autoschedule", return_value=None),
             mock.patch.object(shopify_roundtrip, "pause_webhook_processing", return_value="1"),
             mock.patch.object(shopify_roundtrip, "ensure_no_conflicting_syncs"),
             mock.patch.object(shopify_roundtrip, "run_roundtrip", side_effect=RuntimeError("boom")),
             mock.patch.object(shopify_roundtrip, "restore_sync_autoschedule") as restore_sync_autoschedule_mock,
             mock.patch.object(shopify_roundtrip, "restore_webhook_processing") as restore_webhook_processing_mock,
-            mock.patch.object(shopify_roundtrip, "restore_dispatcher_cron") as restore_dispatcher_cron_mock,
         ):
             with self.assertRaises(RuntimeError):
                 shopify_roundtrip.run_validation_command(
@@ -157,7 +150,6 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
 
         restore_sync_autoschedule_mock.assert_called_once_with(fake_client, original_value=None)
         restore_webhook_processing_mock.assert_called_once_with(fake_client, original_value="1")
-        restore_dispatcher_cron_mock.assert_called_once_with(fake_client, originally_active=False)
 
     def test_run_validation_command_does_not_restore_unapplied_pause_state(self) -> None:
         fake_settings = mock.sentinel.settings
@@ -166,10 +158,9 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
         with (
             mock.patch.object(shopify_roundtrip, "load_settings", return_value=fake_settings),
             mock.patch.object(shopify_roundtrip, "RemoteOdooClient", return_value=fake_client),
-            mock.patch.object(shopify_roundtrip, "pause_dispatcher_cron", side_effect=RuntimeError("pause failed")),
+            mock.patch.object(shopify_roundtrip, "pause_sync_autoschedule", side_effect=RuntimeError("pause failed")),
             mock.patch.object(shopify_roundtrip, "restore_sync_autoschedule") as restore_sync_autoschedule_mock,
             mock.patch.object(shopify_roundtrip, "restore_webhook_processing") as restore_webhook_processing_mock,
-            mock.patch.object(shopify_roundtrip, "restore_dispatcher_cron") as restore_dispatcher_cron_mock,
         ):
             with self.assertRaises(RuntimeError):
                 shopify_roundtrip.run_validation_command(
@@ -182,7 +173,6 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
 
         restore_sync_autoschedule_mock.assert_not_called()
         restore_webhook_processing_mock.assert_not_called()
-        restore_dispatcher_cron_mock.assert_not_called()
 
     def test_ensure_no_conflicting_syncs_fails_fast_by_default(self) -> None:
         client = mock.Mock()
@@ -236,52 +226,6 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
                 mock.call("shopify.sync", "write", [[42], {"cancel_requested": True, "cancel_reason": "because"}]),
             ],
         )
-
-    def test_pause_dispatcher_cron_disables_active_cron(self) -> None:
-        client = mock.Mock()
-
-        with mock.patch.object(
-            shopify_roundtrip,
-            "read_dispatcher_cron",
-            side_effect=[{"id": 101, "active": True}, {"id": 101, "active": True}, {"id": 101, "active": False}],
-        ):
-            was_active = shopify_roundtrip.pause_dispatcher_cron(client)
-
-        self.assertTrue(was_active)
-        client.execute.assert_called_once_with("ir.cron", "write", [[101], {"active": False}])
-
-    def test_pause_dispatcher_cron_retries_busy_cron_write(self) -> None:
-        client = mock.Mock()
-        client.execute.side_effect = [
-            xmlrpc.client.Fault(2, "Record cannot be modified right now: This cron task is currently being executed and may not be modified Please try again in a few minutes"),
-            None,
-        ]
-
-        with (
-            mock.patch.object(
-                shopify_roundtrip,
-                "read_dispatcher_cron",
-                side_effect=[{"id": 101, "active": True}, {"id": 101, "active": True}, {"id": 101, "active": False}],
-            ),
-            mock.patch.object(shopify_roundtrip.time, "sleep") as sleep_mock,
-        ):
-            was_active = shopify_roundtrip.pause_dispatcher_cron(client)
-
-        self.assertTrue(was_active)
-        self.assertEqual(client.execute.call_count, 2)
-        sleep_mock.assert_called_once_with(shopify_roundtrip.CRON_PAUSE_RETRY_SECONDS)
-
-    def test_restore_dispatcher_cron_restores_original_state(self) -> None:
-        client = mock.Mock()
-
-        with mock.patch.object(
-            shopify_roundtrip,
-            "read_dispatcher_cron",
-            side_effect=[{"id": 101, "active": False}, {"id": 101, "active": True}],
-        ):
-            shopify_roundtrip.restore_dispatcher_cron(client, originally_active=True)
-
-        client.execute.assert_called_once_with("ir.cron", "write", [[101], {"active": True}])
 
     def test_pause_webhook_processing_sets_flag_and_returns_original_value(self) -> None:
         client = mock.Mock()

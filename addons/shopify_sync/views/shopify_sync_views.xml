@@ -35,7 +35,7 @@
                 <field name="start_time_human"/>
                 <field name="end_time_human"/>
                 <field name="run_time_human"/>
-                <field name="write_date" string="Last Heartbeat" optional="show"/>
+                <field name="write_date" string="Last Heartbeat" optional="hide"/>
                 <field name="mode" widget="badge"/>
                 <field name="error_exception" optional="show"/>
                 <field name="hard_throttle_count" string="Throttles"/>
@@ -92,7 +92,8 @@
                 <filter name="filter_running" string="Running" domain="[('state','=','running')]"
                         help="Currently running"/>
                 <filter name="filter_failed" string="Failed" domain="[('state','=','failed')]" help="Runs with errors"/>
-                <filter name="filter_canceled" string="Canceled" domain="[('state','=','canceled')]" help="Canceled runs"/>
+                <filter name="filter_canceled" string="Canceled" domain="[('state','=','canceled')]"
+                        help="Canceled runs"/>
                 <filter name="filter_import" string="Import" domain="[('mode','ilike','import')]"/>
                 <filter name="filter_export" string="Export" domain="[('mode','ilike','export')]"/>
                 <separator/>

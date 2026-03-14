@@ -26,7 +26,7 @@ def _account_row(
         on_delivery_schedule=False,
         shipping_enable=False,
         location_drop=None,
-        updated_at=datetime(2026, 3, 14, 9, 0, 0),
+        updated_at=datetime(2026, 3, 14, 9),
     )
 
 

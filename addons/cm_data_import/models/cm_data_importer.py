@@ -393,7 +393,7 @@ class CmDataImporter(models.Model):
                 return
             fallback_keys.append(normalized_candidate)
 
-        stripped_article_value = re.sub(r"^(?:the\s+)", "", cleaned_value, flags=re.IGNORECASE).strip()
+        stripped_article_value = re.sub(r"^the\s+", "", cleaned_value, flags=re.IGNORECASE).strip()
         if stripped_article_value != cleaned_value:
             register_fallback_key(stripped_article_value)
             register_fallback_key(f"{stripped_article_value}, The")
@@ -841,8 +841,8 @@ class CmDataImporter(models.Model):
                 audit_model = self.env["integration.cm_data.pricing.audit"].sudo().with_context(IMPORT_CONTEXT)
         return catalog_row_map, catalog_id_map
 
+    @staticmethod
     def _clear_pricing_catalog_partner_audits(
-        self,
         audit_model: "odoo.model.integration_cm_data_pricing_audit",
         source_catalog_id: int,
     ) -> None:
@@ -1286,8 +1286,8 @@ class CmDataImporter(models.Model):
                 )
         return timeclock_employee_map
 
+    @staticmethod
     def _register_timeclock_employee_alias(
-        self,
         timeclock_employee_map: dict[int, int],
         *,
         alias_value: int | None,
@@ -1308,8 +1308,8 @@ class CmDataImporter(models.Model):
             return
         timeclock_employee_map[alias_value] = employee_id
 
+    @staticmethod
     def _resolve_timeclock_employee_id(
-        self,
         row: CmDataTimeclockPunch,
         timeclock_employee_map: dict[int, int],
     ) -> int | None:

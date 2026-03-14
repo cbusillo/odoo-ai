@@ -1111,7 +1111,6 @@ class CmDataImporter(models.Model):
         commit_interval = self._get_commit_interval()
         processed_count = 0
         employee_map: dict[int, int] = {}
-        timeclock_employee_map: dict[int, int] = {}
         for row in employee_rows:
             first_name, last_name, nick_name = self._split_employee_name_parts(row)
             display_name = " ".join(part for part in [first_name, last_name] if part).strip()
@@ -1163,12 +1162,74 @@ class CmDataImporter(models.Model):
             )
             if employee_record:
                 employee_map[row.record_id] = employee_record.id
-                if row.timeclock_id:
-                    timeclock_employee_map[row.timeclock_id] = employee_record.id
             processed_count += 1
             if self._maybe_commit(processed_count, commit_interval, label="employee"):
                 employee_model = self.env["hr.employee"].sudo().with_context(IMPORT_CONTEXT)
+        timeclock_employee_map = self._build_timeclock_employee_map(employee_rows, employee_map)
         return employee_map, timeclock_employee_map
+
+    def _build_timeclock_employee_map(
+        self,
+        employee_rows: list[CmDataEmployee],
+        employee_map: dict[int, int],
+    ) -> dict[int, int]:
+        timeclock_employee_map: dict[int, int] = {}
+        for row in employee_rows:
+            employee_id = employee_map.get(row.record_id)
+            if employee_id:
+                self._register_timeclock_employee_alias(
+                    timeclock_employee_map,
+                    alias_value=row.timeclock_id,
+                    employee_id=employee_id,
+                    alias_source="timeclock_id",
+                )
+        for row in employee_rows:
+            employee_id = employee_map.get(row.record_id)
+            if employee_id:
+                self._register_timeclock_employee_alias(
+                    timeclock_employee_map,
+                    alias_value=row.record_id,
+                    employee_id=employee_id,
+                    alias_source="employee_id",
+                )
+        return timeclock_employee_map
+
+    def _register_timeclock_employee_alias(
+        self,
+        timeclock_employee_map: dict[int, int],
+        *,
+        alias_value: int | None,
+        employee_id: int,
+        alias_source: str,
+    ) -> None:
+        if not alias_value:
+            return
+        existing_employee_id = timeclock_employee_map.get(alias_value)
+        if existing_employee_id and existing_employee_id != employee_id:
+            _logger.warning(
+                "CM data timeclock alias collision ignored: alias=%s source=%s existing_employee_id=%s conflicting_employee_id=%s",
+                alias_value,
+                alias_source,
+                existing_employee_id,
+                employee_id,
+            )
+            return
+        timeclock_employee_map[alias_value] = employee_id
+
+    def _resolve_timeclock_employee_id(
+        self,
+        row: CmDataTimeclockPunch,
+        timeclock_employee_map: dict[int, int],
+    ) -> int | None:
+        if row.user_id:
+            employee_id = timeclock_employee_map.get(row.user_id)
+            if employee_id:
+                return employee_id
+        if row.compnum:
+            employee_id = timeclock_employee_map.get(row.compnum)
+            if employee_id:
+                return employee_id
+        return None
 
     def _import_pto_usage(
         self,
@@ -1250,7 +1311,9 @@ class CmDataImporter(models.Model):
         closing_time = self._get_timeclock_close_time()
         today_local = fields.Date.context_today(self)
         employee_ids = {
-            employee_id for employee_id in (timeclock_employee_map.get(row.user_id or 0) for row in punch_rows) if employee_id
+            employee_id
+            for employee_id in (self._resolve_timeclock_employee_id(row, timeclock_employee_map) for row in punch_rows)
+            if employee_id
         }
         open_attendance_by_employee: dict[int, int] = {}
         if employee_ids:
@@ -1267,12 +1330,12 @@ class CmDataImporter(models.Model):
                     open_attendance_by_employee[employee_id] = attendance.id
 
         def punch_sort_key(punch: CmDataTimeclockPunch) -> tuple[int, datetime, int]:
-            employee_id = timeclock_employee_map.get(punch.user_id or 0) or 0
+            employee_id = self._resolve_timeclock_employee_id(punch, timeclock_employee_map) or 0
             sort_time = self._resolve_punch_time(punch) or datetime.min
             return employee_id, sort_time, punch.record_id
 
         for row in sorted(punch_rows, key=punch_sort_key):
-            employee_id = timeclock_employee_map.get(row.user_id or 0)
+            employee_id = self._resolve_timeclock_employee_id(row, timeclock_employee_map)
             if not employee_id:
                 _logger.warning("Timeclock punch %s has no mapped employee; skipping.", row.record_id)
                 continue

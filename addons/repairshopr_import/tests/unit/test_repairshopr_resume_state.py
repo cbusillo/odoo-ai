@@ -4,9 +4,7 @@ from unittest.mock import patch
 
 from ...models.repairshopr_importer import (
     REPAIRSHOPR_PHASE_ESTIMATES,
-    REPAIRSHOPR_PHASE_INVOICES,
     REPAIRSHOPR_PHASE_TICKETS,
-    REPAIRSHOPR_PHASE_TRANSPORT_BACKFILL,
     REPAIRSHOPR_RESUME_STATE_PARAM,
     REPAIRSHOPR_RESUME_STATE_VERSION,
 )
@@ -15,7 +13,8 @@ from ..fixtures.base import UnitTestCase
 
 
 class _ClientStub:
-    def clear_cache(self) -> None:
+    @staticmethod
+    def clear_cache() -> None:
         return None
 
 
@@ -83,6 +82,7 @@ class TestRepairshoprResumeState(UnitTestCase):
 
         with (
             patch.object(importer_class, "_build_client", autospec=True, return_value=_ClientStub()),
+            patch.object(importer_class, "_commit_runtime_state", autospec=True),
             patch.object(importer_class, "_import_customers", autospec=True) as import_customers,
             patch.object(importer_class, "_import_products", autospec=True) as import_products,
             patch.object(importer_class, "_import_tickets", autospec=True) as import_tickets,
@@ -107,8 +107,8 @@ class TestRepairshoprResumeState(UnitTestCase):
 
     def test_get_resume_marker_timestamp_uses_latest_created_or_updated_value(self) -> None:
         resume_marker = self.importer._get_resume_marker_timestamp(
-            updated_at=datetime(2026, 1, 3, 9, 15, 0),
-            created_at=datetime(2026, 1, 3, 9, 20, 0),
+            updated_at=datetime(2026, 1, 3, 9, 15),
+            created_at=datetime(2026, 1, 3, 9, 20),
         )
 
         self.assertEqual(resume_marker, "2026-01-03T09:20:00")
@@ -116,7 +116,7 @@ class TestRepairshoprResumeState(UnitTestCase):
     def test_get_resume_marker_timestamp_falls_back_to_created_value(self) -> None:
         resume_marker = self.importer._get_resume_marker_timestamp(
             updated_at=None,
-            created_at=datetime(2026, 1, 4, 7, 45, 0),
+            created_at=datetime(2026, 1, 4, 7, 45),
         )
 
         self.assertEqual(resume_marker, "2026-01-04T07:45:00")

@@ -1,3 +1,5 @@
+from typing import cast
+
 from ...models import fishbowl_rows
 from ...models.fishbowl_import_constants import (
     EXTERNAL_SYSTEM_CODE,
@@ -11,6 +13,7 @@ from ...models.fishbowl_import_constants import (
     RESOURCE_SALES_ORDER,
     RESOURCE_SALES_ORDER_LINE,
 )
+from ...services.fishbowl_client import FishbowlClient
 from ..common_imports import common
 from ..fixtures.base import UnitTestCase
 
@@ -102,7 +105,7 @@ class TestFishbowlHelpers(UnitTestCase):
 
         batches = list(
             importer_model._stream_rows_by_ids(
-                client,
+                cast(FishbowlClient, cast(object, client)),
                 "shipitem",
                 "shipId",
                 [4, 2, 4, 1],
@@ -126,7 +129,7 @@ class TestFishbowlHelpers(UnitTestCase):
         )
 
         grouped_counts = importer_model._count_grouped_rows_by_ids(
-            client,
+            cast(FishbowlClient, cast(object, client)),
             "shipitem",
             "shipId",
             "shipId",
@@ -175,15 +178,19 @@ class TestFishbowlHelpers(UnitTestCase):
             applicable_model_xml_ids=(),
         )
         partner = self.env["res.partner"].create({"name": "Reuse Mapping"})
-        external_id_record = self.env["external.id"].sudo().create(
-            {
-                "res_model": "sale.order.line",
-                "res_id": partner.id,
-                "system_id": system.id,
-                "resource": "salesorderitem",
-                "external_id": "456",
-                "active": False,
-            }
+        external_id_record = (
+            self.env["external.id"]
+            .sudo()
+            .create(
+                {
+                    "res_model": "sale.order.line",
+                    "res_id": partner.id,
+                    "system_id": system.id,
+                    "resource": "salesorderitem",
+                    "external_id": "456",
+                    "active": False,
+                }
+            )
         )
 
         importer_model._upsert_external_id_payloads(
@@ -208,10 +215,15 @@ class TestFishbowlHelpers(UnitTestCase):
     def test_resume_state_advances_tail_phases(self) -> None:
         importer_model = self.env["fishbowl.importer"]
 
-        self.assertEqual(importer_model._phase_names_from_state(importer_model._get_resume_state()), ("orders", "shipments", "receipts", "on_hand"))
+        self.assertEqual(
+            importer_model._phase_names_from_state(importer_model._get_resume_state()),
+            ("orders", "shipments", "receipts", "on_hand"),
+        )
 
         importer_model._set_resume_phase("shipments")
-        self.assertEqual(importer_model._phase_names_from_state(importer_model._get_resume_state()), ("shipments", "receipts", "on_hand"))
+        self.assertEqual(
+            importer_model._phase_names_from_state(importer_model._get_resume_state()), ("shipments", "receipts", "on_hand")
+        )
 
         importer_model._advance_resume_state("shipments")
         self.assertEqual(importer_model._get_resume_state()["phase"], "receipts")
@@ -283,7 +295,7 @@ class TestFishbowlHelpers(UnitTestCase):
                 "res_id": 999,
                 "system_id": system.id,
                 "resource": RESOURCE_SALES_ORDER,
-                "external_id": "not-a-number",
+                "external_id": "0",
                 "active": True,
             }
         )

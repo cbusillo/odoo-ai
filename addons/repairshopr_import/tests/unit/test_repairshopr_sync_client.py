@@ -97,9 +97,23 @@ class TestRepairshoprSyncClient(UnitTestCase):
         self.assertIn("ORDER BY GREATEST(updated_at, created_at), id", captured_calls[0][0])
         self.assertEqual(
             captured_calls[0][1],
-            ["2026-01-01T12:00:00", "2026-01-01T12:00:00", 10, "2022-01-01T00:00:00", "2022-01-01T00:00:00", 2],
+            [
+                datetime(2026, 1, 1, 12),
+                datetime(2026, 1, 1, 12),
+                10,
+                datetime(2022, 1, 1),
+                datetime(2022, 1, 1),
+                2,
+            ],
         )
         self.assertEqual(
             captured_calls[1][1],
-            [datetime(2026, 1, 1, 12, 5), datetime(2026, 1, 1, 12, 5), 12, "2022-01-01T00:00:00", "2022-01-01T00:00:00", 2],
+            [
+                datetime(2026, 1, 1, 12, 5),
+                datetime(2026, 1, 1, 12, 5),
+                12,
+                datetime(2022, 1, 1),
+                datetime(2022, 1, 1),
+                2,
+            ],
         )

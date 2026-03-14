@@ -177,12 +177,14 @@ class FishbowlImporter(models.Model):
         _logger.info("Fishbowl import: products in %.2fs", time.monotonic() - phase_started_at)
         return partner_maps, product_maps
 
-    def _default_resume_state(self) -> dict[str, int | str | None]:
+    @staticmethod
+    def _default_resume_state() -> dict[str, int | str | None]:
         return {
             "version": FISHBOWL_RESUME_STATE_VERSION,
             "phase": FISHBOWL_PHASE_ORDERS,
         }
 
+    # noinspection DuplicatedCode
     def _get_resume_state(self) -> dict[str, int | str | None]:
         parameter_model = self.env["ir.config_parameter"].sudo()
         raw_state = parameter_model.get_param(FISHBOWL_RESUME_STATE_PARAM)
@@ -220,6 +222,7 @@ class FishbowlImporter(models.Model):
         state["phase"] = phase_name
         self._set_resume_state(state)
 
+    # noinspection DuplicatedCode
     def _advance_resume_state(self, phase_name: str) -> dict[str, int | str | None]:
         state = self._get_resume_state()
         current_phase_index = FISHBOWL_PHASE_SEQUENCE.index(phase_name)
@@ -230,7 +233,8 @@ class FishbowlImporter(models.Model):
         self._set_resume_state(state)
         return state
 
-    def _phase_names_from_state(self, state: dict[str, int | str | None]) -> tuple[str, ...]:
+    @staticmethod
+    def _phase_names_from_state(state: dict[str, int | str | None]) -> tuple[str, ...]:
         start_phase = str(state.get("phase") or FISHBOWL_PHASE_ORDERS)
         start_index = FISHBOWL_PHASE_SEQUENCE.index(start_phase)
         return FISHBOWL_PHASE_SEQUENCE[start_index:]
@@ -248,13 +252,17 @@ class FishbowlImporter(models.Model):
         }
 
     def _load_existing_external_id_map(self, system_id: int, resource: str, res_model: str) -> dict[int, int]:
-        external_id_records = self.env["external.id"].sudo().search(
-            [
-                ("system_id", "=", system_id),
-                ("resource", "=", resource),
-                ("res_model", "=", res_model),
-                ("res_id", "!=", False),
-            ]
+        external_id_records = (
+            self.env["external.id"]
+            .sudo()
+            .search(
+                [
+                    ("system_id", "=", system_id),
+                    ("resource", "=", resource),
+                    ("res_model", "=", res_model),
+                    ("res_id", "!=", False),
+                ]
+            )
         )
         existing_map: dict[int, int] = {}
         for external_id_record in external_id_records:
@@ -284,13 +292,17 @@ class FishbowlImporter(models.Model):
         external_id_value: str,
         resource: str,
     ) -> "odoo.model.external_id":
-        return self.env["external.id"].sudo().search(
-            [
-                ("system_id", "=", system.id),
-                ("resource", "=", resource),
-                ("external_id", "=", external_id_value),
-            ],
-            limit=1,
+        return (
+            self.env["external.id"]
+            .sudo()
+            .search(
+                [
+                    ("system_id", "=", system.id),
+                    ("resource", "=", resource),
+                    ("external_id", "=", external_id_value),
+                ],
+                limit=1,
+            )
         )
 
     def _should_process_external_row(
@@ -405,9 +417,7 @@ class FishbowlImporter(models.Model):
                 pending_payloads.append(payload)
                 continue
             if existing_record.res_model and existing_record.res_model != expected_model:
-                raise ValidationError(
-                    f"External ID '{payload['external_id']}' already belongs to {existing_record.res_model}"
-                )
+                raise ValidationError(f"External ID '{payload['external_id']}' already belongs to {existing_record.res_model}")
             existing_record.write(
                 {
                     "res_model": expected_model,
@@ -913,7 +923,7 @@ class FishbowlImporter(models.Model):
         resource: str,
         expected_model: str,
     ) -> tuple[dict[str, int], dict[str, "odoo.model.external_id"], set[str]]:
-        external_id_model = self.env["external.id"].sudo()
+        external_id_model = self.env["external.id"].sudo().with_context(active_test=False)
         records = external_id_model.search(
             [
                 ("system_id", "=", system_id),
@@ -937,6 +947,27 @@ class FishbowlImporter(models.Model):
         return existing_map, stale_map, blocked_ids
 
     @staticmethod
+    def _build_query_for_id_batch(
+        table: str,
+        id_column: str,
+        batch_ids: list[int],
+        *,
+        select_clause: str,
+        trailing_clause: str,
+        extra_where: str | None = None,
+        extra_params: list[Any] | None = None,
+    ) -> tuple[str, list[Any]]:
+        placeholders = ", ".join(["%s"] * len(batch_ids))
+        query = f"SELECT {select_clause} FROM {table} WHERE {id_column} IN ({placeholders})"
+        params: list[Any] = list(batch_ids)
+        if extra_where:
+            query = f"{query} AND {extra_where}"
+            if extra_params:
+                params.extend(extra_params)
+        query = f"{query} {trailing_clause}"
+        return query, params
+
+    @staticmethod
     def _fetch_rows_by_ids(
         client: FishbowlClient,
         table: str,
@@ -956,14 +987,15 @@ class FishbowlImporter(models.Model):
         deduped_ids = sorted(set(record_ids))
         for start_index in range(0, len(deduped_ids), batch_size):
             batch_ids = deduped_ids[start_index : start_index + batch_size]
-            placeholders = ", ".join(["%s"] * len(batch_ids))
-            query = f"SELECT {columns} FROM {table} WHERE {id_column} IN ({placeholders})"
-            params: list[Any] = list(batch_ids)
-            if extra_where:
-                query = f"{query} AND {extra_where}"
-                if extra_params:
-                    params.extend(extra_params)
-            query = f"{query} ORDER BY id"
+            query, params = FishbowlImporter._build_query_for_id_batch(
+                table,
+                id_column,
+                batch_ids,
+                select_clause=columns,
+                trailing_clause="ORDER BY id",
+                extra_where=extra_where,
+                extra_params=extra_params,
+            )
             results.extend(client.fetch_all(query, params))
         if row_parser:
             return FishbowlImporter._parse_rows(row_parser, results)
@@ -988,14 +1020,15 @@ class FishbowlImporter(models.Model):
         deduped_ids = sorted(set(record_ids))
         for start_index in range(0, len(deduped_ids), batch_size):
             batch_ids = deduped_ids[start_index : start_index + batch_size]
-            placeholders = ", ".join(["%s"] * len(batch_ids))
-            query = f"SELECT {columns} FROM {table} WHERE {id_column} IN ({placeholders})"
-            params: list[Any] = list(batch_ids)
-            if extra_where:
-                query = f"{query} AND {extra_where}"
-                if extra_params:
-                    params.extend(extra_params)
-            query = f"{query} ORDER BY id"
+            query, params = FishbowlImporter._build_query_for_id_batch(
+                table,
+                id_column,
+                batch_ids,
+                select_clause=columns,
+                trailing_clause="ORDER BY id",
+                extra_where=extra_where,
+                extra_params=extra_params,
+            )
             rows = client.fetch_all(query, params)
             if not rows:
                 continue
@@ -1022,17 +1055,15 @@ class FishbowlImporter(models.Model):
         deduped_ids = sorted(set(record_ids))
         for start_index in range(0, len(deduped_ids), batch_size):
             batch_ids = deduped_ids[start_index : start_index + batch_size]
-            placeholders = ", ".join(["%s"] * len(batch_ids))
-            query = (
-                f"SELECT {group_column} AS group_id, COUNT(*) AS total FROM {table} "
-                f"WHERE {id_column} IN ({placeholders})"
+            query, params = FishbowlImporter._build_query_for_id_batch(
+                table,
+                id_column,
+                batch_ids,
+                select_clause=f"{group_column} AS group_id, COUNT(*) AS total",
+                trailing_clause=f"GROUP BY {group_column}",
+                extra_where=extra_where,
+                extra_params=extra_params,
             )
-            params: list[Any] = list(batch_ids)
-            if extra_where:
-                query = f"{query} AND {extra_where}"
-                if extra_params:
-                    params.extend(extra_params)
-            query = f"{query} GROUP BY {group_column}"
             for row in client.fetch_all(query, params):
                 group_id = row.get("group_id")
                 total = row.get("total")

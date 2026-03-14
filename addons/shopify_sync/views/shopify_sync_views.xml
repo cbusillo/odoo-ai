@@ -35,6 +35,7 @@
                 <field name="start_time_human"/>
                 <field name="end_time_human"/>
                 <field name="run_time_human"/>
+                <field name="write_date" string="Last Heartbeat" optional="show"/>
                 <field name="mode" widget="badge"/>
                 <field name="error_exception" optional="show"/>
                 <field name="hard_throttle_count" string="Throttles"/>
@@ -149,6 +150,7 @@
                         <field name="start_time" readonly="1" invisible="not start_time" widget="date"/>
                         <field name="end_time" readonly="1" invisible="not end_time"/>
                         <field name="run_time_human" readonly="1" invisible="not run_time"/>
+                        <field name="write_date" string="Last Heartbeat" readonly="1" invisible="not start_time"/>
                     </group>
                     <group string="Progress" invisible="not id">
                         <field name="updated_count" readonly="1" invisible="not updated_count"/>

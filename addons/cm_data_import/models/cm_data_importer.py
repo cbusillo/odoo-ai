@@ -2364,6 +2364,85 @@ class CmDataImporter(models.Model):
     def _set_last_sync_at(self, value: datetime) -> None:
         self.env["ir.config_parameter"].sudo().set_param("cm_data.last_sync_at", fields.Datetime.to_string(value))
 
+    @api.model
+    def get_validation_health_snapshot(self) -> dict[str, object]:
+        parameter_model = self.env["ir.config_parameter"].sudo()
+        audit_model = self.env["integration.cm_data.pricing.audit"].sudo().with_context(active_test=False)
+        external_id_model = self.env["external.id"].sudo().with_context(active_test=False)
+
+        with CmDataClient(self._get_connection_settings()) as client:
+            account_rows = client.fetch_account_names(updated_at=None)
+            contact_rows = client.fetch_contacts(updated_at=None)
+
+        source_account_ids = [str(row.record_id) for row in account_rows]
+        account_external_ids = external_id_model.search(
+            [
+                ("system_id.code", "=", EXTERNAL_SYSTEM_CODE),
+                ("resource", "=", ACCOUNT_RESOURCE),
+                ("external_id", "in", source_account_ids),
+            ]
+        )
+        partner_id_by_account_record_id: dict[int, int] = {}
+        for external_id_record in account_external_ids:
+            try:
+                account_record_id = int(external_id_record.external_id)
+            except (TypeError, ValueError):
+                continue
+            partner_id_by_account_record_id[account_record_id] = external_id_record.res_id
+
+        partner_lookup_map = self._build_account_partner_lookup_map(account_rows, partner_id_by_account_record_id)
+        unmatched_account_names = Counter()
+        source_contact_ids: set[str] = set()
+        for row in contact_rows:
+            source_contact_ids.add(str(row.record_id))
+            if not self._resolve_account_partner_id(row.account_name, partner_lookup_map):
+                unmatched_account_names[row.account_name or ""] += 1
+
+        contact_external_id_records = external_id_model.search(
+            [
+                ("system_id.code", "=", EXTERNAL_SYSTEM_CODE),
+                ("resource", "=", CONTACT_RESOURCE),
+            ]
+        )
+        imported_contact_ids = {str(record.external_id) for record in contact_external_id_records}
+        missing_contact_ids = sorted(source_contact_ids - imported_contact_ids)
+        missing_partner_total = audit_model.search_count([("issue_type", "=", "missing_partner")])
+
+        checks = {
+            "last_run_success": parameter_model.get_param("cm_data.last_run_status") == "success",
+            "contact_account_match_clean": not unmatched_account_names,
+            "contact_external_id_coverage_complete": not missing_contact_ids,
+            "pricing_missing_partner_clear": missing_partner_total == 0,
+        }
+        return {
+            "importer": "cm-data",
+            "ok": all(checks.values()),
+            "checks": checks,
+            "last_run": {
+                "status": parameter_model.get_param("cm_data.last_run_status") or "",
+                "message": parameter_model.get_param("cm_data.last_run_message") or "",
+                "at": parameter_model.get_param("cm_data.last_run_at") or "",
+                "last_sync_at": parameter_model.get_param("cm_data.last_sync_at") or "",
+            },
+            "metrics": {
+                "source_contact_count": len(source_contact_ids),
+                "imported_contact_external_id_count": len(imported_contact_ids),
+                "missing_contact_external_id_count": len(missing_contact_ids),
+                "distinct_unmatched_account_name_count": len(unmatched_account_names),
+                "pricing_missing_partner_count": missing_partner_total,
+                "pricing_missing_partner_counts": {
+                    "stamford": audit_model.search_count(
+                        [("issue_type", "=", "missing_partner"), ("catalog_code", "=", "stamford")]
+                    ),
+                    "esboces": audit_model.search_count([("issue_type", "=", "missing_partner"), ("catalog_code", "=", "esboces")]),
+                },
+            },
+            "samples": {
+                "top_unmatched_account_names": [[name, count] for name, count in unmatched_account_names.most_common(25)],
+                "missing_contact_external_ids_sample": missing_contact_ids[:10],
+            },
+        }
+
     def _record_last_run(self, status: str, message: str) -> None:
         parameter_model = self.env["ir.config_parameter"].sudo()
         parameter_model.set_param("cm_data.last_run_status", status)

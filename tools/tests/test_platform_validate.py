@@ -61,6 +61,45 @@ class PlatformValidateCliTests(unittest.TestCase):
             repository_root=repository_root,
         )
 
+    def test_importer_health_command_dispatches_to_validator(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            repository_root = Path(temporary_directory_name)
+            runner = CliRunner()
+
+            with (
+                patch("tools.platform.cli._discover_repo_root", return_value=repository_root),
+                patch(
+                    "tools.platform.cli.validate_importer_health.run_validation_command",
+                    return_value={"overall_ok": True, "result": "ok", "instance": "local"},
+                ) as run_validation_command_mock,
+            ):
+                result = runner.invoke(
+                    platform_cli_command,
+                    [
+                        "validate",
+                        "importer-health",
+                        "--context",
+                        "cm",
+                        "--instance",
+                        "local",
+                        "--importer",
+                        "cm-data",
+                        "--importer",
+                        "fishbowl",
+                    ],
+                )
+
+        self.assertEqual(result.exit_code, 0, msg=result.output)
+        self.assertEqual(json.loads(result.output), {"instance": "local", "overall_ok": True, "result": "ok"})
+        run_validation_command_mock.assert_called_once_with(
+            context_name="cm",
+            instance_name="local",
+            env_file=None,
+            remote_login="gpt-admin",
+            importers=("cm-data", "fishbowl"),
+            repository_root=repository_root,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -43,6 +43,12 @@ Operator Contract
   or compose-backed managed runtime.
 - `platform validate <scenario>` runs tracked environment validation scenarios
   against a selected stack or managed target.
+- `platform validate importer-health --context cm --instance local` snapshots
+  CM, Fishbowl, and RepairShopr importer run state, resume cleanliness, and
+  external-ID coverage signals without relying on scratch scripts.
+- `platform validate importer-health --importer cm-data --importer fishbowl`
+  scopes the importer-health scenario to a subset of importers when you only
+  need to re-check one workflow after a targeted import or restore.
 
 Command Families
 

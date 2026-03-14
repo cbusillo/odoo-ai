@@ -36,6 +36,7 @@ from tools.platform.models import (
     StackDefinition,
 )
 from tools.stack_data_workflow import run_stack_data_workflow
+from tools.validate import importer_health as validate_importer_health
 from tools.validate import shopify_roundtrip as validate_shopify_roundtrip
 
 PLATFORM_RUNTIME_ENV_KEYS = (
@@ -1263,6 +1264,43 @@ def validate_shopify_roundtrip_command(
         repository_root=_discover_repo_root(Path.cwd()),
     )
     click.echo(json.dumps(results, indent=2, sort_keys=True))
+
+
+@validate.command("importer-health", help="Run importer health checks against a selected Odoo instance.")
+@click.option("--context", "context_name", default="cm", show_default=True)
+@click.option(
+    "--instance",
+    "instance_name",
+    type=click.Choice(validate_importer_health.SUPPORTED_INSTANCES, case_sensitive=False),
+    default="local",
+    show_default=True,
+)
+@click.option("--env-file", type=click.Path(path_type=Path), default=None)
+@click.option("--remote-login", default=validate_importer_health.DEFAULT_REMOTE_LOGIN, show_default=True)
+@click.option(
+    "--importer",
+    "importers",
+    multiple=True,
+    type=click.Choice(validate_importer_health.SUPPORTED_IMPORTERS, case_sensitive=False),
+)
+def validate_importer_health_command(
+    context_name: str,
+    instance_name: str,
+    env_file: Path | None,
+    remote_login: str,
+    importers: tuple[str, ...],
+) -> None:
+    results = validate_importer_health.run_validation_command(
+        context_name=context_name,
+        instance_name=instance_name,
+        env_file=env_file,
+        remote_login=remote_login,
+        importers=importers,
+        repository_root=_discover_repo_root(Path.cwd()),
+    )
+    click.echo(json.dumps(results, indent=2, sort_keys=True))
+    if not bool(results.get("overall_ok")):
+        raise click.exceptions.Exit(1)
 
 
 @main.command("list-contexts")

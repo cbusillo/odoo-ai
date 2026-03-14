@@ -44,15 +44,18 @@ class TestContactImport(UnitTestCase):
         importer._import_contacts(
             cast(
                 CmDataClient,
-                _ContactClientStub(
-                    [
-                        _contact_row(
-                            record_id=320,
-                            account_name="WSBOOCES",
-                            sub_name="POs",
-                            contact_notes="Penny Notarnicola - pnotarni@wsboces.org",
-                        )
-                    ]
+                cast(
+                    object,
+                    _ContactClientStub(
+                        [
+                            _contact_row(
+                                record_id=320,
+                                account_name="WSBOOCES",
+                                sub_name="POs",
+                                contact_notes="Penny Notarnicola - pnotarni@wsboces.org",
+                            )
+                        ]
+                    ),
                 ),
             ),
             None,
@@ -95,15 +98,18 @@ class TestContactImport(UnitTestCase):
         importer._import_contacts(
             cast(
                 CmDataClient,
-                _ContactClientStub(
-                    [
-                        _contact_row(
-                            record_id=143,
-                            account_name="Buckley School, The",
-                            sub_name="Estimates, Pick Up",
-                            contact_notes="Main district contact",
-                        )
-                    ]
+                cast(
+                    object,
+                    _ContactClientStub(
+                        [
+                            _contact_row(
+                                record_id=143,
+                                account_name="Buckley School, The",
+                                sub_name="Estimates, Pick Up",
+                                contact_notes="Main district contact",
+                            )
+                        ]
+                    ),
                 ),
             ),
             None,

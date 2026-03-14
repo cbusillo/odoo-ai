@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+from collections import Counter
 from datetime import date, datetime, time
 from typing import TypeVar
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -261,6 +262,7 @@ class CmDataImporter(models.Model):
         commit_interval = self._get_commit_interval()
         processed_count = 0
         partner_map: dict[str, int] = {}
+        token_counts = self._count_account_partner_tokens(account_rows)
         for row in account_rows:
             values: "odoo.values.res_partner" = {
                 "name": row.account_name,
@@ -288,12 +290,39 @@ class CmDataImporter(models.Model):
                 continue
             self._apply_partner_roles_from_labels(partner, row.label_names, partner_role_map)
             self._apply_partner_price_lists(partner, row.price_list, row.price_list_2, price_list_model)
-            partner_map[self._normalize_key(row.account_name)] = partner.id
+            self._register_account_partner_tokens(partner_map, row, partner.id, token_counts)
             processed_count += 1
             if self._maybe_commit(processed_count, commit_interval, label="account"):
                 partner_model = self.env["res.partner"].sudo().with_context(IMPORT_CONTEXT)
                 price_list_model = self.env["integration.cm_data.price.list"].sudo().with_context(IMPORT_CONTEXT)
         return partner_map
+
+    def _count_account_partner_tokens(self, account_rows: list[CmDataAccountName]) -> Counter[str]:
+        token_counts: Counter[str] = Counter()
+        for row in account_rows:
+            for token in self._iter_account_partner_tokens(row):
+                token_counts[token] += 1
+        return token_counts
+
+    def _register_account_partner_tokens(
+        self,
+        partner_map: dict[str, int],
+        row: CmDataAccountName,
+        partner_id: int,
+        token_counts: Counter[str],
+    ) -> None:
+        for token in self._iter_account_partner_tokens(row):
+            if token_counts[token] != 1:
+                continue
+            partner_map[token] = partner_id
+
+    def _iter_account_partner_tokens(self, row: CmDataAccountName) -> list[str]:
+        tokens: list[str] = []
+        for raw_value in (row.account_name, row.ticket_name, row.ticket_name_report):
+            normalized = self._normalize_key(raw_value)
+            if normalized and normalized not in tokens:
+                tokens.append(normalized)
+        return tokens
 
     def _import_account_aliases(
         self,
@@ -692,6 +721,7 @@ class CmDataImporter(models.Model):
                     message=f"Pricing catalog '{row.name}' partner label '{row.partner_label}' could not be linked to a partner.",
                 )
                 continue
+            self._clear_pricing_catalog_partner_audits(audit_model, row.record_id)
             # noinspection PyUnresolvedReferences
             # False positive: fields are provided by the cm_school dependency.
             values: "odoo.values.school_pricing_catalog" = {
@@ -718,6 +748,20 @@ class CmDataImporter(models.Model):
                 catalog_model = self.env[catalog_model_name].sudo().with_context(IMPORT_CONTEXT)
                 audit_model = self.env["integration.cm_data.pricing.audit"].sudo().with_context(IMPORT_CONTEXT)
         return catalog_row_map, catalog_id_map
+
+    def _clear_pricing_catalog_partner_audits(
+        self,
+        audit_model: "odoo.model.integration_cm_data_pricing_audit",
+        source_catalog_id: int,
+    ) -> None:
+        resolved_audits = audit_model.search(
+            [
+                ("source_catalog_id", "=", source_catalog_id),
+                ("issue_type", "in", ["missing_partner", "ambiguous_partner"]),
+            ]
+        )
+        if resolved_audits:
+            resolved_audits.unlink()
 
     def _import_pricing_lines(
         self,
@@ -1256,9 +1300,17 @@ class CmDataImporter(models.Model):
                         "employee_id": employee_id,
                         "check_in": punch_time,
                     }
-                    attendance_record.write(values)
+                    self._write_attendance_values(
+                        attendance_record,
+                        values,
+                        reason=f"timeclock_existing_check_in punch={row.record_id}",
+                    )
                     if attendance_record.check_out and attendance_record.check_out < punch_time:
-                        attendance_record.write({"check_out": punch_time})
+                        self._write_attendance_values(
+                            attendance_record,
+                            {"check_out": punch_time},
+                            reason=f"timeclock_existing_check_in_adjust_out punch={row.record_id}",
+                        )
                     if attendance_record.check_out:
                         open_attendance_by_employee.pop(employee_id, None)
                     else:
@@ -1271,7 +1323,11 @@ class CmDataImporter(models.Model):
                         values: "odoo.values.hr_attendance" = {
                             "check_out": check_out_time,
                         }
-                        attendance_record.write(values)
+                        self._write_attendance_values(
+                            attendance_record,
+                            values,
+                            reason=f"timeclock_existing_check_out punch={row.record_id}",
+                        )
                     open_attendance_by_employee.pop(employee_id, None)
                 self._mark_external_id_synced(system, external_id_value, resource, updated_at)
                 processed_count += 1
@@ -1297,7 +1353,11 @@ class CmDataImporter(models.Model):
                             if open_attendance.check_in and check_out_time < open_attendance.check_in:
                                 check_out_time = open_attendance.check_in
                             try:
-                                open_attendance.write({"check_out": check_out_time})
+                                self._write_attendance_values(
+                                    open_attendance,
+                                    {"check_out": check_out_time},
+                                    reason=f"missing_checkout_before_new_check_in punch={row.record_id}",
+                                )
                             except ValidationError:
                                 self._close_attendance_with_check_out(
                                     open_attendance,
@@ -1339,7 +1399,11 @@ class CmDataImporter(models.Model):
                     if open_attendance.check_in and check_out_time < open_attendance.check_in:
                         check_out_time = open_attendance.check_in
                     try:
-                        open_attendance.write({"check_out": check_out_time})
+                        self._write_attendance_values(
+                            open_attendance,
+                            {"check_out": check_out_time},
+                            reason=f"missing_checkout_on_check_out punch={row.record_id}",
+                        )
                     except ValidationError:
                         self._close_attendance_with_check_out(
                             open_attendance,
@@ -1699,7 +1763,7 @@ class CmDataImporter(models.Model):
         if attendance.check_out == adjusted_check_out and adjusted_check_in == attendance.check_in:
             return
         try:
-            attendance.write(values)
+            self._write_attendance_values(attendance, values, reason=reason)
         except ValidationError as exc:
             self._log_attendance_fix_failure(
                 attendance,
@@ -1823,7 +1887,11 @@ class CmDataImporter(models.Model):
                     check_out_time = values.get("check_out") if isinstance(values, dict) else None
                     if isinstance(check_out_time, datetime):
                         if not overlapping_attendance.check_out or overlapping_attendance.check_out < check_out_time:
-                            overlapping_attendance.write({"check_out": check_out_time})
+                            self._write_attendance_values(
+                                overlapping_attendance,
+                                {"check_out": check_out_time},
+                                reason=reason,
+                            )
                             updated = True
                     if isinstance(check_time, datetime):
                         self._log_attendance_overlap(
@@ -1834,6 +1902,42 @@ class CmDataImporter(models.Model):
                         )
                     return overlapping_attendance
                 raise
+
+    def _write_attendance_values(
+        self,
+        attendance: "odoo.model.hr_attendance",
+        values: dict[str, object],
+        *,
+        reason: str,
+    ) -> None:
+        try:
+            attendance.write(values)
+            return
+        except (ValidationError, ValueError) as exc:
+            if not values or any(field_name not in {"check_in", "check_out"} for field_name in values):
+                raise
+            updates: list[str] = []
+            parameters: list[object] = []
+            for field_name in ("check_in", "check_out"):
+                if field_name not in values:
+                    continue
+                updates.append(f"{field_name} = %s")
+                parameters.append(values[field_name])
+            if not updates:
+                raise
+            updates.extend(["write_date = NOW()", "write_uid = %s"])
+            parameters.extend([self.env.user.id, attendance.id])
+            self.env.cr.execute(
+                f"UPDATE hr_attendance SET {', '.join(updates)} WHERE id = %s",
+                tuple(parameters),
+            )
+            attendance.invalidate_recordset(["check_in", "check_out", "write_date", "write_uid"])
+            _logger.warning(
+                "CM data attendance write bypassed overtime recompute: attendance_id=%s reason=%s error=%s",
+                attendance.id,
+                reason,
+                exc,
+            )
 
     @staticmethod
     def _resolve_punch_time(row: CmDataTimeclockPunch) -> datetime | None:

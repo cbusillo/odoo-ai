@@ -64,6 +64,7 @@ PRICING_CATALOG_RESOURCE = "pricing_catalog"
 PRICING_LINE_RESOURCE = "pricing_line"
 QUALITY_CONTROL_CHECKLIST_RESOURCE = "quality_control_checklist"
 EMPLOYEE_RESOURCE = "employee"
+EMPLOYEE_TIMECLOCK_PLACEHOLDER_RESOURCE = "employee_timeclock_placeholder"
 PTO_USAGE_RESOURCE = "pto_usage"
 VACATION_USAGE_RESOURCE = "vacation_usage"
 TIMECLOCK_IN_RESOURCE = "timeclock_in"
@@ -176,6 +177,12 @@ class CmDataImporter(models.Model):
                 vacation_rows = client.fetch_vacation_usage(updated_at=None)
                 self._import_vacation_usage(vacation_rows, employee_map, system, sync_started_at)
                 timeclock_rows = client.fetch_timeclock_punches(updated_at=None)
+                self._ensure_timeclock_placeholder_employees(
+                    timeclock_rows,
+                    timeclock_employee_map,
+                    system,
+                    sync_started_at,
+                )
                 self._import_timeclock_punches(timeclock_rows, timeclock_employee_map, system)
         except CronRuntimeBudgetExceeded as exception:
             message = str(exception)
@@ -1230,6 +1237,73 @@ class CmDataImporter(models.Model):
             if employee_id:
                 return employee_id
         return None
+
+    def _collect_timeclock_placeholder_specs(
+        self,
+        punch_rows: list[CmDataTimeclockPunch],
+        timeclock_employee_map: dict[int, int],
+    ) -> dict[int, dict[str, datetime]]:
+        placeholder_specs: dict[int, dict[str, datetime]] = {}
+        for row in punch_rows:
+            if self._resolve_timeclock_employee_id(row, timeclock_employee_map):
+                continue
+            compnum = row.compnum
+            punch_time = self._resolve_punch_time(row)
+            if not compnum or not punch_time:
+                continue
+            existing_spec = placeholder_specs.get(compnum)
+            if not existing_spec:
+                placeholder_specs[compnum] = {
+                    "first_seen": punch_time,
+                    "last_seen": punch_time,
+                }
+                continue
+            existing_spec["first_seen"] = min(existing_spec["first_seen"], punch_time)
+            existing_spec["last_seen"] = max(existing_spec["last_seen"], punch_time)
+        return placeholder_specs
+
+    def _ensure_timeclock_placeholder_employees(
+        self,
+        punch_rows: list[CmDataTimeclockPunch],
+        timeclock_employee_map: dict[int, int],
+        system: "odoo.model.external_system",
+        sync_started_at: datetime,
+    ) -> None:
+        placeholder_specs = self._collect_timeclock_placeholder_specs(punch_rows, timeclock_employee_map)
+        if not placeholder_specs:
+            return
+        employee_model = self.env["hr.employee"].sudo().with_context(IMPORT_CONTEXT)
+        for compnum, placeholder_spec in sorted(placeholder_specs.items()):
+            display_name = f"Archived CM Employee {compnum}"
+            values: dict[str, object] = {
+                "name": display_name,
+            }
+            if "first_name" in employee_model._fields:
+                values["first_name"] = "Archived"
+            if "last_name" in employee_model._fields:
+                values["last_name"] = f"CM Employee {compnum}"
+            if "nick_name" in employee_model._fields:
+                values["nick_name"] = display_name
+            if "active" in employee_model._fields:
+                values["active"] = False
+            if "first_contract_date" in employee_model._fields:
+                values["first_contract_date"] = self._as_date(placeholder_spec["first_seen"])
+            if "cm_data_last_day" in employee_model._fields:
+                values["cm_data_last_day"] = self._as_date(placeholder_spec["last_seen"])
+            placeholder_employee = self._get_or_create_by_external_id_with_sync(
+                employee_model,
+                system,
+                str(compnum),
+                values,
+                resource=EMPLOYEE_TIMECLOCK_PLACEHOLDER_RESOURCE,
+                updated_at=placeholder_spec["last_seen"],
+                sync_started_at=sync_started_at,
+            )
+            timeclock_employee_map[compnum] = placeholder_employee.id
+        _logger.info(
+            "CM data import: ensured %s archived timeclock placeholder employees",
+            len(placeholder_specs),
+        )
 
     def _import_pto_usage(
         self,

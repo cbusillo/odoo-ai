@@ -842,6 +842,7 @@ def _run_update_workflow(
     instance_name: str,
     env_file: Path | None,
     dry_run: bool,
+    echo_fn: Callable[[str], None] = click.echo,
 ) -> None:
     platform_workflow_runtime.run_update_workflow(
         stack_file=stack_file,
@@ -853,10 +854,10 @@ def _run_update_workflow(
         load_stack_fn=_load_stack,
         resolve_runtime_selection_fn=_resolve_runtime_selection,
         load_environment_fn=_load_environment,
-        compose_base_command_fn=_compose_base_command,
-        run_command_fn=_run_command,
-        run_command_best_effort_fn=_run_command_best_effort,
-        echo_fn=click.echo,
+        write_runtime_odoo_conf_file_fn=_write_runtime_odoo_conf_file,
+        write_runtime_env_file_fn=_write_runtime_env_file,
+        run_stack_data_workflow_fn=run_stack_data_workflow,
+        echo_fn=echo_fn,
     )
 
 
@@ -981,6 +982,14 @@ def _run_tui_ship_workflow(
         latest_deployment_for_application_fn=_latest_deployment_for_application,
         wait_for_dokploy_deployment_fn=_wait_for_dokploy_deployment,
         echo_fn=echo_fn,
+        run_post_deploy_update_fn=lambda: _run_update_workflow(
+            stack_file=Path("platform/stack.toml"),
+            context_name=context_name,
+            instance_name=instance_name,
+            env_file=env_file,
+            dry_run=False,
+            echo_fn=echo_fn,
+        ),
         check_dirty_working_tree_fn=_collect_dirty_tracked_files,
     )
 
@@ -1171,7 +1180,7 @@ LOCAL_RUNTIME_CONTRACT_HELP = (
 )
 REMOTE_RUNTIME_CONTRACT_HELP = (
     "Dokploy-managed remote workflow for dev/testing/prod. "
-    "Use ship for non-destructive deploy/restart. Restore and bootstrap are explicit data workflows; init/update remain local-only."
+    "Use ship for non-destructive deploy/restart. Restore and bootstrap are explicit data workflows; init remains local-only."
 )
 DESTRUCTIVE_DATA_WORKFLOW_HELP = (
     "Destructive data workflow. Supports local runtime plus remote dev/testing/prod targets. "
@@ -2309,7 +2318,11 @@ def promote(
     required=True,
 )
 @click.option("--env-file", type=click.Path(path_type=Path), default=None)
-@click.option("--wait/--no-wait", default=True)
+@click.option(
+    "--wait/--no-wait",
+    default=True,
+    help="Wait for deployment completion so the shared post-deploy update and health verification can run.",
+)
 @click.option(
     "--timeout",
     "timeout_override_seconds",
@@ -2392,6 +2405,13 @@ def ship(
         latest_deployment_for_application_fn=_latest_deployment_for_application,
         wait_for_dokploy_deployment_fn=_wait_for_dokploy_deployment,
         echo_fn=click.echo,
+        run_post_deploy_update_fn=lambda: _run_update_workflow(
+            stack_file=Path("platform/stack.toml"),
+            context_name=context_name,
+            instance_name=instance_name,
+            env_file=env_file,
+            dry_run=False,
+        ),
         check_dirty_working_tree_fn=_collect_dirty_tracked_files,
     )
 
@@ -2615,7 +2635,7 @@ def openupgrade(
 
 @main.command(
     "update",
-    help=f"Apply module updates against the local runtime. {LOCAL_RUNTIME_CONTRACT_HELP}",
+    help="Apply module updates against the selected local or remote runtime.",
 )
 @click.option(
     "--stack-file",

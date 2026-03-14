@@ -2056,6 +2056,137 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
     def test_execute_ship_application_wait_uses_predeploy_deployment_key(self) -> None:
         self._assert_execute_ship_wait_uses_predeploy_deployment_key(target_type="application")
 
+    def test_execute_ship_runs_post_deploy_update_before_health_verification(self) -> None:
+        call_order: list[str] = []
+        target_definition = self._target_definition()
+        source_of_truth = self._source_of_truth(target_definition)
+
+        commands_release.execute_ship(
+            context_name="cm",
+            instance_name="testing",
+            env_file=None,
+            wait=True,
+            timeout_override_seconds=None,
+            verify_health=True,
+            health_timeout_override_seconds=None,
+            dry_run=False,
+            no_cache=False,
+            skip_gate=True,
+            source_git_ref="main",
+            discover_repo_root_fn=lambda _path: Path("/tmp"),
+            load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+            load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+            find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+            resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
+            resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
+            resolve_ship_healthcheck_urls_fn=lambda **_kwargs: ("https://cm-testing.example/web/health",),
+            prepare_ship_branch_sync_fn=lambda _source_git_ref, _target_definition: None,
+            run_required_gates_fn=lambda **_kwargs: None,
+            resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
+            read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+            resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
+            apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
+            dokploy_request_fn=lambda **_kwargs: call_order.append("deploy") or {},
+            latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: {"id": "before"},
+            deployment_key_fn=lambda deployment: str(deployment.get("id", "")) if isinstance(deployment, dict) else "",
+            wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: call_order.append("wait") or "deployment=after status=done",
+            verify_ship_healthchecks_fn=lambda **_kwargs: call_order.append("health"),
+            latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
+            wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
+            echo_fn=lambda _line: None,
+            run_post_deploy_update_fn=lambda: call_order.append("update"),
+        )
+
+        self.assertEqual(call_order, ["deploy", "wait", "update", "health"])
+
+    def test_execute_ship_no_wait_skips_post_deploy_update(self) -> None:
+        target_definition = self._target_definition()
+        source_of_truth = self._source_of_truth(target_definition)
+        post_deploy_updates: list[str] = []
+
+        commands_release.execute_ship(
+            context_name="cm",
+            instance_name="testing",
+            env_file=None,
+            wait=False,
+            timeout_override_seconds=None,
+            verify_health=True,
+            health_timeout_override_seconds=None,
+            dry_run=False,
+            no_cache=False,
+            skip_gate=True,
+            source_git_ref="main",
+            discover_repo_root_fn=lambda _path: Path("/tmp"),
+            load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+            load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+            find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+            resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
+            resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
+            resolve_ship_healthcheck_urls_fn=lambda **_kwargs: ("https://cm-testing.example/web/health",),
+            prepare_ship_branch_sync_fn=lambda _source_git_ref, _target_definition: None,
+            run_required_gates_fn=lambda **_kwargs: None,
+            resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
+            read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+            resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
+            apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
+            dokploy_request_fn=lambda **_kwargs: {},
+            latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
+            deployment_key_fn=lambda _deployment: "",
+            wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: (_ for _ in ()).throw(AssertionError("wait should not run")),
+            verify_ship_healthchecks_fn=lambda **_kwargs: (_ for _ in ()).throw(AssertionError("health should not run")),
+            latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
+            wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
+            echo_fn=lambda _line: None,
+            run_post_deploy_update_fn=lambda: post_deploy_updates.append("update"),
+        )
+
+        self.assertEqual(post_deploy_updates, [])
+
+    def test_execute_ship_application_target_skips_post_deploy_update(self) -> None:
+        target_definition = self._target_definition(target_type="application")
+        source_of_truth = self._source_of_truth(target_definition)
+        call_order: list[str] = []
+        emitted_lines: list[str] = []
+
+        commands_release.execute_ship(
+            context_name="cm",
+            instance_name="testing",
+            env_file=None,
+            wait=True,
+            timeout_override_seconds=None,
+            verify_health=True,
+            health_timeout_override_seconds=None,
+            dry_run=False,
+            no_cache=False,
+            skip_gate=True,
+            source_git_ref="main",
+            discover_repo_root_fn=lambda _path: Path("/tmp"),
+            load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+            load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+            find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+            resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
+            resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
+            resolve_ship_healthcheck_urls_fn=lambda **_kwargs: ("https://cm-testing.example/web/health",),
+            prepare_ship_branch_sync_fn=lambda _source_git_ref, _target_definition: None,
+            run_required_gates_fn=lambda **_kwargs: None,
+            resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "application",
+            read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+            resolve_dokploy_target_fn=lambda **_kwargs: ("application", "application-id", "application-name", None, None),
+            apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
+            dokploy_request_fn=lambda **_kwargs: call_order.append("deploy") or {},
+            latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
+            deployment_key_fn=lambda deployment: str(deployment.get("id", "")) if isinstance(deployment, dict) else "",
+            wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: "",
+            verify_ship_healthchecks_fn=lambda **_kwargs: call_order.append("health"),
+            latest_deployment_for_application_fn=lambda _host, _token, _application_id: {"id": "before"},
+            wait_for_dokploy_deployment_fn=lambda **_kwargs: call_order.append("wait") or "deployment=after status=done",
+            echo_fn=emitted_lines.append,
+            run_post_deploy_update_fn=lambda: call_order.append("update"),
+        )
+
+        self.assertEqual(call_order, ["deploy", "wait", "health"])
+        self.assertIn("post_deploy_update=skipped target_type=application", emitted_lines)
+
     def test_execute_ship_dry_run_reports_missing_dokploy_config(self) -> None:
         emitted_lines: list[str] = []
         target_definition = self._target_definition()
@@ -2102,6 +2233,7 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
         emitted_lines: list[str] = []
         target_definition = self._target_definition()
         source_of_truth = self._source_of_truth(target_definition)
+        post_deploy_updates: list[str] = []
 
         with self.assertRaises(click.ClickException):
             commands_release.execute_ship(
@@ -2137,7 +2269,10 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
                 latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
                 wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
                 echo_fn=emitted_lines.append,
+                run_post_deploy_update_fn=lambda: post_deploy_updates.append("update"),
             )
+
+        self.assertEqual(post_deploy_updates, [])
 
     def test_execute_rollback_dry_run_reports_missing_dokploy_config(self) -> None:
         emitted_lines: list[str] = []

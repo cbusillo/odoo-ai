@@ -12,6 +12,42 @@ from tools.deployer.settings import StackSettings
 from tools.platform.models import DokployTargetDefinition
 
 
+def _sample_remote_stack_settings() -> StackSettings:
+    return StackSettings(
+        name="opw-testing",
+        repo_root=Path("/tmp/repo"),
+        env_file=Path("/tmp/opw-testing.env"),
+        source_env_file=Path("/tmp/opw-testing.env"),
+        environment={},
+        state_root=Path("/tmp/state/opw-testing"),
+        data_dir=Path("/tmp/state/opw-testing/data"),
+        db_dir=Path("/tmp/state/opw-testing/db"),
+        log_dir=Path("/tmp/state/opw-testing/logs"),
+        compose_command=("docker", "compose"),
+        compose_project="opw-testing",
+        compose_files=(Path("/tmp/repo/docker-compose.yml"),),
+        docker_context=Path("/tmp/repo"),
+        registry_image="odoo-ai",
+        healthcheck_url="https://opw-testing.example.com/web/health",
+        update_modules=("AUTO",),
+        services=("database", "script-runner", "web"),
+        script_runner_service="script-runner",
+        odoo_bin_path="/odoo/odoo-bin",
+        image_variable_name="DOCKER_IMAGE",
+        github_token=None,
+    )
+
+
+def _sample_remote_target_definition() -> DokployTargetDefinition:
+    return DokployTargetDefinition(
+        context="opw",
+        instance="testing",
+        target_id="compose-1",
+        target_name="opw-testing",
+        deploy_timeout_seconds=7200,
+    )
+
+
 class StackDataWorkflowTests(unittest.TestCase):
     def test_data_workflow_script_environment_keeps_required_keys_and_prefixes(self) -> None:
         env_values = {
@@ -294,6 +330,58 @@ class StackDataWorkflowTests(unittest.TestCase):
             ],
         )
 
+    def test_local_update_only_workflow_skips_upstream_requirements_and_passes_flag(self) -> None:
+        stack_settings = StackSettings(
+            name="opw-local",
+            repo_root=Path("/tmp/repo"),
+            env_file=Path("/tmp/opw-local.env"),
+            source_env_file=Path("/tmp/opw-local.env"),
+            environment={
+                "ODOO_DB_NAME": "opw",
+                "ODOO_FILESTORE_PATH": "/volumes/data/filestore",
+            },
+            state_root=Path("/tmp/state/opw-local"),
+            data_dir=Path("/tmp/state/opw-local/data"),
+            db_dir=Path("/tmp/state/opw-local/db"),
+            log_dir=Path("/tmp/state/opw-local/logs"),
+            compose_command=("docker", "compose"),
+            compose_project="opw-local",
+            compose_files=(Path("/tmp/repo/docker-compose.yml"),),
+            docker_context=Path("/tmp/repo"),
+            registry_image="odoo-ai",
+            healthcheck_url="https://opw-local.example.com/web/health",
+            update_modules=("AUTO",),
+            services=("database", "script-runner", "web"),
+            script_runner_service="script-runner",
+            odoo_bin_path="/odoo/odoo-bin",
+            image_variable_name="DOCKER_IMAGE",
+            github_token=None,
+        )
+        exec_commands: list[list[str]] = []
+        stack_settings.env_file.write_text("ODOO_DB_USER=odoo\n", encoding="utf-8")
+
+        with (
+            patch.object(stack_data_workflow, "load_stack_settings", return_value=stack_settings),
+            patch.object(stack_data_workflow, "build_updated_environment", return_value=stack_settings.environment.copy()),
+            patch.object(stack_data_workflow, "ensure_local_bind_mounts"),
+            patch.object(stack_data_workflow, "write_env_file"),
+            patch.object(stack_data_workflow, "wait_for_local_service"),
+            patch.object(stack_data_workflow, "_run_local_compose"),
+            patch.object(
+                stack_data_workflow, "local_compose_command", side_effect=lambda _settings, extra: ["docker", "compose", *extra]
+            ),
+            patch.object(stack_data_workflow, "local_compose_env", return_value={}),
+            patch.object(
+                stack_data_workflow,
+                "run_process",
+                side_effect=lambda command, **_kwargs: exec_commands.append(list(command)),
+            ),
+        ):
+            stack_data_workflow.run_stack_data_workflow("opw-local", update_only=True)
+
+        self.assertTrue(exec_commands)
+        self.assertEqual(exec_commands[0][-1], "--update-only")
+
     def test_resolve_dokploy_schedule_runtime_uses_server_schedule_for_linked_server(self) -> None:
         with patch.object(
             stack_data_workflow,
@@ -333,6 +421,7 @@ class StackDataWorkflowTests(unittest.TestCase):
             database_name="opw",
             bootstrap=True,
             no_sanitize=True,
+            update_only=False,
             clear_stale_lock=True,
             data_workflow_lock_path="/volumes/data/.data_workflow_in_progress",
         )
@@ -356,6 +445,7 @@ class StackDataWorkflowTests(unittest.TestCase):
             database_name="opw",
             bootstrap=True,
             no_sanitize=False,
+            update_only=False,
             clear_stale_lock=True,
             data_workflow_lock_path="/volumes/data/.data_workflow_in_progress",
         )
@@ -374,6 +464,7 @@ class StackDataWorkflowTests(unittest.TestCase):
             database_name="opw",
             bootstrap=False,
             no_sanitize=False,
+            update_only=False,
             clear_stale_lock=True,
             data_workflow_lock_path="/volumes/data/.data_workflow_in_progress",
         )
@@ -386,6 +477,7 @@ class StackDataWorkflowTests(unittest.TestCase):
             database_name="opw",
             bootstrap=False,
             no_sanitize=False,
+            update_only=False,
             clear_stale_lock=False,
             data_workflow_lock_path="/volumes/data/.data_workflow_in_progress",
         )
@@ -400,43 +492,60 @@ class StackDataWorkflowTests(unittest.TestCase):
             filestore_path="   ",
             bootstrap=False,
             no_sanitize=False,
+            update_only=False,
             clear_stale_lock=False,
             data_workflow_lock_path="/volumes/data/.data_workflow_in_progress",
         )
 
         self.assertIn("filestore_root=/volumes/data/filestore", schedule_script)
 
+    def test_build_dokploy_data_workflow_script_includes_update_only_flag(self) -> None:
+        schedule_script = stack_data_workflow._build_dokploy_data_workflow_script(
+            compose_app_name="compose-opw-testing-abc123",
+            database_name="opw",
+            bootstrap=False,
+            no_sanitize=False,
+            update_only=True,
+            clear_stale_lock=False,
+            data_workflow_lock_path="/volumes/data/.data_workflow_in_progress",
+        )
+
+        self.assertIn("--update-only", schedule_script)
+
+    @staticmethod
+    def test_sync_dokploy_target_environment_and_deploy_skips_compose_deploy_when_env_matches() -> None:
+        target_definition = _sample_remote_target_definition()
+
+        with (
+            patch.object(
+                stack_data_workflow,
+                "fetch_dokploy_target_payload",
+                return_value={"env": "ODOO_DB_NAME=opw\nODOO_FILESTORE_PATH=/volumes/data/filestore"},
+            ),
+            patch.object(stack_data_workflow, "update_dokploy_target_env") as update_target_env,
+            patch.object(stack_data_workflow, "latest_deployment_for_compose") as latest_deployment,
+            patch.object(stack_data_workflow, "wait_for_dokploy_compose_deployment") as wait_for_compose,
+            patch.object(stack_data_workflow, "dokploy_request") as dokploy_request,
+        ):
+            stack_data_workflow._sync_dokploy_target_environment_and_deploy(
+                dokploy_host="https://dokploy.example",
+                dokploy_token="token",
+                target_definition=target_definition,
+                env_values={
+                    "ODOO_DB_NAME": "opw",
+                    "ODOO_FILESTORE_PATH": "/volumes/data/filestore",
+                },
+                deploy_timeout_seconds=7200,
+            )
+
+        update_target_env.assert_not_called()
+        latest_deployment.assert_not_called()
+        wait_for_compose.assert_not_called()
+        dokploy_request.assert_not_called()
+
     def test_run_dokploy_managed_remote_data_workflow_normalizes_blank_filestore_path(self) -> None:
-        stack_settings = StackSettings(
-            name="opw-testing",
-            repo_root=Path("/tmp/repo"),
-            env_file=Path("/tmp/opw-testing.env"),
-            source_env_file=Path("/tmp/opw-testing.env"),
-            environment={},
-            state_root=Path("/tmp/state/opw-testing"),
-            data_dir=Path("/tmp/state/opw-testing/data"),
-            db_dir=Path("/tmp/state/opw-testing/db"),
-            log_dir=Path("/tmp/state/opw-testing/logs"),
-            compose_command=("docker", "compose"),
-            compose_project="opw-testing",
-            compose_files=(Path("/tmp/repo/docker-compose.yml"),),
-            docker_context=Path("/tmp/repo"),
-            registry_image="odoo-ai",
-            healthcheck_url="https://opw-testing.example.com/web/health",
-            update_modules=("AUTO",),
-            services=("database", "script-runner", "web"),
-            script_runner_service="script-runner",
-            odoo_bin_path="/odoo/odoo-bin",
-            image_variable_name="DOCKER_IMAGE",
-            github_token=None,
-        )
-        target_definition = DokployTargetDefinition(
-            context="opw",
-            instance="testing",
-            target_id="compose-1",
-            target_name="opw-testing",
-            deploy_timeout_seconds=7200,
-        )
+        stack_settings = _sample_remote_stack_settings()
+        target_definition = _sample_remote_target_definition()
 
         with (
             patch.object(
@@ -457,7 +566,11 @@ class StackDataWorkflowTests(unittest.TestCase):
                 "latest_deployment_for_schedule",
                 side_effect=[{"deploymentId": "before-1", "status": "done"}, {"deploymentId": "after-1", "status": "done"}],
             ),
-            patch.object(stack_data_workflow, "wait_for_dokploy_schedule_deployment", return_value="deployment=after-1 status=done"),
+            patch.object(
+                stack_data_workflow,
+                "wait_for_dokploy_schedule_deployment",
+                return_value="deployment=after-1 status=done",
+            ) as wait_for_schedule,
             patch.object(stack_data_workflow, "dokploy_request", return_value=True),
         ):
             exit_code = stack_data_workflow._run_dokploy_managed_remote_data_workflow(
@@ -470,9 +583,11 @@ class StackDataWorkflowTests(unittest.TestCase):
                 },
                 bootstrap=False,
                 no_sanitize=False,
+                update_only=False,
             )
 
         self.assertEqual(exit_code, 0)
+        self.assertEqual(wait_for_schedule.call_args.kwargs["timeout_seconds"], 7200)
         upsert_payload = upsert_schedule.call_args.kwargs["schedule_payload"]
         self.assertIn('filestore_root=/volumes/data/filestore', str(upsert_payload["script"]))
 
@@ -518,36 +633,8 @@ class StackDataWorkflowTests(unittest.TestCase):
         )
 
     def test_run_dokploy_managed_remote_data_workflow_upserts_and_runs_schedule(self) -> None:
-        stack_settings = StackSettings(
-            name="opw-testing",
-            repo_root=Path("/tmp/repo"),
-            env_file=Path("/tmp/opw-testing.env"),
-            source_env_file=Path("/tmp/opw-testing.env"),
-            environment={},
-            state_root=Path("/tmp/state/opw-testing"),
-            data_dir=Path("/tmp/state/opw-testing/data"),
-            db_dir=Path("/tmp/state/opw-testing/db"),
-            log_dir=Path("/tmp/state/opw-testing/logs"),
-            compose_command=("docker", "compose"),
-            compose_project="opw-testing",
-            compose_files=(Path("/tmp/repo/docker-compose.yml"),),
-            docker_context=Path("/tmp/repo"),
-            registry_image="odoo-ai",
-            healthcheck_url="https://opw-testing.example.com/web/health",
-            update_modules=("AUTO",),
-            services=("database", "script-runner", "web"),
-            script_runner_service="script-runner",
-            odoo_bin_path="/odoo/odoo-bin",
-            image_variable_name="DOCKER_IMAGE",
-            github_token=None,
-        )
-        target_definition = DokployTargetDefinition(
-            context="opw",
-            instance="testing",
-            target_id="compose-1",
-            target_name="opw-testing",
-            deploy_timeout_seconds=7200,
-        )
+        stack_settings = _sample_remote_stack_settings()
+        target_definition = _sample_remote_target_definition()
         dokploy_request_calls: list[dict[str, object]] = []
         updated_target_env_calls: list[dict[str, object]] = []
 
@@ -621,6 +708,7 @@ class StackDataWorkflowTests(unittest.TestCase):
                 },
                 bootstrap=True,
                 no_sanitize=True,
+                update_only=False,
             )
 
         self.assertEqual(exit_code, 0)
@@ -663,36 +751,8 @@ class StackDataWorkflowTests(unittest.TestCase):
         )
 
     def test_run_dokploy_managed_remote_data_workflow_requires_database_name(self) -> None:
-        stack_settings = StackSettings(
-            name="opw-testing",
-            repo_root=Path("/tmp/repo"),
-            env_file=Path("/tmp/opw-testing.env"),
-            source_env_file=Path("/tmp/opw-testing.env"),
-            environment={},
-            state_root=Path("/tmp/state/opw-testing"),
-            data_dir=Path("/tmp/state/opw-testing/data"),
-            db_dir=Path("/tmp/state/opw-testing/db"),
-            log_dir=Path("/tmp/state/opw-testing/logs"),
-            compose_command=("docker", "compose"),
-            compose_project="opw-testing",
-            compose_files=(Path("/tmp/repo/docker-compose.yml"),),
-            docker_context=Path("/tmp/repo"),
-            registry_image="odoo-ai",
-            healthcheck_url="https://opw-testing.example.com/web/health",
-            update_modules=("AUTO",),
-            services=("database", "script-runner", "web"),
-            script_runner_service="script-runner",
-            odoo_bin_path="/odoo/odoo-bin",
-            image_variable_name="DOCKER_IMAGE",
-            github_token=None,
-        )
-        target_definition = DokployTargetDefinition(
-            context="opw",
-            instance="testing",
-            target_id="compose-1",
-            target_name="opw-testing",
-            deploy_timeout_seconds=7200,
-        )
+        stack_settings = _sample_remote_stack_settings()
+        target_definition = _sample_remote_target_definition()
 
         with (
             patch.object(
@@ -717,6 +777,7 @@ class StackDataWorkflowTests(unittest.TestCase):
                     },
                     bootstrap=False,
                     no_sanitize=False,
+                    update_only=False,
                 )
         sync_target.assert_not_called()
 

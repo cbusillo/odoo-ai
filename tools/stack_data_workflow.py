@@ -202,18 +202,22 @@ def _current_image_reference(settings: StackSettings) -> str:
     return settings.environment.get(settings.image_variable_name) or settings.registry_image
 
 
-def _add_toggle_env_flags(command: list[str], *, bootstrap: bool, no_sanitize: bool) -> None:
+def _add_toggle_env_flags(command: list[str], *, bootstrap: bool, no_sanitize: bool, update_only: bool) -> None:
     if bootstrap:
         command.extend(["-e", "BOOTSTRAP=1"])
     if no_sanitize:
         command.extend(["-e", "NO_SANITIZE=1"])
+    if update_only:
+        command.extend(["-e", "UPDATE_ONLY=1"])
 
 
-def _add_toggle_args(command: list[str], *, bootstrap: bool, no_sanitize: bool) -> None:
+def _add_toggle_args(command: list[str], *, bootstrap: bool, no_sanitize: bool, update_only: bool) -> None:
     if bootstrap:
         command.append("--bootstrap")
     if no_sanitize:
         command.append("--no-sanitize")
+    if update_only:
+        command.append("--update-only")
 
 
 def _resolve_data_workflow_environment(raw_values: dict[str, str]) -> dict[str, str]:
@@ -305,6 +309,7 @@ def _build_dokploy_data_workflow_script(
     filestore_path: str = "/volumes/data/filestore",
     bootstrap: bool,
     no_sanitize: bool,
+    update_only: bool,
     clear_stale_lock: bool,
     data_workflow_lock_path: str,
 ) -> str:
@@ -314,6 +319,8 @@ def _build_dokploy_data_workflow_script(
         workflow_arguments.append("--bootstrap")
     if no_sanitize:
         workflow_arguments.append("--no-sanitize")
+    if update_only:
+        workflow_arguments.append("--update-only")
 
     quoted_workflow_arguments = " ".join(shlex.quote(argument) for argument in workflow_arguments)
     workflow_argument_line = (
@@ -523,27 +530,27 @@ def _sync_dokploy_target_environment_and_deploy(
             len(updated_environment_keys),
             ",".join(sorted(updated_environment_keys)),
         )
-    else:
-        _logger.info("Dokploy compose env already matched generated workflow env for %s", compose_name)
+        latest_compose_deployment = latest_deployment_for_compose(dokploy_host, dokploy_token, compose_id)
+        previous_deployment_key = deployment_key(latest_compose_deployment or {})
+        dokploy_request(
+            host=dokploy_host,
+            token=dokploy_token,
+            path="/api/compose.deploy",
+            method="POST",
+            payload={"composeId": compose_id},
+            timeout_seconds=deploy_timeout_seconds,
+        )
+        deployment_result = wait_for_dokploy_compose_deployment(
+            host=dokploy_host,
+            token=dokploy_token,
+            compose_id=compose_id,
+            before_key=previous_deployment_key,
+            timeout_seconds=deploy_timeout_seconds,
+        )
+        _logger.info("Dokploy compose deployment completed before data workflow: %s", deployment_result)
+        return
 
-    latest_compose_deployment = latest_deployment_for_compose(dokploy_host, dokploy_token, compose_id)
-    previous_deployment_key = deployment_key(latest_compose_deployment or {})
-    dokploy_request(
-        host=dokploy_host,
-        token=dokploy_token,
-        path="/api/compose.deploy",
-        method="POST",
-        payload={"composeId": compose_id},
-        timeout_seconds=deploy_timeout_seconds,
-    )
-    deployment_result = wait_for_dokploy_compose_deployment(
-        host=dokploy_host,
-        token=dokploy_token,
-        compose_id=compose_id,
-        before_key=previous_deployment_key,
-        timeout_seconds=deploy_timeout_seconds,
-    )
-    _logger.info("Dokploy compose deployment completed before data workflow: %s", deployment_result)
+    _logger.info("Dokploy compose env already matched generated workflow env for %s; skipping pre-workflow deploy", compose_name)
 
 
 def _run_dokploy_managed_remote_data_workflow(
@@ -552,6 +559,7 @@ def _run_dokploy_managed_remote_data_workflow(
     *,
     bootstrap: bool,
     no_sanitize: bool,
+    update_only: bool,
 ) -> int:
     """Run the data workflow on a Dokploy-managed target via Dokploy schedule jobs."""
     dokploy_host = env_values.get("DOKPLOY_HOST", "").strip()
@@ -618,6 +626,7 @@ def _run_dokploy_managed_remote_data_workflow(
         filestore_path=filestore_path,
         bootstrap=bootstrap,
         no_sanitize=no_sanitize,
+        update_only=update_only,
         clear_stale_lock=_should_clear_stale_data_workflow_lock(existing_schedule),
         data_workflow_lock_path=env_values.get("ODOO_DATA_WORKFLOW_LOCK_FILE", "/volumes/data/.data_workflow_in_progress"),
     )
@@ -672,7 +681,7 @@ def _run_dokploy_managed_remote_data_workflow(
         token=dokploy_token,
         schedule_id=schedule_id,
         before_key=previous_deployment_key,
-        timeout_seconds=30,
+        timeout_seconds=schedule_timeout_seconds,
     )
     _logger.info("Dokploy schedule workflow deployment completed: %s", deployment_result)
 
@@ -694,6 +703,7 @@ def run_stack_data_workflow(
     env_file: Path | None = None,
     bootstrap: bool = False,
     no_sanitize: bool = False,
+    update_only: bool = False,
 ) -> int:
     settings = load_stack_settings(stack_name, env_file)
     _ensure_stack_env(settings, stack_name)
@@ -702,7 +712,7 @@ def run_stack_data_workflow(
     image_reference = _current_image_reference(stack_settings)
     env_values_raw = build_updated_environment(stack_settings, image_reference)
     env_values = _resolve_data_workflow_environment(env_values_raw)
-    if not bootstrap:
+    if not bootstrap and not update_only:
         missing_upstream_keys = _missing_upstream_source_keys(env_values)
         if missing_upstream_keys:
             missing_joined = ", ".join(missing_upstream_keys)
@@ -713,7 +723,13 @@ def run_stack_data_workflow(
             )
 
     if runtime_scope is not None and runtime_scope[1] in {"dev", "testing", "prod"} and env_values.get("DOKPLOY_HOST", "").strip():
-        return _run_dokploy_managed_remote_data_workflow(stack_settings, env_values, bootstrap=bootstrap, no_sanitize=no_sanitize)
+        return _run_dokploy_managed_remote_data_workflow(
+            stack_settings,
+            env_values,
+            bootstrap=bootstrap,
+            no_sanitize=no_sanitize,
+            update_only=update_only,
+        )
 
     ensure_local_bind_mounts(stack_settings)
     write_env_file(stack_settings.env_file, env_values)
@@ -764,7 +780,7 @@ def run_stack_data_workflow(
         "-T",
     ]
     _add_exec_env_names(exec_extra, data_workflow_env_values.keys())
-    _add_toggle_env_flags(exec_extra, bootstrap=bootstrap, no_sanitize=no_sanitize)
+    _add_toggle_env_flags(exec_extra, bootstrap=bootstrap, no_sanitize=no_sanitize, update_only=update_only)
     exec_extra.extend(
         [
             stack_settings.script_runner_service,
@@ -773,7 +789,7 @@ def run_stack_data_workflow(
             DATA_WORKFLOW_SCRIPT,
         ]
     )
-    _add_toggle_args(exec_extra, bootstrap=bootstrap, no_sanitize=no_sanitize)
+    _add_toggle_args(exec_extra, bootstrap=bootstrap, no_sanitize=no_sanitize, update_only=update_only)
 
     try:
         run_process(

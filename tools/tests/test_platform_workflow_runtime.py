@@ -110,10 +110,12 @@ def _raise_missing_upstream(
     env_file: Path | None,
     bootstrap: bool,
     no_sanitize: bool,
+    update_only: bool,
 ) -> int:
     _ = env_file
     _ = bootstrap
     _ = no_sanitize
+    _ = update_only
     raise ValueError("missing upstream")
 
 
@@ -123,10 +125,12 @@ def _raise_restore_command_error(
     env_file: Path | None,
     bootstrap: bool,
     no_sanitize: bool,
+    update_only: bool,
 ) -> int:
     _ = env_file
     _ = bootstrap
     _ = no_sanitize
+    _ = update_only
     raise CommandError(["restore-from-upstream"], 1, None, "restore failed")
 
 
@@ -266,48 +270,37 @@ class PlatformWorkflowRuntimeTests(unittest.TestCase):
         self.assertEqual(captured_dry_run_commands[0][-3:], ["up", "-d", "script-runner"])
         self.assertEqual(captured_dry_run_commands[1][4:7], ["exec", "-T", "script-runner"])
 
-    def test_run_update_workflow_starts_script_runner_before_exec(self) -> None:
-        executed_commands: list[list[str]] = []
+    def test_run_update_workflow_routes_through_shared_update_only_backend(self) -> None:
+        captured_kwargs: dict[str, object] = {}
 
-        def run_command(command: list[str]) -> None:
-            executed_commands.append(command)
+        def run_stack_data_workflow_with_capture(_stack_name: str, **kwargs: object) -> int:
+            captured_kwargs.update(kwargs)
+            return 0
 
-        def run_web_pause_operation(
-            *_args: object,
-            operation: Callable[[], None],
-            **_kwargs: object,
-        ) -> None:
-            operation()
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            repo_root = Path(temporary_directory)
+            env_file = repo_root / "cm.local.env"
+            env_file.write_text("KEY=value\n", encoding="utf-8")
 
-        with (
-            patch(
-                "tools.platform.workflow_runtime._load_command_runtime_context",
-                return_value=_sample_runtime_context(),
-            ),
-            patch(
-                "tools.platform.workflow_runtime._run_with_web_temporarily_stopped",
-                side_effect=run_web_pause_operation,
-            ),
-        ):
             workflow_runtime.run_update_workflow(
                 stack_file=Path("platform/stack.toml"),
                 context_name="cm",
                 instance_name="local",
-                env_file=None,
+                env_file=env_file,
                 dry_run=False,
-                discover_repo_root_fn=lambda _path: Path("/tmp"),
+                discover_repo_root_fn=lambda _path: repo_root,
                 load_stack_fn=_load_sample_stack,
                 resolve_runtime_selection_fn=_resolve_sample_runtime_selection,
                 load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
-                compose_base_command_fn=_compose_base_command,
-                run_command_fn=run_command,
-                run_command_best_effort_fn=lambda _command: 0,
+                write_runtime_odoo_conf_file_fn=_write_sample_runtime_odoo_conf_file,
+                write_runtime_env_file_fn=_write_sample_runtime_env_file,
+                run_stack_data_workflow_fn=run_stack_data_workflow_with_capture,
                 echo_fn=lambda _message: None,
             )
 
-        self.assertEqual(len(executed_commands), 2)
-        self.assertEqual(executed_commands[0][-3:], ["up", "-d", "script-runner"])
-        self.assertEqual(executed_commands[1][4:7], ["exec", "-T", "script-runner"])
+        self.assertEqual(captured_kwargs["bootstrap"], False)
+        self.assertEqual(captured_kwargs["no_sanitize"], False)
+        self.assertEqual(captured_kwargs["update_only"], True)
 
     def test_run_restore_workflow_wraps_value_errors_as_click_exception(self) -> None:
         _assert_restore_workflow_raises_click_exception(

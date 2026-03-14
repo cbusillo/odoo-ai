@@ -269,7 +269,7 @@ print("admin_default_password_active=false")
     )
 
 
-def _run_data_reset_workflow(
+def _run_stack_data_workflow_command(
     *,
     repo_root: Path,
     stack_file: Path,
@@ -279,6 +279,7 @@ def _run_data_reset_workflow(
     workflow_name: str,
     bootstrap: bool,
     no_sanitize: bool,
+    update_only: bool,
     dry_run: bool,
     load_stack_fn: Callable[[Path], LoadedStack],
     resolve_runtime_selection_fn: Callable[[StackDefinition, str, str], RuntimeSelection],
@@ -322,6 +323,7 @@ def _run_data_reset_workflow(
         echo_fn(f"{workflow_name}_stack={target_stack_name}")
         echo_fn(f"{workflow_name}_env_file={workflow_env_label}")
         echo_fn(f"{workflow_name}_no_sanitize={str(no_sanitize).lower()}")
+        echo_fn(f"{workflow_name}_update_only={str(update_only).lower()}")
         return
 
     try:
@@ -330,6 +332,7 @@ def _run_data_reset_workflow(
             env_file=workflow_env_file,
             bootstrap=bootstrap,
             no_sanitize=no_sanitize,
+            update_only=update_only,
         )
     except (CommandError, ValueError) as error:
         raise click.ClickException(str(error)) from error
@@ -354,7 +357,7 @@ def run_restore_workflow(
     run_stack_data_workflow_fn: Callable[..., int],
     echo_fn: Callable[[str], None],
 ) -> None:
-    _run_data_reset_workflow(
+    _run_stack_data_workflow_command(
         repo_root=repo_root,
         stack_file=stack_file,
         context_name=context_name,
@@ -363,6 +366,7 @@ def run_restore_workflow(
         workflow_name="restore",
         bootstrap=False,
         no_sanitize=no_sanitize,
+        update_only=False,
         dry_run=dry_run,
         load_stack_fn=load_stack_fn,
         resolve_runtime_selection_fn=resolve_runtime_selection_fn,
@@ -391,7 +395,7 @@ def run_bootstrap_workflow(
     run_stack_data_workflow_fn: Callable[..., int],
     echo_fn: Callable[[str], None],
 ) -> None:
-    _run_data_reset_workflow(
+    _run_stack_data_workflow_command(
         repo_root=repo_root,
         stack_file=stack_file,
         context_name=context_name,
@@ -400,6 +404,7 @@ def run_bootstrap_workflow(
         workflow_name="bootstrap",
         bootstrap=True,
         no_sanitize=no_sanitize,
+        update_only=False,
         dry_run=dry_run,
         load_stack_fn=load_stack_fn,
         resolve_runtime_selection_fn=resolve_runtime_selection_fn,
@@ -585,82 +590,32 @@ def run_update_workflow(
     load_stack_fn: Callable[[Path], LoadedStack],
     resolve_runtime_selection_fn: Callable[[StackDefinition, str, str], RuntimeSelection],
     load_environment_fn: Callable[..., tuple[Path, dict[str, str]]],
-    compose_base_command_fn: Callable[[Path], list[str]],
-    run_command_fn: Callable[[list[str]], None],
-    run_command_best_effort_fn: Callable[[list[str]], int],
+    write_runtime_odoo_conf_file_fn: Callable[[RuntimeSelection, StackDefinition, dict[str, str]], Path],
+    write_runtime_env_file_fn: Callable[[Path, StackDefinition, RuntimeSelection, dict[str, str]], Path],
+    run_stack_data_workflow_fn: Callable[..., int],
     echo_fn: Callable[[str], None],
 ) -> None:
-    stack_definition, runtime_selection, loaded_environment, runtime_env_file = _load_command_runtime_context(
+    repo_root = discover_repo_root_fn(Path.cwd())
+    _run_stack_data_workflow_command(
+        repo_root=repo_root,
         stack_file=stack_file,
         context_name=context_name,
         instance_name=instance_name,
         env_file=env_file,
-        discover_repo_root_fn=discover_repo_root_fn,
+        workflow_name="update",
+        bootstrap=False,
+        no_sanitize=False,
+        update_only=True,
+        dry_run=dry_run,
         load_stack_fn=load_stack_fn,
         resolve_runtime_selection_fn=resolve_runtime_selection_fn,
         load_environment_fn=load_environment_fn,
-    )
-
-    update_modules = runtime_selection.context_definition.update_modules
-    module_argument = ",".join(runtime_selection.effective_install_modules)
-    addons_path_argument = ",".join(stack_definition.addons_path)
-    if update_modules.upper() != "AUTO":
-        module_argument = update_modules
-
-    command = [
-        "/odoo/odoo-bin",
-        "-d",
-        runtime_selection.database_name,
-        f"--addons-path={addons_path_argument}",
-        "--data-dir=/volumes/data",
-        "-u",
-        module_argument,
-        "--db_host=database",
-        "--db_port=5432",
-        f"--db_user={loaded_environment.get('ODOO_DB_USER', 'odoo')}",
-        f"--db_password={loaded_environment.get('ODOO_DB_PASSWORD', '')}",
-        "--stop-after-init",
-    ]
-    if dry_run:
-        compose_command = compose_base_command_fn(runtime_env_file)
-        _run_with_web_temporarily_stopped(
-            runtime_env_file,
-            operation=lambda: None,
-            dry_run=True,
-            dry_run_commands=(
-                compose_command + ["up", "-d", "script-runner"],
-                compose_command + ["exec", "-T", "script-runner", *command],
-            ),
-            compose_base_command_fn=compose_base_command_fn,
-            run_command_best_effort_fn=run_command_best_effort_fn,
-            echo_fn=echo_fn,
-        )
-        return
-
-    def _run_update_operation() -> None:
-        _compose_up_script_runner(
-            runtime_env_file,
-            compose_base_command_fn=compose_base_command_fn,
-            run_command_fn=run_command_fn,
-        )
-        _compose_exec(
-            runtime_env_file,
-            "script-runner",
-            command,
-            compose_base_command_fn=compose_base_command_fn,
-            run_command_fn=run_command_fn,
-        )
-
-    _run_with_web_temporarily_stopped(
-        runtime_env_file,
-        operation=_run_update_operation,
-        dry_run=False,
-        dry_run_commands=(),
-        compose_base_command_fn=compose_base_command_fn,
-        run_command_best_effort_fn=run_command_best_effort_fn,
+        write_runtime_odoo_conf_file_fn=write_runtime_odoo_conf_file_fn,
+        write_runtime_env_file_fn=write_runtime_env_file_fn,
+        run_stack_data_workflow_fn=run_stack_data_workflow_fn,
         echo_fn=echo_fn,
     )
-    echo_fn(f"update={runtime_selection.project_name}")
+    echo_fn(f"update={context_name}-{instance_name}")
 
 
 def run_openupgrade_command(
@@ -814,9 +769,9 @@ def run_workflow(
             load_stack_fn=load_stack_fn,
             resolve_runtime_selection_fn=resolve_runtime_selection_fn,
             load_environment_fn=load_environment_fn,
-            compose_base_command_fn=compose_base_command_fn,
-            run_command_fn=run_command_fn,
-            run_command_best_effort_fn=run_command_best_effort_fn,
+            write_runtime_odoo_conf_file_fn=write_runtime_odoo_conf_file_fn,
+            write_runtime_env_file_fn=write_runtime_env_file_fn,
+            run_stack_data_workflow_fn=run_stack_data_workflow_fn,
             echo_fn=echo_fn,
         )
         echo_fn(f"workflow={normalized_workflow}")

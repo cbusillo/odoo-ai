@@ -26,11 +26,11 @@ Sources of Truth
 Operator Contract
 
 - `local` is the only host runtime on this machine.
-- Use `platform init`, `platform update`, `platform build`, `platform up`,
+- Use `platform init`, `platform build`, `platform up`,
   `platform down`, `platform logs`, `platform inspect`, and
   `platform odoo-shell` only with `--instance local`.
 - Treat `dev`, `testing`, and `prod` as Dokploy-managed remote targets.
-  Use `platform ship`, `platform rollback`, `platform gate`,
+  Use `platform ship`, `platform update`, `platform rollback`, `platform gate`,
   `platform promote`, `platform restore`, and `platform bootstrap` there.
 - `platform ship` is the non-destructive remote deploy/restart path.
 - `platform rollback` currently supports Dokploy application targets only.
@@ -39,6 +39,8 @@ Operator Contract
 - `platform bootstrap` is the destructive fresh-start rebuild path.
 - `platform init` remains a local-only module initialization pass for an
   existing database.
+- `platform update` applies module updates against the selected local runtime
+  or compose-backed managed runtime.
 - `platform validate <scenario>` runs tracked environment validation scenarios
   against a selected stack or managed target.
 
@@ -64,6 +66,12 @@ Behavior Highlights
   plus `--source-ref HEAD` for surgical remote testing.
 - `platform ship` is the only supported remote deployment trigger for managed
   Dokploy targets. Keep Dokploy auto deploy disabled for those targets.
+- When `platform ship` waits for deployment completion on compose-backed
+  managed targets, it now runs the shared `platform update` workflow before
+  final health verification so installed addon code/data changes are applied
+  through one canonical upgrade path.
+- `platform ship --no-wait` exits after triggering the deploy, so the post-
+  deploy update and health verification steps do not run in that mode.
 - Remote web startup uses `run_odoo_startup.py` to initialize missing modules
   when needed before launching the long-running server.
 - Release-sensitive commands resolve env layers with collision mode `error`.

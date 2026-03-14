@@ -39,19 +39,23 @@ Generated Files
 Operator Contract Summary
 
 - `local` is the only host runtime on this machine.
-- Use `platform init`, `platform update`, `platform run`, `platform build`,
+- Use `platform init`, `platform run`, `platform build`,
   `platform up`, `platform down`, `platform logs`, `platform inspect`, and
   `platform odoo-shell` only with `--instance local`.
 - Treat `dev`, `testing`, and `prod` as Dokploy-managed remote targets.
-  Use `platform ship`, `platform rollback`, `platform gate`,
+  Use `platform ship`, `platform update`, `platform rollback`, `platform gate`,
   `platform promote`, `platform restore`, and `platform bootstrap` there.
-- `platform ship` deploys and restarts remote code without replacing data, and
-  is the only supported deploy trigger for managed Dokploy targets.
+- `platform ship` deploys and restarts remote code without replacing data, is
+  the only supported deploy trigger for managed Dokploy targets, and when run
+  with the default `--wait` behavior it follows the deploy with the shared
+  module-update workflow before final health verification.
 - `platform restore` replaces database and filestore state from upstream data.
 - `platform bootstrap` clears database and filestore state, then builds a
   fresh runtime.
 - `platform init` remains a local-only module initialization pass against an
   existing database.
+- `platform update` applies module updates against the selected local or
+  compose-backed managed runtime.
 
 Secrets and Env Notes
 

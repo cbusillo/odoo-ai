@@ -25,7 +25,6 @@ SHIP_INSTANCE_NAMES = frozenset({"dev", "testing", "prod"})
 LOCAL_RUNTIME_WORKFLOWS = frozenset(
     {
         "init",
-        "update",
         "openupgrade",
         "select",
         "up",
@@ -692,7 +691,6 @@ def execute_update_command(
     dry_run: bool,
     run_update_workflow_fn: Callable[..., None],
 ) -> None:
-    assert_local_instance_for_local_runtime(instance_name=instance_name, operation_name="platform update")
     run_update_workflow_fn(
         stack_file=stack_file,
         context_name=context_name,

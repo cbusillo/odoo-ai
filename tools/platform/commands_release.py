@@ -87,6 +87,44 @@ def _emit_deploy_plan(
     )
 
 
+def _run_post_deploy_steps(
+    *,
+    should_verify_health: bool,
+    health_timeout_seconds: int,
+    healthcheck_urls: tuple[str, ...],
+    run_post_deploy_update_fn: Callable[[], None] | None,
+    verify_ship_healthchecks_fn: Callable[..., None],
+) -> None:
+    if should_verify_health and not healthcheck_urls:
+        raise click.ClickException(
+            "Healthcheck verification requested but no target domain/URL was resolved. "
+            "Define domains in platform/dokploy.toml or disable with --no-verify-health."
+        )
+
+    if run_post_deploy_update_fn is not None:
+        run_post_deploy_update_fn()
+
+    if not should_verify_health:
+        return
+
+    verify_ship_healthchecks_fn(urls=healthcheck_urls, timeout_seconds=health_timeout_seconds)
+
+
+def _resolve_post_deploy_update_fn(
+    *,
+    selected_target_type: str,
+    run_post_deploy_update_fn: Callable[[], None] | None,
+    echo_fn: Callable[[str], None],
+) -> Callable[[], None] | None:
+    if run_post_deploy_update_fn is None:
+        return None
+    if selected_target_type == "compose":
+        return run_post_deploy_update_fn
+
+    echo_fn(f"post_deploy_update=skipped target_type={selected_target_type}")
+    return None
+
+
 def _assert_clean_working_tree(
     *,
     allow_dirty: bool,
@@ -148,6 +186,7 @@ def execute_ship(
     latest_deployment_for_application_fn: Callable[[str, str, str], JsonObject | None],
     wait_for_dokploy_deployment_fn: Callable[..., str],
     echo_fn: Callable[[str], None],
+    run_post_deploy_update_fn: Callable[[], None] | None = None,
     allow_dirty: bool = False,
     check_dirty_working_tree_fn: Callable[[], tuple[str, ...]] | None = None,
 ) -> None:
@@ -258,6 +297,12 @@ def execute_ship(
             messages.append(f"application_error={app_resolution_error.message}")
         raise click.ClickException(" ".join(messages))
 
+    post_deploy_update_fn = _resolve_post_deploy_update_fn(
+        selected_target_type=selected_target_type,
+        run_post_deploy_update_fn=run_post_deploy_update_fn,
+        echo_fn=echo_fn,
+    )
+
     if ship_branch_sync_plan is not None:
         if dry_run:
             echo_fn("branch_sync_applied=false")
@@ -310,13 +355,13 @@ def execute_ship(
             timeout_seconds=deploy_timeout_seconds,
         )
         echo_fn(result)
-        if should_verify_health:
-            if not healthcheck_urls:
-                raise click.ClickException(
-                    "Healthcheck verification requested but no target domain/URL was resolved. "
-                    "Define domains in platform/dokploy.toml or disable with --no-verify-health."
-                )
-            verify_ship_healthchecks_fn(urls=healthcheck_urls, timeout_seconds=health_timeout_seconds)
+        _run_post_deploy_steps(
+            should_verify_health=should_verify_health,
+            health_timeout_seconds=health_timeout_seconds,
+            healthcheck_urls=healthcheck_urls,
+            run_post_deploy_update_fn=post_deploy_update_fn,
+            verify_ship_healthchecks_fn=verify_ship_healthchecks_fn,
+        )
         return
 
     application_endpoint = "/api/application.redeploy" if no_cache else "/api/application.deploy"
@@ -363,13 +408,13 @@ def execute_ship(
         timeout_seconds=deploy_timeout_seconds,
     )
     echo_fn(result)
-    if should_verify_health:
-        if not healthcheck_urls:
-            raise click.ClickException(
-                "Healthcheck verification requested but no target domain/URL was resolved. "
-                "Define domains in platform/dokploy.toml or disable with --no-verify-health."
-            )
-        verify_ship_healthchecks_fn(urls=healthcheck_urls, timeout_seconds=health_timeout_seconds)
+    _run_post_deploy_steps(
+        should_verify_health=should_verify_health,
+        health_timeout_seconds=health_timeout_seconds,
+        healthcheck_urls=healthcheck_urls,
+        run_post_deploy_update_fn=post_deploy_update_fn,
+        verify_ship_healthchecks_fn=verify_ship_healthchecks_fn,
+    )
 
 
 def execute_rollback(

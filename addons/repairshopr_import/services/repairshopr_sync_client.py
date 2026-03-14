@@ -2,7 +2,7 @@ import logging
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any, Protocol, overload
 
@@ -486,9 +486,11 @@ class RepairshoprSyncClient:
         after_id: int | None,
         resume_after_updated_at: datetime | str | None,
     ) -> Iterator[list[dict[str, object]]]:
+        normalized_updated_at = self._coerce_datetime_value(updated_at)
+        normalized_resume_after_updated_at = self._coerce_datetime_value(resume_after_updated_at)
         last_seen_id = after_id or 0
-        resume_token = resume_after_updated_at
-        if resume_after_updated_at is not None and updated_at is not None and updated_column:
+        resume_token = normalized_resume_after_updated_at
+        if normalized_resume_after_updated_at is not None and normalized_updated_at is not None and updated_column:
             if created_column:
                 resume_column = f"GREATEST({updated_column}, {created_column})"
             else:
@@ -503,13 +505,13 @@ class RepairshoprSyncClient:
         while True:
             where_fragments_for_query = list(where_fragments)
             parameters = list(base_parameters)
-            if updated_at is not None and updated_column:
+            if normalized_updated_at is not None and updated_column:
                 if created_column:
                     where_fragments_for_query.append(f"({updated_column} >= %s OR {created_column} >= %s)")
-                    parameters.extend([updated_at, updated_at])
+                    parameters.extend([normalized_updated_at, normalized_updated_at])
                 else:
                     where_fragments_for_query.append(f"{updated_column} >= %s")
-                    parameters.append(updated_at)
+                    parameters.append(normalized_updated_at)
             where_clause = " AND ".join(where_fragments_for_query)
             column_clause = ", ".join(columns)
             query = (
@@ -522,10 +524,10 @@ class RepairshoprSyncClient:
                 break
             yield rows
             last_seen_id = rows[-1]["id"]
-            if resume_token is not None and updated_at is not None and updated_column:
-                last_seen_updated_at = rows[-1][updated_column]
+            if resume_token is not None and normalized_updated_at is not None and updated_column:
+                last_seen_updated_at = self._coerce_datetime_value(rows[-1][updated_column])
                 if created_column:
-                    last_created_at = rows[-1][created_column]
+                    last_created_at = self._coerce_datetime_value(rows[-1][created_column])
                     if last_seen_updated_at is None:
                         last_seen_updated_at = last_created_at
                     elif last_created_at is not None and last_created_at > last_seen_updated_at:
@@ -536,6 +538,24 @@ class RepairshoprSyncClient:
                 base_parameters[2] = last_seen_id
             else:
                 base_parameters[0] = last_seen_id
+
+    @staticmethod
+    def _coerce_datetime_value(value: datetime | str | None) -> datetime | None:
+        if value in {None, ""}:
+            return None
+        if isinstance(value, datetime):
+            if value.tzinfo is not None:
+                return value.astimezone(UTC).replace(tzinfo=None)
+            return value
+        if isinstance(value, str):
+            try:
+                parsed_value = datetime.fromisoformat(value)
+            except ValueError:
+                return None
+            if parsed_value.tzinfo is not None:
+                return parsed_value.astimezone(UTC).replace(tzinfo=None)
+            return parsed_value
+        return None
 
     def _fetch_contacts(self, customer_ids: Sequence[int]) -> dict[int, list[repairshopr_models.Contact]]:
         contacts_by_customer: dict[int, list[repairshopr_models.Contact]] = defaultdict(list)

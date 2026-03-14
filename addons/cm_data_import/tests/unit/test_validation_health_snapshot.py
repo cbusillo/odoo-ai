@@ -51,11 +51,11 @@ class _CmDataClientStub:
         return False
 
     def fetch_account_names(self, updated_at: datetime | None) -> list[CmDataAccountName]:
-        del updated_at
+        assert updated_at is None
         return self._account_rows
 
     def fetch_contacts(self, updated_at: datetime | None) -> list[CmDataContact]:
-        del updated_at
+        assert updated_at is None
         return self._contact_rows
 
 

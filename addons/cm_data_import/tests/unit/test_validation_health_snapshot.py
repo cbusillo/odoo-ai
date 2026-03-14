@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import cast
 from unittest import mock
 
 from ...services.cm_data_client import CmDataAccountName, CmDataContact
@@ -23,7 +24,7 @@ def _account_row(*, record_id: int, account_name: str) -> CmDataAccountName:
         on_delivery_schedule=False,
         shipping_enable=False,
         location_drop=None,
-        updated_at=datetime(2026, 3, 14, 9, 0, 0),
+        updated_at=datetime(2026, 3, 14, 9),
     )
 
 
@@ -34,7 +35,7 @@ def _contact_row(*, record_id: int, account_name: str) -> CmDataContact:
         sub_name=f"Contact {record_id}",
         contact_notes=None,
         sort_order=record_id,
-        updated_at=datetime(2026, 3, 14, 9, 0, 0),
+        updated_at=datetime(2026, 3, 14, 9),
     )
 
 
@@ -49,10 +50,10 @@ class _CmDataClientStub:
     def __exit__(self, exc_type: object, exc: object, traceback: object) -> bool:
         return False
 
-    def fetch_account_names(self, updated_at: datetime | None) -> list[CmDataAccountName]:
+    def fetch_account_names(self, ignored_updated_at: datetime | None) -> list[CmDataAccountName]:
         return self._account_rows
 
-    def fetch_contacts(self, updated_at: datetime | None) -> list[CmDataContact]:
+    def fetch_contacts(self, ignored_updated_at: datetime | None) -> list[CmDataContact]:
         return self._contact_rows
 
 
@@ -95,12 +96,14 @@ class TestValidationHealthSnapshot(UnitTestCase):
             ),
         ):
             snapshot = importer.get_validation_health_snapshot()
+        metrics = cast(dict[str, object], snapshot["metrics"])
+        samples = cast(dict[str, object], snapshot["samples"])
 
         self.assertTrue(snapshot["ok"])
-        self.assertEqual(snapshot["metrics"]["source_contact_count"], 1)
-        self.assertEqual(snapshot["metrics"]["missing_contact_external_id_count"], 0)
-        self.assertEqual(snapshot["metrics"]["distinct_unmatched_account_name_count"], 0)
-        self.assertEqual(snapshot["samples"]["missing_contact_external_ids_sample"], [])
+        self.assertEqual(metrics["source_contact_count"], 1)
+        self.assertEqual(metrics["missing_contact_external_id_count"], 0)
+        self.assertEqual(metrics["distinct_unmatched_account_name_count"], 0)
+        self.assertEqual(samples["missing_contact_external_ids_sample"], [])
 
     def test_validation_health_snapshot_reports_missing_matches_and_coverage_gaps(self) -> None:
         importer = self.CmDataImporter
@@ -120,12 +123,15 @@ class TestValidationHealthSnapshot(UnitTestCase):
             ),
         ):
             snapshot = importer.get_validation_health_snapshot()
+        checks = cast(dict[str, object], snapshot["checks"])
+        metrics = cast(dict[str, object], snapshot["metrics"])
+        samples = cast(dict[str, object], snapshot["samples"])
 
         self.assertFalse(snapshot["ok"])
-        self.assertFalse(snapshot["checks"]["last_run_success"])
-        self.assertFalse(snapshot["checks"]["contact_account_match_clean"])
-        self.assertFalse(snapshot["checks"]["contact_external_id_coverage_complete"])
-        self.assertFalse(snapshot["checks"]["pricing_missing_partner_clear"])
-        self.assertEqual(snapshot["metrics"]["missing_contact_external_id_count"], 1)
-        self.assertEqual(snapshot["metrics"]["pricing_missing_partner_count"], 1)
-        self.assertEqual(snapshot["samples"]["top_unmatched_account_names"], [["Unknown Account", 1]])
+        self.assertFalse(checks["last_run_success"])
+        self.assertFalse(checks["contact_account_match_clean"])
+        self.assertFalse(checks["contact_external_id_coverage_complete"])
+        self.assertFalse(checks["pricing_missing_partner_clear"])
+        self.assertEqual(metrics["missing_contact_external_id_count"], 1)
+        self.assertEqual(metrics["pricing_missing_partner_count"], 1)
+        self.assertEqual(samples["top_unmatched_account_names"], [["Unknown Account", 1]])

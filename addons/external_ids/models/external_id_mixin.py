@@ -57,7 +57,7 @@ class ExternalIdMixin(models.AbstractModel):
             dom.append(("resource", "=", resource))
         else:
             dom.append(("resource", "=", "default"))
-        existing = ExternalId.search(
+        existing = ExternalId.with_context(active_test=False).search(
             [*dom],
             limit=1,
         )
@@ -135,7 +135,7 @@ class ExternalIdMixin(models.AbstractModel):
             return record
 
         System = self.env["external.system"].sudo()
-        ExternalId = self.env["external.id"].sudo()
+        ExternalId = self.env["external.id"].sudo().with_context(active_test=False)
         system = System.search([("code", "=", system_code)], limit=1)
         if not system:
             raise ValueError(f"External system with code '{system_code}' not found")
@@ -156,6 +156,10 @@ class ExternalIdMixin(models.AbstractModel):
                 )
             existing_record = self.browse(external_id_record.res_id).exists()
             if existing_record:
+                if not external_id_record.active:
+                    raise ValueError(
+                        f"External ID '{sanitized_external_id}' is archived for {self._name}; reactivate or remove the mapping first"
+                    )
                 existing_record.write(values)
                 return existing_record
             record = self.create(values)

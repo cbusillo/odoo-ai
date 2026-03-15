@@ -141,3 +141,86 @@ class TestExternalIdMixin(UnitTestCase):
 
         result = partner.get_external_system_id("discord")
         self.assertFalse(result)
+
+    def test_set_external_id_reuses_inactive_mapping(self) -> None:
+        partner = self.Partner.create({"name": "Inactive Reuse Test"})
+
+        external_id_record = self.ExternalId.create(
+            {
+                "res_model": "res.partner",
+                "res_id": partner.id,
+                "system_id": self.discord_system.id,
+                "external_id": "stale-id",
+                "active": False,
+            }
+        )
+
+        partner.set_external_id("discord", "reactivated-id")
+
+        external_id_record.invalidate_recordset()
+        all_records = self.ExternalId.with_context(active_test=False).search(
+            [
+                ("res_model", "=", "res.partner"),
+                ("res_id", "=", partner.id),
+                ("system_id", "=", self.discord_system.id),
+                ("resource", "=", "default"),
+            ]
+        )
+        self.assertEqual(len(all_records), 1)
+        self.assertTrue(external_id_record.active)
+        self.assertEqual(external_id_record.external_id, "reactivated-id")
+
+    def test_get_or_create_by_external_id_reuses_inactive_orphaned_mapping(self) -> None:
+        partner = self.Partner.create({"name": "Archived Mapping Partner"})
+
+        external_id_record = self.ExternalId.create(
+            {
+                "res_model": "res.partner",
+                "res_id": partner.id + 999999,
+                "system_id": self.discord_system.id,
+                "external_id": "archived-id",
+                "active": False,
+            }
+        )
+
+        found_partner = self.Partner.get_or_create_by_external_id(
+            "discord",
+            "archived-id",
+            {"name": "Updated Archived Mapping Partner"},
+        )
+
+        external_id_record.invalidate_recordset()
+        all_records = self.ExternalId.with_context(active_test=False).search(
+            [
+                ("system_id", "=", self.discord_system.id),
+                ("resource", "=", "default"),
+                ("external_id", "=", "archived-id"),
+            ]
+        )
+        self.assertNotEqual(found_partner, partner)
+        self.assertEqual(len(all_records), 1)
+        self.assertTrue(external_id_record.active)
+        self.assertEqual(found_partner.name, "Updated Archived Mapping Partner")
+        self.assertEqual(external_id_record.res_id, found_partner.id)
+
+    def test_get_or_create_by_external_id_rejects_inactive_live_mapping(self) -> None:
+        partner = self.Partner.create({"name": "Inactive Live Mapping Partner"})
+
+        self.ExternalId.create(
+            {
+                "res_model": "res.partner",
+                "res_id": partner.id,
+                "system_id": self.discord_system.id,
+                "external_id": "inactive-live-id",
+                "active": False,
+            }
+        )
+
+        with self.assertRaises(ValueError) as context:
+            self.Partner.get_or_create_by_external_id(
+                "discord",
+                "inactive-live-id",
+                {"name": "Should Not Update Archived Mapping"},
+            )
+
+        self.assertIn("archived", str(context.exception))

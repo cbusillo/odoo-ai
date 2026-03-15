@@ -110,6 +110,15 @@ class RepairshoprImporter(models.Model):
             return day
         return day_model.create({"name": value})
 
+    def _resolve_claim(
+        self,
+        claim_number: str | None,
+        *,
+        partner: models.Model | None = None,
+    ) -> models.Model:
+        claim_model = self.env["service.repair.claim"].sudo().with_context(IMPORT_CONTEXT)
+        return claim_model.resolve_claim(claim_number, partner=partner)
+
     def _import_tickets(
         self,
         repairshopr_client: RepairshoprImportClient,
@@ -503,8 +512,9 @@ class RepairshoprImporter(models.Model):
             identifiers.setdefault("ticket", set()).add(str(ticket_number))
         if ticket.properties:
             claim_number = ticket.properties.claim_num
-            if claim_number:
-                values["claim_number"] = claim_number
+            claim = self._resolve_claim(claim_number, partner=partner)
+            if claim and "claim_id" in self.env["helpdesk.ticket"]._fields:
+                values["claim_id"] = claim.id
             call_number = ticket.properties.call_num
             if call_number:
                 values["call_number"] = call_number

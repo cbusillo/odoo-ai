@@ -40,7 +40,7 @@
                                 <list editable="bottom">
                                     <field name="device"/>
                                     <field name="has_case"/>
-                                    <field name="claim_number"/>
+                                    <field name="claim_id"/>
                                     <field name="po_number"/>
                                     <field name="needs_estimate"/>
                                     <field name="customer_stated_notes"/>
@@ -50,7 +50,7 @@
                                     <group>
                                         <field name="device"/>
                                         <field name="has_case"/>
-                                        <field name="claim_number"/>
+                                        <field name="claim_id"/>
                                         <field name="po_number"/>
                                         <field name="needs_estimate"/>
                                         <field name="customer_stated_notes"/>

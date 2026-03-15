@@ -13,6 +13,7 @@
         "mail",
         "product",
         "cm_device",
+        "cm_repair",
         "cm_transport",
     ],
     "data": [

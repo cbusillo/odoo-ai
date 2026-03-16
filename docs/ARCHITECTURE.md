@@ -71,15 +71,17 @@ Use explicit context/instance flags in command invocations (for example
   `ghcr.io/cbusillo/odoo-docker:19.0-runtime`
 - Public devtools foundation image:
   `ghcr.io/cbusillo/odoo-docker:19.0-devtools`
-- Custom addons: `/volumes/addons` (repo) and `/opt/extra_addons`
+- Custom addons: `/opt/project/addons` (project tree) and
+  `/opt/extra_addons`
   (`ODOO_ADDON_REPOSITORIES` for non-enterprise extras).
 - Enterprise addons: `/opt/enterprise` from
   `ghcr.io/cbusillo/odoo-enterprise-docker`.
-- Dev-only addon path shaping lives upstream in the image chain:
-  - `odoo-docker` devtools exposes `/odoo`, `/opt/project/addons`, and
-    `/opt/extra_addons`
-  - `odoo-enterprise-docker` devtools appends `/opt/enterprise`
-  - `odoo-ai` does not own `.pth` path shaping
+- Dev-only addon path shaping lives upstream in the image chain. `odoo-docker`
+  devtools exposes `/odoo`, `/opt/project/addons`, and `/opt/extra_addons`,
+  and `odoo-enterprise-docker` appends `/opt/enterprise`. `odoo-ai` keeps
+  `/opt/project` as a real directory in the image. `/volumes/pyproject.toml`
+  and `/volumes/uv.lock` point at the root lockfiles, and local devtools images link
+  `/opt/project/tools` to the `/volumes/tools` bind mount used by testkit.
 - Integrations: Shopify active
 
 ## References

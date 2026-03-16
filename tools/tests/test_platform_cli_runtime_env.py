@@ -223,6 +223,80 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
 
         self.assertEqual(runtime_values.get("DATA_WORKFLOW_SSH_DIR"), "/root/.ssh")
 
+    def test_runtime_env_defaults_local_development_tag_to_latest(self) -> None:
+        runtime_values = self._build_runtime_values(
+            runtime_env_file="/tmp/opw.local.env",
+            source_environment={
+                "ODOO_DB_USER": "odoo",
+                "ODOO_DB_PASSWORD": "database-password",
+                "COMPOSE_BUILD_TARGET": "development",
+            },
+        )
+
+        self.assertEqual(runtime_values.get("DOCKER_IMAGE_TAG"), "latest")
+
+    def test_runtime_env_defaults_local_production_tag_to_prod_local(self) -> None:
+        runtime_values = self._build_runtime_values(
+            runtime_env_file="/tmp/opw.local.env",
+            source_environment={
+                "ODOO_DB_USER": "odoo",
+                "ODOO_DB_PASSWORD": "database-password",
+                "COMPOSE_BUILD_TARGET": "production",
+            },
+        )
+
+        self.assertEqual(runtime_values.get("DOCKER_IMAGE_TAG"), "prod-local")
+
+    def test_runtime_env_defaults_local_target_from_effective_runtime_env(self) -> None:
+        runtime_selection = replace(
+            _sample_runtime_selection(),
+            effective_runtime_env={"COMPOSE_BUILD_TARGET": "production"},
+        )
+
+        runtime_values = self._build_runtime_values(
+            runtime_env_file="/tmp/opw.local.env",
+            runtime_selection=runtime_selection,
+            source_environment={
+                "ODOO_DB_USER": "odoo",
+                "ODOO_DB_PASSWORD": "database-password",
+                "COMPOSE_BUILD_TARGET": "development",
+            },
+        )
+
+        self.assertEqual(runtime_values.get("COMPOSE_BUILD_TARGET"), "production")
+        self.assertEqual(runtime_values.get("DOCKER_IMAGE_TAG"), "prod-local")
+
+    def test_runtime_env_keeps_remote_production_tag_on_latest_by_default(self) -> None:
+        remote_runtime_selection = replace(
+            _sample_runtime_selection(),
+            instance_name="testing",
+        )
+
+        runtime_values = self._build_runtime_values(
+            runtime_env_file="/tmp/opw.testing.env",
+            runtime_selection=remote_runtime_selection,
+            source_environment={
+                "ODOO_DB_USER": "odoo",
+                "ODOO_DB_PASSWORD": "database-password",
+                "COMPOSE_BUILD_TARGET": "production",
+            },
+        )
+
+        self.assertEqual(runtime_values.get("DOCKER_IMAGE_TAG"), "latest")
+
+    def test_runtime_env_respects_explicit_docker_image_tag(self) -> None:
+        runtime_values = self._build_runtime_values(
+            runtime_env_file="/tmp/opw.local.env",
+            source_environment={
+                "ODOO_DB_USER": "odoo",
+                "ODOO_DB_PASSWORD": "database-password",
+                "COMPOSE_BUILD_TARGET": "production",
+                "DOCKER_IMAGE_TAG": "custom-tag",
+            },
+        )
+
+        self.assertEqual(runtime_values.get("DOCKER_IMAGE_TAG"), "custom-tag")
+
     def test_runtime_env_adds_openupgrade_repo_when_enabled(self) -> None:
         runtime_values = self._build_runtime_values(
             runtime_env_file="/tmp/opw.local.env",

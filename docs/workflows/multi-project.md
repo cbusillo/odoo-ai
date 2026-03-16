@@ -64,6 +64,7 @@ Notes
       volumes:
         - ./docker/scripts:/volumes/scripts
         - ./pyproject.toml:/opt/project/pyproject.toml:ro
+        - ./uv.lock:/opt/project/uv.lock:ro
         - ./addons:/opt/project/addons
       environment:
         - ODOO_ADDON_REPOSITORIES=

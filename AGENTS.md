@@ -134,6 +134,10 @@ the linked docs, then keep prompts lean.
   `docs/odoo/performance.md`, and `docs/odoo/workflow.md` before touching models
   or access rules. Use `with_context(skip_shopify_sync=True)` when bulk
   operations risk syncing loops.
+- **Odoo typing/imports**: Do not rely on `odoo.addons.<local_addon>` imports
+  for local addon code; that path is not a supported contract here. Prefer
+  magic types for typing (see `docs/style/python.md`) and use `self.env[...]`
+  / `env[...]` for model access, for example `self.env["external.id"]`.
 - **Frontend & Tours**: Keep selectors simple and avoid jQuery-style filters. See
   `docs/style/javascript.md`, `docs/style/browser-automation.md`, and
   `docs/style/testing.md`.
@@ -146,10 +150,10 @@ the linked docs, then keep prompts lean.
 - Addons live directly in this repo under `./addons/` (no submodules). If an
   addon needs to be shared externally, mirror or export it from this repo
   instead of embedding a submodule.
-- Local compose bind-mounts `./addons` to `/volumes/addons`, so running
-  containers see the checkout they were started from. Prefer a separate
-  worktree for isolated edits and commits, then bring ready commits/patches
-  back to the main checkout for Docker-backed or local-stack validation.
+- Local stacks standardize project addons at `/opt/project/addons`. Prefer a
+  separate worktree for isolated edits and commits, then bring ready
+  commits/patches back to the main checkout for Docker-backed or local-stack
+  validation.
   Worktrees usually do not carry the operator's local `.env`, generated
   `.platform/env/...` files, or local compose overrides by default. Only run a
   stack directly from a worktree when you intentionally provision that runtime

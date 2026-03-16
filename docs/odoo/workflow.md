@@ -46,7 +46,7 @@ Container Paths
 
 - Host `./` maps to container `/volumes/`.
 - Odoo core lives at `/odoo/addons/*` inside containers (not on host).
-- Custom addons live at `/volumes/addons/*`.
+- Custom addons live at `/opt/project/addons/*`.
 
 Generated Files (Do Not Modify)
 

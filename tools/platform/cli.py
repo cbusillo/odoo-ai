@@ -249,6 +249,8 @@ def _build_runtime_env_values(
         source_environment=openupgrade_environment,
     )
 
+    compose_build_target = openupgrade_environment.get("COMPOSE_BUILD_TARGET", "development")
+
     runtime_values = {
         "PLATFORM_CONTEXT": runtime_selection.context_name,
         "PLATFORM_INSTANCE": runtime_selection.instance_name,
@@ -260,8 +262,11 @@ def _build_runtime_env_values(
         "ODOO_STATE_ROOT": str(runtime_selection.state_path),
         "ODOO_RUNTIME_CONF_HOST_PATH": str(runtime_selection.runtime_conf_host_path),
         "DOCKER_IMAGE": source_environment.get("DOCKER_IMAGE", runtime_selection.project_name),
-        "DOCKER_IMAGE_TAG": source_environment.get("DOCKER_IMAGE_TAG", "latest"),
-        "COMPOSE_BUILD_TARGET": source_environment.get("COMPOSE_BUILD_TARGET", "development"),
+        "DOCKER_IMAGE_TAG": source_environment.get(
+            "DOCKER_IMAGE_TAG",
+            "prod-local" if runtime_selection.instance_name == "local" and compose_build_target == "production" else "latest",
+        ),
+        "COMPOSE_BUILD_TARGET": compose_build_target,
         "ODOO_DATA_VOLUME": runtime_selection.data_volume_name,
         "ODOO_LOG_VOLUME": runtime_selection.log_volume_name,
         "ODOO_DB_VOLUME": runtime_selection.db_volume_name,

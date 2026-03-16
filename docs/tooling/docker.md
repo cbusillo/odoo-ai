@@ -57,6 +57,11 @@ Tips
   tags (for example `ghcr.io/cbusillo/odoo-enterprise-docker:19.0-runtime` and
   `ghcr.io/cbusillo/odoo-enterprise-docker:19.0-devtools`), ideally pinned by
   digest in promoted environments.
+- Platform-generated local env files keep development builds on
+  `DOCKER_IMAGE_TAG=latest` so PyCharm and other devtools flows keep a stable
+  image, and default local production-target validation builds to
+  `DOCKER_IMAGE_TAG=prod-local` so a production build does not overwrite the
+  devtools image.
 - For private GHCR base images, `platform` commands perform a registry login
   preflight before build/restore. Provide either:
   - `GHCR_TOKEN` (preferred) or `GITHUB_TOKEN`

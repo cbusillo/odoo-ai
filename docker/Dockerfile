@@ -26,16 +26,20 @@ ARG ODOO_PYTHON_SYNC_SKIP_ADDONS
 USER root
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+RUN rm -rf /opt/project \
+    && mkdir -p /opt/project /volumes
+
 COPY /platform/config /volumes/config
 COPY /docker/scripts /volumes/scripts
-COPY /addons /volumes/addons
+COPY /addons /opt/project/addons
 COPY --from=addon-sources --chown=ubuntu:ubuntu /opt/extra_addons /opt/extra_addons
-COPY /pyproject.toml /volumes/pyproject.toml
-COPY /uv.lock /volumes/uv.lock
+COPY /pyproject.toml /opt/project/pyproject.toml
+COPY /uv.lock /opt/project/uv.lock
 
-RUN mkdir -p /opt \
-    && rm -rf /opt/project \
-    && ln -s /volumes /opt/project
+RUN mkdir -p /volumes /opt/project \
+    && rm -f /volumes/pyproject.toml /volumes/uv.lock \
+    && ln -s /opt/project/pyproject.toml /volumes/pyproject.toml \
+    && ln -s /opt/project/uv.lock /volumes/uv.lock
 
 FROM ${ODOO_BASE_DEVTOOLS_IMAGE} AS base-devtools
 ARG ODOO_ADDON_REPOSITORIES
@@ -45,16 +49,22 @@ ARG ODOO_PYTHON_SYNC_SKIP_ADDONS
 USER root
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+RUN rm -rf /opt/project \
+    && mkdir -p /opt/project /volumes
+
 COPY /platform/config /volumes/config
 COPY /docker/scripts /volumes/scripts
-COPY /addons /volumes/addons
+COPY /addons /opt/project/addons
 COPY --from=addon-sources --chown=ubuntu:ubuntu /opt/extra_addons /opt/extra_addons
-COPY /pyproject.toml /volumes/pyproject.toml
-COPY /uv.lock /volumes/uv.lock
+COPY /pyproject.toml /opt/project/pyproject.toml
+COPY /uv.lock /opt/project/uv.lock
 
-RUN mkdir -p /opt \
-    && rm -rf /opt/project \
-    && ln -s /volumes /opt/project
+RUN mkdir -p /volumes /opt/project \
+    && rm -f /volumes/pyproject.toml /volumes/uv.lock \
+    && ln -s /opt/project/pyproject.toml /volumes/pyproject.toml \
+    && ln -s /opt/project/uv.lock /volumes/uv.lock \
+    && rm -rf /opt/project/tools \
+    && ln -s /volumes/tools /opt/project/tools
 
 FROM base-runtime AS runtime-common
 FROM runtime-common AS production

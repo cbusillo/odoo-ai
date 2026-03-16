@@ -36,6 +36,10 @@ Layer Model
     must not recreate it
   - downstream images use fixed project layout paths:
     `/opt/project`, `/opt/project/addons`, `/opt/extra_addons`
+  - `odoo-ai` keeps `/opt/project` as a real source tree while preserving the
+    specific local workflow links still required for tooling: `/volumes/pyproject.toml`,
+    `/volumes/uv.lock`, and local devtools images link `/opt/project/tools` to the `/volumes/tools`
+    bind mount used by testkit
   - `odoo-python-sync.sh <prod|dev>` provides the supported additive install
     path for root lockfile-backed dependencies and addon `pyproject.toml`
     dependencies; legacy `requirements*.txt` support exists only for older

@@ -56,9 +56,10 @@ docker-compose.yml
   closed and asks you to align or remove the duplicate from `base.env`.
 - Raw `docker compose` still loads `.env` then `base.env` for service
   `env_file` entries, so later values in `base.env` win in that path.
-- Create a local `docker-compose.override.yml` to expose ports and mount the
-  repo for live-editing. Keep `./addons:/opt/project/addons` in the shared
-  section so `web` and `script-runner` execute the same addon source tree (see
+- Copy `docker-compose.override.example.yml` to `docker-compose.override.yml`
+  when you need local port bindings or live code mounts. Keep
+  `./addons:/opt/project/addons` in the shared section so `web` and
+  `script-runner` execute the same addon source tree (see
   `docs/workflows/multi-project.md`).
 - Restore runs (`uv run platform restore --context <target> --instance local`)
   rely on `DATA_WORKFLOW_SSH_DIR` being set so the base compose mounts the SSH

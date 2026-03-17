@@ -296,7 +296,7 @@ class StackDataWorkflowTests(unittest.TestCase):
             stack_data_workflow.run_stack_data_workflow("opw-local")
 
         self.assertGreaterEqual(len(compose_calls), 4)
-        self.assertEqual(compose_calls[0], ["build", "script-runner"])
+        self.assertEqual(compose_calls[0], ["build", "web"])
         self.assertEqual(compose_calls[1], ["up", "-d", "--remove-orphans", "database"])
         self.assertEqual(compose_calls[2], ["up", "-d", "--remove-orphans", "script-runner"])
         self.assertEqual(compose_calls[3][:5], ["exec", "-T", "--user", "root", "script-runner"])

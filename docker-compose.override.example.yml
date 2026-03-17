@@ -1,0 +1,22 @@
+x-common: &common
+  depends_on:
+    database:
+      condition: service_healthy
+  volumes:
+    - ./docker/scripts:/volumes/scripts
+    - ./tools:/volumes/tools:ro
+    - ./pyproject.toml:/opt/project/pyproject.toml:ro
+    - ./uv.lock:/opt/project/uv.lock:ro
+    - ./addons:/opt/project/addons
+
+services:
+  web:
+    <<: *common
+    ports:
+      - "${ODOO_WEB_HOST_PORT:-8069}:8069"
+      - "${ODOO_LONGPOLL_HOST_PORT:-8072}:8072"
+  database:
+    ports:
+      - "${ODOO_DB_HOST_PORT:-5432}:5432"
+  script-runner:
+    <<: *common

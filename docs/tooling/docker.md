@@ -97,11 +97,15 @@ Tips
 Local stacks use layered configs under `platform/config/` and
 `platform/compose/`. The concise source of truth is `platform/config/README.md`.
 
-`docker-compose.override.yml` is local-only (ignored by git). Create it when
-you need port bindings or live code mounts. For addon development, keep
-`./addons:/opt/project/addons` in the shared section so `web` and
-`script-runner` see the same checkout; see @docs/workflows/multi-project.md for
-an example.
+`docker-compose.override.yml` is local-only (ignored by git). Start from the
+tracked `docker-compose.override.example.yml` when you need port bindings or
+live code mounts. For addon development, keep `./addons:/opt/project/addons`
+in the shared section so `web` and `script-runner` see the same checkout; see
+@docs/workflows/multi-project.md for an example.
+
+Local compose builds the canonical `odoo-ai` image once via `web`; `script-runner`
+reuses that same image tag so the two services do not drift onto separate baked
+snapshots.
 
 Platform local lifecycle commands (`up`, `build`, `down`, `logs`) use the
 platform runtime env (`.platform/env/<context>.<instance>.env`) and base compose

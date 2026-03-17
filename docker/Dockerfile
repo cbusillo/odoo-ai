@@ -7,6 +7,13 @@ ARG OPENUPGRADE_ADDON_REPOSITORY
 ARG OPENUPGRADELIB_INSTALL_SPEC
 ARG ODOO_PYTHON_SYNC_SKIP_ADDONS
 
+FROM scratch AS project-payload
+COPY /platform/config /payload/volumes/config
+COPY /docker/scripts /payload/volumes/scripts
+COPY /addons /payload/opt/project/addons
+COPY /pyproject.toml /payload/opt/project/pyproject.toml
+COPY /uv.lock /payload/opt/project/uv.lock
+
 FROM ${ODOO_BASE_RUNTIME_IMAGE} AS addon-sources
 ARG ODOO_ADDON_REPOSITORIES
 ARG OPENUPGRADE_ADDON_REPOSITORY
@@ -29,12 +36,8 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN rm -rf /opt/project \
     && mkdir -p /opt/project /volumes
 
-COPY /platform/config /volumes/config
-COPY /docker/scripts /volumes/scripts
-COPY /addons /opt/project/addons
+COPY --from=project-payload /payload/ /
 COPY --from=addon-sources --chown=ubuntu:ubuntu /opt/extra_addons /opt/extra_addons
-COPY /pyproject.toml /opt/project/pyproject.toml
-COPY /uv.lock /opt/project/uv.lock
 
 RUN mkdir -p /volumes /opt/project \
     && rm -f /volumes/pyproject.toml /volumes/uv.lock \
@@ -52,12 +55,8 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN rm -rf /opt/project \
     && mkdir -p /opt/project /volumes
 
-COPY /platform/config /volumes/config
-COPY /docker/scripts /volumes/scripts
-COPY /addons /opt/project/addons
+COPY --from=project-payload /payload/ /
 COPY --from=addon-sources --chown=ubuntu:ubuntu /opt/extra_addons /opt/extra_addons
-COPY /pyproject.toml /opt/project/pyproject.toml
-COPY /uv.lock /opt/project/uv.lock
 
 RUN mkdir -p /volumes /opt/project \
     && rm -f /volumes/pyproject.toml /volumes/uv.lock \
@@ -66,18 +65,11 @@ RUN mkdir -p /volumes /opt/project \
     && rm -rf /opt/project/tools \
     && ln -s /volumes/tools /opt/project/tools
 
-FROM base-runtime AS runtime-common
-FROM runtime-common AS production
+FROM base-runtime AS production
 WORKDIR /opt/project
 RUN --mount=type=cache,target=/home/ubuntu/.cache/uv,uid=1000,gid=1000,sharing=locked \
 	ODOO_PYTHON_SYNC_SKIP_ADDONS="${ODOO_PYTHON_SYNC_SKIP_ADDONS}" /usr/local/bin/odoo-python-sync.sh prod
-RUN if [[ -n "${OPENUPGRADE_ADDON_REPOSITORY}" ]] && [[ ",${ODOO_ADDON_REPOSITORIES}," == *,${OPENUPGRADE_ADDON_REPOSITORY},* ]]; then \
-			if [[ -z "${OPENUPGRADELIB_INSTALL_SPEC}" ]]; then \
-				echo "OPENUPGRADELIB_INSTALL_SPEC is required when OpenUpgrade addons are enabled" >&2; \
-				exit 1; \
-			fi; \
-			uv pip install --python /venv/bin/python "${OPENUPGRADELIB_INSTALL_SPEC}"; \
-		fi
+RUN /bin/bash /volumes/scripts/install_openupgradelib_if_needed.sh
 WORKDIR /
 USER ubuntu
 
@@ -86,11 +78,5 @@ WORKDIR /opt/project
 
 RUN --mount=type=cache,target=/home/ubuntu/.cache/uv,uid=1000,gid=1000,sharing=locked \
 	ODOO_PYTHON_SYNC_SKIP_ADDONS="${ODOO_PYTHON_SYNC_SKIP_ADDONS}" /usr/local/bin/odoo-python-sync.sh dev
-RUN if [[ -n "${OPENUPGRADE_ADDON_REPOSITORY}" ]] && [[ ",${ODOO_ADDON_REPOSITORIES}," == *,${OPENUPGRADE_ADDON_REPOSITORY},* ]]; then \
-			if [[ -z "${OPENUPGRADELIB_INSTALL_SPEC}" ]]; then \
-				echo "OPENUPGRADELIB_INSTALL_SPEC is required when OpenUpgrade addons are enabled" >&2; \
-				exit 1; \
-			fi; \
-			uv pip install --python /venv/bin/python "${OPENUPGRADELIB_INSTALL_SPEC}"; \
-		fi
+RUN /bin/bash /volumes/scripts/install_openupgradelib_if_needed.sh
 USER ubuntu

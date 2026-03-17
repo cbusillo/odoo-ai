@@ -48,9 +48,10 @@ Quick flow
 Notes
 
 - Layer order and env merge rules are documented in `platform/config/README.md`.
-- Create a local `docker-compose.override.yml` to expose ports and mount the
-  repo for live-editing. Put the addon bind mount in the shared section so both
-  `web` and `script-runner` see the same checkout. Example:
+- Copy `docker-compose.override.example.yml` to
+  `docker-compose.override.yml` to expose ports and mount the repo for
+  live-editing. Put the addon bind mount in the shared section so both `web`
+  and `script-runner` see the same checkout. Example:
 
     ```yaml
     x-common: &common

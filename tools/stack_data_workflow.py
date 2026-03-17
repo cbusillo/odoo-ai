@@ -202,6 +202,12 @@ def _current_image_reference(settings: StackSettings) -> str:
     return settings.environment.get(settings.image_variable_name) or settings.registry_image
 
 
+def _local_image_build_service(settings: StackSettings) -> str:
+    if "web" in settings.services:
+        return "web"
+    return settings.script_runner_service
+
+
 def _add_toggle_env_flags(command: list[str], *, bootstrap: bool, no_sanitize: bool, update_only: bool) -> None:
     if bootstrap:
         command.extend(["-e", "BOOTSTRAP=1"])
@@ -733,7 +739,7 @@ def run_stack_data_workflow(
 
     ensure_local_bind_mounts(stack_settings)
     write_env_file(stack_settings.env_file, env_values)
-    _run_local_compose(stack_settings, ["build", stack_settings.script_runner_service])
+    _run_local_compose(stack_settings, ["build", _local_image_build_service(stack_settings)])
 
     stack_started = False
 

@@ -80,6 +80,9 @@ Layer Model
 - Local iteration:
   - prefer mounting project addon code over rebuilding image for routine code
     changes
+  - local compose builds one canonical `odoo-ai` image and both `web` and
+    `script-runner` consume that same image tag to avoid service-level source
+    skew
   - both production and local `development` targets bake project addons into
     `/opt/project/addons`; live-edit workflows must override that path with a
     bind mount when they need the mounted repo tree to win

@@ -33,6 +33,7 @@ from ._shared import (
     CONFLICT_CLEAR_RETRY_SLEEP_SECONDS,
     DEFAULT_REMOTE_LOGIN,
     DEFAULT_SAMPLE_SIZE,
+    DEFAULT_STANDARD_SAMPLE_SIZE,
     FIELD_TIMEOUT_SECONDS,
     POLL_SECONDS,
     PREPARE_SYNC_MODES,
@@ -57,6 +58,8 @@ from ._shared import (
     _parse_odoo_utc_timestamp,
     _shopify_prepare_snapshot_matches,
     _snapshot_fields_match,
+    profile_roundtrip_product_count,
+    profile_uses_bounded_prepare,
 )
 
 
@@ -178,7 +181,6 @@ def _build_operator_summary(
     instance_name: str,
     results: dict[str, object],
     runtime_state: dict[str, object],
-    sample_size: int,
 ) -> dict[str, object]:
     def _sync_id(key: str) -> int | None:
         value = results.get(key)
@@ -198,11 +200,7 @@ def _build_operator_summary(
     export_sample_product_ids = results.get("export_sample_product_ids")
     active_syncs = runtime_state.get("active_syncs")
     active_sync_count = len(active_syncs) if isinstance(active_syncs, list) else None
-    export_sample_count = (
-        len(export_sample_product_ids)
-        if isinstance(export_sample_product_ids, list)
-        else (sample_size if profile == "smoke" else None)
-    )
+    export_sample_count = len(export_sample_product_ids) if isinstance(export_sample_product_ids, list) else None
     return {
         "scenario": "shopify-roundtrip",
         "context": context_name,
@@ -721,13 +719,13 @@ def _run_roundtrip_for_product(
     export_changed_sync_mode = "export_changed_products"
     export_changed_sync_values: dict[str, object] | None = None
     export_changed_label = "remote export_changed_products"
-    if profile == "smoke":
+    if profile_uses_bounded_prepare(profile):
         export_changed_sync_mode = "export_batch_products"
         export_changed_sync_values = {"odoo_products_to_sync": [[6, 0, [product_id]]]}
         export_changed_label = "remote export_batch_products (odoo-to-shopify)"
     export_changed_sync_id = create_sync(client, export_changed_sync_mode, export_changed_sync_values)
     export_changed_sync = wait_for_sync(client, export_changed_sync_id, export_changed_label)
-    if profile == "smoke":
+    if profile_uses_bounded_prepare(profile):
         assert_sync_count_at_most(export_changed_sync, maximum_count=1, label=export_changed_label)
     shopify_snapshot_after_export = wait_for_shopify_snapshot(
         settings,
@@ -778,13 +776,13 @@ def _run_roundtrip_for_product(
     restore_sync_mode = "export_changed_products"
     restore_sync_values: dict[str, object] | None = None
     restore_label = "remote restore original title"
-    if profile == "smoke":
+    if profile_uses_bounded_prepare(profile):
         restore_sync_mode = "export_batch_products"
         restore_sync_values = {"odoo_products_to_sync": [[6, 0, [product_id]]]}
         restore_label = "remote export_batch_products (restore original product state)"
     restore_sync_id = create_sync(client, restore_sync_mode, restore_sync_values)
     restore_sync = wait_for_sync(client, restore_sync_id, restore_label)
-    if profile == "smoke":
+    if profile_uses_bounded_prepare(profile):
         assert_sync_count_at_most(restore_sync, maximum_count=1, label=restore_label)
     wait_for_shopify_snapshot(
         settings,
@@ -885,12 +883,21 @@ def _select_roundtrip_prepare_selection(
     *,
     profile: str,
     sample_size: int,
+    require_shopify_link: bool = False,
 ) -> RoundtripPrepareSelection:
-    product_snapshot = _find_prepare_candidate(client)
+    product_snapshot = _find_candidate_snapshot(
+        client,
+        require_shopify_link=require_shopify_link,
+        missing_message=(
+            "No Shopify-linked product with a restorable condition metafield was found for round-trip validation"
+            if require_shopify_link
+            else "No exportable product with a restorable condition metafield was found for round-trip validation"
+        ),
+    )
 
-    if profile == "smoke":
+    if profile_uses_bounded_prepare(profile):
         candidate_product_ids = []
-        for candidate_row in search_export_candidates(client, require_shopify_link=False):
+        for candidate_row in search_export_candidates(client, require_shopify_link=require_shopify_link):
             candidate_product_id = candidate_row.get("id")
             if isinstance(candidate_product_id, int):
                 candidate_product_ids.append(candidate_product_id)
@@ -909,6 +916,35 @@ def _select_roundtrip_prepare_selection(
     )
 
 
+def _execute_roundtrip_products(
+    client: RemoteOdooClient,
+    settings: RemoteShopifySettings,
+    *,
+    profile: str,
+    product_ids: tuple[int, ...] | list[int],
+    primary_snapshot: ProductSnapshot | None = None,
+) -> list[dict[str, object]]:
+    roundtrip_results: list[dict[str, object]] = []
+    primary_product_id = primary_snapshot.product_id if primary_snapshot else None
+    for roundtrip_product_id in product_ids:
+        if primary_product_id is not None and roundtrip_product_id == primary_product_id:
+            assert primary_snapshot is not None
+            roundtrip_product_snapshot = primary_snapshot
+        else:
+            roundtrip_product_snapshot = read_product_snapshot(client, roundtrip_product_id)
+        roundtrip_shopify_product_id = get_external_system_id(client, roundtrip_product_id, "product")
+        roundtrip_results.append(
+            _run_roundtrip_for_product(
+                client,
+                settings,
+                product_snapshot=roundtrip_product_snapshot,
+                shopify_product_id=roundtrip_shopify_product_id,
+                profile=profile,
+            )
+        )
+    return roundtrip_results
+
+
 def run_roundtrip(
     settings: RemoteShopifySettings,
     *,
@@ -919,16 +955,25 @@ def run_roundtrip(
 ) -> dict[str, object]:
     client = client or RemoteOdooClient(settings)
     if start_after_export:
-        selection = _find_roundtrip_candidate(client)
-        resumed_results = _run_roundtrip_for_product(
+        prepare_selection = _select_roundtrip_prepare_selection(
+            client,
+            profile=profile,
+            sample_size=sample_size,
+            require_shopify_link=True,
+        )
+        roundtrip_product_ids = list(prepare_selection.export_product_ids[: profile_roundtrip_product_count(profile)])
+        roundtrip_results = _execute_roundtrip_products(
             client,
             settings,
-            product_snapshot=selection[0],
-            shopify_product_id=selection[1],
             profile=profile,
+            product_ids=roundtrip_product_ids,
+            primary_snapshot=prepare_selection.product_snapshot,
         )
+        resumed_results = roundtrip_results[0]
         resumed_results["start_mode"] = "after_export"
         resumed_results["profile"] = profile
+        if len(roundtrip_results) > 1:
+            resumed_results["additional_roundtrip_results"] = roundtrip_results[1:]
         return resumed_results
 
     prepare_selection = _select_roundtrip_prepare_selection(client, profile=profile, sample_size=sample_size)
@@ -936,18 +981,18 @@ def run_roundtrip(
     prepare_marker = _current_utc_timestamp()
     reset_sync_id = create_sync(client, "reset_shopify")
     reset_sync = wait_for_sync(client, reset_sync_id, "remote reset_shopify")
-    if profile == "smoke":
+    if profile_uses_bounded_prepare(profile):
         ensure_no_conflicting_syncs(client, clear_conflicts=True)
     prepare_sync_mode = "export_all_products"
     prepare_sync_values: dict[str, object] | None = None
     prepare_sync_label = "remote export_all_products"
-    if profile == "smoke":
+    if profile_uses_bounded_prepare(profile):
         prepare_sync_mode = "export_batch_products"
         prepare_sync_values = {"odoo_products_to_sync": [[6, 0, list(prepare_selection.export_product_ids)]]}
         prepare_sync_label = "remote export_batch_products"
     export_sync_id = create_sync(client, prepare_sync_mode, prepare_sync_values)
     export_sync = wait_for_sync(client, export_sync_id, prepare_sync_label)
-    if profile == "smoke":
+    if profile_uses_bounded_prepare(profile):
         assert_sync_count_at_most(export_sync, maximum_count=len(prepare_selection.export_product_ids), label=prepare_sync_label)
     wait_for_related_syncs_to_quiet(
         client,
@@ -955,7 +1000,7 @@ def run_roundtrip(
         modes=PREPARE_SYNC_MODES,
         label="post prepare settle",
     )
-    if profile == "smoke":
+    if profile_uses_bounded_prepare(profile):
         stamp_non_sample_products_as_exported_for_validation(
             client,
             keep_product_ids=prepare_selection.export_product_ids,
@@ -969,26 +1014,25 @@ def run_roundtrip(
         )
         for sample_product_id in prepare_selection.export_product_ids
     ]
-    selection = RoundtripProductSelection(
-        product_snapshot=prepare_selection.product_snapshot,
-        shopify_product_id=get_external_system_id(client, prepare_selection.product_snapshot.product_id, "product"),
-        export_product_ids=prepare_selection.export_product_ids,
-    )
-    resumed_results = _run_roundtrip_for_product(
+    roundtrip_product_ids = list(prepare_selection.export_product_ids[: profile_roundtrip_product_count(profile)])
+    roundtrip_results = _execute_roundtrip_products(
         client,
         settings,
-        product_snapshot=selection.product_snapshot,
-        shopify_product_id=selection.shopify_product_id,
         profile=profile,
+        product_ids=roundtrip_product_ids,
+        primary_snapshot=prepare_selection.product_snapshot,
     )
+    resumed_results = roundtrip_results[0]
     resumed_results["reset_sync"] = reset_sync
     resumed_results["export_all_sync"] = export_sync
     resumed_results["start_mode"] = "prepared"
     resumed_results["profile"] = profile
     resumed_results["prepare_sync_mode"] = prepare_sync_mode
     resumed_results["prepared_sample_results"] = prepared_sample_results
-    if profile == "smoke":
-        resumed_results["export_sample_product_ids"] = list(selection.export_product_ids)
+    if profile_uses_bounded_prepare(profile):
+        resumed_results["export_sample_product_ids"] = list(prepare_selection.export_product_ids)
+    if len(roundtrip_results) > 1:
+        resumed_results["additional_roundtrip_results"] = roundtrip_results[1:]
     return resumed_results
 
 
@@ -1006,8 +1050,10 @@ def run_validation_command(
 ) -> dict[str, object]:
     if instance_name == "prod":
         raise click.ClickException("shopify-roundtrip is disabled on prod because it performs destructive and mutating validation")
-    if profile == "full" and sample_size != DEFAULT_SAMPLE_SIZE:
-        raise click.ClickException("--sample-size is only supported with --profile smoke")
+    if not profile_uses_bounded_prepare(profile) and sample_size != DEFAULT_SAMPLE_SIZE:
+        raise click.ClickException("--sample-size is only supported with --profile smoke or --profile standard")
+    if profile == "standard" and sample_size == DEFAULT_SAMPLE_SIZE:
+        sample_size = DEFAULT_STANDARD_SAMPLE_SIZE
 
     effective_repository_root = repository_root or discover_repo_root(Path.cwd())
     settings = load_settings(
@@ -1048,7 +1094,6 @@ def run_validation_command(
         instance_name=instance_name,
         results=results,
         runtime_state=runtime_state,
-        sample_size=sample_size,
     )
     return results
 

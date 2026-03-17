@@ -14,8 +14,9 @@ SYNC_SETTLE_TIMEOUT_SECONDS = 300
 SYNC_SETTLE_QUIET_SECONDS = 15
 DEFAULT_REMOTE_LOGIN = "gpt-admin"
 SUPPORTED_REMOTE_INSTANCES = ("dev", "testing", "prod")
-VALIDATION_PROFILES = ("smoke", "full")
+VALIDATION_PROFILES = ("smoke", "standard", "full")
 DEFAULT_SAMPLE_SIZE = 25
+DEFAULT_STANDARD_SAMPLE_SIZE = 10
 VALIDATION_EXPORT_MARKER_OFFSET_SECONDS = 60 * 60
 SHOPIFY_WEBHOOK_PAUSE_KEY = "shopify.pause_webhook_processing"
 SHOPIFY_AUTOSCHEDULE_PAUSE_KEY = "shopify.pause_sync_autoschedule"
@@ -84,6 +85,16 @@ class RoundtripProductSelection:
 class RoundtripPrepareSelection:
     product_snapshot: ProductSnapshot
     export_product_ids: tuple[int, ...]
+
+
+def profile_uses_bounded_prepare(profile: str) -> bool:
+    return profile in {"smoke", "standard"}
+
+
+def profile_roundtrip_product_count(profile: str) -> int:
+    if profile == "standard":
+        return 2
+    return 1
 
 
 def _normalize_html_fragment(value: str | None) -> str:

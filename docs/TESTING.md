@@ -65,9 +65,10 @@ Notes
   through platform-managed entry points so stack selection, env loading, and
   logs stay reproducible.
 - Example: the tracked Shopify remote round-trip scenario now runs as
-  `uv run platform validate shopify-roundtrip --context opw --instance testing`
-  `--profile smoke --sample-size 5` for fast reset-plus-sample validation, or
-  `--profile full` for a full export.
+  `uv run platform validate shopify-roundtrip --context opw --instance testing --profile smoke --sample-size 5`
+  for fast reset-plus-sample validation, `--profile standard` for a bounded
+  sample plus multiple deep round-trip products, or `--profile full` for a
+  full export.
 - `shopify-roundtrip` is intentionally disabled on `prod` because it performs
   destructive and mutating validation against both Odoo and Shopify.
 - `shopify-roundtrip` supports `--start-after-export` when reset/export has

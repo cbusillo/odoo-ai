@@ -67,7 +67,6 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
                 instance_name="prod",
                 env_file=None,
                 remote_login="gpt-admin",
-                profile="full",
                 sample_size=5,
                 repository_root=Path("/repo"),
             )
@@ -141,6 +140,43 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
         )
         restore_sync_autoschedule_mock.assert_called_once_with(fake_client, original_value=None)
         restore_webhook_processing_mock.assert_called_once_with(fake_client, original_value=None)
+
+    @staticmethod
+    def test_run_validation_command_defaults_standard_sample_size() -> None:
+        fake_settings = mock.sentinel.settings
+        fake_client = mock.sentinel.client
+
+        with (
+            mock.patch.object(shopify_roundtrip, "load_settings", return_value=fake_settings),
+            mock.patch.object(shopify_roundtrip, "RemoteOdooClient", return_value=fake_client),
+            mock.patch.object(shopify_roundtrip, "pause_sync_autoschedule", return_value=None),
+            mock.patch.object(shopify_roundtrip, "pause_webhook_processing", return_value=None),
+            mock.patch.object(shopify_roundtrip, "ensure_no_conflicting_syncs"),
+            mock.patch.object(
+                shopify_roundtrip,
+                "read_validation_runtime_state",
+                return_value={"active_syncs": [], "autoschedule_pause": None, "webhook_pause": None},
+            ),
+            mock.patch.object(shopify_roundtrip, "run_roundtrip", return_value={"start_mode": "prepared"}) as run_roundtrip_mock,
+            mock.patch.object(shopify_roundtrip, "restore_sync_autoschedule"),
+            mock.patch.object(shopify_roundtrip, "restore_webhook_processing"),
+        ):
+            shopify_roundtrip.run_validation_command(
+                context_name="opw",
+                instance_name="testing",
+                env_file=None,
+                remote_login="gpt-admin",
+                profile="standard",
+                repository_root=Path("/repo"),
+            )
+
+        run_roundtrip_mock.assert_called_once_with(
+            fake_settings,
+            profile="standard",
+            sample_size=shopify_roundtrip.DEFAULT_STANDARD_SAMPLE_SIZE,
+            start_after_export=False,
+            client=fake_client,
+        )
 
     def test_run_validation_command_restores_pause_flags_on_failure(self) -> None:
         fake_settings = mock.sentinel.settings
@@ -375,7 +411,7 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
         )
 
         with (
-            mock.patch.object(shopify_roundtrip, "_find_prepare_candidate", return_value=product_snapshot),
+            mock.patch.object(shopify_roundtrip, "_find_candidate_snapshot", return_value=product_snapshot),
             mock.patch.object(
                 shopify_roundtrip,
                 "search_export_candidates",
@@ -525,9 +561,9 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
             mock.patch.object(shopify_roundtrip, "wait_for_related_syncs_to_quiet"),
             mock.patch.object(
                 shopify_roundtrip,
-                "_run_roundtrip_for_product",
-                return_value={"shopify_product_id": "new-product-id"},
-            ) as run_for_product_mock,
+                "_execute_roundtrip_products",
+                return_value=[{"shopify_product_id": "new-product-id"}],
+            ) as execute_roundtrip_products_mock,
             mock.patch.object(
                 shopify_roundtrip,
                 "verify_prepare_export_sample",
@@ -537,13 +573,13 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
             results = shopify_roundtrip.run_roundtrip(fake_settings)
 
         self.assertEqual(results["shopify_product_id"], "new-product-id")
-        self.assertEqual(get_external_system_id_mock.call_count, 1)
-        run_for_product_mock.assert_called_once_with(
+        get_external_system_id_mock.assert_not_called()
+        execute_roundtrip_products_mock.assert_called_once_with(
             fake_client,
             fake_settings,
-            product_snapshot=product_snapshot,
-            shopify_product_id="new-product-id",
             profile="full",
+            product_ids=[77],
+            primary_snapshot=product_snapshot,
         )
         verify_prepare_export_sample_mock.assert_called_once_with(
             fake_client,
@@ -562,6 +598,44 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
                 sample_size=5,
                 repository_root=Path("/repo"),
             )
+
+    @staticmethod
+    def test_run_validation_command_allows_sample_size_for_standard_profile() -> None:
+        fake_settings = mock.sentinel.settings
+        fake_client = mock.sentinel.client
+
+        with (
+            mock.patch.object(shopify_roundtrip, "load_settings", return_value=fake_settings),
+            mock.patch.object(shopify_roundtrip, "RemoteOdooClient", return_value=fake_client),
+            mock.patch.object(shopify_roundtrip, "pause_sync_autoschedule", return_value=None),
+            mock.patch.object(shopify_roundtrip, "pause_webhook_processing", return_value=None),
+            mock.patch.object(shopify_roundtrip, "ensure_no_conflicting_syncs"),
+            mock.patch.object(
+                shopify_roundtrip,
+                "read_validation_runtime_state",
+                return_value={"active_syncs": [], "autoschedule_pause": None, "webhook_pause": None},
+            ),
+            mock.patch.object(shopify_roundtrip, "run_roundtrip", return_value={"start_mode": "prepared"}) as run_roundtrip_mock,
+            mock.patch.object(shopify_roundtrip, "restore_sync_autoschedule"),
+            mock.patch.object(shopify_roundtrip, "restore_webhook_processing"),
+        ):
+            shopify_roundtrip.run_validation_command(
+                context_name="opw",
+                instance_name="testing",
+                env_file=None,
+                remote_login="gpt-admin",
+                profile="standard",
+                sample_size=6,
+                repository_root=Path("/repo"),
+            )
+
+        run_roundtrip_mock.assert_called_once_with(
+            fake_settings,
+            profile="standard",
+            sample_size=6,
+            start_after_export=False,
+            client=fake_client,
+        )
 
     def test_run_validation_command_rejects_shopify_roundtrip_on_prod(self) -> None:
         with self.assertRaises(click.ClickException):
@@ -688,7 +762,7 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
                 return_value={"product_id": 77, "shopify_product_id": "new-product-id", "status": "ACTIVE"},
             ),
             mock.patch.object(
-                shopify_roundtrip, "_run_roundtrip_for_product", return_value={"shopify_product_id": "new-product-id"}
+                shopify_roundtrip, "_execute_roundtrip_products", return_value=[{"shopify_product_id": "new-product-id"}]
             ),
         ):
             results = shopify_roundtrip.run_roundtrip(fake_settings)
@@ -749,24 +823,137 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
         )
         with (
             mock.patch.object(shopify_roundtrip, "RemoteOdooClient", return_value=fake_client),
-            mock.patch.object(shopify_roundtrip, "_find_roundtrip_candidate", return_value=(product_snapshot, "product-id")),
             mock.patch.object(
                 shopify_roundtrip,
-                "_run_roundtrip_for_product",
-                return_value={"shopify_product_id": "product-id"},
-            ) as run_roundtrip_for_product_mock,
+                "_select_roundtrip_prepare_selection",
+                return_value=shopify_roundtrip.RoundtripPrepareSelection(
+                    product_snapshot=product_snapshot,
+                    export_product_ids=(77,),
+                ),
+            ),
+            mock.patch.object(
+                shopify_roundtrip,
+                "_execute_roundtrip_products",
+                return_value=[{"shopify_product_id": "product-id"}],
+            ) as execute_roundtrip_products_mock,
         ):
             results = shopify_roundtrip.run_roundtrip(fake_settings, profile="smoke", sample_size=3, start_after_export=True)
 
         self.assertEqual(results["start_mode"], "after_export")
         self.assertEqual(results["profile"], "smoke")
-        run_roundtrip_for_product_mock.assert_called_once_with(
+        execute_roundtrip_products_mock.assert_called_once_with(
             fake_client,
             fake_settings,
-            product_snapshot=product_snapshot,
-            shopify_product_id="product-id",
             profile="smoke",
+            product_ids=[77],
+            primary_snapshot=product_snapshot,
         )
+
+    def test_run_roundtrip_standard_uses_two_roundtrip_products(self) -> None:
+        fake_settings = mock.sentinel.settings
+        fake_client = mock.Mock()
+        primary_snapshot = shopify_roundtrip.ProductSnapshot(product_id=77, title="One", description_html="<p>One</p>", condition_id=5, condition_code="used")
+
+        with (
+            mock.patch.object(shopify_roundtrip, "RemoteOdooClient", return_value=fake_client),
+            mock.patch.object(
+                shopify_roundtrip,
+                "_select_roundtrip_prepare_selection",
+                return_value=shopify_roundtrip.RoundtripPrepareSelection(
+                    product_snapshot=primary_snapshot,
+                    export_product_ids=(77, 88, 99),
+                ),
+            ),
+            mock.patch.object(shopify_roundtrip, "_current_utc_timestamp", return_value="2026-03-13 15:50:18"),
+            mock.patch.object(shopify_roundtrip, "create_sync", side_effect=[101, 102]),
+            mock.patch.object(shopify_roundtrip, "wait_for_sync", side_effect=[{"id": 101, "total_count": 0}, {"id": 102, "total_count": 3}]),
+            mock.patch.object(shopify_roundtrip, "wait_for_related_syncs_to_quiet"),
+            mock.patch.object(shopify_roundtrip, "stamp_non_sample_products_as_exported_for_validation", return_value="2026-03-13 15:50:19"),
+            mock.patch.object(
+                shopify_roundtrip,
+                "verify_prepare_export_sample",
+                side_effect=[
+                    {"product_id": 77, "shopify_product_id": "shopify-77"},
+                    {"product_id": 88, "shopify_product_id": "shopify-88"},
+                    {"product_id": 99, "shopify_product_id": "shopify-99"},
+                ],
+            ),
+            mock.patch.object(
+                shopify_roundtrip,
+                "_execute_roundtrip_products",
+                return_value=[
+                    {"candidate_product_id": 77, "shopify_product_id": "shopify-77"},
+                    {"candidate_product_id": 88, "shopify_product_id": "shopify-88"},
+                ],
+            ) as execute_roundtrip_products_mock,
+            mock.patch.object(shopify_roundtrip, "ensure_no_conflicting_syncs") as ensure_mock,
+        ):
+            results = shopify_roundtrip.run_roundtrip(fake_settings, profile="standard", sample_size=3)
+
+        self.assertEqual(results["profile"], "standard")
+        self.assertEqual(results["export_sample_product_ids"], [77, 88, 99])
+        self.assertEqual(results["additional_roundtrip_results"], [{"candidate_product_id": 88, "shopify_product_id": "shopify-88"}])
+        execute_roundtrip_products_mock.assert_called_once_with(
+            fake_client,
+            fake_settings,
+            profile="standard",
+            product_ids=[77, 88],
+            primary_snapshot=primary_snapshot,
+        )
+        ensure_mock.assert_called_once_with(fake_client, clear_conflicts=True)
+
+    def test_run_roundtrip_standard_runs_two_roundtrip_products(self) -> None:
+        fake_settings = mock.sentinel.settings
+        fake_client = mock.sentinel.client
+        product_one = shopify_roundtrip.ProductSnapshot(product_id=77, title="One", description_html="<p>One</p>", condition_id=5, condition_code="used")
+        product_two = shopify_roundtrip.ProductSnapshot(product_id=88, title="Two", description_html="<p>Two</p>", condition_id=6, condition_code="refurbished")
+
+        with (
+            mock.patch.object(shopify_roundtrip, "RemoteOdooClient", return_value=fake_client),
+            mock.patch.object(
+                shopify_roundtrip,
+                "_select_roundtrip_prepare_selection",
+                return_value=shopify_roundtrip.RoundtripPrepareSelection(
+                    product_snapshot=product_one,
+                    export_product_ids=(77, 88, 99),
+                ),
+            ),
+            mock.patch.object(shopify_roundtrip, "_current_utc_timestamp", return_value="2026-03-13 15:50:18"),
+            mock.patch.object(shopify_roundtrip, "create_sync", side_effect=[101, 102]) as create_sync_mock,
+            mock.patch.object(shopify_roundtrip, "wait_for_sync", side_effect=[{"id": 101, "total_count": 0}, {"id": 102, "total_count": 3}]),
+            mock.patch.object(shopify_roundtrip, "wait_for_related_syncs_to_quiet"),
+            mock.patch.object(shopify_roundtrip, "stamp_non_sample_products_as_exported_for_validation", return_value="2026-03-13 15:50:19") as stamp_mock,
+            mock.patch.object(
+                shopify_roundtrip,
+                "verify_prepare_export_sample",
+                side_effect=[
+                    {"product_id": 77, "shopify_product_id": "shopify-77"},
+                    {"product_id": 88, "shopify_product_id": "shopify-88"},
+                    {"product_id": 99, "shopify_product_id": "shopify-99"},
+                ],
+            ),
+            mock.patch.object(shopify_roundtrip, "read_product_snapshot", side_effect=[product_one, product_two]),
+            mock.patch.object(shopify_roundtrip, "get_external_system_id", side_effect=["shopify-77", "shopify-88"]),
+            mock.patch.object(
+                shopify_roundtrip,
+                "_run_roundtrip_for_product",
+                side_effect=[
+                    {"candidate_product_id": 77, "shopify_product_id": "shopify-77"},
+                    {"candidate_product_id": 88, "shopify_product_id": "shopify-88"},
+                ],
+            ) as run_roundtrip_for_product_mock,
+            mock.patch.object(shopify_roundtrip, "ensure_no_conflicting_syncs") as ensure_mock,
+        ):
+            results = shopify_roundtrip.run_roundtrip(fake_settings, profile="standard", sample_size=3)
+
+        self.assertEqual(results["candidate_product_id"], 77)
+        self.assertEqual(results["profile"], "standard")
+        self.assertEqual(results["export_sample_product_ids"], [77, 88, 99])
+        self.assertEqual(results["additional_roundtrip_results"], [{"candidate_product_id": 88, "shopify_product_id": "shopify-88"}])
+        self.assertEqual(run_roundtrip_for_product_mock.call_count, 2)
+        ensure_mock.assert_called_once_with(fake_client, clear_conflicts=True)
+        stamp_mock.assert_called_once_with(fake_client, keep_product_ids=(77, 88, 99))
+        self.assertEqual(create_sync_mock.call_args_list[1].args, (fake_client, "export_batch_products", {"odoo_products_to_sync": [[6, 0, [77, 88, 99]]]}))
 
 
 if __name__ == "__main__":

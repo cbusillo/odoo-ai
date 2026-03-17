@@ -57,8 +57,9 @@ Quick Start
 
 - Prefer explicit profiles for long-running scenarios. For Shopify validation,
   `--profile smoke` resets Shopify and re-exports a bounded sample before the
-  round-trip checks, while `--profile full` keeps the same checks but prepares
-  with a full export.
+  round-trip checks, `--profile standard` keeps the bounded sample but runs
+  multiple deep round-trip products, and `--profile full` prepares with a full
+  export.
 - `shopify-roundtrip` is disabled on `prod`; use it only on non-production
   instances where destructive round-trip validation is appropriate.
 

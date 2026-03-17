@@ -1264,7 +1264,7 @@ def validate_shopify_roundtrip_command(
         remote_login=remote_login,
         profile=profile,
         sample_size=sample_size,
-        clear_conflicting_syncs=clear_conflicting_syncs,
+        clear_conflicts=clear_conflicting_syncs,
         start_after_export=start_after_export,
         repository_root=_discover_repo_root(Path.cwd()),
     )

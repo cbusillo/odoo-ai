@@ -2,7 +2,6 @@
 title: Shopify Integration Guide
 ---
 
-
 Purpose
 
 This page keeps a short, accurate map of the Shopify integration. Use it to
@@ -15,19 +14,26 @@ When
 ## Sources of Truth
 
 - `addons/shopify_sync/models/shopify_sync.py` — sync job model, queueing,
-    health checks, and async execution.
+  health checks, and async execution.
 - `addons/shopify_sync/services/shopify/service.py` — API client, rate
-    limiting, and `API_VERSION`.
+  limiting, and `API_VERSION`.
 - `addons/shopify_sync/services/shopify/helpers.py` — `SyncMode` values and
-    Shopify error types.
+  Shopify error types.
 - `addons/shopify_sync/services/shopify/sync/` — importers, exporters, and
-    deleters.
+  deleters.
 - `addons/shopify_sync/controllers/shopify_webhook.py` — webhook endpoint
-    and topic routing.
+  and topic routing.
 - `addons/shopify_sync/graphql/shopify/*.graphql` — GraphQL operations and
-    fragments.
+  fragments.
 - `addons/shopify_sync/services/shopify/gql/` — generated client and models
-    (do not edit).
+  (do not edit).
+
+Shopify identity mappings are stored in `external.id` resources, including
+products, variants, media, customers, addresses, orders, and order lines.
+Orders and order lines read/write those mappings through `external.id.mixin`
+helpers instead of legacy `shopify_*_id` model fields.
+`reset_shopify` clears those Shopify mappings so the local database is fully
+disconnected from remote Shopify records before a rebuild/export.
 
 ## Sync
 
@@ -72,12 +78,16 @@ See `addons/shopify_sync/services/shopify/sync/importers/order_importer.py`.
 - Keep Shopify instance secrets in `platform/secrets.toml`, not duplicated in
   root `.env`, so release-time env collision checks stay clean.
 - `uv run python docker/scripts/generate_shopify_models.py --context opw \
-  --instance local` loads Shopify credentials from the same layered platform
+--instance local` loads Shopify credentials from the same layered platform
   env used by runtime commands and refreshes the checked-in schema snapshots
   used for code generation. If `addons/shopify_sync/graphql/.env` exists, that
   command also keeps `SHOPIFY_GRAPHQL_API_VERSION` aligned with the generated
   schema version. If `.env` is absent, it applies the same update to
   `addons/shopify_sync/graphql/.env.local` when present.
+- Generated enums and input types are intentionally scoped to the operations we
+  check in rather than the full Shopify schema surface. This keeps the tracked
+  `services/shopify/gql/` package smaller while preserving the current query
+  and mutation workflows.
 - Checked-in schema snapshots remain under
   `addons/shopify_sync/graphql/schema/` for reference and generated client
   history.
@@ -108,6 +118,9 @@ snapshots remain checked in for codegen history and reference.
 - `shopify.api_token`
 - `shopify.test_store`
 - `shopify.webhook_key`
+
+`shopify.test_store` is a runtime safety gate, not just a UI hint: destructive
+`reset_shopify` runs are blocked unless it is enabled.
 
 See `addons/shopify_sync/services/shopify/service.py` and
 `addons/shopify_sync/controllers/shopify_webhook.py` for the lookup logic.

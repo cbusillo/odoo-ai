@@ -71,7 +71,7 @@ class Client(BaseClient):
             query=STAGED_UPLOADS_CREATE_GQL,
             operation_name="StagedUploadsCreate",
             variables=variables,
-            **kwargs
+            **kwargs,
         )
         data = self.get_data(response)
         return StagedUploadsCreate.model_validate(data).staged_uploads_create
@@ -87,7 +87,7 @@ class Client(BaseClient):
             query=PRODUCT_SET_BULK_RUN_GQL,
             operation_name="ProductSetBulkRun",
             variables=variables,
-            **kwargs
+            **kwargs,
         )
         data = self.get_data(response)
         return ProductSetBulkRun.model_validate(data).bulk_operation_run_mutation
@@ -100,7 +100,7 @@ class Client(BaseClient):
             query=CURRENT_BULK_OPERATION_GQL,
             operation_name="CurrentBulkOperation",
             variables=variables,
-            **kwargs
+            **kwargs,
         )
         data = self.get_data(response)
         return CurrentBulkOperation.model_validate(data).bulk_operations
@@ -110,7 +110,7 @@ class Client(BaseClient):
         limit: int,
         cursor: Union[Optional[str], UnsetType] = UNSET,
         query: Union[Optional[str], UnsetType] = UNSET,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> GetCustomersCustomers:
         variables: dict[str, object] = {
             "cursor": cursor,
@@ -121,7 +121,7 @@ class Client(BaseClient):
             query=GET_CUSTOMERS_GQL,
             operation_name="GetCustomers",
             variables=variables,
-            **kwargs
+            **kwargs,
         )
         data = self.get_data(response)
         return GetCustomers.model_validate(data).customers
@@ -131,7 +131,7 @@ class Client(BaseClient):
         limit: int,
         cursor: Union[Optional[str], UnsetType] = UNSET,
         query: Union[Optional[str], UnsetType] = UNSET,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> GetOrderIdsOrders:
         variables: dict[str, object] = {
             "cursor": cursor,
@@ -142,7 +142,7 @@ class Client(BaseClient):
             query=GET_ORDER_IDS_GQL,
             operation_name="GetOrderIds",
             variables=variables,
-            **kwargs
+            **kwargs,
         )
         data = self.get_data(response)
         return GetOrderIds.model_validate(data).orders
@@ -152,7 +152,7 @@ class Client(BaseClient):
         limit: int,
         cursor: Union[Optional[str], UnsetType] = UNSET,
         query: Union[Optional[str], UnsetType] = UNSET,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> GetOrdersOrders:
         variables: dict[str, object] = {
             "cursor": cursor,
@@ -163,7 +163,7 @@ class Client(BaseClient):
             query=GET_ORDERS_GQL,
             operation_name="GetOrders",
             variables=variables,
-            **kwargs
+            **kwargs,
         )
         data = self.get_data(response)
         return GetOrders.model_validate(data).orders
@@ -173,7 +173,7 @@ class Client(BaseClient):
         limit: int,
         cursor: Union[Optional[str], UnsetType] = UNSET,
         query: Union[Optional[str], UnsetType] = UNSET,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> GetProductIdsProducts:
         variables: dict[str, object] = {
             "cursor": cursor,
@@ -184,7 +184,7 @@ class Client(BaseClient):
             query=GET_PRODUCT_IDS_GQL,
             operation_name="GetProductIds",
             variables=variables,
-            **kwargs
+            **kwargs,
         )
         data = self.get_data(response)
         return GetProductIds.model_validate(data).products
@@ -194,7 +194,7 @@ class Client(BaseClient):
         limit: int,
         cursor: Union[Optional[str], UnsetType] = UNSET,
         query: Union[Optional[str], UnsetType] = UNSET,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> GetProductsProducts:
         variables: dict[str, object] = {
             "cursor": cursor,
@@ -205,7 +205,7 @@ class Client(BaseClient):
             query=GET_PRODUCTS_GQL,
             operation_name="GetProducts",
             variables=variables,
-            **kwargs
+            **kwargs,
         )
         data = self.get_data(response)
         return GetProducts.model_validate(data).products
@@ -216,7 +216,7 @@ class Client(BaseClient):
             query=GET_LOCATIONS_GQL,
             operation_name="GetLocations",
             variables=variables,
-            **kwargs
+            **kwargs,
         )
         data = self.get_data(response)
         return GetLocations.model_validate(data).locations
@@ -225,14 +225,14 @@ class Client(BaseClient):
         self,
         input: ProductSetInput,
         identifier: Union[Optional[ProductSetIdentifiers], UnsetType] = UNSET,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> Optional[ProductSetProductSet]:
         variables: dict[str, object] = {"identifier": identifier, "input": input}
         response = self.execute(
             query=PRODUCT_SET_GQL,
             operation_name="ProductSet",
             variables=variables,
-            **kwargs
+            **kwargs,
         )
         data = self.get_data(response)
         return ProductSet.model_validate(data).product_set
@@ -245,7 +245,7 @@ class Client(BaseClient):
             query=UPDATE_PUBLICATIONS_GQL,
             operation_name="UpdatePublications",
             variables=variables,
-            **kwargs
+            **kwargs,
         )
         data = self.get_data(response)
         return UpdatePublications.model_validate(data).publishable_publish
@@ -254,14 +254,14 @@ class Client(BaseClient):
         self,
         input: ProductDeleteInput,
         synchronous: Union[Optional[bool], UnsetType] = UNSET,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> Optional[DeleteProductProductDelete]:
         variables: dict[str, object] = {"input": input, "synchronous": synchronous}
         response = self.execute(
             query=DELETE_PRODUCT_GQL,
             operation_name="DeleteProduct",
             variables=variables,
-            **kwargs
+            **kwargs,
         )
         data = self.get_data(response)
         return DeleteProduct.model_validate(data).product_delete
@@ -274,7 +274,7 @@ class Client(BaseClient):
             query=PRODUCT_REORDER_MEDIA_GQL,
             operation_name="ProductReorderMedia",
             variables=variables,
-            **kwargs
+            **kwargs,
         )
         data = self.get_data(response)
         return ProductReorderMedia.model_validate(data).product_reorder_media

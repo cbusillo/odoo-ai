@@ -181,6 +181,8 @@ def main() -> None:
         "target_package_name": client_name,
         "target_package_path": str(services_path),
         "convert_to_snake_case": True,
+        "include_all_inputs": False,
+        "include_all_enums": False,
         "async_client": False,
         "plugins": [
             "ariadne_codegen.contrib.shorter_results.ShorterResultsPlugin",

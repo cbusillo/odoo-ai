@@ -56,7 +56,7 @@ class PlatformValidateCliTests(unittest.TestCase):
             remote_login="gpt-admin",
             profile="smoke",
             sample_size=7,
-            clear_conflicting_syncs=True,
+            clear_conflicts=True,
             start_after_export=True,
             repository_root=repository_root,
         )

@@ -1,74 +1,63 @@
 from __future__ import annotations
 
-import html
 import json
 import sys
 import time
-import urllib.request
 import xmlrpc.client
-from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
 import click
 
-from tools.platform import dokploy as platform_dokploy
-from tools.platform.environment import discover_repo_root, load_dokploy_source_of_truth, load_environment
+from tools.platform.environment import discover_repo_root
 
-POLL_SECONDS = 5
-SYNC_TIMEOUT_SECONDS = 8 * 60 * 60
-TITLE_TIMEOUT_SECONDS = 180
-FIELD_TIMEOUT_SECONDS = 180
-SYNC_SEARCH_CUTOFF_SECONDS = 300
-SYNC_SETTLE_TIMEOUT_SECONDS = 300
-SYNC_SETTLE_QUIET_SECONDS = 15
-DEFAULT_REMOTE_LOGIN = "gpt-admin"
-SUPPORTED_REMOTE_INSTANCES = ("dev", "testing", "prod")
-VALIDATION_PROFILES = ("smoke", "full")
-DEFAULT_SAMPLE_SIZE = 25
-VALIDATION_EXPORT_MARKER_OFFSET_SECONDS = 60 * 60
-SHOPIFY_WEBHOOK_PAUSE_KEY = "shopify.pause_webhook_processing"
-SHOPIFY_AUTOSCHEDULE_PAUSE_KEY = "shopify.pause_sync_autoschedule"
-PREPARE_SYNC_MODES = ("reset_shopify", "export_all_products", "import_then_export_products", "export_changed_products", "export_batch_products")
-ROUNDTRIP_SYNC_MODES = ("import_then_export_products", "export_changed_products", "import_one_product", "export_batch_products")
-SHOPIFY_METAFIELD_NAMESPACE = "custom"
-CONDITION_METAFIELD_KEY = "condition"
-CONFLICTING_SYNC_STATES = ("queued", "running")
-
-
-@dataclass(frozen=True)
-class RemoteShopifySettings:
-    odoo_url: str
-    database_name: str
-    odoo_password: str
-    remote_login: str
-    shop_url_key: str
-    shopify_api_token: str
-    shopify_api_version: str
-
-
-@dataclass(frozen=True)
-class ProductSnapshot:
-    product_id: int
-    title: str
-    description_html: str
-    condition_id: int | None
-    condition_code: str | None
-
-
-@dataclass(frozen=True)
-class ShopifyProductSnapshot:
-    title: str | None
-    description_html: str | None
-    condition_metafield_id: str | None
-    condition_code: str | None
-
-
-@dataclass(frozen=True)
-class RoundtripProductSelection:
-    product_snapshot: ProductSnapshot
-    shopify_product_id: str
-    export_product_ids: tuple[int, ...]
+from . import _remote
+from ._remote import (
+    RemoteOdooClient,
+    _export_candidate_domain,
+    _shopify_linked_export_candidate_domain,
+    get_external_system_id,
+    get_shopify_product_snapshot,
+    get_shopify_title,
+    load_settings,
+    read_product_name,
+    read_product_snapshot,
+    search_export_candidates,
+    select_alternate_condition,
+    stamp_non_sample_products_as_exported_for_validation,
+    update_shopify_product_snapshot,
+)
+from ._shared import (
+    CONFLICTING_SYNC_STATES,
+    CONFLICT_CLEAR_MAX_RETRIES,
+    CONFLICT_CLEAR_RETRY_SLEEP_SECONDS,
+    DEFAULT_REMOTE_LOGIN,
+    DEFAULT_SAMPLE_SIZE,
+    FIELD_TIMEOUT_SECONDS,
+    POLL_SECONDS,
+    PREPARE_SYNC_MODES,
+    ProductSnapshot,
+    ROUNDTRIP_SYNC_MODES,
+    RemoteShopifySettings,
+    RoundtripPrepareSelection,
+    RoundtripProductSelection,
+    SHOPIFY_AUTOSCHEDULE_PAUSE_KEY,
+    SHOPIFY_WEBHOOK_PAUSE_KEY,
+    SUPPORTED_REMOTE_INSTANCES,
+    SYNC_SEARCH_CUTOFF_SECONDS,
+    SYNC_SETTLE_QUIET_SECONDS,
+    SYNC_SETTLE_TIMEOUT_SECONDS,
+    SYNC_TIMEOUT_SECONDS,
+    ShopifyProductSnapshot,
+    TITLE_TIMEOUT_SECONDS,
+    VALIDATION_PROFILES,
+    _expected_shopify_status,
+    _future_utc_timestamp,
+    _normalize_html_fragment,
+    _parse_odoo_utc_timestamp,
+    _shopify_prepare_snapshot_matches,
+    _snapshot_fields_match,
+)
 
 
 def read_config_parameter(client: RemoteOdooClient, key: str) -> dict[str, object] | None:
@@ -103,7 +92,10 @@ def pause_webhook_processing(client: RemoteOdooClient) -> str | None:
     updated_row = set_config_parameter(client, SHOPIFY_WEBHOOK_PAUSE_KEY, "1")
     print(
         json.dumps(
-            {"label": "pause webhook processing", "config_parameter": updated_row or {"key": SHOPIFY_WEBHOOK_PAUSE_KEY, "value": None}},
+            {
+                "label": "pause webhook processing",
+                "config_parameter": updated_row or {"key": SHOPIFY_WEBHOOK_PAUSE_KEY, "value": None},
+            },
             sort_keys=True,
         ),
         flush=True,
@@ -115,7 +107,10 @@ def restore_webhook_processing(client: RemoteOdooClient, *, original_value: str 
     restored_row = set_config_parameter(client, SHOPIFY_WEBHOOK_PAUSE_KEY, original_value)
     print(
         json.dumps(
-            {"label": "restore webhook processing", "config_parameter": restored_row or {"key": SHOPIFY_WEBHOOK_PAUSE_KEY, "value": None}},
+            {
+                "label": "restore webhook processing",
+                "config_parameter": restored_row or {"key": SHOPIFY_WEBHOOK_PAUSE_KEY, "value": None},
+            },
             sort_keys=True,
         ),
         flush=True,
@@ -128,7 +123,10 @@ def pause_sync_autoschedule(client: RemoteOdooClient) -> str | None:
     updated_row = set_config_parameter(client, SHOPIFY_AUTOSCHEDULE_PAUSE_KEY, "1")
     print(
         json.dumps(
-            {"label": "pause Shopify autoschedule", "config_parameter": updated_row or {"key": SHOPIFY_AUTOSCHEDULE_PAUSE_KEY, "value": None}},
+            {
+                "label": "pause Shopify autoschedule",
+                "config_parameter": updated_row or {"key": SHOPIFY_AUTOSCHEDULE_PAUSE_KEY, "value": None},
+            },
             sort_keys=True,
         ),
         flush=True,
@@ -140,7 +138,10 @@ def restore_sync_autoschedule(client: RemoteOdooClient, *, original_value: str |
     restored_row = set_config_parameter(client, SHOPIFY_AUTOSCHEDULE_PAUSE_KEY, original_value)
     print(
         json.dumps(
-            {"label": "restore Shopify autoschedule", "config_parameter": restored_row or {"key": SHOPIFY_AUTOSCHEDULE_PAUSE_KEY, "value": None}},
+            {
+                "label": "restore Shopify autoschedule",
+                "config_parameter": restored_row or {"key": SHOPIFY_AUTOSCHEDULE_PAUSE_KEY, "value": None},
+            },
             sort_keys=True,
         ),
         flush=True,
@@ -197,7 +198,11 @@ def _build_operator_summary(
     export_sample_product_ids = results.get("export_sample_product_ids")
     active_syncs = runtime_state.get("active_syncs")
     active_sync_count = len(active_syncs) if isinstance(active_syncs, list) else None
-    export_sample_count = len(export_sample_product_ids) if isinstance(export_sample_product_ids, list) else (sample_size if profile == "smoke" else None)
+    export_sample_count = (
+        len(export_sample_product_ids)
+        if isinstance(export_sample_product_ids, list)
+        else (sample_size if profile == "smoke" else None)
+    )
     return {
         "scenario": "shopify-roundtrip",
         "context": context_name,
@@ -218,53 +223,65 @@ def _build_operator_summary(
     }
 
 
-def _export_candidate_domain() -> list[list[object]]:
-    return [
-        ["sale_ok", "=", True],
-        ["is_ready_for_sale", "=", True],
-        ["is_published", "=", True],
-        ["website_description", "!=", False],
-        ["website_description", "!=", ""],
-        ["type", "=", "consu"],
-    ]
-
-
-def _shopify_linked_export_candidate_domain() -> list[list[object]]:
-    return [
-        *_export_candidate_domain(),
-        ["external_ids.system_id.code", "=", "shopify"],
-        ["external_ids.resource", "=", "product"],
-    ]
+def _is_serialization_failure_fault(exception: xmlrpc.client.Fault) -> bool:
+    fault_text = f"{exception.faultCode} {exception.faultString}".lower()
+    return "serializationfailure" in fault_text or "could not serialize access due to concurrent update" in fault_text
 
 
 def clear_conflicting_syncs(client: RemoteOdooClient, *, reason: str) -> list[int]:
-    conflicting_syncs = list_conflicting_syncs(client)
-    conflicting_sync_ids: list[int] = []
-    queued_sync_ids: list[int] = []
-    running_sync_ids: list[int] = []
-    for row in conflicting_syncs:
-        sync_id = row.get("id")
-        if isinstance(sync_id, int):
-            conflicting_sync_ids.append(sync_id)
-            state_value = str(row.get("state") or "")
-            if state_value == "queued":
-                queued_sync_ids.append(sync_id)
-            elif state_value == "running":
-                running_sync_ids.append(sync_id)
+    last_conflicting_sync_ids: list[int] = []
+    for attempt in range(1, CONFLICT_CLEAR_MAX_RETRIES + 1):
+        conflicting_syncs = list_conflicting_syncs(client)
+        conflicting_sync_ids: list[int] = []
+        queued_sync_ids: list[int] = []
+        running_sync_ids: list[int] = []
+        for row in conflicting_syncs:
+            sync_id = row.get("id")
+            if isinstance(sync_id, int):
+                conflicting_sync_ids.append(sync_id)
+                state_value = str(row.get("state") or "")
+                if state_value == "queued":
+                    queued_sync_ids.append(sync_id)
+                elif state_value == "running":
+                    running_sync_ids.append(sync_id)
 
-    if queued_sync_ids:
-        client.execute(
-            "shopify.sync",
-            "write",
-            [queued_sync_ids, {"state": "canceled", "error_message": reason}],
-        )
-    if running_sync_ids:
-        client.execute(
-            "shopify.sync",
-            "write",
-            [running_sync_ids, {"cancel_requested": True, "cancel_reason": reason}],
-        )
-    return conflicting_sync_ids
+        if not conflicting_sync_ids:
+            return last_conflicting_sync_ids
+        last_conflicting_sync_ids = conflicting_sync_ids
+
+        try:
+            if queued_sync_ids:
+                client.execute(
+                    "shopify.sync",
+                    "write",
+                    [queued_sync_ids, {"state": "canceled", "error_message": reason}],
+                )
+            if running_sync_ids:
+                client.execute(
+                    "shopify.sync",
+                    "write",
+                    [running_sync_ids, {"cancel_requested": True, "cancel_reason": reason}],
+                )
+            return conflicting_sync_ids
+        except xmlrpc.client.Fault as exception:
+            if not _is_serialization_failure_fault(exception) or attempt >= CONFLICT_CLEAR_MAX_RETRIES:
+                raise
+            sleep_seconds = CONFLICT_CLEAR_RETRY_SLEEP_SECONDS * attempt
+            print(
+                json.dumps(
+                    {
+                        "label": "retry clear conflicting syncs",
+                        "attempt": attempt,
+                        "max_retries": CONFLICT_CLEAR_MAX_RETRIES,
+                        "sleep_seconds": sleep_seconds,
+                    },
+                    sort_keys=True,
+                ),
+                flush=True,
+            )
+            time.sleep(sleep_seconds)
+
+    return last_conflicting_sync_ids
 
 
 def ensure_no_conflicting_syncs(client: RemoteOdooClient, *, clear_conflicts: bool) -> None:
@@ -291,243 +308,6 @@ def ensure_no_conflicting_syncs(client: RemoteOdooClient, *, clear_conflicts: bo
         "Conflicting Shopify syncs already exist. Re-run with --clear-conflicting-syncs if you want the validator to cancel them first. "
         f"Current conflicts: {json.dumps(conflicting_syncs, sort_keys=True)}"
     )
-
-
-def load_settings(
-    *,
-    repository_root: Path,
-    env_file: Path | None,
-    context_name: str,
-    instance_name: str,
-    remote_login: str,
-) -> RemoteShopifySettings:
-    if instance_name not in SUPPORTED_REMOTE_INSTANCES:
-        raise click.ClickException(
-            f"shopify-roundtrip currently supports remote instances only: {', '.join(SUPPORTED_REMOTE_INSTANCES)}"
-        )
-
-    _, environment_values = load_environment(
-        repository_root,
-        env_file,
-        context_name=context_name,
-        instance_name=instance_name,
-        collision_mode="error",
-    )
-    dokploy_source_file = repository_root / "platform" / "dokploy.toml"
-    dokploy_source_of_truth = load_dokploy_source_of_truth(dokploy_source_file)
-    target_definition = platform_dokploy.find_dokploy_target_definition(
-        dokploy_source_of_truth,
-        context_name=context_name,
-        instance_name=instance_name,
-    )
-    base_urls = platform_dokploy.resolve_healthcheck_base_urls(
-        target_definition=target_definition,
-        environment_values=environment_values,
-    )
-    if not base_urls:
-        raise click.ClickException(
-            f"Could not resolve base URL for {context_name}/{instance_name}. Configure platform/dokploy.toml domains or ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL."
-        )
-    odoo_url = base_urls[0]
-    odoo_key = str(environment_values["ODOO_KEY"])
-    database_name = str(environment_values.get("ODOO_DB_NAME", context_name)).strip()
-    if not database_name:
-        database_name = context_name
-    return RemoteShopifySettings(
-        odoo_url=odoo_url,
-        database_name=database_name,
-        odoo_password=odoo_key,
-        remote_login=remote_login,
-        shop_url_key=str(environment_values["ENV_OVERRIDE_SHOPIFY__SHOP_URL_KEY"]),
-        shopify_api_token=str(environment_values["ENV_OVERRIDE_SHOPIFY__API_TOKEN"]),
-        shopify_api_version=str(environment_values["ENV_OVERRIDE_SHOPIFY__API_VERSION"]),
-    )
-
-
-class RemoteOdooClient:
-    def __init__(self, settings: RemoteShopifySettings) -> None:
-        common_proxy = xmlrpc.client.ServerProxy(f"{settings.odoo_url}/xmlrpc/2/common", allow_none=True)
-        uid = common_proxy.authenticate(settings.database_name, settings.remote_login, settings.odoo_password, {})
-        if not uid:
-            raise RuntimeError(f"Failed to authenticate remote Odoo XML-RPC session for {settings.remote_login}")
-        self.settings = settings
-        self.uid = uid
-        self.object_proxy = xmlrpc.client.ServerProxy(f"{settings.odoo_url}/xmlrpc/2/object", allow_none=True)
-
-    def execute(self, model_name: str, method_name: str, args: list[object], kwargs: dict[str, object] | None = None) -> object:
-        return self.object_proxy.execute_kw(
-            self.settings.database_name,
-            self.uid,
-            self.settings.odoo_password,
-            model_name,
-            method_name,
-            args,
-            kwargs or {},
-        )
-
-
-def shopify_graphql(settings: RemoteShopifySettings, query: str, variables: dict[str, object]) -> dict[str, object]:
-    request = urllib.request.Request(
-        url=f"https://{settings.shop_url_key}.myshopify.com/admin/api/{settings.shopify_api_version}/graphql.json",
-        data=json.dumps({"query": query, "variables": variables}).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-            "X-Shopify-Access-Token": settings.shopify_api_token,
-        },
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=60) as response:
-        payload = json.loads(response.read().decode("utf-8"))
-    if payload.get("errors"):
-        raise RuntimeError(f"Shopify GraphQL errors: {payload['errors']}")
-    return payload.get("data") or {}
-
-
-def shopify_product_gid(shopify_product_id: str) -> str:
-    return f"gid://shopify/Product/{shopify_product_id}"
-
-
-def get_shopify_title(settings: RemoteShopifySettings, shopify_product_id: str) -> str | None:
-    return get_shopify_product_snapshot(settings, shopify_product_id).title
-
-
-def get_shopify_product_snapshot(settings: RemoteShopifySettings, shopify_product_id: str) -> ShopifyProductSnapshot:
-    data = shopify_graphql(
-        settings,
-        query=(
-            "query ProductSnapshot($id: ID!) {"
-            "  product(id: $id) {"
-            "    title"
-            "    descriptionHtml"
-            "    metafields(first: 15, namespace: \"custom\") {"
-            "      nodes { id key value }"
-            "    }"
-            "  }"
-            "}"
-        ),
-        variables={"id": shopify_product_gid(shopify_product_id)},
-    )
-    product_payload = data.get("product") or {}
-    if not isinstance(product_payload, dict):
-        raise RuntimeError("Unexpected Shopify product payload while reading product snapshot")
-
-    condition_metafield_id = None
-    condition_code = None
-    metafields_payload = product_payload.get("metafields") or {}
-    metafield_nodes = metafields_payload.get("nodes") if isinstance(metafields_payload, dict) else []
-    if isinstance(metafield_nodes, list):
-        for metafield in metafield_nodes:
-            if not isinstance(metafield, dict):
-                continue
-            if metafield.get("key") != CONDITION_METAFIELD_KEY:
-                continue
-            metafield_id = metafield.get("id")
-            metafield_value = metafield.get("value")
-            condition_metafield_id = str(metafield_id) if metafield_id else None
-            condition_code = str(metafield_value) if metafield_value is not None else None
-            break
-
-    return ShopifyProductSnapshot(
-        title=str(product_payload.get("title")) if product_payload.get("title") is not None else None,
-        description_html=(
-            str(product_payload.get("descriptionHtml")) if product_payload.get("descriptionHtml") is not None else None
-        ),
-        condition_metafield_id=condition_metafield_id,
-        condition_code=condition_code,
-    )
-
-
-def set_shopify_title(settings: RemoteShopifySettings, shopify_product_id: str, title: str) -> None:
-    update_shopify_product_snapshot(settings, shopify_product_id, title=title)
-
-
-def update_shopify_product_snapshot(
-    settings: RemoteShopifySettings,
-    shopify_product_id: str,
-    *,
-    title: str | None = None,
-    description_html: str | None = None,
-    condition_code: str | None = None,
-    condition_metafield_id: str | None = None,
-) -> None:
-    input_payload: dict[str, object] = {}
-    if title is not None:
-        input_payload["title"] = title
-    if description_html is not None:
-        input_payload["descriptionHtml"] = description_html
-    if condition_code is not None:
-        metafield_payload: dict[str, object] = {
-            "namespace": SHOPIFY_METAFIELD_NAMESPACE,
-            "key": CONDITION_METAFIELD_KEY,
-            "value": condition_code,
-            "type": "single_line_text_field",
-        }
-        if condition_metafield_id:
-            metafield_payload["id"] = condition_metafield_id
-        input_payload["metafields"] = [metafield_payload]
-
-    if not input_payload:
-        return
-
-    data = shopify_graphql(
-        settings,
-        query=(
-            "mutation ProductSet($identifier: ProductSetIdentifiers!, $input: ProductSetInput!) {"
-            "  productSet(identifier: $identifier, input: $input) {"
-            "    product { id title }"
-            "    userErrors { field message }"
-            "  }"
-            "}"
-        ),
-        variables={
-            "identifier": {"id": shopify_product_gid(shopify_product_id)},
-            "input": input_payload,
-        },
-    )
-    response_payload = data.get("productSet") or {}
-    if not isinstance(response_payload, dict):
-        raise RuntimeError("Unexpected Shopify productSet payload while updating title")
-    user_errors = response_payload.get("userErrors") or []
-    if user_errors:
-        raise RuntimeError(f"Shopify title update failed: {user_errors}")
-
-
-def search_export_candidate(client: RemoteOdooClient) -> dict[str, object]:
-    domain = [
-        ["sale_ok", "=", True],
-        ["is_ready_for_sale", "=", True],
-        ["is_published", "=", True],
-        ["website_description", "!=", False],
-        ["website_description", "!=", ""],
-        ["type", "=", "consu"],
-        ["external_ids.system_id.code", "=", "shopify"],
-        ["external_ids.resource", "=", "product"],
-    ]
-    result = client.execute(
-        "product.product",
-        "search_read",
-        [domain],
-        {"fields": ["id", "name"], "limit": 1},
-    )
-    if not isinstance(result, list) or not result:
-        raise RuntimeError("No Shopify-linked product found for Shopify round-trip validation")
-    candidate = result[0]
-    if not isinstance(candidate, dict):
-        raise RuntimeError("Unexpected search_read payload for candidate product")
-    return candidate
-
-
-def search_export_candidates(client: RemoteOdooClient) -> list[dict[str, object]]:
-    domain = _shopify_linked_export_candidate_domain()
-    result = client.execute(
-        "product.product",
-        "search_read",
-        [domain],
-        {"fields": ["id", "name"], "order": "id asc"},
-    )
-    if not isinstance(result, list):
-        raise RuntimeError(f"Unexpected search_read payload for Shopify export candidates: {result!r}")
-    return [row for row in result if isinstance(row, dict)]
 
 
 def _sample_product_ids(product_ids: list[int], *, sample_size: int) -> tuple[int, ...]:
@@ -564,110 +344,13 @@ def _sample_product_ids(product_ids: list[int], *, sample_size: int) -> tuple[in
     return tuple(sampled_ids)
 
 
-def _inject_primary_product_id(sampled_product_ids: tuple[int, ...], *, primary_product_id: int, sample_size: int) -> tuple[int, ...]:
+def _inject_primary_product_id(
+    sampled_product_ids: tuple[int, ...], *, primary_product_id: int, sample_size: int
+) -> tuple[int, ...]:
     if primary_product_id in sampled_product_ids:
         return sampled_product_ids
     adjusted_product_ids = (primary_product_id, *tuple(pid for pid in sampled_product_ids if pid != primary_product_id))
     return adjusted_product_ids[:sample_size]
-
-
-def get_external_system_id(client: RemoteOdooClient, product_id: int, resource: str) -> str:
-    external_id = client.execute("product.product", "get_external_system_id", [[product_id], "shopify", resource])
-    if not isinstance(external_id, str) or not external_id:
-        raise RuntimeError(f"Product {product_id} is missing Shopify {resource} external id")
-    return external_id
-
-
-def read_product_name(client: RemoteOdooClient, product_id: int) -> str:
-    result = client.execute("product.product", "read", [[product_id], ["name"]])
-    if not isinstance(result, list) or not result or not isinstance(result[0], dict):
-        raise RuntimeError(f"Failed to read product {product_id}")
-    return str(result[0].get("name") or "")
-
-
-def read_product_snapshot(client: RemoteOdooClient, product_id: int) -> ProductSnapshot:
-    result = client.execute(
-        "product.product",
-        "read",
-        [[product_id], ["name", "website_description", "condition"]],
-    )
-    if not isinstance(result, list) or not result or not isinstance(result[0], dict):
-        raise RuntimeError(f"Failed to read product snapshot for product {product_id}")
-
-    product_payload = result[0]
-    condition_value = product_payload.get("condition")
-    condition_id = None
-    condition_code = None
-    if isinstance(condition_value, list) and condition_value and isinstance(condition_value[0], int):
-        condition_id = condition_value[0]
-        condition_rows = client.execute("product.condition", "read", [[condition_id], ["code"]])
-        if isinstance(condition_rows, list) and condition_rows and isinstance(condition_rows[0], dict):
-            code_value = condition_rows[0].get("code")
-            condition_code = str(code_value) if code_value else None
-
-    return ProductSnapshot(
-        product_id=product_id,
-        title=str(product_payload.get("name") or ""),
-        description_html=str(product_payload.get("website_description") or ""),
-        condition_id=condition_id,
-        condition_code=condition_code,
-    )
-
-
-def stamp_non_sample_products_as_exported_for_validation(
-    client: RemoteOdooClient,
-    *,
-    keep_product_ids: tuple[int, ...],
-) -> str:
-    stamp_timestamp = _future_utc_timestamp(VALIDATION_EXPORT_MARKER_OFFSET_SECONDS)
-    domain = _export_candidate_domain()
-    if keep_product_ids:
-        domain.append(["id", "not in", list(keep_product_ids)])
-    product_ids_to_stamp = client.execute("product.product", "search", [domain])
-    if not isinstance(product_ids_to_stamp, list):
-        raise RuntimeError(f"Unexpected product search payload while stamping validation export state: {product_ids_to_stamp!r}")
-    if product_ids_to_stamp:
-        client.execute(
-            "product.product",
-            "write",
-            [product_ids_to_stamp, {"shopify_last_exported_at": stamp_timestamp, "shopify_next_export": False}],
-        )
-    print(
-        json.dumps(
-            {
-                "label": "stamp validation export state",
-                "product_count": len(product_ids_to_stamp),
-                "kept_product_count": len(keep_product_ids),
-                "shopify_last_exported_at": stamp_timestamp,
-            },
-            sort_keys=True,
-        ),
-        flush=True,
-    )
-    return stamp_timestamp
-
-
-def select_alternate_condition(client: RemoteOdooClient, *, exclude_condition_id: int | None) -> tuple[int, str] | None:
-    domain: list[list[object]] = [
-        ["code", "!=", False],
-    ]
-    if exclude_condition_id is not None:
-        domain.append(["id", "!=", exclude_condition_id])
-
-    result = client.execute(
-        "product.condition",
-        "search_read",
-        [domain],
-        {"fields": ["id", "code"], "limit": 1, "order": "id asc"},
-    )
-    if not isinstance(result, list) or not result or not isinstance(result[0], dict):
-        return None
-
-    condition_id = result[0].get("id")
-    condition_code = result[0].get("code")
-    if not isinstance(condition_id, int) or not condition_code:
-        return None
-    return condition_id, str(condition_code)
 
 
 def _correlate_sync_timestamp() -> str:
@@ -683,20 +366,6 @@ def _fallback_sync_window_start() -> str:
 
 def _current_utc_timestamp() -> str:
     return time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-
-
-def _future_utc_timestamp(offset_seconds: int) -> str:
-    return (datetime.now(tz=UTC) + timedelta(seconds=offset_seconds)).strftime("%Y-%m-%d %H:%M:%S")
-
-
-def _normalize_html_fragment(value: str | None) -> str:
-    return html.unescape(value or "")
-
-
-def _parse_odoo_utc_timestamp(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    return datetime.strptime(value, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
 
 
 def create_sync(client: RemoteOdooClient, mode: str, extra_values: dict[str, object] | None = None) -> int:
@@ -780,8 +449,7 @@ def assert_sync_count_at_most(sync_state: dict[str, object], *, maximum_count: i
         raise RuntimeError(f"Unexpected sync total_count during {label}: {sync_state!r}")
     if total_count > maximum_count:
         raise RuntimeError(
-            f"Unexpected sync size during {label}: expected at most {maximum_count}, got {total_count}. "
-            f"Sync state: {sync_state}"
+            f"Unexpected sync size during {label}: expected at most {maximum_count}, got {total_count}. Sync state: {sync_state}"
         )
 
 
@@ -855,7 +523,9 @@ def wait_for_shopify_title(settings: RemoteShopifySettings, shopify_product_id: 
     deadline = time.time() + TITLE_TIMEOUT_SECONDS
     while time.time() < deadline:
         actual_title = get_shopify_title(settings, shopify_product_id)
-        print(json.dumps({"label": label, "expected_shopify_title": expected_title, "actual_shopify_title": actual_title}), flush=True)
+        print(
+            json.dumps({"label": label, "expected_shopify_title": expected_title, "actual_shopify_title": actual_title}), flush=True
+        )
         if actual_title == expected_title:
             return
         time.sleep(POLL_SECONDS)
@@ -888,15 +558,14 @@ def wait_for_shopify_snapshot(
             ),
             flush=True,
         )
-        if expected_title is not None and actual_snapshot.title != expected_title:
-            time.sleep(POLL_SECONDS)
-            continue
-        normalized_expected_description = _normalize_html_fragment(expected_description_html)
-        normalized_actual_description = _normalize_html_fragment(actual_snapshot.description_html)
-        if expected_description_html is not None and normalized_actual_description != normalized_expected_description:
-            time.sleep(POLL_SECONDS)
-            continue
-        if expected_condition_code is not None and actual_snapshot.condition_code != expected_condition_code:
+        if not _snapshot_fields_match(
+            actual_title=actual_snapshot.title,
+            actual_description_html=actual_snapshot.description_html,
+            actual_condition_code=actual_snapshot.condition_code,
+            expected_title=expected_title,
+            expected_description_html=expected_description_html,
+            expected_condition_code=expected_condition_code,
+        ):
             time.sleep(POLL_SECONDS)
             continue
         return actual_snapshot
@@ -940,19 +609,83 @@ def wait_for_odoo_snapshot(
             ),
             flush=True,
         )
-        if expected_title is not None and actual_snapshot.title != expected_title:
-            time.sleep(POLL_SECONDS)
-            continue
-        normalized_expected_description = _normalize_html_fragment(expected_description_html)
-        normalized_actual_description = _normalize_html_fragment(actual_snapshot.description_html)
-        if expected_description_html is not None and normalized_actual_description != normalized_expected_description:
-            time.sleep(POLL_SECONDS)
-            continue
-        if expected_condition_code is not None and actual_snapshot.condition_code != expected_condition_code:
+        if not _snapshot_fields_match(
+            actual_title=actual_snapshot.title,
+            actual_description_html=actual_snapshot.description_html,
+            actual_condition_code=actual_snapshot.condition_code,
+            expected_title=expected_title,
+            expected_description_html=expected_description_html,
+            expected_condition_code=expected_condition_code,
+        ):
             time.sleep(POLL_SECONDS)
             continue
         return actual_snapshot
     raise RuntimeError(f"Timed out waiting for Odoo product snapshot during {label}")
+
+
+def wait_for_shopify_prepare_snapshot(
+    settings: RemoteShopifySettings,
+    shopify_product_id: str,
+    *,
+    product_snapshot: ProductSnapshot,
+    label: str,
+) -> ShopifyProductSnapshot:
+    deadline = time.time() + FIELD_TIMEOUT_SECONDS
+    while time.time() < deadline:
+        actual_snapshot = get_shopify_product_snapshot(settings, shopify_product_id)
+        print(
+            json.dumps(
+                {
+                    "label": label,
+                    "expected_shopify_status": _expected_shopify_status(product_snapshot),
+                    "actual_shopify_status": actual_snapshot.status,
+                    "expected_shopify_total_inventory": int(product_snapshot.quantity_available),
+                    "actual_shopify_total_inventory": actual_snapshot.total_inventory,
+                    "expected_shopify_variant_price": str(product_snapshot.list_price),
+                    "actual_shopify_variant_price": str(actual_snapshot.variant_price) if actual_snapshot.variant_price is not None else None,
+                    "expected_shopify_variant_unit_cost": str(product_snapshot.standard_price),
+                    "actual_shopify_variant_unit_cost": (
+                        str(actual_snapshot.variant_unit_cost) if actual_snapshot.variant_unit_cost is not None else None
+                    ),
+                    "expected_shopify_media_count": product_snapshot.image_count,
+                    "actual_shopify_media_count": actual_snapshot.media_count,
+                    "actual_shopify_failed_media_count": actual_snapshot.failed_media_count,
+                },
+                sort_keys=True,
+            ),
+            flush=True,
+        )
+        if _shopify_prepare_snapshot_matches(actual_snapshot=actual_snapshot, product_snapshot=product_snapshot):
+            return actual_snapshot
+        time.sleep(POLL_SECONDS)
+    raise RuntimeError(f"Timed out waiting for Shopify prepare snapshot during {label}")
+
+
+def verify_prepare_export_sample(
+    client: RemoteOdooClient,
+    settings: RemoteShopifySettings,
+    *,
+    product_id: int,
+    label: str,
+) -> dict[str, object]:
+    product_snapshot = read_product_snapshot(client, product_id)
+    shopify_product_id = get_external_system_id(client, product_id, "product")
+    shopify_snapshot = wait_for_shopify_prepare_snapshot(
+        settings,
+        shopify_product_id,
+        product_snapshot=product_snapshot,
+        label=label,
+    )
+    return {
+        "product_id": product_id,
+        "shopify_product_id": shopify_product_id,
+        "status": shopify_snapshot.status,
+        "total_inventory": shopify_snapshot.total_inventory,
+        "variant_price": str(shopify_snapshot.variant_price) if shopify_snapshot.variant_price is not None else None,
+        "variant_unit_cost": str(shopify_snapshot.variant_unit_cost) if shopify_snapshot.variant_unit_cost is not None else None,
+        "media_count": shopify_snapshot.media_count,
+        "failed_media_count": shopify_snapshot.failed_media_count,
+    }
 
 
 def _run_roundtrip_for_product(
@@ -1097,12 +830,18 @@ def _run_roundtrip_for_product(
     }
 
 
-def _find_roundtrip_candidate(client: RemoteOdooClient) -> tuple[ProductSnapshot, str]:
+def _find_candidate_snapshot(
+    client: RemoteOdooClient,
+    *,
+    require_shopify_link: bool,
+    missing_message: str,
+) -> ProductSnapshot:
     alternate_condition = select_alternate_condition(client, exclude_condition_id=None)
     if alternate_condition is None:
         raise RuntimeError("No alternate Shopify-linked product.condition found for validator metafield coverage")
 
-    for candidate_row in search_export_candidates(client):
+    fallback_snapshot: ProductSnapshot | None = None
+    for candidate_row in search_export_candidates(client, require_shopify_link=require_shopify_link):
         candidate_product_id = candidate_row.get("id")
         if not isinstance(candidate_product_id, int):
             continue
@@ -1112,23 +851,46 @@ def _find_roundtrip_candidate(client: RemoteOdooClient) -> tuple[ProductSnapshot
         alternate_for_product = select_alternate_condition(client, exclude_condition_id=product_snapshot.condition_id)
         if alternate_for_product is None:
             continue
-        shopify_product_id = get_external_system_id(client, product_snapshot.product_id, "product")
-        return product_snapshot, shopify_product_id
+        if product_snapshot.image_count > 0:
+            return product_snapshot
+        if fallback_snapshot is None:
+            fallback_snapshot = product_snapshot
 
-    raise RuntimeError("No Shopify-linked product with a restorable condition metafield was found for round-trip validation")
+    if fallback_snapshot is not None:
+        return fallback_snapshot
+
+    raise RuntimeError(missing_message)
 
 
-def _select_roundtrip_product(
+def _find_roundtrip_candidate(client: RemoteOdooClient) -> tuple[ProductSnapshot, str]:
+    product_snapshot = _find_candidate_snapshot(
+        client,
+        require_shopify_link=True,
+        missing_message="No Shopify-linked product with a restorable condition metafield was found for round-trip validation",
+    )
+    shopify_product_id = get_external_system_id(client, product_snapshot.product_id, "product")
+    return product_snapshot, shopify_product_id
+
+
+def _find_prepare_candidate(client: RemoteOdooClient) -> ProductSnapshot:
+    return _find_candidate_snapshot(
+        client,
+        require_shopify_link=False,
+        missing_message="No exportable product with a restorable condition metafield was found for round-trip validation",
+    )
+
+
+def _select_roundtrip_prepare_selection(
     client: RemoteOdooClient,
     *,
     profile: str,
     sample_size: int,
-) -> RoundtripProductSelection:
-    product_snapshot, shopify_product_id = _find_roundtrip_candidate(client)
+) -> RoundtripPrepareSelection:
+    product_snapshot = _find_prepare_candidate(client)
 
     if profile == "smoke":
         candidate_product_ids = []
-        for candidate_row in search_export_candidates(client):
+        for candidate_row in search_export_candidates(client, require_shopify_link=False):
             candidate_product_id = candidate_row.get("id")
             if isinstance(candidate_product_id, int):
                 candidate_product_ids.append(candidate_product_id)
@@ -1141,9 +903,8 @@ def _select_roundtrip_product(
     else:
         export_product_ids = (product_snapshot.product_id,)
 
-    return RoundtripProductSelection(
+    return RoundtripPrepareSelection(
         product_snapshot=product_snapshot,
-        shopify_product_id=shopify_product_id,
         export_product_ids=export_product_ids,
     )
 
@@ -1158,19 +919,19 @@ def run_roundtrip(
 ) -> dict[str, object]:
     client = client or RemoteOdooClient(settings)
     if start_after_export:
-        selection = _select_roundtrip_product(client, profile=profile, sample_size=sample_size)
+        selection = _find_roundtrip_candidate(client)
         resumed_results = _run_roundtrip_for_product(
             client,
             settings,
-            product_snapshot=selection.product_snapshot,
-            shopify_product_id=selection.shopify_product_id,
+            product_snapshot=selection[0],
+            shopify_product_id=selection[1],
             profile=profile,
         )
         resumed_results["start_mode"] = "after_export"
         resumed_results["profile"] = profile
         return resumed_results
 
-    selection = _select_roundtrip_product(client, profile=profile, sample_size=sample_size)
+    prepare_selection = _select_roundtrip_prepare_selection(client, profile=profile, sample_size=sample_size)
 
     prepare_marker = _current_utc_timestamp()
     reset_sync_id = create_sync(client, "reset_shopify")
@@ -1182,12 +943,12 @@ def run_roundtrip(
     prepare_sync_label = "remote export_all_products"
     if profile == "smoke":
         prepare_sync_mode = "export_batch_products"
-        prepare_sync_values = {"odoo_products_to_sync": [[6, 0, list(selection.export_product_ids)]]}
+        prepare_sync_values = {"odoo_products_to_sync": [[6, 0, list(prepare_selection.export_product_ids)]]}
         prepare_sync_label = "remote export_batch_products"
     export_sync_id = create_sync(client, prepare_sync_mode, prepare_sync_values)
     export_sync = wait_for_sync(client, export_sync_id, prepare_sync_label)
     if profile == "smoke":
-        assert_sync_count_at_most(export_sync, maximum_count=len(selection.export_product_ids), label=prepare_sync_label)
+        assert_sync_count_at_most(export_sync, maximum_count=len(prepare_selection.export_product_ids), label=prepare_sync_label)
     wait_for_related_syncs_to_quiet(
         client,
         since_timestamp=prepare_marker,
@@ -1197,15 +958,22 @@ def run_roundtrip(
     if profile == "smoke":
         stamp_non_sample_products_as_exported_for_validation(
             client,
-            keep_product_ids=selection.export_product_ids,
+            keep_product_ids=prepare_selection.export_product_ids,
         )
-    updated_shopify_product_id = get_external_system_id(client, selection.product_snapshot.product_id, "product")
-    if updated_shopify_product_id:
-        selection = RoundtripProductSelection(
-            product_snapshot=selection.product_snapshot,
-            shopify_product_id=updated_shopify_product_id,
-            export_product_ids=selection.export_product_ids,
+    prepared_sample_results = [
+        verify_prepare_export_sample(
+            client,
+            settings,
+            product_id=sample_product_id,
+            label=f"prepare export product {sample_product_id}",
         )
+        for sample_product_id in prepare_selection.export_product_ids
+    ]
+    selection = RoundtripProductSelection(
+        product_snapshot=prepare_selection.product_snapshot,
+        shopify_product_id=get_external_system_id(client, prepare_selection.product_snapshot.product_id, "product"),
+        export_product_ids=prepare_selection.export_product_ids,
+    )
     resumed_results = _run_roundtrip_for_product(
         client,
         settings,
@@ -1218,6 +986,7 @@ def run_roundtrip(
     resumed_results["start_mode"] = "prepared"
     resumed_results["profile"] = profile
     resumed_results["prepare_sync_mode"] = prepare_sync_mode
+    resumed_results["prepared_sample_results"] = prepared_sample_results
     if profile == "smoke":
         resumed_results["export_sample_product_ids"] = list(selection.export_product_ids)
     return resumed_results
@@ -1231,14 +1000,14 @@ def run_validation_command(
     remote_login: str,
     profile: str = "full",
     sample_size: int = DEFAULT_SAMPLE_SIZE,
-    clear_conflicting_syncs: bool = False,
+    clear_conflicts: bool = False,
     start_after_export: bool = False,
     repository_root: Path | None = None,
 ) -> dict[str, object]:
-    if profile == "full" and sample_size != DEFAULT_SAMPLE_SIZE:
-        raise click.ClickException("--sample-size is only supported with --profile smoke")
     if instance_name == "prod":
         raise click.ClickException("shopify-roundtrip is disabled on prod because it performs destructive and mutating validation")
+    if profile == "full" and sample_size != DEFAULT_SAMPLE_SIZE:
+        raise click.ClickException("--sample-size is only supported with --profile smoke")
 
     effective_repository_root = repository_root or discover_repo_root(Path.cwd())
     settings = load_settings(
@@ -1249,7 +1018,6 @@ def run_validation_command(
         remote_login=remote_login,
     )
     client = RemoteOdooClient(settings)
-    validation_results: dict[str, object] | None = None
     original_webhook_pause_value: str | None = None
     original_autoschedule_pause_value: str | None = None
     webhook_pause_applied = False
@@ -1259,8 +1027,8 @@ def run_validation_command(
         autoschedule_pause_applied = True
         original_webhook_pause_value = pause_webhook_processing(client)
         webhook_pause_applied = True
-        ensure_no_conflicting_syncs(client, clear_conflicts=clear_conflicting_syncs)
-        validation_results = run_roundtrip(
+        ensure_no_conflicting_syncs(client, clear_conflicts=clear_conflicts)
+        results = run_roundtrip(
             settings,
             profile=profile,
             sample_size=sample_size,
@@ -1273,19 +1041,16 @@ def run_validation_command(
         if autoschedule_pause_applied:
             restore_sync_autoschedule(client, original_value=original_autoschedule_pause_value)
 
-    if validation_results is None:
-        raise RuntimeError("Shopify validation finished without producing a result payload")
-
     runtime_state = read_validation_runtime_state(client)
-    validation_results["post_validation_runtime_state"] = runtime_state
-    validation_results["operator_summary"] = _build_operator_summary(
+    results["post_validation_runtime_state"] = runtime_state
+    results["operator_summary"] = _build_operator_summary(
         context_name=context_name,
         instance_name=instance_name,
-        results=validation_results,
+        results=results,
         runtime_state=runtime_state,
         sample_size=sample_size,
     )
-    return validation_results
+    return results
 
 
 @click.command()
@@ -1310,7 +1075,7 @@ def main(
     remote_login: str,
     profile: str,
     sample_size: int,
-    clear_conflicting_syncs: bool,
+    clear_conflicts: bool,
     start_after_export: bool,
 ) -> None:
     results = run_validation_command(
@@ -1320,7 +1085,7 @@ def main(
         remote_login=remote_login,
         profile=profile,
         sample_size=sample_size,
-        clear_conflicting_syncs=clear_conflicting_syncs,
+        clear_conflicts=clear_conflicts,
         start_after_export=start_after_export,
     )
     operator_summary = results.get("operator_summary")
@@ -1330,4 +1095,4 @@ def main(
 
 
 if __name__ == "__main__":
-    raise SystemExit(main.main(args=sys.argv[1:], prog_name="shopify-roundtrip", standalone_mode=True))
+    raise SystemExit(main.main(args=sys.argv[1:], prog_name="shopify-roundtrip"))

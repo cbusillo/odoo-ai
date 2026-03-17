@@ -2,7 +2,6 @@
 title: Docker Usage
 ---
 
-
 Purpose
 
 - Provide standard container operations for local Odoo stacks.
@@ -64,10 +63,10 @@ Tips
   devtools image.
 - For private GHCR base images, `platform` commands perform a registry login
   preflight before build/restore. Provide either:
-  - `GHCR_TOKEN` (preferred) or `GITHUB_TOKEN`
-  - `GHCR_USERNAME` (falls back to image owner / `GITHUB_ACTOR`)
-  Tokens must include package read access (`read:packages`) for the private
-  image package.
+    - `GHCR_TOKEN` (preferred) or `GITHUB_TOKEN`
+    - `GHCR_USERNAME` (falls back to image owner / `GITHUB_ACTOR`)
+      Tokens must include package read access (`read:packages`) for the private
+      image package.
 - Full tag and promotion contracts are documented in
   [@docs/tooling/image-contracts.md](image-contracts.md).
 - `ODOO_ADDON_REPOSITORIES` accepts a comma-separated list of addon repos
@@ -99,8 +98,10 @@ Local stacks use layered configs under `platform/config/` and
 `platform/compose/`. The concise source of truth is `platform/config/README.md`.
 
 `docker-compose.override.yml` is local-only (ignored by git). Create it when
-you need port bindings or live code mounts; see
-@docs/workflows/multi-project.md for an example.
+you need port bindings or live code mounts. For addon development, keep
+`./addons:/opt/project/addons` in the shared section so `web` and
+`script-runner` see the same checkout; see @docs/workflows/multi-project.md for
+an example.
 
 Platform local lifecycle commands (`up`, `build`, `down`, `logs`) use the
 platform runtime env (`.platform/env/<context>.<instance>.env`) and base compose

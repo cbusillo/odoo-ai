@@ -37,14 +37,14 @@ docker-compose.yml
 ## Quick start
 
 1. Copy the templates you need:
-   - `cp .env.example .env`
-   - Fill required secrets in `.env` or `platform/secrets.toml`.
+    - `cp .env.example .env`
+    - Fill required secrets in `.env` or `platform/secrets.toml`.
 
 2. Run the stack:
 
-   ```bash
-   uv run platform up --context opw --instance local --build
-   ```
+    ```bash
+    uv run platform up --context opw --instance local --build
+    ```
 
 ## Notes
 
@@ -57,7 +57,9 @@ docker-compose.yml
 - Raw `docker compose` still loads `.env` then `base.env` for service
   `env_file` entries, so later values in `base.env` win in that path.
 - Create a local `docker-compose.override.yml` to expose ports and mount the
-  repo for live-editing (see `docs/workflows/multi-project.md`).
+  repo for live-editing. Keep `./addons:/opt/project/addons` in the shared
+  section so `web` and `script-runner` execute the same addon source tree (see
+  `docs/workflows/multi-project.md`).
 - Restore runs (`uv run platform restore --context <target> --instance local`)
   rely on `DATA_WORKFLOW_SSH_DIR` being set so the base compose mounts the SSH
   directory for upstream access. Ensure that directory includes both the

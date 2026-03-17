@@ -2,7 +2,6 @@
 title: Inspections (JetBrains)
 ---
 
-
 Purpose
 
 - Define inspection scope and zero-warning expectations.

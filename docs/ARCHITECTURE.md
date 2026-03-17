@@ -79,9 +79,13 @@ Use explicit context/instance flags in command invocations (for example
 - Dev-only addon path shaping lives upstream in the image chain. `odoo-docker`
   devtools exposes `/odoo`, `/opt/project/addons`, and `/opt/extra_addons`,
   and `odoo-enterprise-docker` appends `/opt/enterprise`. `odoo-ai` keeps
-  `/opt/project` as a real directory in the image. `/volumes/pyproject.toml`
-  and `/volumes/uv.lock` point at the root lockfiles, and local devtools images link
-  `/opt/project/tools` to the `/volumes/tools` bind mount used by testkit.
+  `/opt/project` as a real directory in the image. Both production and
+  development targets bake `/opt/project/addons` at build time; local workflows
+  that need live addon editing must override that path explicitly with a bind
+  mount.
+  `/volumes/pyproject.toml` and `/volumes/uv.lock` point at the root lockfiles,
+  and local devtools images link `/opt/project/tools` to the `/volumes/tools`
+  bind mount used by testkit.
 - Integrations: Shopify active
 
 ## References

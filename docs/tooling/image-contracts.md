@@ -80,6 +80,9 @@ Layer Model
 - Local iteration:
   - prefer mounting project addon code over rebuilding image for routine code
     changes
+  - both production and local `development` targets bake project addons into
+    `/opt/project/addons`; live-edit workflows must override that path with a
+    bind mount when they need the mounted repo tree to win
   - rebuild only when dependency/runtime layers change
   - call the inherited `odoo-python-sync.sh` helper instead of owning local
     dependency-install mechanics

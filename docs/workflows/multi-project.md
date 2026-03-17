@@ -77,6 +77,8 @@ Notes
   - Host: `0.0.0.0` (or `host.docker.internal`)
   - Port: `5678` (OPW) or `5679` (CM)
   - Path mappings: `/opt/project/addons` → `$PROJECT_DIR$/addons`
+  - Keep the `/opt/project/addons` path mapping in PyCharm when local override
+    mounts make the repo addon tree authoritative inside the container.
   - Optional: enable “Suspend after connect” if you want to pause on startup
 - The Debug Server starts listening before “Before launch” tasks run, so it is
   safe to keep

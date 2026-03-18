@@ -226,41 +226,16 @@ def _is_serialization_failure_fault(exception: xmlrpc.client.Fault) -> bool:
     return "serializationfailure" in fault_text or "could not serialize access due to concurrent update" in fault_text
 
 
-def clear_conflicting_syncs(client: RemoteOdooClient, *, reason: str) -> list[int]:
-    last_conflicting_sync_ids: list[int] = []
+def _write_conflicting_sync(
+    client: RemoteOdooClient,
+    *,
+    sync_id: int,
+    values: dict[str, object],
+) -> None:
     for attempt in range(1, CONFLICT_CLEAR_MAX_RETRIES + 1):
-        conflicting_syncs = list_conflicting_syncs(client)
-        conflicting_sync_ids: list[int] = []
-        queued_sync_ids: list[int] = []
-        running_sync_ids: list[int] = []
-        for row in conflicting_syncs:
-            sync_id = row.get("id")
-            if isinstance(sync_id, int):
-                conflicting_sync_ids.append(sync_id)
-                state_value = str(row.get("state") or "")
-                if state_value == "queued":
-                    queued_sync_ids.append(sync_id)
-                elif state_value == "running":
-                    running_sync_ids.append(sync_id)
-
-        if not conflicting_sync_ids:
-            return last_conflicting_sync_ids
-        last_conflicting_sync_ids = conflicting_sync_ids
-
         try:
-            if queued_sync_ids:
-                client.execute(
-                    "shopify.sync",
-                    "write",
-                    [queued_sync_ids, {"state": "canceled", "error_message": reason}],
-                )
-            if running_sync_ids:
-                client.execute(
-                    "shopify.sync",
-                    "write",
-                    [running_sync_ids, {"cancel_requested": True, "cancel_reason": reason}],
-                )
-            return conflicting_sync_ids
+            client.execute("shopify.sync", "write", [[sync_id], values])
+            return
         except xmlrpc.client.Fault as exception:
             if not _is_serialization_failure_fault(exception) or attempt >= CONFLICT_CLEAR_MAX_RETRIES:
                 raise
@@ -269,6 +244,7 @@ def clear_conflicting_syncs(client: RemoteOdooClient, *, reason: str) -> list[in
                 json.dumps(
                     {
                         "label": "retry clear conflicting syncs",
+                        "sync_id": sync_id,
                         "attempt": attempt,
                         "max_retries": CONFLICT_CLEAR_MAX_RETRIES,
                         "sleep_seconds": sleep_seconds,
@@ -279,7 +255,31 @@ def clear_conflicting_syncs(client: RemoteOdooClient, *, reason: str) -> list[in
             )
             time.sleep(sleep_seconds)
 
-    return last_conflicting_sync_ids
+
+def clear_conflicting_syncs(client: RemoteOdooClient, *, reason: str) -> list[int]:
+    # Cancel each sync independently so one concurrent row update does not force
+    # a bulk rewrite retry across the whole conflicting set.
+    conflicting_syncs = list_conflicting_syncs(client)
+    conflicting_sync_ids: list[int] = []
+    for row in conflicting_syncs:
+        sync_id = row.get("id")
+        if not isinstance(sync_id, int):
+            continue
+        conflicting_sync_ids.append(sync_id)
+        state_value = str(row.get("state") or "")
+        if state_value == "queued":
+            _write_conflicting_sync(
+                client,
+                sync_id=sync_id,
+                values={"state": "canceled", "error_message": reason},
+            )
+        elif state_value == "running":
+            _write_conflicting_sync(
+                client,
+                sync_id=sync_id,
+                values={"cancel_requested": True, "cancel_reason": reason},
+            )
+    return conflicting_sync_ids
 
 
 def ensure_no_conflicting_syncs(client: RemoteOdooClient, *, clear_conflicts: bool) -> None:

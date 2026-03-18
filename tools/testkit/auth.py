@@ -13,6 +13,28 @@ def _last_output_line(result_output: str | None) -> str:
     return lines[-1] if lines else ""
 
 
+def _database_has_res_users_table(db_name: str) -> bool:
+    result = compose_exec(
+        get_database_service(),
+        [
+            "psql",
+            "-U",
+            get_db_user(),
+            "-d",
+            db_name,
+            "-t",
+            "-A",
+            "-c",
+            "SELECT to_regclass('public.res_users') IS NOT NULL;",
+        ],
+    )
+    if result.returncode != 0:
+        detail = _last_output_line(result.stderr) or _last_output_line(result.stdout)
+        suffix = f": {detail}" if detail else ""
+        raise RuntimeError(f"Unable to determine whether res_users exists in test database{suffix}")
+    return (result.stdout or "").strip().lower() == "t"
+
+
 def setup_test_authentication(db_name: str) -> str:
     alphabet = string.ascii_letters + string.digits
     password = "".join(secrets.choice(alphabet) for _ in range(16))
@@ -42,6 +64,9 @@ def setup_test_authentication(db_name: str) -> str:
     if not hash_output:
         raise RuntimeError("Hash command returned no output for test admin password")
     hashed = hash_output[-1]
+    if not _database_has_res_users_table(db_name):
+        os.environ["ODOO_TEST_PASSWORD"] = password
+        return password
     sanitized = hashed.replace("'", "''")
     sql = f"UPDATE res_users SET password='{sanitized}' WHERE login='admin';"
 

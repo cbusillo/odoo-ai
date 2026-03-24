@@ -42,6 +42,10 @@ Notes
 - Adjust memory values to your host RAM (above assumes 32–64GB).
 - Ensure the Docker host has sufficient IOPS; consider local NVMe or tmpfs for CI scratch.
 - For extreme parallelism (>50 containers), consider a connection pooler (e.g., pgbouncer) in transaction pooling mode.
+- The shared stack defaults also expose `POSTGRES_MAX_FILES_PER_PROCESS` and
+  `POSTGRES_ULIMIT_NOFILE_SOFT` / `POSTGRES_ULIMIT_NOFILE_HARD` for the
+  `database` service in `docker-compose.yml`; Dokploy-managed targets inherit
+  those values from the compose file they deploy.
 
 Verifications
 

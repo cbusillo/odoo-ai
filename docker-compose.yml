@@ -80,10 +80,16 @@ services:
   database:
     image: postgres:17
     restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: ${POSTGRES_ULIMIT_NOFILE_SOFT:-8192}
+        hard: ${POSTGRES_ULIMIT_NOFILE_HARD:-8192}
     command:
       - postgres
       - -c
       - max_connections=${POSTGRES_MAX_CONNECTIONS:-100}
+      - -c
+      - max_files_per_process=${POSTGRES_MAX_FILES_PER_PROCESS:-4096}
       - -c
       - shared_buffers=${POSTGRES_SHARED_BUFFERS:-1GB}
       - -c

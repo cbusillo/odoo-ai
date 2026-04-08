@@ -239,6 +239,7 @@ def execute_promote(
     source_health_timeout_override_seconds: int | None,
     dry_run: bool,
     no_cache: bool,
+    allow_dirty: bool,
     assert_promote_path_allowed_fn: Callable[..., None],
     discover_repo_root_fn: Callable[[Path], Path],
     load_dokploy_source_of_truth_if_present_fn: Callable[[Path], object | None],
@@ -340,5 +341,6 @@ def execute_promote(
         dry_run=dry_run,
         no_cache=no_cache,
         skip_gate=True,
+        allow_dirty=allow_dirty,
         source_git_ref=source_commit,
     )

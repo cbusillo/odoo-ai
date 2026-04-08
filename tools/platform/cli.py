@@ -2306,6 +2306,12 @@ def inspect_context(
 )
 @click.option("--dry-run", is_flag=True, default=False)
 @click.option("--no-cache", is_flag=True, default=False, help="Request rebuild deployment on Dokploy target.")
+@click.option(
+    "--allow-dirty",
+    is_flag=True,
+    default=False,
+    help="Allow promotion from a dirty tracked working tree (uncommitted changes). Prefer a clean worktree when possible.",
+)
 def promote(
     context_name: str,
     from_instance_name: str,
@@ -2319,6 +2325,7 @@ def promote(
     source_health_timeout_override_seconds: int | None,
     dry_run: bool,
     no_cache: bool,
+    allow_dirty: bool,
 ) -> None:
     platform_release_workflows.execute_promote(
         context_name=context_name,
@@ -2333,6 +2340,7 @@ def promote(
         source_health_timeout_override_seconds=source_health_timeout_override_seconds,
         dry_run=dry_run,
         no_cache=no_cache,
+        allow_dirty=allow_dirty,
         assert_promote_path_allowed_fn=_assert_promote_path_allowed,
         discover_repo_root_fn=_discover_repo_root,
         load_dokploy_source_of_truth_if_present_fn=_load_dokploy_source_of_truth_if_present,

@@ -640,7 +640,9 @@ def wait_for_shopify_prepare_snapshot(
                     "expected_shopify_total_inventory": int(product_snapshot.quantity_available),
                     "actual_shopify_total_inventory": actual_snapshot.total_inventory,
                     "expected_shopify_variant_price": str(product_snapshot.list_price),
-                    "actual_shopify_variant_price": str(actual_snapshot.variant_price) if actual_snapshot.variant_price is not None else None,
+                    "actual_shopify_variant_price": str(actual_snapshot.variant_price)
+                    if actual_snapshot.variant_price is not None
+                    else None,
                     "expected_shopify_variant_unit_cost": str(product_snapshot.standard_price),
                     "actual_shopify_variant_unit_cost": (
                         str(actual_snapshot.variant_unit_cost) if actual_snapshot.variant_unit_cost is not None else None

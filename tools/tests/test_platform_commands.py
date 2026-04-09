@@ -1649,6 +1649,82 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
     def _source_of_truth(target_definition: DokployTargetDefinition) -> DokploySourceOfTruth:
         return DokploySourceOfTruth(schema_version=1, targets=(target_definition,))
 
+    def test_execute_promote_passes_allow_dirty_through_to_ship(self) -> None:
+        source_target_definition = self._target_definition(context_name="opw", instance_name="testing").model_copy(
+            update={"git_branch": "opw-testing"}
+        )
+        destination_target_definition = self._target_definition(context_name="opw", instance_name="prod").model_copy(
+            update={"git_branch": "opw-prod"}
+        )
+        source_of_truth = DokploySourceOfTruth(
+            schema_version=1,
+            targets=(source_target_definition, destination_target_definition),
+        )
+        captured_invocations: list[tuple[str, dict[str, object]]] = []
+        emitted_lines: list[str] = []
+
+        def invoke_platform_command(command_name: str, **kwargs: object) -> None:
+            captured_invocations.append((command_name, dict(kwargs)))
+
+        release_workflows.execute_promote(
+            context_name="opw",
+            from_instance_name="testing",
+            to_instance_name="prod",
+            env_file=None,
+            wait=True,
+            timeout_override_seconds=600,
+            verify_health=True,
+            health_timeout_override_seconds=60,
+            verify_source_health=False,
+            source_health_timeout_override_seconds=None,
+            dry_run=True,
+            no_cache=False,
+            allow_dirty=True,
+            assert_promote_path_allowed_fn=lambda **_kwargs: None,
+            discover_repo_root_fn=lambda _path: Path("/tmp"),
+            load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+            find_dokploy_target_definition_fn=lambda source_of_truth, **kwargs: next(
+                (
+                    target_definition
+                    for target_definition in source_of_truth.targets
+                    if target_definition.context == kwargs["context_name"] and target_definition.instance == kwargs["instance_name"]
+                ),
+                None,
+            ),
+            run_command_fn=lambda _command: None,
+            resolve_remote_git_branch_commit_fn=lambda _remote_name, _branch_name: "abc123",
+            load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+            resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
+            resolve_ship_healthcheck_urls_fn=lambda **_kwargs: ("https://opw-testing.example/web/health",),
+            collect_environment_gate_results_fn=lambda **_kwargs: [
+                {"url": "https://opw-testing.example/web/health", "result": "pass"}
+            ],
+            run_production_backup_gate_fn=lambda **_kwargs: None,
+            invoke_platform_command_fn=invoke_platform_command,
+            echo_fn=emitted_lines.append,
+        )
+
+        self.assertEqual(
+            emitted_lines,
+            [
+                "promote_context=opw",
+                "promote_from_instance=testing",
+                "promote_to_instance=prod",
+                "promote_source_branch=opw-testing",
+                "promote_source_commit=abc123",
+                "promote_destination_branch=opw-prod",
+                "prod_backup_gate=true",
+            ],
+        )
+        self.assertEqual(len(captured_invocations), 1)
+        command_name, command_kwargs = captured_invocations[0]
+        self.assertEqual(command_name, "ship")
+        self.assertEqual(command_kwargs["context_name"], "opw")
+        self.assertEqual(command_kwargs["instance_name"], "prod")
+        self.assertEqual(command_kwargs["skip_gate"], True)
+        self.assertEqual(command_kwargs["allow_dirty"], True)
+        self.assertEqual(command_kwargs["source_git_ref"], "abc123")
+
     def _assert_execute_ship_wait_uses_predeploy_deployment_key(
         self,
         *,

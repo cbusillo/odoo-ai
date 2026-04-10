@@ -78,6 +78,10 @@ Behavior Highlights
   owner for live promotion orchestration. The wrapper fails closed if the
   sibling control-plane repo is missing or misconfigured instead of silently
   falling back to legacy in-repo ownership.
+- `platform ship` now follows the same ownership rule: the public command is a
+  fail-closed wrapper into `odoo-control-plane`, while the old execution path
+  survives only as an internal compatibility worker for control-plane
+  delegation during transition.
 - `platform ship` is the only supported remote deployment trigger for managed
   Dokploy targets. Keep Dokploy auto deploy disabled for those targets.
 - When `platform ship` waits for deployment completion on compose-backed

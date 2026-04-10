@@ -368,3 +368,96 @@ def execute_export_ship_request(
     except ValueError as error:
         raise click.ClickException(str(error)) from error
     emit_payload_fn(ship_request.model_dump(mode="json"))
+
+
+def execute_delegate_ship(
+    *,
+    context_name: str,
+    instance_name: str,
+    env_file: Path | None,
+    source_git_ref: str,
+    wait: bool,
+    timeout_override_seconds: int | None,
+    verify_health: bool,
+    health_timeout_override_seconds: int | None,
+    dry_run: bool,
+    no_cache: bool,
+    allow_dirty: bool,
+    default_source_git_ref: str,
+    discover_repo_root_fn: Callable[[Path], Path],
+    load_dokploy_source_of_truth_if_present_fn: Callable[[Path], object | None],
+    find_dokploy_target_definition_fn: Callable[..., object | None],
+    load_environment_fn: Callable[..., tuple[Path, dict[str, str]]],
+    resolve_ship_health_timeout_seconds_fn: Callable[..., int],
+    resolve_ship_healthcheck_urls_fn: Callable[..., tuple[str, ...]],
+    resolve_dokploy_ship_mode_fn: Callable[[str, str, dict[str, str]], str],
+    build_compatibility_ship_request_fn: Callable[..., object],
+    invoke_control_plane_ship_fn: Callable[..., None],
+) -> None:
+    repo_root = discover_repo_root_fn(Path.cwd())
+    source_of_truth = load_dokploy_source_of_truth_if_present_fn(repo_root)
+    if source_of_truth is None:
+        raise click.ClickException("Ship delegation requires platform/dokploy.toml with target definitions.")
+
+    target_definition = find_dokploy_target_definition_fn(
+        source_of_truth,
+        context_name=context_name,
+        instance_name=instance_name,
+    )
+    if target_definition is None:
+        raise click.ClickException(f"No Dokploy target definition found for {context_name}/{instance_name}.")
+
+    environment_values: dict[str, str] = {}
+    try:
+        _env_file_path, environment_values = load_environment_fn(
+            repo_root,
+            env_file,
+            context_name=context_name,
+            instance_name=instance_name,
+            collision_mode="error",
+        )
+    except click.ClickException:
+        if verify_health and wait:
+            raise
+
+    resolved_source_git_ref = source_git_ref.strip() or target_definition.source_git_ref.strip() or default_source_git_ref
+    destination_health_timeout_seconds = resolve_ship_health_timeout_seconds_fn(
+        health_timeout_override_seconds=health_timeout_override_seconds,
+        target_definition=target_definition,
+    )
+    destination_healthcheck_urls: tuple[str, ...] = ()
+    if environment_values:
+        destination_healthcheck_urls = resolve_ship_healthcheck_urls_fn(
+            target_definition=target_definition,
+            environment_values=environment_values,
+        )
+    configured_ship_mode = "auto"
+    if environment_values:
+        configured_ship_mode = resolve_dokploy_ship_mode_fn(context_name, instance_name, environment_values)
+    deploy_mode = _resolve_deploy_mode(
+        configured_ship_mode=configured_ship_mode,
+        target_type=target_definition.target_type,
+    )
+
+    try:
+        ship_request = build_compatibility_ship_request_fn(
+            context_name=context_name,
+            instance_name=instance_name,
+            source_git_ref=resolved_source_git_ref,
+            target_name=target_definition.target_name.strip() or f"{context_name}-{instance_name}",
+            target_type=target_definition.target_type,
+            deploy_mode=deploy_mode,
+            wait=wait,
+            timeout_seconds=timeout_override_seconds,
+            verify_health=verify_health,
+            health_timeout_seconds=destination_health_timeout_seconds,
+            dry_run=dry_run,
+            no_cache=no_cache,
+            allow_dirty=allow_dirty,
+            destination_health_urls=destination_healthcheck_urls,
+            destination_health_timeout_seconds=destination_health_timeout_seconds,
+            destination_health_status="pending" if verify_health and wait else "skipped",
+        )
+    except ValueError as error:
+        raise click.ClickException(str(error)) from error
+    invoke_control_plane_ship_fn(repo_root=repo_root, env_file=env_file, request=ship_request)

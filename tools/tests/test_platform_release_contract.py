@@ -290,6 +290,64 @@ class PlatformReleaseContractCommandTests(unittest.TestCase):
         self.assertEqual(captured_payload["source_git_ref"], "origin/opw-prod")
         self.assertEqual(captured_payload["deploy_mode"], "dokploy-compose-api")
 
+    def test_execute_delegate_ship_invokes_control_plane_with_request(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            repo_root = Path(temporary_directory_name)
+            source_of_truth = DokploySourceOfTruth(
+                schema_version=1,
+                targets=(
+                    DokployTargetDefinition(
+                        context="opw",
+                        instance="prod",
+                        target_type="compose",
+                        target_name="opw-prod",
+                        source_git_ref="origin/opw-prod",
+                        domains=("prod.example.com",),
+                    ),
+                ),
+            )
+            captured_invocation: dict[str, object] = {}
+
+            commands_release_contract.execute_delegate_ship(
+                context_name="opw",
+                instance_name="prod",
+                env_file=None,
+                source_git_ref="",
+                wait=True,
+                timeout_override_seconds=600,
+                verify_health=True,
+                health_timeout_override_seconds=None,
+                dry_run=True,
+                no_cache=False,
+                allow_dirty=True,
+                default_source_git_ref="origin/main",
+                discover_repo_root_fn=lambda _path: repo_root,
+                load_dokploy_source_of_truth_if_present_fn=lambda _path: source_of_truth,
+                find_dokploy_target_definition_fn=lambda source_of_truth, context_name, instance_name: next(
+                    (
+                        target_definition
+                        for target_definition in source_of_truth.targets
+                        if target_definition.context == context_name and target_definition.instance == instance_name
+                    ),
+                    None,
+                ),
+                load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (repo_root / ".env", {}),
+                resolve_ship_health_timeout_seconds_fn=lambda health_timeout_override_seconds, target_definition: 45,
+                resolve_ship_healthcheck_urls_fn=lambda target_definition, environment_values: tuple(
+                    f"https://{domain_name}{target_definition.healthcheck_path}" for domain_name in target_definition.domains
+                ),
+                resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "auto",
+                build_compatibility_ship_request_fn=build_compatibility_ship_request,
+                invoke_control_plane_ship_fn=lambda **kwargs: captured_invocation.update(kwargs),
+            )
+
+        self.assertEqual(captured_invocation["repo_root"], repo_root)
+        request = captured_invocation["request"]
+        self.assertEqual(request.context, "opw")
+        self.assertEqual(request.instance, "prod")
+        self.assertEqual(request.source_git_ref, "origin/opw-prod")
+        self.assertTrue(request.allow_dirty)
+
 
 if __name__ == "__main__":
     unittest.main()

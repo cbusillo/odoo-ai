@@ -76,6 +76,14 @@ Current phase-3 progress:
 - Artifact manifests can now be handed off explicitly into `odoo-control-plane`
   instead of remaining implied metadata in `odoo-ai` only.
 
+Updated phase-4 progress:
+
+- Public `platform ship` now delegates into `odoo-control-plane` as a
+  fail-closed wrapper.
+- The old `ship` executor remains only as an internal compatibility worker so
+  the control plane can drive it without recursion while direct ownership is
+  still being migrated.
+
 Phase-One Goal
 
 - Move the long-term release contract out of branch mutation and repo-local

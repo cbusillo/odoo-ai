@@ -524,6 +524,38 @@ def _handoff_artifact_identity_to_control_plane(*, manifest: object) -> None:
         manifest_path.unlink(missing_ok=True)
 
 
+def _invoke_control_plane_ship(*, repo_root: Path, env_file: Path | None, request: object) -> None:
+    control_plane_root = _resolve_control_plane_repo_root(repo_root)
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as request_file:
+        request_path = Path(request_file.name)
+        json.dump(request.model_dump(mode="json"), request_file, indent=2, sort_keys=True)
+
+    try:
+        command = [
+            "uv",
+            "run",
+            "--project",
+            str(control_plane_root),
+            "control-plane",
+            "ship",
+            "compatibility-execute",
+            "--input-file",
+            str(request_path),
+            "--odoo-ai-root",
+            str(repo_root),
+        ]
+        if env_file is not None:
+            command.extend(["--env-file", str(env_file)])
+        command_env = _command_execution_env()
+        command_env.pop("VIRTUAL_ENV", None)
+        result = subprocess.run(command, env=command_env)
+        if result.returncode != 0:
+            joined_command = " ".join(command)
+            raise click.ClickException(f"Command failed ({result.returncode}): {joined_command}")
+    finally:
+        request_path.unlink(missing_ok=True)
+
+
 def _command_execution_env() -> dict[str, str]:
     execution_env = dict(os.environ)
     for runtime_key in PLATFORM_RUNTIME_ENV_KEYS:
@@ -2790,6 +2822,98 @@ def export_ship_request(
     help="Git reference used to sync the Dokploy target branch before deploy. Use this to test an exact commit or worktree HEAD. Defaults to target source_git_ref or origin/main.",
 )
 def ship(
+    context_name: str,
+    instance_name: str,
+    env_file: Path | None,
+    wait: bool,
+    timeout_override_seconds: int | None,
+    verify_health: bool,
+    health_timeout_override_seconds: int | None,
+    dry_run: bool,
+    no_cache: bool,
+    skip_gate: bool,
+    allow_dirty: bool,
+    source_git_ref: str,
+) -> None:
+    if skip_gate:
+        raise click.ClickException(
+            "Public ship wrapper no longer accepts live --skip-gate execution. "
+            "Use the control-plane-owned path or the internal compatibility worker only through control-plane delegation."
+        )
+    platform_commands_release_contract.execute_delegate_ship(
+        context_name=context_name,
+        instance_name=instance_name,
+        env_file=env_file,
+        source_git_ref=source_git_ref,
+        wait=wait,
+        timeout_override_seconds=timeout_override_seconds,
+        verify_health=verify_health,
+        health_timeout_override_seconds=health_timeout_override_seconds,
+        dry_run=dry_run,
+        no_cache=no_cache,
+        allow_dirty=allow_dirty,
+        default_source_git_ref=DEFAULT_DOKPLOY_SHIP_SOURCE_GIT_REF,
+        discover_repo_root_fn=_discover_repo_root,
+        load_dokploy_source_of_truth_if_present_fn=_load_dokploy_source_of_truth_if_present,
+        find_dokploy_target_definition_fn=_find_dokploy_target_definition,
+        load_environment_fn=_load_environment,
+        resolve_ship_health_timeout_seconds_fn=_resolve_ship_health_timeout_seconds,
+        resolve_ship_healthcheck_urls_fn=_resolve_ship_healthcheck_urls,
+        resolve_dokploy_ship_mode_fn=_resolve_dokploy_ship_mode,
+        build_compatibility_ship_request_fn=platform_release_contract.build_compatibility_ship_request,
+        invoke_control_plane_ship_fn=_invoke_control_plane_ship,
+    )
+
+
+@main.command("compatibility-ship-worker", hidden=True)
+@click.option("--context", "context_name", required=True)
+@click.option(
+    "--instance",
+    "instance_name",
+    type=click.Choice(("dev", "testing", "prod"), case_sensitive=False),
+    required=True,
+)
+@click.option("--env-file", type=click.Path(path_type=Path), default=None)
+@click.option(
+    "--wait/--no-wait",
+    default=True,
+    help="Wait for deployment completion so the shared post-deploy update and health verification can run.",
+)
+@click.option(
+    "--timeout",
+    "timeout_override_seconds",
+    type=int,
+    default=None,
+    help="Deployment wait timeout in seconds. Defaults to platform/dokploy.toml per-target value or 600.",
+)
+@click.option(
+    "--verify-health/--no-verify-health",
+    default=True,
+    help="Verify /web/health endpoints after a successful deploy when --wait is enabled.",
+)
+@click.option(
+    "--health-timeout",
+    "health_timeout_override_seconds",
+    type=int,
+    default=None,
+    help="Health verification timeout in seconds per endpoint. Defaults to per-target value or 180.",
+)
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--no-cache", is_flag=True, default=False, help="Request rebuild deployment on Dokploy target.")
+@click.option("--skip-gate", is_flag=True, default=False, help="Skip required test/prod gates from platform/dokploy.toml.")
+@click.option(
+    "--allow-dirty",
+    is_flag=True,
+    default=False,
+    help="Allow ship from a dirty tracked working tree (uncommitted changes). Prefer a clean worktree plus --source-ref for surgical tests.",
+)
+@click.option(
+    "--source-ref",
+    "source_git_ref",
+    default="",
+    help="Git reference used to sync the Dokploy target branch before deploy. Use this to test an exact commit or worktree HEAD. Defaults to target source_git_ref or origin/main.",
+)
+def compatibility_ship_worker(
     context_name: str,
     instance_name: str,
     env_file: Path | None,

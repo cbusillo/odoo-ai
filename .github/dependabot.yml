@@ -1,0 +1,38 @@
+---
+version: 2
+
+multi-ecosystem-groups:
+  infrastructure:
+    schedule:
+      interval: weekly
+
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    patterns:
+      - "*"
+    multi-ecosystem-group: infrastructure
+    open-pull-requests-limit: 2
+    labels:
+      - dependencies
+      - github-actions
+    groups:
+      all-security-updates:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  - package-ecosystem: docker
+    directory: "/docker"
+    patterns:
+      - "*"
+    multi-ecosystem-group: infrastructure
+    open-pull-requests-limit: 2
+    labels:
+      - dependencies
+      - docker
+    groups:
+      all-security-updates:
+        applies-to: security-updates
+        patterns:
+          - "*"

@@ -3,8 +3,14 @@ from .models import (
     ArtifactAddonSource,
     ArtifactBuildFlags,
     ArtifactIdentityManifest,
+    ArtifactIdentityReference,
     ArtifactImageReference,
     ArtifactOpenUpgradeInputs,
+    BackupGateEvidence,
+    DeploymentEvidence,
+    HealthcheckEvidence,
+    PostDeployUpdateEvidence,
+    PromotionRecord,
     RuntimeSelection,
 )
 
@@ -64,4 +70,29 @@ def build_artifact_identity_manifest(
             digest=image_digest,
             tags=image_tags,
         ),
+    )
+
+
+def build_promotion_record(
+    *,
+    artifact_id: str,
+    context_name: str,
+    from_instance_name: str,
+    to_instance_name: str,
+    deploy: DeploymentEvidence,
+    source_health: HealthcheckEvidence | None = None,
+    backup_gate: BackupGateEvidence | None = None,
+    post_deploy_update: PostDeployUpdateEvidence | None = None,
+    destination_health: HealthcheckEvidence | None = None,
+) -> PromotionRecord:
+    return PromotionRecord(
+        artifact_identity=ArtifactIdentityReference(artifact_id=artifact_id),
+        context=context_name,
+        from_instance=from_instance_name,
+        to_instance=to_instance_name,
+        source_health=source_health or HealthcheckEvidence(),
+        backup_gate=backup_gate or BackupGateEvidence(),
+        deploy=deploy,
+        post_deploy_update=post_deploy_update or PostDeployUpdateEvidence(),
+        destination_health=destination_health or HealthcheckEvidence(),
     )

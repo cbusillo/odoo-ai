@@ -1,8 +1,20 @@
 import unittest
 from pathlib import Path
 
-from tools.platform.models import ContextDefinition, InstanceDefinition, RuntimeSelection
-from tools.platform.release_contract import build_artifact_identity_manifest, parse_artifact_addon_source
+from tools.platform.models import (
+    BackupGateEvidence,
+    ContextDefinition,
+    DeploymentEvidence,
+    HealthcheckEvidence,
+    InstanceDefinition,
+    PostDeployUpdateEvidence,
+    RuntimeSelection,
+)
+from tools.platform.release_contract import (
+    build_artifact_identity_manifest,
+    build_promotion_record,
+    parse_artifact_addon_source,
+)
 
 
 def _sample_runtime_selection() -> RuntimeSelection:
@@ -73,6 +85,34 @@ class ReleaseContractTests(unittest.TestCase):
         )
         self.assertEqual(manifest.build_flags.values["OPENUPGRADE_ENABLED"], "true")
         self.assertEqual(manifest.image.tags, ("sha-f45db648", "prod-candidate"))
+
+    def test_build_promotion_record_applies_defaults_and_nested_evidence(self) -> None:
+        record = build_promotion_record(
+            artifact_id="artifact-20260410-f45db648",
+            context_name="opw",
+            from_instance_name="testing",
+            to_instance_name="prod",
+            deploy=DeploymentEvidence(
+                target_name="opw-prod",
+                target_type="compose",
+                deploy_mode="artifact-promotion",
+                deployment_id="deploy-123",
+                status="pass",
+            ),
+            source_health=HealthcheckEvidence(
+                verified=True,
+                urls=("https://testing.example.com/web/health",),
+                timeout_seconds=30,
+                status="pass",
+            ),
+            backup_gate=BackupGateEvidence(required=True, status="pass", evidence={"snapshot": "snap-1"}),
+            post_deploy_update=PostDeployUpdateEvidence(attempted=True, status="pass", detail="updated modules"),
+        )
+
+        self.assertEqual(record.artifact_identity.artifact_id, "artifact-20260410-f45db648")
+        self.assertEqual(record.deploy.target_name, "opw-prod")
+        self.assertEqual(record.backup_gate.evidence["snapshot"], "snap-1")
+        self.assertEqual(record.destination_health.status, "skipped")
 
 
 if __name__ == "__main__":

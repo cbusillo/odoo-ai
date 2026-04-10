@@ -208,6 +208,7 @@ Phase one is complete when:
 
 Related Docs
 
+- [@docs/control-plane-bootstrap-layout.md](control-plane-bootstrap-layout.md)
 - [@docs/control-plane-roadmap.md](control-plane-roadmap.md)
 - [@docs/tooling/platform-cli.md](tooling/platform-cli.md)
 - [@docs/tooling/image-contracts.md](tooling/image-contracts.md)

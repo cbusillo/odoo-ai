@@ -3,7 +3,7 @@ import unittest
 from collections.abc import Callable
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Literal
+from typing import Literal, cast
 from unittest.mock import patch
 
 import click
@@ -1713,6 +1713,72 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             )
 
         self.assertIn("artifact_id", captured_error.exception.message)
+
+    def test_execute_export_ship_request_requires_healthcheck_urls_when_verification_waits(self) -> None:
+        target_definition = self._target_definition(context_name="opw", instance_name="prod")
+        source_of_truth = self._source_of_truth(target_definition)
+
+        with self.assertRaises(click.ClickException) as captured_error:
+            commands_release.execute_export_ship_request(
+                context_name="opw",
+                instance_name="prod",
+                artifact_id="artifact-sha256-image456",
+                env_file=None,
+                source_git_ref="abc123",
+                wait=True,
+                timeout_override_seconds=600,
+                verify_health=True,
+                health_timeout_override_seconds=None,
+                dry_run=False,
+                no_cache=False,
+                allow_dirty=False,
+                default_source_git_ref="origin/main",
+                discover_repo_root_fn=lambda _path: Path("/tmp"),
+                load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+                find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+                load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+                resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 45,
+                resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
+                resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "auto",
+                emit_payload_fn=lambda _payload: None,
+            )
+
+        self.assertIn("no target domain/URL was resolved", captured_error.exception.message)
+
+    def test_execute_export_ship_request_disables_health_verification_when_not_waiting(self) -> None:
+        target_definition = self._target_definition(context_name="opw", instance_name="prod").model_copy(
+            update={"domains": ("prod.example.com",), "source_git_ref": "origin/opw-prod"}
+        )
+        source_of_truth = self._source_of_truth(target_definition)
+        captured_payload: dict[str, object] = {}
+
+        commands_release.execute_export_ship_request(
+            context_name="opw",
+            instance_name="prod",
+            artifact_id="artifact-sha256-image456",
+            env_file=None,
+            source_git_ref="",
+            wait=False,
+            timeout_override_seconds=600,
+            verify_health=True,
+            health_timeout_override_seconds=None,
+            dry_run=False,
+            no_cache=False,
+            allow_dirty=False,
+            default_source_git_ref="origin/main",
+            discover_repo_root_fn=lambda _path: Path("/tmp"),
+            load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+            find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+            load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+            resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 45,
+            resolve_ship_healthcheck_urls_fn=lambda **_kwargs: ("https://prod.example.com/web/health",),
+            resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "auto",
+            emit_payload_fn=lambda payload: captured_payload.update(payload),
+        )
+
+        self.assertEqual(captured_payload["verify_health"], False)
+        destination_health = cast(dict[str, object], captured_payload["destination_health"])
+        self.assertEqual(destination_health.get("status"), "skipped")
 
     def test_execute_promote_passes_allow_dirty_through_to_ship(self) -> None:
         source_target_definition = self._target_definition(context_name="opw", instance_name="testing").model_copy(

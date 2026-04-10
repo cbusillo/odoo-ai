@@ -439,6 +439,9 @@ def execute_export_ship_request(
     emit_payload_fn: Callable[[JsonObject], None],
 ) -> None:
     _assert_release_context_supported(context_name=context_name, operation_name="Ship request export")
+    normalized_artifact_id = artifact_id.strip()
+    if not normalized_artifact_id:
+        raise click.ClickException("ship request requires artifact_id")
 
     runtime_environment = _load_runtime_environment(
         context_name=context_name,
@@ -468,6 +471,12 @@ def execute_export_ship_request(
         target_definition=target_definition,
         environment_values=environment_values,
     )
+    should_verify_health = verify_health and wait
+    if should_verify_health and not destination_healthcheck_urls:
+        raise click.ClickException(
+            "Healthcheck verification requested but no target domain/URL was resolved. "
+            "Define domains in platform/dokploy.toml or disable with --no-verify-health."
+        )
     configured_ship_mode = resolve_dokploy_ship_mode_fn(context_name, instance_name, environment_values)
     deploy_mode = _resolve_deploy_mode(
         configured_ship_mode=configured_ship_mode,
@@ -476,7 +485,7 @@ def execute_export_ship_request(
 
     try:
         ship_request = ShipRequest(
-            artifact_id=artifact_id,
+            artifact_id=normalized_artifact_id,
             context=context_name,
             instance=instance_name,
             source_git_ref=resolved_source_git_ref,
@@ -485,7 +494,7 @@ def execute_export_ship_request(
             deploy_mode=deploy_mode,
             wait=wait,
             timeout_seconds=timeout_override_seconds,
-            verify_health=verify_health,
+            verify_health=should_verify_health,
             health_timeout_seconds=destination_health_timeout_seconds,
             dry_run=dry_run,
             no_cache=no_cache,
@@ -493,7 +502,7 @@ def execute_export_ship_request(
             destination_health={
                 "urls": destination_healthcheck_urls,
                 "timeout_seconds": destination_health_timeout_seconds,
-                "status": "pending" if verify_health and wait else "skipped",
+                "status": "pending" if should_verify_health else "skipped",
             },
         )
     except ValueError as error:

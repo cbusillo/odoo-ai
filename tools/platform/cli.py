@@ -10,12 +10,14 @@ from tools.platform import commands_core as platform_commands_core
 from tools.platform import commands_dokploy as platform_commands_dokploy
 from tools.platform import commands_lifecycle as platform_commands_lifecycle
 from tools.platform import commands_release as platform_commands_release
+from tools.platform import commands_release_contract as platform_commands_release_contract
 from tools.platform import commands_selection as platform_commands_selection
 from tools.platform import commands_workflow as platform_commands_workflow
 from tools.platform import dokploy as platform_dokploy
 from tools.platform import environment as platform_environment
 from tools.platform import ide_support as platform_ide_support
 from tools.platform import registry as platform_registry
+from tools.platform import release_contract as platform_release_contract
 from tools.platform import release_workflows as platform_release_workflows
 from tools.platform import runtime as platform_runtime
 from tools.platform import runtime_status as platform_runtime_status
@@ -1504,6 +1506,55 @@ def info(
         load_environment_fn=_load_environment,
         dokploy_status_payload_fn=_dokploy_status_payload,
         emit_payload_fn=_emit_payload,
+    )
+
+
+@main.command(
+    "export-artifact-identity",
+    help="Render the typed artifact identity manifest from the selected runtime inputs.",
+)
+@click.option(
+    "--stack-file",
+    type=click.Path(path_type=Path),
+    default=Path("platform/stack.toml"),
+    show_default=True,
+)
+@click.option("--context", "context_name", required=True)
+@click.option("--instance", "instance_name", default="local", show_default=True)
+@click.option("--env-file", type=click.Path(path_type=Path), default=None)
+@click.option("--git-ref", default="HEAD", show_default=True)
+@click.option("--enterprise-base-digest", required=True)
+@click.option("--image-repository", required=True)
+@click.option("--image-digest", required=True)
+@click.option("--image-tag", "image_tags", multiple=True)
+def export_artifact_identity(
+    stack_file: Path,
+    context_name: str,
+    instance_name: str,
+    env_file: Path | None,
+    git_ref: str,
+    enterprise_base_digest: str,
+    image_repository: str,
+    image_digest: str,
+    image_tags: tuple[str, ...],
+) -> None:
+    platform_commands_release_contract.execute_export_artifact_identity(
+        stack_file=stack_file,
+        context_name=context_name,
+        instance_name=instance_name,
+        env_file=env_file,
+        git_reference=git_ref,
+        enterprise_base_digest=enterprise_base_digest,
+        image_repository=image_repository,
+        image_digest=image_digest,
+        image_tags=image_tags,
+        discover_repo_root_fn=_discover_repo_root,
+        load_stack_fn=_load_stack,
+        resolve_runtime_selection_fn=_resolve_runtime_selection,
+        load_environment_fn=_load_environment,
+        resolve_local_git_commit_fn=_resolve_local_git_commit,
+        build_artifact_identity_manifest_fn=platform_release_contract.build_artifact_identity_manifest,
+        emit_payload_fn=lambda payload: click.echo(json.dumps(payload, indent=2, sort_keys=True)),
     )
 
 

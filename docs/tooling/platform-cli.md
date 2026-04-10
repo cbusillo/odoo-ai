@@ -85,6 +85,10 @@ Behavior Highlights
 - Remote web startup uses `run_odoo_startup.py` to initialize missing modules
   when needed before launching the long-running server.
 - Release-sensitive commands resolve env layers with collision mode `error`.
+- `platform export-artifact-identity` is a read-only bridge for the future
+  private control plane: it renders the typed artifact identity manifest from
+  current runtime inputs plus explicit build outputs such as Enterprise digest
+  and final image digest.
 - `platform restore` and `platform bootstrap` use the same generated runtime env
   contract as `platform select`.
 - `platform select` writes both `.platform/env/<context>.<instance>.env` and

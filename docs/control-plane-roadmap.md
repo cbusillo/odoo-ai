@@ -108,6 +108,7 @@ Non-Goals
 Related Docs
 
 - [@docs/ARCHITECTURE.md](ARCHITECTURE.md)
+- [@docs/control-plane-extraction-contract.md](control-plane-extraction-contract.md)
 - [@docs/tooling/platform-cli.md](tooling/platform-cli.md)
 - [@docs/tooling/image-contracts.md](tooling/image-contracts.md)
 - [@docs/workflows/multi-project.md](workflows/multi-project.md)

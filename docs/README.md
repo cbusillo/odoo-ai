@@ -50,6 +50,7 @@ Routing
   [@docs/tooling/cm-seeds.md](tooling/cm-seeds.md)
 - Architecture: [@docs/ARCHITECTURE.md](ARCHITECTURE.md),
   [@docs/control-plane-roadmap.md](control-plane-roadmap.md),
+  [@docs/control-plane-extraction-contract.md](control-plane-extraction-contract.md),
   [@docs/resources.md](resources.md)
 - Roles: [@docs/roles.md](roles.md)
 - Platform migration status: [@docs/todo/platform-migration-status.md](todo/platform-migration-status.md)

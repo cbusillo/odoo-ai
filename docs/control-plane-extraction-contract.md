@@ -107,6 +107,8 @@ Updated phase-5 progress:
   timeout used for deployment.
 - Compatibility `ship` now also executes Dokploy trigger/wait from
   `odoo-control-plane`, including Dokploy credential loading.
+- Dokploy credentials are now expected to live with `odoo-control-plane`
+  instead of piggybacking on `odoo-ai` local env files.
 - The only remaining delegated runtime step is the Odoo-specific post-deploy
   update worker. The thin Dokploy execution worker is no longer part of the
   live control-plane path.

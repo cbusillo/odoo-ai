@@ -22,9 +22,11 @@ Sources of Truth
 - `tools/platform/models.py` - Dokploy target models plus artifact identity and
   promotion record contracts.
 - `tools/platform/release_contract.py` - helpers that translate current runtime
-  inputs into artifact identity manifests.
+  inputs into artifact identity manifests and promotion records.
 - `platform export-artifact-identity` - read-only export command for the typed
   artifact identity manifest.
+- `platform export-promotion-record` - read-only export command for the typed
+  promotion record used by the compatibility promote flow.
 - `docs/control-plane-roadmap.md` - durable target-state decisions.
 - `docs/tooling/platform-cli.md` - current operator contract.
 
@@ -45,6 +47,20 @@ Current State
   - optionally verify source environment health
   - run the production backup gate
   - delegate deployment by calling `platform ship` with the source commit
+
+Current extraction progress:
+
+- Phase 1: complete
+  - typed artifact/promotion contracts are defined
+  - `platform export-artifact-identity` exists
+- Phase 2: in progress
+  - `platform export-promotion-record` makes current promote checkpoints
+    explicit without moving live deploy ownership yet
+  - bootstrap and ownership docs are being tightened so repo creation does not
+    reopen boundary questions
+- Phase 3: next
+  - create the private control-plane repo and start moving build/promotion
+    ownership there behind thin compatibility wrappers
 
 Phase-One Goal
 
@@ -186,6 +202,14 @@ Minimum persisted records:
 - Promotion records.
 - Environment inventory records.
 - Backup evidence records.
+
+Planned sequence:
+
+- Finish phase 2 inside `odoo-ai` by making artifact and promotion exports
+  explicit and by freezing the bootstrap boundary.
+- Start phase 3 by creating the private repo only after those read-only
+  contracts are accepted, so the new repo begins from stable persisted record
+  shapes instead of log-parsing or branch-coupled behavior.
 
 ## Transitional Rules
 

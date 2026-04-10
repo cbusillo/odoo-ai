@@ -5,6 +5,7 @@ from tools.platform.models import (
     BackupGateEvidence,
     ContextDefinition,
     DeploymentEvidence,
+    DokployTargetDefinition,
     HealthcheckEvidence,
     InstanceDefinition,
     PostDeployUpdateEvidence,
@@ -12,6 +13,7 @@ from tools.platform.models import (
 )
 from tools.platform.release_contract import (
     build_artifact_identity_manifest,
+    build_compatibility_promotion_record,
     build_promotion_record,
     parse_artifact_addon_source,
 )
@@ -113,6 +115,39 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertEqual(record.deploy.target_name, "opw-prod")
         self.assertEqual(record.backup_gate.evidence["snapshot"], "snap-1")
         self.assertEqual(record.destination_health.status, "skipped")
+
+    def test_build_compatibility_promotion_record_maps_pending_promote_checkpoints(self) -> None:
+        record = build_compatibility_promotion_record(
+            artifact_id="artifact-20260410-f45db648",
+            context_name="opw",
+            from_instance_name="testing",
+            to_instance_name="prod",
+            destination_target_definition=DokployTargetDefinition(
+                context="opw",
+                instance="prod",
+                target_type="compose",
+                target_name="",
+            ),
+            deploy_mode="dokploy-compose-api",
+            source_health_urls=("https://testing.example.com/web/health",),
+            source_health_timeout_seconds=30,
+            source_health_status="pending",
+            backup_gate_status="pending",
+            post_deploy_update_status="pending",
+            post_deploy_update_detail="compose update will run after deploy",
+            destination_health_urls=("https://prod.example.com/web/health",),
+            destination_health_timeout_seconds=45,
+            destination_health_status="pending",
+        )
+
+        self.assertEqual(record.deploy.target_name, "opw-prod")
+        self.assertEqual(record.deploy.deploy_mode, "dokploy-compose-api")
+        self.assertFalse(record.source_health.verified)
+        self.assertEqual(record.source_health.status, "pending")
+        self.assertEqual(record.source_health.urls, ("https://testing.example.com/web/health",))
+        self.assertTrue(record.post_deploy_update.attempted)
+        self.assertEqual(record.post_deploy_update.status, "pending")
+        self.assertEqual(record.destination_health.timeout_seconds, 45)
 
 
 if __name__ == "__main__":

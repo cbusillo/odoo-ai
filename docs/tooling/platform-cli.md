@@ -89,6 +89,10 @@ Behavior Highlights
   private control plane: it renders the typed artifact identity manifest from
   current runtime inputs plus explicit build outputs such as Enterprise digest
   and final image digest.
+- `platform export-promotion-record` is the matching read-only bridge for the
+  current compatibility promote workflow: it renders the typed promotion
+  record from current target definitions, healthcheck settings, and explicit
+  release evidence overrides such as backup evidence or deployment status.
 - `platform restore` and `platform bootstrap` use the same generated runtime env
   contract as `platform select`.
 - `platform select` writes both `.platform/env/<context>.<instance>.env` and

@@ -90,11 +90,16 @@ Control Plane UI Scope
 Implementation Direction
 
 1. Keep current local DX and image layering stable.
-2. Move long-term deploy and promotion logic out of `odoo-ai`.
-3. Replace branch-sync deployment with private immutable artifact promotion.
-4. Reduce `uv run platform ...` responsibilities inside `odoo-ai` to local DX,
+2. Make artifact identity and promotion evidence exportable from `odoo-ai`
+   before moving ownership.
+3. Create the private control-plane repo once those read-only contracts and the
+   bootstrap layout are stable enough to implement without reopening boundary
+   questions.
+4. Move long-term deploy and promotion logic out of `odoo-ai`.
+5. Replace branch-sync deployment with private immutable artifact promotion.
+6. Reduce `uv run platform ...` responsibilities inside `odoo-ai` to local DX,
    diagnostics, data workflows, and transitional compatibility helpers.
-5. Make the UI the normal operator surface, with CLI as fallback.
+7. Make the UI the normal operator surface, with CLI as fallback.
 
 Non-Goals
 

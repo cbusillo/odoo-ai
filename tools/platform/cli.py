@@ -1558,6 +1558,132 @@ def export_artifact_identity(
     )
 
 
+@main.command(
+    "export-promotion-record",
+    help="Render the typed promotion record that matches the current compatibility promote workflow.",
+)
+@click.option("--context", "context_name", required=True)
+@click.option("--from-instance", "from_instance_name", default="testing", show_default=True)
+@click.option("--to-instance", "to_instance_name", default="prod", show_default=True)
+@click.option("--env-file", type=click.Path(path_type=Path), default=None)
+@click.option("--artifact-id", required=True)
+@click.option("--wait/--no-wait", default=True, show_default=True)
+@click.option(
+    "--verify-health/--no-verify-health",
+    default=True,
+    help="Plan destination health verification the same way as `platform promote`.",
+)
+@click.option(
+    "--health-timeout",
+    "health_timeout_override_seconds",
+    type=int,
+    default=None,
+    help="Destination health verification timeout in seconds.",
+)
+@click.option(
+    "--verify-source-health/--no-verify-source-health",
+    default=True,
+    help="Plan source health verification the same way as `platform promote`.",
+)
+@click.option(
+    "--source-health-timeout",
+    "source_health_timeout_override_seconds",
+    type=int,
+    default=None,
+    help="Source health verification timeout in seconds.",
+)
+@click.option("--deployment-id", default="", show_default=False)
+@click.option("--deploy-started-at", default="", show_default=False)
+@click.option("--deploy-finished-at", default="", show_default=False)
+@click.option(
+    "--deploy-status",
+    type=click.Choice(["pending", "pass", "fail", "skipped"]),
+    default="pending",
+    show_default=True,
+)
+@click.option(
+    "--source-health-status",
+    type=click.Choice(["pending", "pass", "fail", "skipped"]),
+    default=None,
+)
+@click.option(
+    "--backup-gate-status",
+    type=click.Choice(["pending", "pass", "fail", "skipped"]),
+    default=None,
+)
+@click.option(
+    "--backup-evidence",
+    "backup_evidence_items",
+    multiple=True,
+    help="Repeatable <key>=<value> metadata for backup evidence.",
+)
+@click.option(
+    "--post-deploy-update-status",
+    type=click.Choice(["pending", "pass", "fail", "skipped"]),
+    default=None,
+)
+@click.option("--post-deploy-update-detail", default="", show_default=False)
+@click.option(
+    "--destination-health-status",
+    type=click.Choice(["pending", "pass", "fail", "skipped"]),
+    default=None,
+)
+def export_promotion_record(
+    context_name: str,
+    from_instance_name: str,
+    to_instance_name: str,
+    env_file: Path | None,
+    artifact_id: str,
+    wait: bool,
+    verify_health: bool,
+    health_timeout_override_seconds: int | None,
+    verify_source_health: bool,
+    source_health_timeout_override_seconds: int | None,
+    deployment_id: str,
+    deploy_started_at: str,
+    deploy_finished_at: str,
+    deploy_status: str,
+    source_health_status: str | None,
+    backup_gate_status: str | None,
+    backup_evidence_items: tuple[str, ...],
+    post_deploy_update_status: str | None,
+    post_deploy_update_detail: str,
+    destination_health_status: str | None,
+) -> None:
+    platform_commands_release_contract.execute_export_promotion_record(
+        context_name=context_name,
+        from_instance_name=from_instance_name,
+        to_instance_name=to_instance_name,
+        env_file=env_file,
+        artifact_id=artifact_id,
+        wait=wait,
+        verify_health=verify_health,
+        health_timeout_override_seconds=health_timeout_override_seconds,
+        verify_source_health=verify_source_health,
+        source_health_timeout_override_seconds=source_health_timeout_override_seconds,
+        deployment_id=deployment_id,
+        deploy_started_at=deploy_started_at,
+        deploy_finished_at=deploy_finished_at,
+        deploy_status=deploy_status,
+        source_health_status=source_health_status,
+        backup_gate_status=backup_gate_status,
+        backup_evidence_items=backup_evidence_items,
+        post_deploy_update_status=post_deploy_update_status,
+        post_deploy_update_detail=post_deploy_update_detail,
+        destination_health_status=destination_health_status,
+        assert_promote_path_allowed_fn=_assert_promote_path_allowed,
+        discover_repo_root_fn=_discover_repo_root,
+        load_dokploy_source_of_truth_if_present_fn=_load_dokploy_source_of_truth_if_present,
+        find_dokploy_target_definition_fn=_find_dokploy_target_definition,
+        load_environment_fn=_load_environment,
+        resolve_ship_health_timeout_seconds_fn=_resolve_ship_health_timeout_seconds,
+        resolve_ship_healthcheck_urls_fn=_resolve_ship_healthcheck_urls,
+        resolve_dokploy_ship_mode_fn=_resolve_dokploy_ship_mode,
+        build_compatibility_promotion_record_fn=platform_release_contract.build_compatibility_promotion_record,
+        emit_payload_fn=lambda payload: click.echo(json.dumps(payload, indent=2, sort_keys=True)),
+    )
+
+
 @main.command("status")
 @click.option(
     "--stack-file",

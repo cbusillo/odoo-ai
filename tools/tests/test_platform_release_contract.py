@@ -3,7 +3,16 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from tools.platform import commands_release_contract
-from tools.platform.models import ContextDefinition, InstanceDefinition, LoadedStack, RuntimeSelection, StackDefinition
+from tools.platform.models import (
+    ContextDefinition,
+    DokploySourceOfTruth,
+    DokployTargetDefinition,
+    InstanceDefinition,
+    LoadedStack,
+    RuntimeSelection,
+    StackDefinition,
+)
+from tools.platform.release_contract import build_compatibility_promotion_record
 
 
 def _sample_runtime_selection() -> RuntimeSelection:
@@ -83,6 +92,82 @@ class PlatformReleaseContractCommandTests(unittest.TestCase):
         self.assertEqual(captured_payload["odoo_ai_commit"], "resolved-HEAD")
         self.assertEqual(captured_payload["enterprise_base_digest"], "sha256:enterprise123")
         self.assertEqual(captured_payload["image_repository"], "ghcr.io/cbusillo/odoo-ai-private")
+
+    def test_execute_export_promotion_record_emits_compatibility_payload(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            repo_root = Path(temporary_directory_name)
+            source_of_truth = DokploySourceOfTruth(
+                schema_version=1,
+                targets=(
+                    DokployTargetDefinition(
+                        context="opw",
+                        instance="testing",
+                        target_type="compose",
+                        target_name="opw-testing",
+                        domains=("testing.example.com",),
+                    ),
+                    DokployTargetDefinition(
+                        context="opw",
+                        instance="prod",
+                        target_type="compose",
+                        target_name="opw-prod",
+                        domains=("prod.example.com",),
+                    ),
+                ),
+            )
+            captured_payload: dict[str, object] = {}
+
+            commands_release_contract.execute_export_promotion_record(
+                context_name="opw",
+                from_instance_name="testing",
+                to_instance_name="prod",
+                env_file=None,
+                artifact_id="artifact-20260410-f45db648",
+                wait=True,
+                verify_health=True,
+                health_timeout_override_seconds=None,
+                verify_source_health=True,
+                source_health_timeout_override_seconds=None,
+                deployment_id="",
+                deploy_started_at="",
+                deploy_finished_at="",
+                deploy_status="pending",
+                source_health_status=None,
+                backup_gate_status=None,
+                backup_evidence_items=("snapshot=snap-123",),
+                post_deploy_update_status=None,
+                post_deploy_update_detail="",
+                destination_health_status=None,
+                assert_promote_path_allowed_fn=lambda **_kwargs: None,
+                discover_repo_root_fn=lambda _path: repo_root,
+                load_dokploy_source_of_truth_if_present_fn=lambda _path: source_of_truth,
+                find_dokploy_target_definition_fn=lambda source_of_truth, context_name, instance_name: next(
+                    (
+                        target_definition
+                        for target_definition in source_of_truth.targets
+                        if target_definition.context == context_name and target_definition.instance == instance_name
+                    ),
+                    None,
+                ),
+                load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (repo_root / ".env", {}),
+                resolve_ship_health_timeout_seconds_fn=lambda health_timeout_override_seconds, target_definition: (
+                    health_timeout_override_seconds or (25 if target_definition.instance == "testing" else 45)
+                ),
+                resolve_ship_healthcheck_urls_fn=lambda target_definition, environment_values: tuple(
+                    f"https://{domain_name}{target_definition.healthcheck_path}" for domain_name in target_definition.domains
+                ),
+                resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "auto",
+                build_compatibility_promotion_record_fn=build_compatibility_promotion_record,
+                emit_payload_fn=lambda payload: captured_payload.update(payload),
+            )
+
+        self.assertEqual(captured_payload["artifact_identity"]["artifact_id"], "artifact-20260410-f45db648")
+        self.assertEqual(captured_payload["deploy"]["target_name"], "opw-prod")
+        self.assertEqual(captured_payload["deploy"]["deploy_mode"], "dokploy-compose-api")
+        self.assertEqual(captured_payload["source_health"]["status"], "pending")
+        self.assertEqual(captured_payload["backup_gate"]["evidence"], {"snapshot": "snap-123"})
+        self.assertEqual(captured_payload["destination_health"]["status"], "pending")
+        self.assertEqual(captured_payload["post_deploy_update"]["status"], "pending")
 
 
 if __name__ == "__main__":

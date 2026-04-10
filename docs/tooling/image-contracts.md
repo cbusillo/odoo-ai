@@ -124,5 +124,8 @@ Operational Notes
 - The compose runtime contract now accepts either `repo:tag` or an exact
   `DOCKER_IMAGE_REFERENCE` so the control plane can promote known immutable
   artifacts without changing the local developer image flow.
+- Direct local Compose/testkit callers must strip `DOCKER_IMAGE_REFERENCE`
+  before invoking `docker compose`; digest references are for remote runtime
+  selection, not local build/up paths.
 - Keep enterprise fetch/publish workflows on private infrastructure (for
   example the `chris-testing` self-hosted runner).

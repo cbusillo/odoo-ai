@@ -199,6 +199,28 @@ class TestkitDockerApiTests(unittest.TestCase):
             str((repo_root / ".platform" / "state" / "cm-local").resolve()),
         )
 
+    def test_compose_env_strips_immutable_image_reference(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            repo_root = Path(temporary_directory_name)
+            (repo_root / ".git").mkdir()
+            env_file = repo_root / "runtime.env"
+            env_file.write_text(
+                "\n".join(
+                    (
+                        "ODOO_STACK_NAME=cm-local",
+                        "DOCKER_IMAGE_REFERENCE=odoo-ai@sha256:0123456789abcdef",
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict("os.environ", {"TESTKIT_ENV_FILE": str(env_file)}, clear=True):
+                with patch("tools.testkit.docker_api.Path.cwd", return_value=repo_root):
+                    composed_environment = docker_api.compose_env()
+
+        self.assertNotIn("DOCKER_IMAGE_REFERENCE", composed_environment)
+
 
 if __name__ == "__main__":
     unittest.main()

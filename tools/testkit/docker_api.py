@@ -78,6 +78,8 @@ def compose_env() -> dict[str, str]:
     if stack_override:
         env["ODOO_STACK_NAME"] = stack_override
 
+    env.pop("DOCKER_IMAGE_REFERENCE", None)
+
     if _is_truthy(env.get("TESTKIT_DISABLE_DEV_MODE")):
         env.pop("ODOO_DEV_MODE", None)
 

@@ -49,6 +49,7 @@ PLATFORM_RUNTIME_ENV_KEYS = (
     "ODOO_RUNTIME_CONF_HOST_PATH",
     "DOCKER_IMAGE",
     "DOCKER_IMAGE_TAG",
+    "DOCKER_IMAGE_REFERENCE",
     "COMPOSE_BUILD_TARGET",
     "ODOO_DATA_VOLUME",
     "ODOO_LOG_VOLUME",
@@ -120,6 +121,7 @@ PLATFORM_RUNTIME_PASSTHROUGH_KEYS = (
     "DATA_WORKFLOW_SSH_KEY",
     "DOKPLOY_HOST",
     "DOKPLOY_TOKEN",
+    "DOCKER_IMAGE_REFERENCE",
 )
 
 ENV_COLLISION_MODE_ENV_KEY = platform_environment.ENV_COLLISION_MODE_ENV_KEY
@@ -370,6 +372,7 @@ def _write_pycharm_odoo_conf(
 
 def _compose_base_command(runtime_env_file: Path) -> list[str]:
     repo_root = _discover_repo_root(Path.cwd())
+    compose_env_file = _compose_runtime_env_file(runtime_env_file)
     compose_files = [
         repo_root / "docker-compose.yml",
         repo_root / "platform" / "compose" / "base.yaml",
@@ -389,12 +392,20 @@ def _compose_base_command(runtime_env_file: Path) -> list[str]:
         "--project-directory",
         str(repo_root),
         "--env-file",
-        str(runtime_env_file),
+        str(compose_env_file),
     ]
     for compose_file in compose_files:
         command.extend(["-f", str(compose_file)])
 
     return command
+
+
+def _compose_runtime_env_file(runtime_env_file: Path) -> Path:
+    compose_env_file = runtime_env_file.with_suffix(".compose.env")
+    runtime_env_values = _parse_env_file(runtime_env_file)
+    runtime_env_values.pop("DOCKER_IMAGE_REFERENCE", None)
+    compose_env_file.write_text(_render_runtime_env(runtime_env_values), encoding="utf-8")
+    return compose_env_file
 
 
 def _ensure_registry_auth_for_base_images(environment_values: dict[str, str]) -> None:

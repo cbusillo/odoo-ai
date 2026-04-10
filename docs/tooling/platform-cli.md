@@ -82,6 +82,10 @@ Behavior Highlights
   from the control plane so deploy execution can use an exact immutable image
   while local workflows keep the existing `DOCKER_IMAGE` + `DOCKER_IMAGE_TAG`
   contract.
+- Direct Compose callers sanitize `DOCKER_IMAGE_REFERENCE` before invoking
+  `docker compose` so local/testkit workflows keep using buildable image-name
+  inputs even when shared runtime env files carry an immutable digest for
+  remote execution.
 - `platform export-ship-request` now emits an artifact-backed ship contract
   with no branch-sync metadata. If the caller cannot provide an artifact id,
   the handoff should fail closed rather than falling back to branch-oriented

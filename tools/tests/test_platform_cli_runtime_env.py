@@ -23,6 +23,7 @@ from tools.platform.cli import (
     _run_code_gate,
     _run_production_backup_gate,
     _run_with_web_temporarily_stopped,
+    _write_runtime_env_file,
     _validate_target_gate_policy,
 )
 from tools.platform.models import (
@@ -97,12 +98,13 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
             repo_root = Path(temporary_directory_name)
             write_compose_stack_files(repo_root)
             runtime_env_file = write_runtime_env_file(repo_root)
+            compose_env_file = runtime_env_file.with_suffix(".compose.env")
 
             with patch("tools.platform.cli._discover_repo_root", return_value=repo_root):
                 command = _compose_base_command(runtime_env_file)
 
         self.assertEqual(
-            command[:6], ["docker", "compose", "--project-directory", str(repo_root), "--env-file", str(runtime_env_file)]
+            command[:6], ["docker", "compose", "--project-directory", str(repo_root), "--env-file", str(compose_env_file)]
         )
         self.assertEqual(
             command[6:],
@@ -137,11 +139,66 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
         self.assertEqual(dirty_lines, ("M platform/dokploy.toml", "M tools/platform/cli.py"))
 
     def test_command_execution_env_drops_stale_stack_name(self) -> None:
-        with patch.dict("os.environ", {"ODOO_STACK_NAME": "opw-local", "KEEP_ME": "1"}, clear=True):
+        with patch.dict(
+            "os.environ",
+            {
+                "ODOO_STACK_NAME": "opw-local",
+                "DOCKER_IMAGE_REFERENCE": "odoo-ai@sha256:0123456789abcdef",
+                "KEEP_ME": "1",
+            },
+            clear=True,
+        ):
             execution_environment = _command_execution_env()
 
         self.assertNotIn("ODOO_STACK_NAME", execution_environment)
+        self.assertNotIn("DOCKER_IMAGE_REFERENCE", execution_environment)
         self.assertEqual(execution_environment.get("KEEP_ME"), "1")
+
+    def test_write_runtime_env_file_preserves_immutable_image_reference(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            repo_root = Path(temporary_directory_name)
+            stack_definition = _sample_stack_definition()
+            runtime_selection = _sample_runtime_selection()
+            runtime_env_file = _write_runtime_env_file(
+                repo_root=repo_root,
+                stack_definition=stack_definition,
+                runtime_selection=runtime_selection,
+                source_environment={
+                    "ODOO_DB_USER": "odoo",
+                    "ODOO_DB_PASSWORD": "database-password",
+                    "DOCKER_IMAGE_REFERENCE": "odoo-ai@sha256:0123456789abcdef",
+                },
+            )
+
+            runtime_env_content = runtime_env_file.read_text(encoding="utf-8")
+
+        self.assertIn("DOCKER_IMAGE_REFERENCE=odoo-ai@sha256:0123456789abcdef", runtime_env_content)
+        self.assertIn("DOCKER_IMAGE=odoo-opw-local", runtime_env_content)
+
+    def test_compose_runtime_env_file_strips_immutable_image_reference(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            repo_root = Path(temporary_directory_name)
+            write_compose_stack_files(repo_root)
+            runtime_env_file = write_runtime_env_file(repo_root)
+            runtime_env_file.write_text(
+                "\n".join(
+                    (
+                        "DOCKER_IMAGE_REFERENCE=odoo-ai@sha256:0123456789abcdef",
+                        "DOCKER_IMAGE=odoo-ai",
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with patch("tools.platform.cli._discover_repo_root", return_value=repo_root):
+                compose_command = _compose_base_command(runtime_env_file)
+
+            compose_env_file = runtime_env_file.with_suffix(".compose.env")
+            compose_env_content = compose_env_file.read_text(encoding="utf-8")
+
+        self.assertIn(str(compose_env_file), compose_command)
+        self.assertNotIn("DOCKER_IMAGE_REFERENCE=", compose_env_content)
 
     def test_runtime_env_includes_admin_credential_keys_when_configured(self) -> None:
         runtime_values = _build_runtime_env_values(

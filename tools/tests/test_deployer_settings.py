@@ -124,6 +124,7 @@ class DeployerSettingsTests(unittest.TestCase):
                     (
                         "ODOO_PROJECT_NAME=odoo-opw-local",
                         "DOCKER_IMAGE=odoo-ai",
+                        "DOCKER_IMAGE_REFERENCE=odoo-ai@sha256:0123456789abcdef",
                         "ODOO_DB_PASSWORD=database-password",
                         "ODOO_MASTER_PASSWORD=master-password",
                         "ENV_OVERRIDE_CONFIG_PARAM__WEB__BASE__URL=https://opw-local.example.com",
@@ -135,12 +136,15 @@ class DeployerSettingsTests(unittest.TestCase):
             (repo_root / ".env").write_text("DOKPLOY_HOST=example\n", encoding="utf-8")
 
             stack_settings = settings.load_stack_settings("opw-local", base_directory=repo_root)
+            runtime_env_content = stack_settings.env_file.read_text(encoding="utf-8")
 
         self.assertEqual(stack_settings.state_root, (repo_root / ".platform" / "state" / "opw-local").resolve())
+        self.assertEqual(stack_settings.environment["DOCKER_IMAGE_REFERENCE"], "odoo-ai@sha256:0123456789abcdef")
         self.assertEqual(
             stack_settings.env_file,
             (repo_root / ".platform" / "state" / "opw-local" / ".compose.env").resolve(),
         )
+        self.assertIn("DOCKER_IMAGE_REFERENCE=odoo-ai@sha256:0123456789abcdef", runtime_env_content)
 
     @staticmethod
     def test_validate_base_env_defaults_allows_matching_overlaps() -> None:

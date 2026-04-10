@@ -280,9 +280,9 @@ class StackSettings:
     image_variable_name: str
     github_token: str | None
 
-    def compose_arguments(self) -> list[str]:
+    def compose_arguments(self, env_file: Path | None = None) -> list[str]:
         arguments = list(self.compose_command)
-        arguments += ["-p", self.compose_project, "--env-file", str(self.env_file)]
+        arguments += ["-p", self.compose_project, "--env-file", str(env_file or self.env_file)]
         for file_path in self.compose_files:
             arguments += ["-f", str(file_path)]
         return arguments

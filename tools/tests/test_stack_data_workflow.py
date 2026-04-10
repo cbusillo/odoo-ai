@@ -1,6 +1,7 @@
 import os
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from tools import stack_data_workflow
@@ -45,6 +46,46 @@ def _sample_remote_target_definition() -> DokployTargetDefinition:
 
 
 class StackDataWorkflowTests(unittest.TestCase):
+    def test_local_compose_command_writes_sanitized_compose_env_file(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            repo_root = Path(temporary_directory_name)
+            compose_env_file = repo_root / ".platform" / "env" / "opw.local.compose.env"
+            compose_env_file.parent.mkdir(parents=True, exist_ok=True)
+            stack_settings = StackSettings(
+                name="opw-local",
+                repo_root=repo_root,
+                env_file=repo_root / ".platform" / "env" / "opw.local.env",
+                source_env_file=repo_root / ".platform" / "env" / "opw.local.env",
+                environment={
+                    "DOCKER_IMAGE_REFERENCE": "odoo-ai@sha256:0123456789abcdef",
+                    "DOCKER_IMAGE": "odoo-ai",
+                    "ODOO_DB_PASSWORD": "database-password",
+                },
+                state_root=repo_root / ".platform" / "state" / "opw-local",
+                data_dir=repo_root / ".platform" / "state" / "opw-local" / "data",
+                db_dir=repo_root / ".platform" / "state" / "opw-local" / "db",
+                log_dir=repo_root / ".platform" / "state" / "opw-local" / "logs",
+                compose_command=("docker", "compose"),
+                compose_project="odoo-opw-local",
+                compose_files=(repo_root / "docker-compose.yml",),
+                docker_context=repo_root,
+                registry_image="odoo-ai",
+                healthcheck_url="https://opw-local.example.com/web/health",
+                update_modules=("AUTO",),
+                services=("database", "web", "script-runner"),
+                script_runner_service="script-runner",
+                odoo_bin_path="/odoo/odoo-bin",
+                image_variable_name="DOCKER_IMAGE",
+                github_token=None,
+            )
+
+            command = stack_data_workflow.local_compose_command(stack_settings, ["build", "web"])
+            compose_env_content = compose_env_file.read_text(encoding="utf-8")
+
+        self.assertIn(str(compose_env_file), command)
+        self.assertNotIn("DOCKER_IMAGE_REFERENCE=", compose_env_content)
+        self.assertIn("DOCKER_IMAGE=odoo-ai", compose_env_content)
+
     def test_data_workflow_script_environment_keeps_required_keys_and_prefixes(self) -> None:
         env_values = {
             "ODOO_DB_PASSWORD": "secret",

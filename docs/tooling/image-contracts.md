@@ -87,6 +87,10 @@ Layer Model
   - local compose builds one canonical `odoo-ai` image and both `web` and
     `script-runner` consume that same image tag to avoid service-level source
     skew
+  - managed targets may override the normal `DOCKER_IMAGE` +
+    `DOCKER_IMAGE_TAG` pair with `DOCKER_IMAGE_REFERENCE=<repo>@<digest>` when
+    the control plane needs an exact immutable runtime image for deploy or
+    promotion execution
   - both production and local `development` targets bake project addons into
     `/opt/project/addons`; runtime env generation expands grouped addon roots
     under that tree when present, and live-edit workflows must override that
@@ -117,5 +121,8 @@ Operational Notes
 
 - Treat `19.0-*` as promotion tags, not moving dev targets.
 - Prefer digest references in `platform/config/base.env` for repeatable deploys.
+- The compose runtime contract now accepts either `repo:tag` or an exact
+  `DOCKER_IMAGE_REFERENCE` so the control plane can promote known immutable
+  artifacts without changing the local developer image flow.
 - Keep enterprise fetch/publish workflows on private infrastructure (for
   example the `chris-testing` self-hosted runner).

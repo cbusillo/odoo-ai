@@ -76,6 +76,10 @@ Behavior Highlights
   accepts `--allow-dirty` only as an explicit override.
 - `platform ship` is the only supported remote deployment trigger for managed
   Dokploy targets. Keep Dokploy auto deploy disabled for those targets.
+- Managed remote targets may receive `DOCKER_IMAGE_REFERENCE=<repo>@<digest>`
+  from the control plane so deploy execution can use an exact immutable image
+  while local workflows keep the existing `DOCKER_IMAGE` + `DOCKER_IMAGE_TAG`
+  contract.
 - When `platform ship` waits for deployment completion on compose-backed
   managed targets, it now runs the shared `platform update` workflow before
   final health verification so installed addon code/data changes are applied

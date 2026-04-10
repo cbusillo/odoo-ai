@@ -99,6 +99,9 @@ Updated phase-5 progress:
   `odoo-control-plane` before delegation, and the internal worker only needs to
   accept the pre-applied branch-sync evidence instead of owning that git push
   itself.
+- Compatibility `ship` destination health verification now also runs from
+  `odoo-control-plane`, so the internal worker only needs to complete the
+  delegated deploy and Odoo-specific post-deploy update path.
 
 Phase-One Goal
 

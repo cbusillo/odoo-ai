@@ -12,6 +12,7 @@ from tools.platform.models import (
     RuntimeSelection,
 )
 from tools.platform.release_contract import (
+    build_artifact_id,
     build_compatibility_artifact_id,
     build_compatibility_promotion_request,
     build_compatibility_ship_request,
@@ -76,6 +77,7 @@ class ReleaseContractTests(unittest.TestCase):
         )
 
         self.assertEqual(manifest.odoo_ai_commit, "f45db648")
+        self.assertEqual(manifest.artifact_id, build_artifact_id(image_digest="sha256:image456"))
         self.assertEqual(manifest.enterprise_base_digest, "sha256:enterprise123")
         self.assertEqual(
             manifest.addon_sources,
@@ -207,6 +209,9 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertEqual(request.source_git_ref, "abc123")
         self.assertEqual(request.destination_health.status, "pending")
         self.assertEqual(request.deploy_mode, "dokploy-compose-api")
+
+    def test_build_artifact_id_normalizes_digest(self) -> None:
+        self.assertEqual(build_artifact_id(image_digest="sha256:image456"), "artifact-sha256-image456")
 
 
 if __name__ == "__main__":

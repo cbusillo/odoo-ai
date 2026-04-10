@@ -32,6 +32,13 @@ def _split_addon_skip_flags(source_environment: dict[str, str]) -> tuple[str, ..
     return tuple(flag for flag in (part.strip() for part in raw_value.split(",")) if flag)
 
 
+def build_artifact_id(*, image_digest: str) -> str:
+    normalized_digest = image_digest.strip().replace(":", "-")
+    if not normalized_digest:
+        raise ValueError("artifact identity requires image_digest")
+    return f"artifact-{normalized_digest}"
+
+
 def build_artifact_identity_manifest(
     *,
     odoo_ai_commit: str,
@@ -64,6 +71,7 @@ def build_artifact_identity_manifest(
     )
 
     return ArtifactIdentityManifest(
+        artifact_id=build_artifact_id(image_digest=image_digest),
         odoo_ai_commit=odoo_ai_commit,
         enterprise_base_digest=enterprise_base_digest,
         addon_sources=addon_sources,

@@ -84,14 +84,79 @@ class PlatformReleaseContractCommandTests(unittest.TestCase):
                 build_artifact_identity_manifest_fn=lambda **payload: type(
                     "_Manifest",
                     (),
-                    {"model_dump": staticmethod(lambda mode="json": payload)},
+                    {
+                        "model_dump": staticmethod(
+                            lambda mode="json": {
+                                **payload,
+                                "artifact_id": "artifact-sha256-image456",
+                            }
+                        )
+                    },
                 )(),
                 emit_payload_fn=lambda payload: captured_payload.update(payload),
             )
 
+        self.assertEqual(captured_payload["artifact_id"], "artifact-sha256-image456")
         self.assertEqual(captured_payload["odoo_ai_commit"], "resolved-HEAD")
         self.assertEqual(captured_payload["enterprise_base_digest"], "sha256:enterprise123")
         self.assertEqual(captured_payload["image_repository"], "ghcr.io/cbusillo/odoo-ai-private")
+
+    def test_execute_handoff_artifact_identity_invokes_control_plane_with_manifest(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            repo_root = Path(temporary_directory_name)
+            stack_file_path = repo_root / "platform" / "stack.toml"
+            stack_file_path.parent.mkdir(parents=True, exist_ok=True)
+            stack_file_path.write_text("schema_version = 1\n", encoding="utf-8")
+            loaded_stack = LoadedStack(
+                stack_file_path=stack_file_path,
+                stack_definition=StackDefinition(
+                    schema_version=1,
+                    odoo_version="19.0",
+                    addons_path=("/odoo/addons",),
+                    contexts={"opw": ContextDefinition(instances={"prod": InstanceDefinition()})},
+                ),
+            )
+            captured_manifest: dict[str, object] = {}
+
+            commands_release_contract.execute_handoff_artifact_identity(
+                stack_file=Path("platform/stack.toml"),
+                context_name="opw",
+                instance_name="prod",
+                env_file=None,
+                git_reference="HEAD",
+                enterprise_base_digest="sha256:enterprise123",
+                image_repository="ghcr.io/cbusillo/odoo-ai-private",
+                image_digest="sha256:image456",
+                image_tags=("sha-f45db648",),
+                discover_repo_root_fn=lambda _path: repo_root,
+                load_stack_fn=lambda _path: loaded_stack,
+                resolve_runtime_selection_fn=lambda _stack, _context, _instance: _sample_runtime_selection(),
+                load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (
+                    repo_root / ".env",
+                    {
+                        "OPENUPGRADE_ENABLED": "true",
+                        "OPENUPGRADE_ADDON_REPOSITORY": "OCA/OpenUpgrade@89e649728027a8ab656b3aa4be18f4bd364db417",
+                        "OPENUPGRADELIB_INSTALL_SPEC": "git+https://github.com/OCA/openupgradelib.git@46d66ff5ed6a99481f84d3c79fc6e50835da7286",
+                    },
+                ),
+                resolve_local_git_commit_fn=lambda git_reference: f"resolved-{git_reference}",
+                build_artifact_identity_manifest_fn=lambda **payload: type(
+                    "_Manifest",
+                    (),
+                    {
+                        "model_dump": staticmethod(
+                            lambda mode="json": {
+                                **payload,
+                                "artifact_id": "artifact-sha256-image456",
+                            }
+                        ),
+                    },
+                )(),
+                invoke_control_plane_artifact_handoff_fn=lambda manifest: captured_manifest.update(manifest.model_dump(mode="json")),
+            )
+
+        self.assertEqual(captured_manifest["artifact_id"], "artifact-sha256-image456")
+        self.assertEqual(captured_manifest["image_digest"], "sha256:image456")
 
     def test_execute_export_promotion_record_emits_compatibility_payload(self) -> None:
         with TemporaryDirectory() as temporary_directory_name:

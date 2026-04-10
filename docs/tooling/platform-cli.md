@@ -93,6 +93,9 @@ Behavior Highlights
   private control plane: it renders the typed artifact identity manifest from
   current runtime inputs plus explicit build outputs such as Enterprise digest
   and final image digest.
+- `platform handoff-artifact-identity` is the write-side companion for that
+  contract: it generates the same typed manifest and persists it into
+  `odoo-control-plane`.
 - `platform export-promotion-record` is the matching read-only bridge for the
   current compatibility promote workflow: it renders the typed promotion
   record from current target definitions, healthcheck settings, and explicit

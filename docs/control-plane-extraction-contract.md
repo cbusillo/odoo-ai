@@ -25,6 +25,8 @@ Sources of Truth
   inputs into artifact identity manifests and promotion records.
 - `platform export-artifact-identity` - read-only export command for the typed
   artifact identity manifest.
+- `platform handoff-artifact-identity` - cross-repo handoff command that
+  persists the typed artifact manifest into `odoo-control-plane`.
 - `platform export-promotion-record` - read-only export command for the typed
   promotion record used by the compatibility promote flow.
 - `docs/control-plane-roadmap.md` - durable target-state decisions.
@@ -71,6 +73,8 @@ Current phase-3 progress:
   the underlying `ship` worker back to `odoo-ai` during the transition.
 - `platform export-ship-request` now defines the first explicit ship handoff
   contract even though live `ship` ownership remains in `odoo-ai` for now.
+- Artifact manifests can now be handed off explicitly into `odoo-control-plane`
+  instead of remaining implied metadata in `odoo-ai` only.
 
 Phase-One Goal
 

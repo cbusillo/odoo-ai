@@ -495,6 +495,35 @@ def _invoke_control_plane_promote(*, repo_root: Path, env_file: Path | None, req
         request_path.unlink(missing_ok=True)
 
 
+def _handoff_artifact_identity_to_control_plane(*, manifest: object) -> None:
+    repo_root = _discover_repo_root(Path.cwd())
+    control_plane_root = _resolve_control_plane_repo_root(repo_root)
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as manifest_file:
+        manifest_path = Path(manifest_file.name)
+        json.dump(manifest.model_dump(mode="json"), manifest_file, indent=2, sort_keys=True)
+
+    try:
+        command = [
+            "uv",
+            "run",
+            "--project",
+            str(control_plane_root),
+            "control-plane",
+            "artifacts",
+            "ingest-odoo-ai",
+            "--input-file",
+            str(manifest_path),
+        ]
+        command_env = _command_execution_env()
+        command_env.pop("VIRTUAL_ENV", None)
+        result = subprocess.run(command, env=command_env)
+        if result.returncode != 0:
+            joined_command = " ".join(command)
+            raise click.ClickException(f"Command failed ({result.returncode}): {joined_command}")
+    finally:
+        manifest_path.unlink(missing_ok=True)
+
+
 def _command_execution_env() -> dict[str, str]:
     execution_env = dict(os.environ)
     for runtime_key in PLATFORM_RUNTIME_ENV_KEYS:
@@ -1601,6 +1630,55 @@ def export_artifact_identity(
         resolve_local_git_commit_fn=_resolve_local_git_commit,
         build_artifact_identity_manifest_fn=platform_release_contract.build_artifact_identity_manifest,
         emit_payload_fn=lambda payload: click.echo(json.dumps(payload, indent=2, sort_keys=True)),
+    )
+
+
+@main.command(
+    "handoff-artifact-identity",
+    help="Generate the typed artifact identity manifest and hand it off to odoo-control-plane.",
+)
+@click.option(
+    "--stack-file",
+    type=click.Path(path_type=Path),
+    default=Path("platform/stack.toml"),
+    show_default=True,
+)
+@click.option("--context", "context_name", required=True)
+@click.option("--instance", "instance_name", default="local", show_default=True)
+@click.option("--env-file", type=click.Path(path_type=Path), default=None)
+@click.option("--git-ref", default="HEAD", show_default=True)
+@click.option("--enterprise-base-digest", required=True)
+@click.option("--image-repository", required=True)
+@click.option("--image-digest", required=True)
+@click.option("--image-tag", "image_tags", multiple=True)
+def handoff_artifact_identity(
+    stack_file: Path,
+    context_name: str,
+    instance_name: str,
+    env_file: Path | None,
+    git_ref: str,
+    enterprise_base_digest: str,
+    image_repository: str,
+    image_digest: str,
+    image_tags: tuple[str, ...],
+) -> None:
+    platform_commands_release_contract.execute_handoff_artifact_identity(
+        stack_file=stack_file,
+        context_name=context_name,
+        instance_name=instance_name,
+        env_file=env_file,
+        git_reference=git_ref,
+        enterprise_base_digest=enterprise_base_digest,
+        image_repository=image_repository,
+        image_digest=image_digest,
+        image_tags=image_tags,
+        discover_repo_root_fn=_discover_repo_root,
+        load_stack_fn=_load_stack,
+        resolve_runtime_selection_fn=_resolve_runtime_selection,
+        load_environment_fn=_load_environment,
+        resolve_local_git_commit_fn=_resolve_local_git_commit,
+        build_artifact_identity_manifest_fn=platform_release_contract.build_artifact_identity_manifest,
+        invoke_control_plane_artifact_handoff_fn=_handoff_artifact_identity_to_control_plane,
     )
 
 

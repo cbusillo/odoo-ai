@@ -20,6 +20,7 @@ from tools.platform.models import (
 class ArtifactIdentityManifestTests(unittest.TestCase):
     def test_artifact_identity_manifest_accepts_explicit_release_inputs(self) -> None:
         manifest = ArtifactIdentityManifest(
+            artifact_id="artifact-sha256-def456",
             odoo_ai_commit="f45db648",
             enterprise_base_digest="sha256:abc123",
             addon_sources=(
@@ -42,6 +43,7 @@ class ArtifactIdentityManifestTests(unittest.TestCase):
         )
 
         self.assertEqual(manifest.schema_version, 1)
+        self.assertEqual(manifest.artifact_id, "artifact-sha256-def456")
         self.assertEqual(manifest.odoo_ai_commit, "f45db648")
         self.assertEqual(manifest.addon_sources[0].repository, "cbusillo/private-addon-a")
         self.assertEqual(manifest.build_flags.addon_skip_flags, ("skip_shopify_sync",))
@@ -50,6 +52,7 @@ class ArtifactIdentityManifestTests(unittest.TestCase):
     def test_artifact_identity_manifest_rejects_unknown_fields(self) -> None:
         with self.assertRaises(ValidationError):
             ArtifactIdentityManifest(
+                artifact_id="artifact-sha256-def456",
                 odoo_ai_commit="f45db648",
                 enterprise_base_digest="sha256:abc123",
                 image=ArtifactImageReference(

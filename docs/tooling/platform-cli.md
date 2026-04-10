@@ -97,6 +97,10 @@ Behavior Highlights
   current compatibility promote workflow: it renders the typed promotion
   record from current target definitions, healthcheck settings, and explicit
   release evidence overrides such as backup evidence or deployment status.
+- `platform export-ship-request` is the read-only compatibility contract for a
+  future direct `ship` handoff: it renders the typed deploy request that the
+  control plane will eventually own directly, without moving live `ship`
+  ownership yet.
 - `platform restore` and `platform bootstrap` use the same generated runtime env
   contract as `platform select`.
 - `platform select` writes both `.platform/env/<context>.<instance>.env` and

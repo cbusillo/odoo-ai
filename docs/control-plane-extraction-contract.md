@@ -69,6 +69,8 @@ Current phase-3 progress:
   performs Odoo-specific prechecks, then delegates promotion execution and
   promotion-record ownership to `odoo-control-plane`, which in turn delegates
   the underlying `ship` worker back to `odoo-ai` during the transition.
+- `platform export-ship-request` now defines the first explicit ship handoff
+  contract even though live `ship` ownership remains in `odoo-ai` for now.
 
 Phase-One Goal
 

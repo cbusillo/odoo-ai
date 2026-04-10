@@ -222,6 +222,37 @@ class CompatibilityPromotionRequest(BaseModel):
         return self
 
 
+class CompatibilityShipRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: int = Field(default=1, ge=1)
+    context: str
+    instance: str
+    source_git_ref: str
+    target_name: str
+    target_type: str
+    deploy_mode: str
+    artifact_id: str = ""
+    wait: bool = True
+    timeout_seconds: int | None = Field(default=None, ge=1)
+    verify_health: bool = True
+    health_timeout_seconds: int | None = Field(default=None, ge=1)
+    dry_run: bool = False
+    no_cache: bool = False
+    allow_dirty: bool = False
+    destination_health: HealthcheckEvidence = Field(default_factory=HealthcheckEvidence)
+
+    @model_validator(mode="after")
+    def _validate_ship_request(self) -> "CompatibilityShipRequest":
+        if not self.context.strip():
+            raise ValueError("ship request requires context")
+        if not self.instance.strip():
+            raise ValueError("ship request requires instance")
+        if not self.source_git_ref.strip():
+            raise ValueError("ship request requires source_git_ref")
+        return self
+
+
 def _normalize_dokploy_source_payload(raw_value: object) -> object:
     if not isinstance(raw_value, Mapping):
         return raw_value

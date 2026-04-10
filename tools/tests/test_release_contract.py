@@ -14,6 +14,7 @@ from tools.platform.models import (
 from tools.platform.release_contract import (
     build_compatibility_artifact_id,
     build_compatibility_promotion_request,
+    build_compatibility_ship_request,
     build_artifact_identity_manifest,
     build_compatibility_promotion_record,
     build_promotion_record,
@@ -182,6 +183,30 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertEqual(request.source_git_ref, "abc123")
         self.assertEqual(request.source_health.status, "pass")
         self.assertEqual(request.destination_health.status, "pending")
+
+    def test_build_compatibility_ship_request_tracks_planned_health(self) -> None:
+        request = build_compatibility_ship_request(
+            context_name="opw",
+            instance_name="prod",
+            source_git_ref="abc123",
+            target_name="opw-prod",
+            target_type="compose",
+            deploy_mode="dokploy-compose-api",
+            wait=True,
+            timeout_seconds=600,
+            verify_health=True,
+            health_timeout_seconds=45,
+            dry_run=False,
+            no_cache=False,
+            allow_dirty=False,
+            destination_health_urls=("https://prod.example.com/web/health",),
+            destination_health_timeout_seconds=45,
+            destination_health_status="pending",
+        )
+
+        self.assertEqual(request.source_git_ref, "abc123")
+        self.assertEqual(request.destination_health.status, "pending")
+        self.assertEqual(request.deploy_mode, "dokploy-compose-api")
 
 
 if __name__ == "__main__":

@@ -35,3 +35,25 @@ updates:
         applies-to: security-updates
         patterns:
           - "*"
+
+  - package-ecosystem: uv
+    directories:
+      - "/"
+      - "/addons/*"
+      - "/addons/*/*"
+    exclude-paths:
+      - "tmp/**"
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - python:uv
+    groups:
+      python-uv:
+        patterns:
+          - "*"
+        group-by: dependency-name
+      all-security-updates:
+        applies-to: security-updates
+        patterns:
+          - "*"

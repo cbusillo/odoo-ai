@@ -93,7 +93,7 @@ Implementation Direction
 2. Move long-term deploy and promotion logic out of `odoo-ai`.
 3. Replace branch-sync deployment with private immutable artifact promotion.
 4. Reduce `uv run platform ...` responsibilities inside `odoo-ai` to local DX,
-   diagnostics, data workflows, and transitional compatibility helpers.
+   diagnostics, data workflows, and explicit control-plane handoff surfaces.
 5. Make the UI the normal operator surface, with CLI as fallback.
 
 Non-Goals

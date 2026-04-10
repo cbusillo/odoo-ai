@@ -86,6 +86,9 @@ Behavior Highlights
   managed targets, it now runs the shared `platform update` workflow before
   final health verification so installed addon code/data changes are applied
   through one canonical upgrade path.
+- That `platform update` call is now the one explicit Odoo-owned runtime seam
+  left in the phase-5 extraction: `odoo-control-plane` owns deploy
+  orchestration, while `odoo-ai` still owns the actual Odoo update workflow.
 - `platform ship --no-wait` exits after triggering the deploy, so the post-
   deploy update and health verification steps do not run in that mode.
 - Remote web startup uses `run_odoo_startup.py` to initialize missing modules

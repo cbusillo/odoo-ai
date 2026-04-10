@@ -108,9 +108,10 @@ Updated phase-5 progress:
   `odoo-control-plane`, including Dokploy credential loading.
 - Dokploy credentials are now expected to live with `odoo-control-plane`
   instead of piggybacking on `odoo-ai` local env files.
-- The only remaining delegated runtime step is the Odoo-specific post-deploy
-  update, which now goes through the canonical `platform update` path rather
-  than a hidden compatibility worker.
+- Phase 5 closes with one explicit cross-repo runtime seam: the Odoo-specific
+  post-deploy update. That step remains in `odoo-ai` on purpose and goes
+  through the canonical `platform update` path rather than a hidden
+  compatibility worker.
 
 Phase-One Goal
 

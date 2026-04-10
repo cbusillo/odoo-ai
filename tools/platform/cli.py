@@ -2921,6 +2921,7 @@ def ship(
 @click.option("--branch-sync-target-branch", default="")
 @click.option("--branch-sync-remote-branch-commit-before", default="")
 @click.option("--branch-sync-update-required/--no-branch-sync-update-required", default=False)
+@click.option("--branch-sync-applied/--no-branch-sync-applied", default=False)
 def compatibility_ship_worker(
     context_name: str,
     instance_name: str,
@@ -2939,6 +2940,7 @@ def compatibility_ship_worker(
     branch_sync_target_branch: str,
     branch_sync_remote_branch_commit_before: str,
     branch_sync_update_required: bool,
+    branch_sync_applied: bool,
 ) -> None:
     precomputed_ship_branch_sync_plan = None
     if branch_sync_target_branch.strip():
@@ -2993,6 +2995,7 @@ def compatibility_ship_worker(
         ),
         check_dirty_working_tree_fn=_collect_dirty_tracked_files,
         precomputed_ship_branch_sync_plan=precomputed_ship_branch_sync_plan,
+        precomputed_ship_branch_sync_applied=branch_sync_applied,
     )
 
 

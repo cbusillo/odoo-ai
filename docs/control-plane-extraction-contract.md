@@ -95,6 +95,10 @@ Updated phase-5 progress:
   handoff and includes that metadata in the request so the control plane owns
   the deploy intent record even while the transitional worker still performs
   the actual git push.
+- Compatibility `ship` branch-sync application now runs from
+  `odoo-control-plane` before delegation, and the internal worker only needs to
+  accept the pre-applied branch-sync evidence instead of owning that git push
+  itself.
 
 Phase-One Goal
 

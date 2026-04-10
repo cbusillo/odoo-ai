@@ -186,6 +186,7 @@ def execute_ship(
     allow_dirty: bool = False,
     check_dirty_working_tree_fn: Callable[[], tuple[str, ...]] | None = None,
     precomputed_ship_branch_sync_plan: ShipBranchSyncPlan | None = None,
+    precomputed_ship_branch_sync_applied: bool = False,
 ) -> None:
     _assert_release_context_supported(context_name=context_name, operation_name="Ship")
 
@@ -301,6 +302,8 @@ def execute_ship(
     if ship_branch_sync_plan is not None:
         if dry_run:
             echo_fn("branch_sync_applied=false")
+        elif precomputed_ship_branch_sync_applied:
+            echo_fn("branch_sync_applied=true")
         else:
             apply_ship_branch_sync_fn(ship_branch_sync_plan)
             echo_fn(f"branch_sync_applied={str(ship_branch_sync_plan.branch_update_required).lower()}")

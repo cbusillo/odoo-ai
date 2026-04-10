@@ -74,6 +74,10 @@ Behavior Highlights
   plus `--source-ref HEAD` for surgical remote testing.
 - `platform promote` follows the same clean-tree policy as `platform ship` and
   accepts `--allow-dirty` only as an explicit override.
+- `platform promote` now treats `odoo-control-plane` as the first compatibility
+  owner for live promotion orchestration. The wrapper fails closed if the
+  sibling control-plane repo is missing or misconfigured instead of silently
+  falling back to legacy in-repo ownership.
 - `platform ship` is the only supported remote deployment trigger for managed
   Dokploy targets. Keep Dokploy auto deploy disabled for those targets.
 - When `platform ship` waits for deployment completion on compose-backed

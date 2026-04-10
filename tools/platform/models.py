@@ -192,6 +192,36 @@ class PromotionRecord(BaseModel):
         return self
 
 
+class CompatibilityPromotionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: int = Field(default=1, ge=1)
+    artifact_id: str
+    source_git_ref: str
+    context: str
+    from_instance: str
+    to_instance: str
+    target_name: str
+    target_type: Literal["compose", "application"]
+    deploy_mode: str
+    wait: bool = True
+    timeout_seconds: int | None = Field(default=None, ge=1)
+    verify_health: bool = True
+    health_timeout_seconds: int | None = Field(default=None, ge=1)
+    dry_run: bool = False
+    no_cache: bool = False
+    allow_dirty: bool = False
+    source_health: HealthcheckEvidence = Field(default_factory=HealthcheckEvidence)
+    backup_gate: BackupGateEvidence = Field(default_factory=BackupGateEvidence)
+    destination_health: HealthcheckEvidence = Field(default_factory=HealthcheckEvidence)
+
+    @model_validator(mode="after")
+    def _validate_instances(self) -> "CompatibilityPromotionRequest":
+        if self.from_instance == self.to_instance:
+            raise ValueError("promotion source and destination instances must differ")
+        return self
+
+
 def _normalize_dokploy_source_payload(raw_value: object) -> object:
     if not isinstance(raw_value, Mapping):
         return raw_value

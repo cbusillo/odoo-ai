@@ -2,6 +2,7 @@ from . import runtime
 from .models import (
     ArtifactAddonSource,
     ArtifactBuildFlags,
+    CompatibilityPromotionRequest,
     ArtifactIdentityManifest,
     ArtifactIdentityReference,
     ArtifactImageReference,
@@ -100,6 +101,10 @@ def build_promotion_record(
     )
 
 
+def build_compatibility_artifact_id(*, context_name: str, source_commit: str) -> str:
+    return f"compatibility-{context_name}-{source_commit}"
+
+
 def _build_healthcheck_evidence(
     *,
     urls: tuple[str, ...],
@@ -189,6 +194,67 @@ def build_compatibility_promotion_record(
         post_deploy_update=_build_post_deploy_update_evidence(
             status=post_deploy_update_status,
             detail=post_deploy_update_detail,
+        ),
+        destination_health=_build_healthcheck_evidence(
+            urls=destination_health_urls,
+            timeout_seconds=destination_health_timeout_seconds,
+            status=destination_health_status,
+        ),
+    )
+
+
+def build_compatibility_promotion_request(
+    *,
+    artifact_id: str,
+    source_git_ref: str,
+    context_name: str,
+    from_instance_name: str,
+    to_instance_name: str,
+    target_name: str,
+    target_type: str,
+    deploy_mode: str,
+    wait: bool,
+    timeout_seconds: int | None,
+    verify_health: bool,
+    health_timeout_seconds: int | None,
+    dry_run: bool,
+    no_cache: bool,
+    allow_dirty: bool,
+    source_health_urls: tuple[str, ...],
+    source_health_timeout_seconds: int | None,
+    source_health_status: ReleaseStatus,
+    backup_gate_required: bool,
+    backup_gate_status: ReleaseStatus,
+    backup_gate_evidence: dict[str, str] | None = None,
+    destination_health_urls: tuple[str, ...],
+    destination_health_timeout_seconds: int | None,
+    destination_health_status: ReleaseStatus,
+) -> CompatibilityPromotionRequest:
+    return CompatibilityPromotionRequest(
+        artifact_id=artifact_id,
+        source_git_ref=source_git_ref,
+        context=context_name,
+        from_instance=from_instance_name,
+        to_instance=to_instance_name,
+        target_name=target_name,
+        target_type=target_type,
+        deploy_mode=deploy_mode,
+        wait=wait,
+        timeout_seconds=timeout_seconds,
+        verify_health=verify_health,
+        health_timeout_seconds=health_timeout_seconds,
+        dry_run=dry_run,
+        no_cache=no_cache,
+        allow_dirty=allow_dirty,
+        source_health=_build_healthcheck_evidence(
+            urls=source_health_urls,
+            timeout_seconds=source_health_timeout_seconds,
+            status=source_health_status,
+        ),
+        backup_gate=BackupGateEvidence(
+            required=backup_gate_required,
+            status=backup_gate_status,
+            evidence=backup_gate_evidence or {},
         ),
         destination_health=_build_healthcheck_evidence(
             urls=destination_health_urls,

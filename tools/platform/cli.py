@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
@@ -447,6 +448,51 @@ def _run_command_capture(command: list[str]) -> str:
             message = f"{message}\n{stderr_text}"
         raise click.ClickException(message)
     return result.stdout
+
+
+def _resolve_control_plane_repo_root(repo_root: Path) -> Path:
+    configured_root = os.environ.get("ODOO_CONTROL_PLANE_ROOT", "").strip()
+    control_plane_root = Path(configured_root) if configured_root else repo_root.parent / "odoo-control-plane"
+    if not control_plane_root.exists():
+        raise click.ClickException(
+            f"Control-plane repo not found: {control_plane_root}. "
+            "Create the sibling repo or set ODOO_CONTROL_PLANE_ROOT explicitly."
+        )
+    if not (control_plane_root / "pyproject.toml").exists():
+        raise click.ClickException(f"Control-plane repo is missing pyproject.toml: {control_plane_root}")
+    return control_plane_root
+
+
+def _invoke_control_plane_promote(*, repo_root: Path, env_file: Path | None, request: object) -> None:
+    control_plane_root = _resolve_control_plane_repo_root(repo_root)
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as request_file:
+        request_path = Path(request_file.name)
+        json.dump(request.model_dump(mode="json"), request_file, indent=2, sort_keys=True)
+
+    try:
+        command = [
+            "uv",
+            "run",
+            "--project",
+            str(control_plane_root),
+            "control-plane",
+            "promote",
+            "compatibility-execute",
+            "--input-file",
+            str(request_path),
+            "--odoo-ai-root",
+            str(repo_root),
+        ]
+        if env_file is not None:
+            command.extend(["--env-file", str(env_file)])
+        command_env = _command_execution_env()
+        command_env.pop("VIRTUAL_ENV", None)
+        result = subprocess.run(command, env=command_env)
+        if result.returncode != 0:
+            joined_command = " ".join(command)
+            raise click.ClickException(f"Command failed ({result.returncode}): {joined_command}")
+    finally:
+        request_path.unlink(missing_ok=True)
 
 
 def _command_execution_env() -> dict[str, str]:
@@ -2527,7 +2573,10 @@ def promote(
         resolve_ship_healthcheck_urls_fn=_resolve_ship_healthcheck_urls,
         collect_environment_gate_results_fn=_collect_environment_gate_results,
         run_production_backup_gate_fn=_run_production_backup_gate,
-        invoke_platform_command_fn=_invoke_platform_command,
+        resolve_dokploy_ship_mode_fn=_resolve_dokploy_ship_mode,
+        build_compatibility_artifact_id_fn=platform_release_contract.build_compatibility_artifact_id,
+        build_compatibility_promotion_request_fn=platform_release_contract.build_compatibility_promotion_request,
+        invoke_control_plane_promote_fn=_invoke_control_plane_promote,
         echo_fn=click.echo,
     )
 

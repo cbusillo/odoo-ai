@@ -244,7 +244,10 @@ def execute_promote(
     resolve_ship_healthcheck_urls_fn: Callable[..., tuple[str, ...]],
     collect_environment_gate_results_fn: Callable[..., list[JsonObject]],
     run_production_backup_gate_fn: Callable[..., None],
-    invoke_platform_command_fn: Callable[..., None],
+    resolve_dokploy_ship_mode_fn: Callable[[str, str, dict[str, str]], str],
+    build_compatibility_artifact_id_fn: Callable[..., str],
+    build_compatibility_promotion_request_fn: Callable[..., object],
+    invoke_control_plane_promote_fn: Callable[..., None],
     echo_fn: Callable[[str], None],
 ) -> None:
     if context_name not in {"cm", "opw"}:
@@ -293,6 +296,10 @@ def execute_promote(
     echo_fn(f"promote_source_commit={source_commit}")
     echo_fn(f"promote_destination_branch={destination_target_definition.git_branch}")
 
+    source_healthcheck_urls: tuple[str, ...] = ()
+    source_health_timeout_seconds: int | None = None
+    source_health_status: str = "skipped"
+
     if verify_source_health:
         _env_file_path, source_environment_values = load_environment_fn(
             repo_root,
@@ -309,6 +316,7 @@ def execute_promote(
             target_definition=source_target_definition,
             environment_values=source_environment_values,
         )
+        source_health_status = "pending" if dry_run else "pass"
         echo_fn(f"source_health_verify={str(True).lower()}")
         echo_fn(f"source_health_timeout_seconds={source_health_timeout_seconds}")
         for source_healthcheck_url in source_healthcheck_urls:
@@ -317,23 +325,69 @@ def execute_promote(
             collect_environment_gate_results_fn(urls=source_healthcheck_urls, timeout_seconds=source_health_timeout_seconds)
             echo_fn("source_healthcheck_result=pass")
 
+    destination_environment_values: dict[str, str] = {}
+    try:
+        _destination_env_file_path, destination_environment_values = load_environment_fn(
+            repo_root,
+            env_file,
+            context_name=context_name,
+            instance_name=to_instance_name,
+            collision_mode="error",
+        )
+    except click.ClickException:
+        if verify_health and wait:
+            raise
+    destination_health_timeout_seconds = resolve_ship_health_timeout_seconds_fn(
+        health_timeout_override_seconds=health_timeout_override_seconds,
+        target_definition=destination_target_definition,
+    )
+    destination_healthcheck_urls = ()
+    if destination_environment_values:
+        destination_healthcheck_urls = resolve_ship_healthcheck_urls_fn(
+            target_definition=destination_target_definition,
+            environment_values=destination_environment_values,
+        )
+    configured_ship_mode = "auto"
+    if destination_environment_values:
+        configured_ship_mode = resolve_dokploy_ship_mode_fn(context_name, to_instance_name, destination_environment_values)
+    selected_ship_mode = configured_ship_mode if configured_ship_mode != "auto" else destination_target_definition.target_type
+    deploy_mode = f"dokploy-{selected_ship_mode}-api"
+
     echo_fn("prod_backup_gate=true")
     run_production_backup_gate_fn(context_name=context_name, dry_run=dry_run)
+    backup_gate_status = "pending" if dry_run else "pass"
     if not dry_run:
         echo_fn("prod_backup_gate_result=pass")
 
-    invoke_platform_command_fn(
-        "ship",
-        context_name=context_name,
-        instance_name=to_instance_name,
+    invoke_control_plane_promote_fn(
+        repo_root=repo_root,
         env_file=env_file,
-        wait=wait,
-        timeout_override_seconds=timeout_override_seconds,
-        verify_health=verify_health,
-        health_timeout_override_seconds=health_timeout_override_seconds,
-        dry_run=dry_run,
-        no_cache=no_cache,
-        skip_gate=True,
-        allow_dirty=allow_dirty,
-        source_git_ref=source_commit,
+        request=build_compatibility_promotion_request_fn(
+            artifact_id=build_compatibility_artifact_id_fn(
+                context_name=context_name,
+                source_commit=source_commit,
+            ),
+            source_git_ref=source_commit,
+            context_name=context_name,
+            from_instance_name=from_instance_name,
+            to_instance_name=to_instance_name,
+            target_name=destination_target_definition.target_name.strip() or f"{context_name}-{to_instance_name}",
+            target_type=destination_target_definition.target_type,
+            deploy_mode=deploy_mode,
+            wait=wait,
+            timeout_seconds=timeout_override_seconds,
+            verify_health=verify_health,
+            health_timeout_seconds=destination_health_timeout_seconds,
+            dry_run=dry_run,
+            no_cache=no_cache,
+            allow_dirty=allow_dirty,
+            source_health_urls=source_healthcheck_urls,
+            source_health_timeout_seconds=source_health_timeout_seconds,
+            source_health_status=source_health_status,
+            backup_gate_required=True,
+            backup_gate_status=backup_gate_status,
+            destination_health_urls=destination_healthcheck_urls,
+            destination_health_timeout_seconds=destination_health_timeout_seconds,
+            destination_health_status="pending" if verify_health and wait else "skipped",
+        ),
     )

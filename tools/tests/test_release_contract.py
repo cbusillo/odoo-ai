@@ -12,6 +12,8 @@ from tools.platform.models import (
     RuntimeSelection,
 )
 from tools.platform.release_contract import (
+    build_compatibility_artifact_id,
+    build_compatibility_promotion_request,
     build_artifact_identity_manifest,
     build_compatibility_promotion_record,
     build_promotion_record,
@@ -148,6 +150,38 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertTrue(record.post_deploy_update.attempted)
         self.assertEqual(record.post_deploy_update.status, "pending")
         self.assertEqual(record.destination_health.timeout_seconds, 45)
+
+    def test_build_compatibility_promotion_request_captures_handoff_contract(self) -> None:
+        request = build_compatibility_promotion_request(
+            artifact_id=build_compatibility_artifact_id(context_name="opw", source_commit="abc123"),
+            source_git_ref="abc123",
+            context_name="opw",
+            from_instance_name="testing",
+            to_instance_name="prod",
+            target_name="opw-prod",
+            target_type="compose",
+            deploy_mode="dokploy-compose-api",
+            wait=True,
+            timeout_seconds=600,
+            verify_health=True,
+            health_timeout_seconds=45,
+            dry_run=False,
+            no_cache=False,
+            allow_dirty=False,
+            source_health_urls=("https://testing.example.com/web/health",),
+            source_health_timeout_seconds=30,
+            source_health_status="pass",
+            backup_gate_required=True,
+            backup_gate_status="pass",
+            destination_health_urls=("https://prod.example.com/web/health",),
+            destination_health_timeout_seconds=45,
+            destination_health_status="pending",
+        )
+
+        self.assertEqual(request.artifact_id, "compatibility-opw-abc123")
+        self.assertEqual(request.source_git_ref, "abc123")
+        self.assertEqual(request.source_health.status, "pass")
+        self.assertEqual(request.destination_health.status, "pending")
 
 
 if __name__ == "__main__":

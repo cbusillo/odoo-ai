@@ -62,6 +62,14 @@ Current extraction progress:
   - create the private control-plane repo and start moving build/promotion
     ownership there behind thin compatibility wrappers
 
+Current phase-3 progress:
+
+- The private repo now exists as `odoo-control-plane`.
+- `platform promote` is the first live compatibility handoff: `odoo-ai`
+  performs Odoo-specific prechecks, then delegates promotion execution and
+  promotion-record ownership to `odoo-control-plane`, which in turn delegates
+  the underlying `ship` worker back to `odoo-ai` during the transition.
+
 Phase-One Goal
 
 - Move the long-term release contract out of branch mutation and repo-local

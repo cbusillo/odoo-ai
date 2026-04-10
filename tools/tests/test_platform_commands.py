@@ -1656,11 +1656,11 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             schema_version=1,
             targets=(source_target_definition, destination_target_definition),
         )
-        captured_invocations: list[tuple[str, dict[str, object]]] = []
+        captured_invocations: list[dict[str, object]] = []
         emitted_lines: list[str] = []
 
-        def invoke_platform_command(invoked_command_name: str, **kwargs: object) -> None:
-            captured_invocations.append((invoked_command_name, dict(kwargs)))
+        def invoke_control_plane_promote(**kwargs: object) -> None:
+            captured_invocations.append(dict(kwargs))
 
         release_workflows.execute_promote(
             context_name="opw",
@@ -1696,7 +1696,10 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
                 {"url": "https://opw-testing.example/web/health", "result": "pass"}
             ],
             run_production_backup_gate_fn=lambda **_kwargs: None,
-            invoke_platform_command_fn=invoke_platform_command,
+            resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "auto",
+            build_compatibility_artifact_id_fn=lambda **kwargs: f"compatibility-{kwargs['context_name']}-{kwargs['source_commit']}",
+            build_compatibility_promotion_request_fn=lambda **kwargs: kwargs,
+            invoke_control_plane_promote_fn=invoke_control_plane_promote,
             echo_fn=emitted_lines.append,
         )
 
@@ -1713,13 +1716,14 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             ],
         )
         self.assertEqual(len(captured_invocations), 1)
-        command_name, command_kwargs = captured_invocations[0]
-        self.assertEqual(command_name, "ship")
-        self.assertEqual(command_kwargs["context_name"], "opw")
-        self.assertEqual(command_kwargs["instance_name"], "prod")
-        self.assertEqual(command_kwargs["skip_gate"], True)
-        self.assertEqual(command_kwargs["allow_dirty"], True)
-        self.assertEqual(command_kwargs["source_git_ref"], "abc123")
+        invocation = captured_invocations[0]
+        self.assertEqual(invocation["repo_root"], Path("/tmp"))
+        request = invocation["request"]
+        self.assertEqual(request["artifact_id"], "compatibility-opw-abc123")
+        self.assertEqual(request["source_git_ref"], "abc123")
+        self.assertEqual(request["to_instance_name"], "prod")
+        self.assertEqual(request["allow_dirty"], True)
+        self.assertEqual(request["backup_gate_status"], "pending")
 
     def _assert_execute_ship_wait_uses_predeploy_deployment_key(
         self,

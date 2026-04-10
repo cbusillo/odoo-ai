@@ -1,7 +1,3 @@
-"""Regression tests for testkit docker helpers."""
-
-from __future__ import annotations
-
 import subprocess
 import unittest
 from pathlib import Path

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import time
 from collections.abc import Callable
@@ -44,9 +42,7 @@ def execute_validate_config(
     env_file_path, parsed_environment = load_environment_fn(repo_root, env_file)
 
     missing_required_keys = [
-        required_key
-        for required_key in loaded_stack.stack_definition.required_env_keys
-        if not parsed_environment.get(required_key)
+        required_key for required_key in loaded_stack.stack_definition.required_env_keys if not parsed_environment.get(required_key)
     ]
 
     click.echo(f"stack_file={loaded_stack.stack_file_path}")

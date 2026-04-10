@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import urllib.request
 import xmlrpc.client
@@ -92,7 +90,7 @@ def load_settings(
 
 
 class RemoteOdooClient:
-    def __init__(self, settings: RemoteShopifySettings) -> None:
+    def __init__(self, settings: RemoteShopifySettings):
         common_proxy = xmlrpc.client.ServerProxy(f"{settings.odoo_url}/xmlrpc/2/common", allow_none=True)
         uid = common_proxy.authenticate(settings.database_name, settings.remote_login, settings.odoo_password, {})
         if not uid:
@@ -192,9 +190,11 @@ def get_shopify_product_snapshot(settings: RemoteShopifySettings, shopify_produc
     media_payload = product_payload.get("media") or {}
     media_nodes = media_payload.get("nodes") if isinstance(media_payload, dict) else []
     media_count = len([node for node in media_nodes if isinstance(node, dict)]) if isinstance(media_nodes, list) else 0
-    failed_media_count = len(
-        [node for node in media_nodes if isinstance(node, dict) and str(node.get("status") or "") == "FAILED"]
-    ) if isinstance(media_nodes, list) else 0
+    failed_media_count = (
+        len([node for node in media_nodes if isinstance(node, dict) and str(node.get("status") or "") == "FAILED"])
+        if isinstance(media_nodes, list)
+        else 0
+    )
 
     variant_price = None
     variant_unit_cost = None

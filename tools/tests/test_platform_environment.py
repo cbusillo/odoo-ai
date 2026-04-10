@@ -1,7 +1,3 @@
-"""Regression tests for platform environment layering behavior."""
-
-from __future__ import annotations
-
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -60,7 +56,7 @@ class PlatformEnvironmentTests(unittest.TestCase):
                         "schema_version = 1",
                         "",
                         "[contexts.opw.shared]",
-                        'ENV_OVERRIDE_SHOPIFY__TEST_STORE = true',
+                        "ENV_OVERRIDE_SHOPIFY__TEST_STORE = true",
                     )
                 )
                 + "\n",
@@ -96,7 +92,7 @@ class PlatformEnvironmentTests(unittest.TestCase):
                         "schema_version = 1",
                         "",
                         "[shared]",
-                        'ENV_OVERRIDE_SHOPIFY__TEST_STORE = true',
+                        "ENV_OVERRIDE_SHOPIFY__TEST_STORE = true",
                     )
                 )
                 + "\n",
@@ -130,10 +126,10 @@ class PlatformEnvironmentTests(unittest.TestCase):
                         "schema_version = 1",
                         "",
                         "[shared]",
-                        'ENV_OVERRIDE_SHOPIFY__TEST_STORE = false',
+                        "ENV_OVERRIDE_SHOPIFY__TEST_STORE = false",
                         "",
                         "[contexts.opw.shared]",
-                        'ENV_OVERRIDE_SHOPIFY__TEST_STORE = true',
+                        "ENV_OVERRIDE_SHOPIFY__TEST_STORE = true",
                     )
                 )
                 + "\n",

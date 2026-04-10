@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import io
 import json
 import sys
@@ -64,15 +62,11 @@ def _parse_selector_values(*, raw_value: str | None, option_name: str) -> tuple[
         parsed_values.append(canonical_value)
 
     if not parsed_values:
-        raise click.ClickException(
-            f"Invalid {option_name} selector '{raw_value}'. Provide at least one non-empty value."
-        )
+        raise click.ClickException(f"Invalid {option_name} selector '{raw_value}'. Provide at least one non-empty value.")
 
     wildcard_count = len([value for value in parsed_values if _is_wildcard(value)])
     if wildcard_count > 0 and len(parsed_values) > 1:
-        raise click.ClickException(
-            f"{option_name} selector cannot mix wildcard values (all/*) with named values."
-        )
+        raise click.ClickException(f"{option_name} selector cannot mix wildcard values (all/*) with named values.")
 
     return tuple(parsed_values)
 
@@ -188,9 +182,7 @@ def _run_workflow_for_targets(
 
     failed_runs = [result for result in run_results if result.status == "failed"]
     if failed_runs:
-        failed_targets = ", ".join(
-            sorted(f"{result.context_name}/{result.instance_name}" for result in failed_runs)
-        )
+        failed_targets = ", ".join(sorted(f"{result.context_name}/{result.instance_name}" for result in failed_runs))
         raise click.ClickException(f"{len(failed_runs)} target run(s) failed: {failed_targets}")
 
 
@@ -208,9 +200,7 @@ def _emit_tui_run_summary(run_results: list[WorkflowRunResult], *, echo_fn: Call
         f"{'Status'.ljust(status_column_width)}  Detail"
     )
     separator_row = (
-        f"{'-' * context_column_width}  "
-        f"{'-' * instance_column_width}  "
-        f"{'-' * status_column_width}  {'-' * len('Detail')}"
+        f"{'-' * context_column_width}  {'-' * instance_column_width}  {'-' * status_column_width}  {'-' * len('Detail')}"
     )
 
     echo_fn("tui_summary")
@@ -260,9 +250,7 @@ def _prompt_confirm(*, prompt_text: str, default_choice: bool = False) -> bool:
         return bool(answer)
 
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
-        raise click.ClickException(
-            "Interactive confirmation is required for this TUI workflow in the current context."
-        )
+        raise click.ClickException("Interactive confirmation is required for this TUI workflow in the current context.")
 
     return bool(click.confirm(prompt_text, default=default_choice))
 
@@ -372,9 +360,7 @@ def execute_tui_command(
         target_context_names = tuple(context_names)
     else:
         unknown_context_names = [
-            context_value
-            for context_value in selected_context_values
-            if context_value not in loaded_stack.stack_definition.contexts
+            context_value for context_value in selected_context_values if context_value not in loaded_stack.stack_definition.contexts
         ]
         if unknown_context_names:
             unknown_context_list = ", ".join(sorted(unknown_context_names))
@@ -388,22 +374,22 @@ def execute_tui_command(
         workflow_choices = platform_tui_workflows
         if context_fanout_requested:
             workflow_choices = tuple(
-                workflow_name
-                for workflow_name in platform_tui_workflows
-                if workflow_name in WILDCARD_SAFE_WORKFLOWS
+                workflow_name for workflow_name in platform_tui_workflows if workflow_name in WILDCARD_SAFE_WORKFLOWS
             )
             if not workflow_choices:
                 raise click.ClickException("No wildcard-safe workflows are configured for TUI.")
-        selected_workflow = _prompt_choice(
-            prompt_text="Select workflow",
-            choices=workflow_choices,
-            default_choice="status" if "status" in workflow_choices else workflow_choices[0],
-        ).strip().lower()
+        selected_workflow = (
+            _prompt_choice(
+                prompt_text="Select workflow",
+                choices=workflow_choices,
+                default_choice="status" if "status" in workflow_choices else workflow_choices[0],
+            )
+            .strip()
+            .lower()
+        )
 
     if context_fanout_requested and selected_workflow not in WILDCARD_SAFE_WORKFLOWS:
-        raise click.ClickException(
-            "Fan-out context runs are limited to status/info workflows for safety."
-        )
+        raise click.ClickException("Fan-out context runs are limited to status/info workflows for safety.")
 
     selected_instance_values = _parse_selector_values(raw_value=instance_name, option_name="--instance")
     if selected_instance_values is None:
@@ -412,9 +398,7 @@ def execute_tui_command(
                 {
                     instance_name_item
                     for context_name_item in target_context_names
-                    for instance_name_item in ordered_instance_names_fn(
-                        loaded_stack.stack_definition.contexts[context_name_item]
-                    )
+                    for instance_name_item in ordered_instance_names_fn(loaded_stack.stack_definition.contexts[context_name_item])
                 }
             )
             if not all_instance_names:
@@ -466,9 +450,7 @@ def execute_tui_command(
             continue
 
         missing_instances = tuple(
-            instance_value
-            for instance_value in selected_instance_values
-            if instance_value not in context_definition.instances
+            instance_value for instance_value in selected_instance_values if instance_value not in context_definition.instances
         )
         if missing_instances:
             missing_instances_by_context[context_name_item] = missing_instances
@@ -487,9 +469,7 @@ def execute_tui_command(
                 f"Instance '{selected_instance_name}' is not available in contexts: {missing_context_list}. "
                 "Use --instance all to fan out across each context's configured instances."
             )
-        raise click.ClickException(
-            f"Unknown instance '{selected_instance_name}' for context '{target_context_names[0]}'."
-        )
+        raise click.ClickException(f"Unknown instance '{selected_instance_name}' for context '{target_context_names[0]}'.")
 
     if missing_instances_by_context:
         detail_lines = []
@@ -497,25 +477,20 @@ def execute_tui_command(
             missing_instance_list = ", ".join(missing_instances_by_context[context_name_item])
             detail_lines.append(f"{context_name_item}: {missing_instance_list}")
         details = "; ".join(detail_lines)
-        raise click.ClickException(
-            f"Instance selector values are not available for selected contexts ({details})."
-        )
+        raise click.ClickException(f"Instance selector values are not available for selected contexts ({details}).")
 
     if not target_pairs:
         raise click.ClickException("No target context/instance pairs resolved for TUI run.")
 
     if len(target_pairs) > 1 and selected_workflow not in WILDCARD_SAFE_WORKFLOWS:
-        raise click.ClickException(
-            "Fan-out runs are limited to status/info workflows for safety."
-        )
+        raise click.ClickException("Fan-out runs are limited to status/info workflows for safety.")
 
     if selected_workflow == SHIP_WORKFLOW_NAME:
         if run_ship_fn is None:
             raise click.ClickException("Ship workflow is not configured for TUI execution.")
         if json_output:
             raise click.ClickException(
-                "JSON output is not supported for TUI ship workflow. "
-                "Use `platform ship` directly for scripted release automation."
+                "JSON output is not supported for TUI ship workflow. Use `platform ship` directly for scripted release automation."
             )
         if len(target_pairs) != 1:
             raise click.ClickException("TUI ship requires a single explicit context/instance target.")
@@ -523,17 +498,13 @@ def execute_tui_command(
         ship_context_name, ship_instance_name = target_pairs[0]
         if ship_instance_name not in SHIP_INSTANCE_NAMES:
             allowed_instances = ", ".join(sorted(SHIP_INSTANCE_NAMES))
-            raise click.ClickException(
-                f"TUI ship supports only deploy instances: {allowed_instances}."
-            )
+            raise click.ClickException(f"TUI ship supports only deploy instances: {allowed_instances}.")
 
         allow_dirty_ship_run = False
         dirty_tracked_files = ()
         if check_dirty_working_tree_fn is not None:
             dirty_tracked_files = tuple(
-                cleaned_line.strip()
-                for cleaned_line in check_dirty_working_tree_fn()
-                if cleaned_line.strip()
+                cleaned_line.strip() for cleaned_line in check_dirty_working_tree_fn() if cleaned_line.strip()
             )
 
         if dirty_tracked_files:
@@ -549,10 +520,7 @@ def execute_tui_command(
                     "Use `platform ship --allow-dirty` for non-interactive overrides."
                 )
 
-            confirmation_text = (
-                "Continue ship with dirty tracked changes? "
-                "Uncommitted changes will be ignored by deploy."
-            )
+            confirmation_text = "Continue ship with dirty tracked changes? Uncommitted changes will be ignored by deploy."
             allow_dirty_ship_run = _prompt_confirm(prompt_text=confirmation_text)
             if not allow_dirty_ship_run:
                 raise click.Abort()

@@ -72,6 +72,8 @@ Behavior Highlights
   Dokploy target diagnostics.
 - `platform ship` fails closed on dirty tracked files. Prefer a clean worktree
   plus `--source-ref HEAD` for surgical remote testing.
+- `platform promote` follows the same clean-tree policy as `platform ship` and
+  accepts `--allow-dirty` only as an explicit override.
 - `platform ship` is the only supported remote deployment trigger for managed
   Dokploy targets. Keep Dokploy auto deploy disabled for those targets.
 - When `platform ship` waits for deployment completion on compose-backed
@@ -112,7 +114,7 @@ Command Patterns
   for concrete examples, TUI usage, restore patterns, Dokploy helpers, and
   release workflow recipes.
 - `platform dokploy inventory --output-file tmp/dokploy-inventory.json
-  --snapshot-dir tmp/dokploy-snapshots` captures a reusable live baseline of
+--snapshot-dir tmp/dokploy-snapshots` captures a reusable live baseline of
   Dokploy projects, servers, and compose targets before destructive changes.
 
 Related Docs
@@ -122,3 +124,5 @@ Related Docs
 - [@docs/tooling/gpt-service-user.md](gpt-service-user.md) — `ODOO_KEY`
   restore provisioning behavior.
 - [@docs/tooling/inspection.md](inspection.md) — JetBrains inspection setup.
+- [@docs/control-plane-roadmap.md](../control-plane-roadmap.md) — long-term
+  plan for moving deploy/control-plane concerns out of `odoo-ai`.

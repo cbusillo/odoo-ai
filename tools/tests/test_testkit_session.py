@@ -1,7 +1,3 @@
-"""Regression tests for testkit session fanout controls."""
-
-from __future__ import annotations
-
 import os
 import unittest
 from unittest.mock import patch
@@ -165,10 +161,13 @@ class TestkitSessionFanoutTests(unittest.TestCase):
             slice_count=2,
         )
 
-        with patch.object(session, "_cap_by_db_guardrail", return_value=2), patch.object(
-            session,
-            "_template_db_for_phase",
-            return_value="unit-template",
+        with (
+            patch.object(session, "_cap_by_db_guardrail", return_value=2),
+            patch.object(
+                session,
+                "_template_db_for_phase",
+                return_value="unit-template",
+            ),
         ):
             requests = session._build_method_slice_requests(phase_plan)
 

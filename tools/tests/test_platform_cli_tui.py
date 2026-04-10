@@ -1,7 +1,3 @@
-"""Integration-style tests for platform CLI TUI wiring."""
-
-from __future__ import annotations
-
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -171,7 +167,10 @@ class PlatformCliTuiTests(unittest.TestCase):
             with (
                 patch("tools.platform.cli._discover_repo_root", return_value=repo_root),
                 patch("tools.platform.cli._load_stack", return_value=loaded_stack),
-                patch("tools.platform.cli._ordered_instance_names", side_effect=lambda context_definition: list(context_definition.instances)),
+                patch(
+                    "tools.platform.cli._ordered_instance_names",
+                    side_effect=lambda context_definition: list(context_definition.instances),
+                ),
                 patch("tools.platform.cli._run_workflow", side_effect=run_workflow),
                 patch("tools.platform.commands_workflow.questionary", None),
             ):

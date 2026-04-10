@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 from collections.abc import Callable
 from pathlib import Path
@@ -118,9 +116,7 @@ def local_runtime_status(
 
     services = [_normalize_compose_service_status(item) for item in parse_compose_ps_output(raw_output)]
     running_services = [
-        service_payload
-        for service_payload in services
-        if str(service_payload.get("state") or "").lower() == "running"
+        service_payload for service_payload in services if str(service_payload.get("state") or "").lower() == "running"
     ]
     status_payload["state"] = "running" if running_services else "stopped"
     status_payload["project_running"] = bool(running_services)

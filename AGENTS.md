@@ -121,6 +121,11 @@ the linked docs, then keep prompts lean.
   before inventing new approaches.
 - Run JetBrains inspections on changed scope and then git scope before the gate
   (`docs/tooling/inspection.md`).
+- PyCharm 2026 note: the 261 build line has a known false-positive regression
+  around `X | None` reassignment narrowing. When using 2026, check whether a
+  newer build includes the upstream fix before trusting those warnings. If you
+  are still on an affected 261 build, disable the Registry flag
+  `python.typing.strict.unions` until JetBrains ships the fix in a public build.
 - Use Codex built-ins for routine file reads/searches and `apply_patch`; reserve
   JetBrains automation for IDE-only tasks.
 - Sandbox/approval profiles are documented in `docs/tooling/codex-cli.md`.

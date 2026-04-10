@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import argparse
 import importlib.util
 import os
@@ -77,8 +75,8 @@ class OdooStartupAdminPolicyTests(unittest.TestCase):
         )
         captured_calls: list[dict[str, object]] = []
 
-        def _capture_run(command: list[str], input: bytes, check: bool) -> None:
-            captured_calls.append({"command": command, "input": input.decode(), "check": check})
+        def _capture_run(command: list[str], input_bytes: bytes, check: bool) -> None:
+            captured_calls.append({"command": command, "input": input_bytes.decode(), "check": check})
 
         with patch.object(odoo_startup.subprocess, "run", side_effect=_capture_run):
             odoo_startup._apply_admin_password_if_configured(settings)
@@ -110,8 +108,8 @@ class OdooStartupAdminPolicyTests(unittest.TestCase):
         )
         captured_calls: list[dict[str, object]] = []
 
-        def _capture_run(command: list[str], input: bytes, check: bool) -> None:
-            captured_calls.append({"command": command, "input": input.decode(), "check": check})
+        def _capture_run(command: list[str], input_bytes: bytes, check: bool) -> None:
+            captured_calls.append({"command": command, "input": input_bytes.decode(), "check": check})
 
         with patch.object(odoo_startup.subprocess, "run", side_effect=_capture_run):
             odoo_startup._apply_environment_overrides_if_available(settings)

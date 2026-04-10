@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
@@ -70,23 +68,18 @@ def assert_promote_path_allowed(*, from_instance_name: str, to_instance_name: st
     normalized_to_instance = to_instance_name.strip().lower()
     if (normalized_from_instance, normalized_to_instance) in PROMOTION_INSTANCE_PATHS:
         return
-    raise click.ClickException(
-        "Unsupported promotion path. "
-        "Only --from-instance testing --to-instance prod is currently allowed."
-    )
+    raise click.ClickException("Unsupported promotion path. Only --from-instance testing --to-instance prod is currently allowed.")
 
 
 def validate_target_gate_policy(*, target_definition: TargetGatePolicy) -> None:
     normalized_instance = target_definition.instance.strip().lower()
     if target_definition.require_test_gate and normalized_instance != "testing":
         raise click.ClickException(
-            "Invalid gate policy in platform/dokploy.toml: "
-            "require_test_gate=true is only allowed for testing targets."
+            "Invalid gate policy in platform/dokploy.toml: require_test_gate=true is only allowed for testing targets."
         )
     if target_definition.require_prod_gate and normalized_instance != "prod":
         raise click.ClickException(
-            "Invalid gate policy in platform/dokploy.toml: "
-            "require_prod_gate=true is only allowed for prod targets."
+            "Invalid gate policy in platform/dokploy.toml: require_prod_gate=true is only allowed for prod targets."
         )
 
 

@@ -1,7 +1,3 @@
-"""Regression tests for testkit CLI and validation summaries."""
-
-from __future__ import annotations
-
 import json
 import os
 import tempfile
@@ -15,7 +11,7 @@ from click.testing import CliRunner
 
 from tools.testkit.cli import _host_resources_from_run_plan, _outcome_kinds_from_summary, _top_failure_reasons
 from tools.testkit.cli import test as test_command_group
-from tools.testkit.plan import PhaseExecutionPlan, RunExecutionPlan
+from tools.testkit.plan import PhaseExecutionPlan, PhaseName, RunExecutionPlan
 from tools.testkit.summary_helpers import host_resources_from_run_plan, outcome_kinds_from_results, phase_outcome_kinds_from_results
 from tools.testkit.validate import _outcome_kinds_summary, _run_plan_host_resources
 
@@ -145,7 +141,8 @@ class TestkitCliSummaryTests(unittest.TestCase):
             def build_run_plan() -> RunExecutionPlan:
                 self_overlap = os.environ.get("PHASES_OVERLAP")
                 assert self_overlap == "1"
-                phase_groups = (("unit", "js"), ("integration", "tour"))
+                phase_names: tuple[PhaseName, ...] = ("unit", "js", "integration", "tour")
+                phase_groups: tuple[tuple[PhaseName, ...], ...] = (("unit", "js"), ("integration", "tour"))
                 phases = tuple(
                     PhaseExecutionPlan(
                         phase=phase_name,
@@ -160,7 +157,7 @@ class TestkitCliSummaryTests(unittest.TestCase):
                         uses_production_clone=phase_name in {"integration", "tour"},
                         module_shards=((f"{phase_name}_module",),),
                     )
-                    for phase_name in ("unit", "js", "integration", "tour")
+                    for phase_name in phase_names
                 )
                 return RunExecutionPlan(
                     phases=phases,

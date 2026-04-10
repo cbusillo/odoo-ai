@@ -1,7 +1,3 @@
-"""Regression tests for platform workflow runtime command sequencing."""
-
-from __future__ import annotations
-
 import tempfile
 import unittest
 from collections.abc import Callable

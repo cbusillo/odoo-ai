@@ -82,7 +82,9 @@ services:
     restart: unless-stopped
     ulimits:
       nofile:
+        # noinspection ComposeUnknownValues
         soft: ${POSTGRES_ULIMIT_NOFILE_SOFT:-8192}
+        # noinspection ComposeUnknownValues
         hard: ${POSTGRES_ULIMIT_NOFILE_HARD:-8192}
     command:
       - postgres

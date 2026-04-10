@@ -1,7 +1,3 @@
-"""Regression tests for stack data workflow environment propagation behavior."""
-
-from __future__ import annotations
-
 import os
 import unittest
 from pathlib import Path
@@ -436,8 +432,8 @@ class StackDataWorkflowTests(unittest.TestCase):
         self.assertIn("workflow_ssh_dir=/tmp/platform-data-workflow-ssh", schedule_script)
         self.assertIn('workflow_identity_key=""', schedule_script)
         self.assertIn('workflow_identity_key="$WORKFLOW_SSH_DIR/$(basename "$source_key_path")"', schedule_script)
-        self.assertIn('for candidate_key in id_ed25519 id_ecdsa id_rsa id_dsa; do', schedule_script)
-        self.assertIn("install -m 600 -o \"$WORKFLOW_UID\" -g \"$WORKFLOW_GID\"", schedule_script)
+        self.assertIn("for candidate_key in id_ed25519 id_ecdsa id_rsa id_dsa; do", schedule_script)
+        self.assertIn('install -m 600 -o "$WORKFLOW_UID" -g "$WORKFLOW_GID"', schedule_script)
 
     def test_build_dokploy_data_workflow_script_runs_main_workflow_non_root(self) -> None:
         schedule_script = stack_data_workflow._build_dokploy_data_workflow_script(
@@ -454,8 +450,8 @@ class StackDataWorkflowTests(unittest.TestCase):
         self.assertIn('docker exec "${script_runner_container_id}"', schedule_script)
         self.assertIn('-e DATA_WORKFLOW_SSH_DIR="${workflow_ssh_dir}"', schedule_script)
         self.assertIn('-e DATA_WORKFLOW_SSH_KEY="$workflow_identity_key"', schedule_script)
-        self.assertIn('python3 -u /volumes/scripts/run_odoo_data_workflows.py', schedule_script)
-        self.assertNotIn('${workflow_ssh_dir}/id_rsa', schedule_script)
+        self.assertIn("python3 -u /volumes/scripts/run_odoo_data_workflows.py", schedule_script)
+        self.assertNotIn("${workflow_ssh_dir}/id_rsa", schedule_script)
         self.assertNotIn('docker exec -u root "${script_runner_container_id}"     python3 -u', schedule_script)
 
     def test_build_dokploy_data_workflow_script_limits_root_usage_to_lock_cleanup(self) -> None:
@@ -560,7 +556,9 @@ class StackDataWorkflowTests(unittest.TestCase):
             ),
             patch.object(stack_data_workflow, "find_matching_dokploy_schedule", return_value=None),
             patch.object(stack_data_workflow, "_sync_dokploy_target_environment_and_deploy"),
-            patch.object(stack_data_workflow, "upsert_dokploy_schedule", return_value={"scheduleId": "schedule-123"}) as upsert_schedule,
+            patch.object(
+                stack_data_workflow, "upsert_dokploy_schedule", return_value={"scheduleId": "schedule-123"}
+            ) as upsert_schedule,
             patch.object(
                 stack_data_workflow,
                 "latest_deployment_for_schedule",
@@ -589,7 +587,7 @@ class StackDataWorkflowTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(wait_for_schedule.call_args.kwargs["timeout_seconds"], 7200)
         upsert_payload = upsert_schedule.call_args.kwargs["schedule_payload"]
-        self.assertIn('filestore_root=/volumes/data/filestore', str(upsert_payload["script"]))
+        self.assertIn("filestore_root=/volumes/data/filestore", str(upsert_payload["script"]))
 
     def test_should_clear_stale_data_workflow_lock_only_for_cancelled_latest_deployment(self) -> None:
         self.assertTrue(
@@ -715,8 +713,7 @@ class StackDataWorkflowTests(unittest.TestCase):
         self.assertEqual(len(updated_target_env_calls), 1)
         rendered_env_text = str(updated_target_env_calls[0]["env_text"])
         self.assertIn(
-            "ODOO_ADDON_REPOSITORIES=cbusillo/disable_odoo_online@main,"
-            "OCA/OpenUpgrade@89e649728027a8ab656b3aa4be18f4bd364db417",
+            "ODOO_ADDON_REPOSITORIES=cbusillo/disable_odoo_online@main,OCA/OpenUpgrade@89e649728027a8ab656b3aa4be18f4bd364db417",
             rendered_env_text,
         )
         upsert_payload = upsert_schedule.call_args.kwargs["schedule_payload"]
@@ -746,7 +743,7 @@ class StackDataWorkflowTests(unittest.TestCase):
                     "method": "POST",
                     "payload": {"scheduleId": "schedule-123"},
                     "timeout_seconds": 7200,
-                }
+                },
             ],
         )
 

@@ -1,7 +1,3 @@
-"""Regression tests for tracked importer health validation scenarios."""
-
-from __future__ import annotations
-
 import unittest
 from pathlib import Path
 from typing import cast

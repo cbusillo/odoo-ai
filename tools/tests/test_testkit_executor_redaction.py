@@ -1,7 +1,3 @@
-"""Regression tests for testkit executor secret redaction."""
-
-from __future__ import annotations
-
 import unittest
 
 from tools.testkit.executor import (

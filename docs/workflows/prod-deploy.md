@@ -37,16 +37,16 @@ Example for OPW (commented):
 
 Deploy flow (OPW example)
 
-1) Run tests + backup gate:
-   - `uv run prod-gate backup --target opw --run-tests`
+1. Run tests + backup gate:
+    - `uv run prod-gate backup --target opw --run-tests`
 
-2) Promote testing to prod with platform:
-   - `uv run platform promote --context <target> --from-instance testing \
-     --to-instance prod`
+2. Promote testing to prod with platform:
+    - `uv run platform promote --context <target> --from-instance testing --to-instance prod`
+    - Add `--allow-dirty` only when you intentionally need to run from a dirty tracked worktree; the default remains fail-closed.
 
-3) If rollback needed:
-   - `uv run prod-gate list --target opw`
-   - `uv run prod-gate rollback --target opw --snapshot <snapshot-name>`
+3. If rollback needed:
+    - `uv run prod-gate list --target opw`
+    - `uv run prod-gate rollback --target opw --snapshot <snapshot-name>`
 
 Notes
 

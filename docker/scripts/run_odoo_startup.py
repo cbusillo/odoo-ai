@@ -10,8 +10,6 @@ The command is safe to run on every container start because initialization only
 executes when the target database is missing required installed modules.
 """
 
-from __future__ import annotations
-
 import argparse
 import configparser
 import json
@@ -109,10 +107,7 @@ def _load_settings(argument_namespace: argparse.Namespace) -> StartupSettings:
             "/volumes/data/.data_workflow_in_progress",
         ).strip()
         or "/volumes/data/.data_workflow_in_progress",
-        data_workflow_lock_timeout_seconds=int(
-            os.environ.get("ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS", "7200").strip()
-            or "7200"
-        ),
+        data_workflow_lock_timeout_seconds=int(os.environ.get("ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS", "7200").strip() or "7200"),
         ready_timeout_seconds=180,
         poll_interval_seconds=2.0,
     )
@@ -356,8 +351,7 @@ def _run_initialization_if_needed(settings: StartupSettings) -> None:
         return
 
     print(
-        "[platform-startup] running database initialization for modules: "
-        f"{','.join(['base', *missing_modules])}",
+        f"[platform-startup] running database initialization for modules: {','.join(['base', *missing_modules])}",
         flush=True,
     )
     initialize_command = _build_odoo_command(settings, initialize_modules=missing_modules, stop_after_init=True)

@@ -1,7 +1,3 @@
-"""Regression tests for tracked Shopify round-trip validation scenarios."""
-
-from __future__ import annotations
-
 import unittest
 import xmlrpc.client
 from pathlib import Path
@@ -23,8 +19,13 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
         }
 
         with (
-            mock.patch("tools.validate.shopify_roundtrip._remote.load_environment", return_value=(Path("/tmp/.env"), fake_environment_values)),
-            mock.patch("tools.validate.shopify_roundtrip._remote.load_dokploy_source_of_truth", return_value=mock.sentinel.source_of_truth),
+            mock.patch(
+                "tools.validate.shopify_roundtrip._remote.load_environment",
+                return_value=(Path("/tmp/.env"), fake_environment_values),
+            ),
+            mock.patch(
+                "tools.validate.shopify_roundtrip._remote.load_dokploy_source_of_truth", return_value=mock.sentinel.source_of_truth
+            ),
             mock.patch.object(
                 shopify_roundtrip._remote.platform_dokploy, "find_dokploy_target_definition", return_value=mock.sentinel.target
             ),
@@ -852,7 +853,9 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
     def test_run_roundtrip_standard_uses_two_roundtrip_products(self) -> None:
         fake_settings = mock.sentinel.settings
         fake_client = mock.Mock()
-        primary_snapshot = shopify_roundtrip.ProductSnapshot(product_id=77, title="One", description_html="<p>One</p>", condition_id=5, condition_code="used")
+        primary_snapshot = shopify_roundtrip.ProductSnapshot(
+            product_id=77, title="One", description_html="<p>One</p>", condition_id=5, condition_code="used"
+        )
 
         with (
             mock.patch.object(shopify_roundtrip, "RemoteOdooClient", return_value=fake_client),
@@ -866,9 +869,13 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
             ),
             mock.patch.object(shopify_roundtrip, "_current_utc_timestamp", return_value="2026-03-13 15:50:18"),
             mock.patch.object(shopify_roundtrip, "create_sync", side_effect=[101, 102]),
-            mock.patch.object(shopify_roundtrip, "wait_for_sync", side_effect=[{"id": 101, "total_count": 0}, {"id": 102, "total_count": 3}]),
+            mock.patch.object(
+                shopify_roundtrip, "wait_for_sync", side_effect=[{"id": 101, "total_count": 0}, {"id": 102, "total_count": 3}]
+            ),
             mock.patch.object(shopify_roundtrip, "wait_for_related_syncs_to_quiet"),
-            mock.patch.object(shopify_roundtrip, "stamp_non_sample_products_as_exported_for_validation", return_value="2026-03-13 15:50:19"),
+            mock.patch.object(
+                shopify_roundtrip, "stamp_non_sample_products_as_exported_for_validation", return_value="2026-03-13 15:50:19"
+            ),
             mock.patch.object(
                 shopify_roundtrip,
                 "verify_prepare_export_sample",
@@ -905,8 +912,12 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
     def test_run_roundtrip_standard_runs_two_roundtrip_products(self) -> None:
         fake_settings = mock.sentinel.settings
         fake_client = mock.sentinel.client
-        product_one = shopify_roundtrip.ProductSnapshot(product_id=77, title="One", description_html="<p>One</p>", condition_id=5, condition_code="used")
-        product_two = shopify_roundtrip.ProductSnapshot(product_id=88, title="Two", description_html="<p>Two</p>", condition_id=6, condition_code="refurbished")
+        product_one = shopify_roundtrip.ProductSnapshot(
+            product_id=77, title="One", description_html="<p>One</p>", condition_id=5, condition_code="used"
+        )
+        product_two = shopify_roundtrip.ProductSnapshot(
+            product_id=88, title="Two", description_html="<p>Two</p>", condition_id=6, condition_code="refurbished"
+        )
 
         with (
             mock.patch.object(shopify_roundtrip, "RemoteOdooClient", return_value=fake_client),
@@ -920,9 +931,13 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
             ),
             mock.patch.object(shopify_roundtrip, "_current_utc_timestamp", return_value="2026-03-13 15:50:18"),
             mock.patch.object(shopify_roundtrip, "create_sync", side_effect=[101, 102]) as create_sync_mock,
-            mock.patch.object(shopify_roundtrip, "wait_for_sync", side_effect=[{"id": 101, "total_count": 0}, {"id": 102, "total_count": 3}]),
+            mock.patch.object(
+                shopify_roundtrip, "wait_for_sync", side_effect=[{"id": 101, "total_count": 0}, {"id": 102, "total_count": 3}]
+            ),
             mock.patch.object(shopify_roundtrip, "wait_for_related_syncs_to_quiet"),
-            mock.patch.object(shopify_roundtrip, "stamp_non_sample_products_as_exported_for_validation", return_value="2026-03-13 15:50:19") as stamp_mock,
+            mock.patch.object(
+                shopify_roundtrip, "stamp_non_sample_products_as_exported_for_validation", return_value="2026-03-13 15:50:19"
+            ) as stamp_mock,
             mock.patch.object(
                 shopify_roundtrip,
                 "verify_prepare_export_sample",
@@ -953,7 +968,10 @@ class ShopifyRoundtripValidationTests(unittest.TestCase):
         self.assertEqual(run_roundtrip_for_product_mock.call_count, 2)
         ensure_mock.assert_called_once_with(fake_client, clear_conflicts=True)
         stamp_mock.assert_called_once_with(fake_client, keep_product_ids=(77, 88, 99))
-        self.assertEqual(create_sync_mock.call_args_list[1].args, (fake_client, "export_batch_products", {"odoo_products_to_sync": [[6, 0, [77, 88, 99]]]}))
+        self.assertEqual(
+            create_sync_mock.call_args_list[1].args,
+            (fake_client, "export_batch_products", {"odoo_products_to_sync": [[6, 0, [77, 88, 99]]]}),
+        )
 
 
 if __name__ == "__main__":

@@ -1,7 +1,3 @@
-"""Targeted tests for the platform odoo-shell command helper."""
-
-from __future__ import annotations
-
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -89,7 +85,9 @@ class PlatformOdooShellTests(unittest.TestCase):
             write_runtime_odoo_conf_file_fn=lambda *_args, **_kwargs: self._runtime_state_path(repo_root),
             write_runtime_env_file_fn=lambda *_args, **_kwargs: self._runtime_env_file(repo_root),
             compose_base_command_fn=lambda _runtime_env_file: ["docker", "compose"],
-            run_command_with_input_fn=(run_command_with_input_fn if run_command_with_input_fn is not None else lambda _command, _input_text: None),
+            run_command_with_input_fn=(
+                run_command_with_input_fn if run_command_with_input_fn is not None else lambda _command, _input_text: None
+            ),
             run_command_with_input_to_log_fn=(
                 run_command_with_input_to_log_fn
                 if run_command_with_input_to_log_fn is not None
@@ -111,7 +109,9 @@ class PlatformOdooShellTests(unittest.TestCase):
                 repo_root=repo_root,
                 loaded_stack=loaded_stack,
                 script_path=script_path,
-                run_command_with_input_fn=lambda command, input_text: captured_commands.append(command) or captured_inputs.append(input_text),
+                run_command_with_input_fn=lambda command, input_text: (
+                    captured_commands.append(command) or captured_inputs.append(input_text)
+                ),
                 run_command_with_input_to_log_fn=self._unexpected_log_runner,
             )
 

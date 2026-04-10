@@ -24,7 +24,8 @@ Routing
   [@docs/tooling/inspection.md](tooling/inspection.md)
 - Documentation style: [@docs/policies/doc-style.md](policies/doc-style.md)
 - Odoo canon: [@docs/odoo/workflow.md](odoo/workflow.md), [@docs/odoo/orm.md](odoo/orm.md),
-  [@docs/odoo/security.md](odoo/security.md), [@docs/odoo/performance.md](odoo/performance.md)
+  [@docs/odoo/security.md](odoo/security.md), [@docs/odoo/performance.md](odoo/performance.md),
+  [@docs/odoo/external-ids.md](odoo/external-ids.md)
 - Style: [@docs/style/index.md](style/index.md) (then [@docs/style/python.md](style/python.md),
   [@docs/style/javascript.md](style/javascript.md), [@docs/style/testing.md](style/testing.md),
   [@docs/style/browser-automation.md](style/browser-automation.md))
@@ -47,11 +48,14 @@ Routing
   [@docs/tooling/chris-testing-runner.md](tooling/chris-testing-runner.md),
   [@docs/tooling/docker.md](tooling/docker.md),
   [@docs/tooling/cm-seeds.md](tooling/cm-seeds.md)
-- Architecture: [@docs/ARCHITECTURE.md](ARCHITECTURE.md), [@docs/resources.md](resources.md)
+- Architecture: [@docs/ARCHITECTURE.md](ARCHITECTURE.md),
+  [@docs/control-plane-roadmap.md](control-plane-roadmap.md),
+  [@docs/resources.md](resources.md)
 - Roles: [@docs/roles.md](roles.md)
 - Platform migration status: [@docs/todo/platform-migration-status.md](todo/platform-migration-status.md)
 - Odoo 19 OPW cutover: [@docs/todo/odoo-19-cutover-runbook.md](todo/odoo-19-cutover-runbook.md)
 - CM import baseline: [@docs/todo/cm-import-baseline.md](todo/cm-import-baseline.md)
+- Dokploy deploy follow-ups: [@docs/todo/dokploy-deploy-observability-and-branch-safety.md](todo/dokploy-deploy-observability-and-branch-safety.md)
 
 Notes
 

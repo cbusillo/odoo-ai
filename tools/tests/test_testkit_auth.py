@@ -1,7 +1,3 @@
-"""Regression tests for testkit auth bootstrap."""
-
-from __future__ import annotations
-
 import os
 import subprocess
 import unittest
@@ -20,7 +16,9 @@ class TestkitAuthTests(unittest.TestCase):
             patch("tools.testkit.auth.ensure_services_up"),
             patch("tools.testkit.auth.get_database_service", return_value="database"),
             patch("tools.testkit.auth.get_db_user", return_value="odoo"),
-            patch("tools.testkit.auth.compose_exec", side_effect=[hash_result, table_probe_result, update_result]) as compose_exec_mock,
+            patch(
+                "tools.testkit.auth.compose_exec", side_effect=[hash_result, table_probe_result, update_result]
+            ) as compose_exec_mock,
             patch.dict(os.environ, {}, clear=True),
         ):
             generated_password = setup_test_authentication("odoo-test")
@@ -101,6 +99,7 @@ class TestkitAuthTests(unittest.TestCase):
 
         self.assertIn("Unable to determine whether res_users exists in test database", str(error_context.exception))
         self.assertNotIn("ODOO_TEST_PASSWORD", os.environ)
+
 
 if __name__ == "__main__":
     unittest.main()

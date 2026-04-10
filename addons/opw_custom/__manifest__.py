@@ -1,6 +1,6 @@
 {
     "name": "OPW Custom",
-    "version": "19.0.8.2",
+    "version": "19.0.8.3",
     "category": "Industries",
     "author": "Chris Busillo (Shiny Computers)",
     "maintainers": ["cbusillo"],

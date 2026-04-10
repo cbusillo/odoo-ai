@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import os
 import tempfile
 import unittest
@@ -31,8 +29,9 @@ class ProdGateEnvironmentTests(unittest.TestCase):
             repo_root = Path(temporary_directory_name)
             (repo_root / ".git").mkdir()
             (repo_root / ".env").write_text("CM_PROD_BACKUP_STORAGE=pbs-backup\n", encoding="utf-8")
-            with patch.dict(os.environ, {"CM_PROD_BACKUP_STORAGE": ""}, clear=True), patch(
-                "pathlib.Path.cwd", return_value=repo_root
+            with (
+                patch.dict(os.environ, {"CM_PROD_BACKUP_STORAGE": ""}, clear=True),
+                patch("pathlib.Path.cwd", return_value=repo_root),
             ):
                 self.assertEqual(prod_gate._env("CM", "PROD_BACKUP_STORAGE", required=True), "pbs-backup")
 
@@ -41,8 +40,9 @@ class ProdGateEnvironmentTests(unittest.TestCase):
             repo_root = Path(temporary_directory_name)
             (repo_root / ".git").mkdir()
             (repo_root / ".env").write_text("CM_PROD_PROXMOX_HOST=repo-host\n", encoding="utf-8")
-            with patch.dict(os.environ, {"CM_PROD_PROXMOX_HOST": "shell-host"}, clear=True), patch(
-                "pathlib.Path.cwd", return_value=repo_root
+            with (
+                patch.dict(os.environ, {"CM_PROD_PROXMOX_HOST": "shell-host"}, clear=True),
+                patch("pathlib.Path.cwd", return_value=repo_root),
             ):
                 self.assertEqual(prod_gate._env("CM", "PROD_PROXMOX_HOST", required=True), "repo-host")
 
@@ -51,8 +51,9 @@ class ProdGateEnvironmentTests(unittest.TestCase):
             repo_root = Path(temporary_directory_name)
             (repo_root / ".git").mkdir()
             (repo_root / ".env").write_text("OTHER_KEY=1\n", encoding="utf-8")
-            with patch.dict(os.environ, {"CM_PROD_PROXMOX_HOST": "shell-host"}, clear=True), patch(
-                "pathlib.Path.cwd", return_value=repo_root
+            with (
+                patch.dict(os.environ, {"CM_PROD_PROXMOX_HOST": "shell-host"}, clear=True),
+                patch("pathlib.Path.cwd", return_value=repo_root),
             ):
                 self.assertEqual(prod_gate._env("CM", "PROD_PROXMOX_HOST", required=True), "shell-host")
 

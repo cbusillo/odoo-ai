@@ -1,7 +1,3 @@
-"""Regression tests for extracted platform command modules."""
-
-from __future__ import annotations
-
 import json
 import unittest
 from collections.abc import Callable
@@ -1663,8 +1659,8 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
         captured_invocations: list[tuple[str, dict[str, object]]] = []
         emitted_lines: list[str] = []
 
-        def invoke_platform_command(command_name: str, **kwargs: object) -> None:
-            captured_invocations.append((command_name, dict(kwargs)))
+        def invoke_platform_command(invoked_command_name: str, **kwargs: object) -> None:
+            captured_invocations.append((invoked_command_name, dict(kwargs)))
 
         release_workflows.execute_promote(
             context_name="opw",
@@ -1683,10 +1679,10 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             assert_promote_path_allowed_fn=lambda **_kwargs: None,
             discover_repo_root_fn=lambda _path: Path("/tmp"),
             load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
-            find_dokploy_target_definition_fn=lambda source_of_truth, **kwargs: next(
+            find_dokploy_target_definition_fn=lambda dokploy_source_of_truth, **kwargs: next(
                 (
                     target_definition
-                    for target_definition in source_of_truth.targets
+                    for target_definition in dokploy_source_of_truth.targets
                     if target_definition.context == kwargs["context_name"] and target_definition.instance == kwargs["instance_name"]
                 ),
                 None,

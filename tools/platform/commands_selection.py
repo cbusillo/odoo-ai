@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 from collections.abc import Callable
 from pathlib import Path
@@ -99,6 +97,7 @@ def execute_select(
             source_environment=loaded_environment,
         )
         echo_fn(f"pycharm_odoo_conf_file={pycharm_odoo_conf_file}")
+
 
 def execute_inspect(
     *,

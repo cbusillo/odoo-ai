@@ -1,7 +1,3 @@
-"""Regression tests for platform runtime selection guards."""
-
-from __future__ import annotations
-
 import unittest
 from pathlib import Path
 
@@ -65,4 +61,3 @@ class PlatformRuntimeSelectionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

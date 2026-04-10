@@ -1,7 +1,3 @@
-"""Regression tests for Shopify codegen environment loading."""
-
-from __future__ import annotations
-
 import importlib.util
 import os
 import unittest

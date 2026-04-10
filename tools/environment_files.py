@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pathlib import Path
 
 
@@ -28,9 +26,7 @@ def parse_env_lines(raw_lines: list[str]) -> dict[str, str]:
         environment_key = key_part.strip()
         environment_value = value_part.strip()
         is_quoted_value = (
-            len(environment_value) >= 2
-            and environment_value[0] == environment_value[-1]
-            and environment_value[0] in {'"', "'"}
+            len(environment_value) >= 2 and environment_value[0] == environment_value[-1] and environment_value[0] in {'"', "'"}
         )
         if is_quoted_value:
             environment_value = environment_value[1:-1]

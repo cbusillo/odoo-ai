@@ -1,7 +1,3 @@
-"""Regression tests for testkit DB helpers."""
-
-from __future__ import annotations
-
 import shlex
 import subprocess
 import unittest

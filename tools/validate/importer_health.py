@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import xmlrpc.client
 from dataclasses import dataclass

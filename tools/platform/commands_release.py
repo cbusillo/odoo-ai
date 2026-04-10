@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -132,9 +130,7 @@ def _assert_clean_working_tree(
 ) -> None:
     if allow_dirty or check_dirty_working_tree_fn is None:
         return
-    dirty_tracked_files = tuple(
-        cleaned_line.strip() for cleaned_line in check_dirty_working_tree_fn() if cleaned_line.strip()
-    )
+    dirty_tracked_files = tuple(cleaned_line.strip() for cleaned_line in check_dirty_working_tree_fn() if cleaned_line.strip())
     if not dirty_tracked_files:
         return
 
@@ -202,18 +198,14 @@ def execute_ship(
     environment_values = runtime_environment.environment_values
     source_of_truth = load_dokploy_source_of_truth_if_present_fn(runtime_environment.repo_root)
     if source_of_truth is None:
-        raise click.ClickException(
-            "Ship requires platform/dokploy.toml source of truth. Add the target definition before shipping."
-        )
+        raise click.ClickException("Ship requires platform/dokploy.toml source of truth. Add the target definition before shipping.")
     target_definition = find_dokploy_target_definition_fn(
         source_of_truth,
         context_name=context_name,
         instance_name=instance_name,
     )
     if target_definition is None:
-        raise click.ClickException(
-            f"Ship target {context_name}/{instance_name} is missing from platform/dokploy.toml."
-        )
+        raise click.ClickException(f"Ship target {context_name}/{instance_name} is missing from platform/dokploy.toml.")
 
     _assert_clean_working_tree(
         allow_dirty=allow_dirty,
@@ -475,9 +467,7 @@ def execute_rollback(
         raise
 
     if target_definition is None:
-        raise click.ClickException(
-            f"Rollback target {context_name}/{instance_name} is missing from platform/dokploy.toml."
-        )
+        raise click.ClickException(f"Rollback target {context_name}/{instance_name} is missing from platform/dokploy.toml.")
     if target_definition.target_type != "application":
         raise click.ClickException(
             "Rollback requires an application target, but platform/dokploy.toml "
@@ -486,9 +476,7 @@ def execute_rollback(
 
     application_id = target_definition.target_id.strip()
     if not application_id:
-        raise click.ClickException(
-            f"Rollback target {context_name}/{instance_name} must define target_id in platform/dokploy.toml."
-        )
+        raise click.ClickException(f"Rollback target {context_name}/{instance_name} must define target_id in platform/dokploy.toml.")
     app_name = target_definition.target_name.strip() or f"{context_name}-{instance_name}"
 
     deployment_payload = dokploy_request_fn(

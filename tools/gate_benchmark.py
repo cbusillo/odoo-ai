@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import statistics
 import subprocess
@@ -116,9 +114,7 @@ def _benchmark_local_gate(
             )
         )
         if command_result.returncode != 0:
-            return samples, (
-                f"Local gate benchmark sample {sample_index} failed with exit code {command_result.returncode}."
-            )
+            return samples, f"Local gate benchmark sample {sample_index} failed with exit code {command_result.returncode}."
     return samples, None
 
 
@@ -306,11 +302,7 @@ def main(
     if local_p50 > 0 and github_p50 > 0:
         ratio = github_p50 / local_p50
         payload["comparison"]["github_to_local_p50_ratio"] = ratio
-        payload["comparison"]["note"] = (
-            "GitHub workflow p50 is within 1.5x local benchmark."
-            if ratio <= 1.5
-            else "GitHub workflow p50 is above 1.5x local benchmark; evaluate self-hosted runners."
-        )
+        payload["comparison"]["note"] = "GitHub workflow p50 is within 1.5x local benchmark." if ratio <= 1.5 else "GitHub workflow p50 is above 1.5x local benchmark; evaluate self-hosted runners."
     else:
         payload["comparison"]["note"] = "Insufficient data for local vs GitHub p50 comparison."
 

@@ -1,7 +1,3 @@
-"""Regression tests for platform IDE configuration helpers."""
-
-from __future__ import annotations
-
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -58,8 +54,7 @@ class PlatformIdeSupportTests(unittest.TestCase):
             self.assertEqual(written_conf, repo_root / ".platform" / "ide" / "cm.local.odoo.conf")
             rendered_conf = written_conf.read_text(encoding="utf-8")
             self.assertIn(
-                "addons_path = /odoo/addons,/odoo/odoo/addons,"
-                f"{repo_root / 'addons'},/opt/extra_addons,/opt/enterprise",
+                f"addons_path = /odoo/addons,/odoo/odoo/addons,{repo_root / 'addons'},/opt/extra_addons,/opt/enterprise",
                 rendered_conf,
             )
             self.assertNotIn("/.platform/ide/", rendered_conf)

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import importlib.util
 import sys
 import tempfile
@@ -7,6 +5,7 @@ import types
 import unittest
 from pathlib import Path
 from types import SimpleNamespace, TracebackType
+from typing import Self
 from unittest.mock import patch
 
 
@@ -61,7 +60,7 @@ class _FakeCursor:
     def __init__(self) -> None:
         self._query = ""
 
-    def __enter__(self) -> _FakeCursor:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(
@@ -75,11 +74,11 @@ class _FakeCursor:
     def execute(self, query: str, _params: tuple[object, ...]) -> None:
         self._query = query
 
-    def fetchone(self) -> tuple[int,int] | tuple[str] | None:
+    def fetchone(self) -> tuple[int, int] | tuple[str] | None:
         if "FROM res_users" in self._query:
             return 1, 2
         if "FROM res_partner" in self._query:
-            return "admin@localhost",
+            return ("admin@localhost",)
         return None
 
 
@@ -186,7 +185,9 @@ class DataWorkflowAdminPolicyTests(unittest.TestCase):
         )
         workflow_runner._ssh_identity = None
 
-        with patch.object(odoo_data_workflow, "_path_exists_safely", side_effect=lambda path: str(path) == "/home/ubuntu/.ssh/known_hosts"):
+        with patch.object(
+            odoo_data_workflow, "_path_exists_safely", side_effect=lambda path: str(path) == "/home/ubuntu/.ssh/known_hosts"
+        ):
             ssh_command = workflow_runner._build_ssh_command()
 
         self.assertEqual(

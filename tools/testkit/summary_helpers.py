@@ -1,6 +1,3 @@
-from __future__ import annotations
-
-
 def host_resources_from_run_plan(run_plan: dict[str, object]) -> dict[str, int]:
     host_resources = run_plan.get("host_resources")
     if not isinstance(host_resources, dict):

@@ -1,7 +1,3 @@
-"""Regression tests for platform runtime status helpers."""
-
-from __future__ import annotations
-
 import json
 import unittest
 from pathlib import Path

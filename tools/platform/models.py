@@ -455,6 +455,13 @@ class ShipBranchSyncPlan:
     branch_update_required: bool
 
 
+@dataclass(frozen=True)
+class ResolvedDokployTarget:
+    target_type: Literal["compose", "application"]
+    target_id: str
+    target_name: str
+
+
 class PlatformSecretsInstanceDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

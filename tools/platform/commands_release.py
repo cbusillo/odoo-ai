@@ -5,7 +5,7 @@ from pathlib import Path
 
 import click
 
-from .models import DokploySourceOfTruth, DokployTargetDefinition, JsonObject, ShipBranchSyncPlan
+from .models import DokploySourceOfTruth, DokployTargetDefinition, JsonObject, ResolvedDokployTarget, ShipBranchSyncPlan
 
 SUPPORTED_RELEASE_CONTEXTS = frozenset({"cm", "opw"})
 
@@ -187,6 +187,7 @@ def execute_ship(
     check_dirty_working_tree_fn: Callable[[], tuple[str, ...]] | None = None,
     precomputed_ship_branch_sync_plan: ShipBranchSyncPlan | None = None,
     precomputed_ship_branch_sync_applied: bool = False,
+    precomputed_resolved_target: ResolvedDokployTarget | None = None,
 ) -> None:
     _assert_release_context_supported(context_name=context_name, operation_name="Ship")
 
@@ -269,21 +270,28 @@ def execute_ship(
             return
         raise
 
-    (
-        selected_target_type,
-        selected_target_id,
-        selected_target_name,
-        compose_resolution_error,
-        app_resolution_error,
-    ) = resolve_dokploy_target_fn(
-        host=host,
-        token=token,
-        context_name=context_name,
-        instance_name=instance_name,
-        environment_values=environment_values,
-        ship_mode=ship_mode,
-        target_definition=target_definition,
-    )
+    compose_resolution_error = None
+    app_resolution_error = None
+    if precomputed_resolved_target is None:
+        (
+            selected_target_type,
+            selected_target_id,
+            selected_target_name,
+            compose_resolution_error,
+            app_resolution_error,
+        ) = resolve_dokploy_target_fn(
+            host=host,
+            token=token,
+            context_name=context_name,
+            instance_name=instance_name,
+            environment_values=environment_values,
+            ship_mode=ship_mode,
+            target_definition=target_definition,
+        )
+    else:
+        selected_target_type = precomputed_resolved_target.target_type
+        selected_target_id = precomputed_resolved_target.target_id
+        selected_target_name = precomputed_resolved_target.target_name
 
     if not selected_target_type:
         messages = ["No Dokploy deployment target resolved."]

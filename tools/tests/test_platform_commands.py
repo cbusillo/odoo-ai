@@ -28,6 +28,7 @@ from tools.platform.models import (
     JsonValue,
     LoadedEnvironment,
     LoadedStack,
+    ResolvedDokployTarget,
     RuntimeSelection,
     ShipBranchSyncPlan,
     StackDefinition,
@@ -1756,6 +1757,55 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
         )
 
         self.assertIn("branch_sync_applied=true", emitted_lines)
+
+    def test_execute_ship_uses_precomputed_resolved_target_when_present(self) -> None:
+        emitted_lines: list[str] = []
+        target_definition = self._target_definition().model_copy(update={"git_branch": "dev"})
+        source_of_truth = self._source_of_truth(target_definition)
+
+        commands_release.execute_ship(
+            context_name="cm",
+            instance_name="dev",
+            env_file=None,
+            wait=False,
+            timeout_override_seconds=None,
+            verify_health=False,
+            health_timeout_override_seconds=None,
+            dry_run=True,
+            no_cache=False,
+            skip_gate=False,
+            source_git_ref="main",
+            discover_repo_root_fn=lambda _path: Path("/tmp"),
+            load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+            load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+            find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+            resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
+            resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
+            resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
+            prepare_ship_branch_sync_fn=lambda _source_git_ref, _target_definition: None,
+            run_required_gates_fn=lambda **_kwargs: None,
+            resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
+            read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+            resolve_dokploy_target_fn=lambda **_kwargs: self.fail(
+                "resolve_dokploy_target_fn should not run when a precomputed target is supplied"
+            ),
+            apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
+            dokploy_request_fn=lambda **_kwargs: {},
+            latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
+            deployment_key_fn=lambda _deployment: "",
+            wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: "",
+            verify_ship_healthchecks_fn=lambda **_kwargs: None,
+            latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
+            wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
+            echo_fn=emitted_lines.append,
+            precomputed_resolved_target=ResolvedDokployTarget(
+                target_type="compose",
+                target_id="compose-123",
+                target_name="compose-name",
+            ),
+        )
+
+        self.assertIn("compose_id=compose-123", emitted_lines)
 
     def test_execute_promote_passes_allow_dirty_through_to_ship(self) -> None:
         source_target_definition = self._target_definition(context_name="opw", instance_name="testing").model_copy(

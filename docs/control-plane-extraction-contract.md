@@ -102,6 +102,9 @@ Updated phase-5 progress:
 - Compatibility `ship` destination health verification now also runs from
   `odoo-control-plane`, so the internal worker only needs to complete the
   delegated deploy and Odoo-specific post-deploy update path.
+- Compatibility `ship` Dokploy target resolution now also runs before the
+  worker executes, with the resolved target handed into the worker as explicit
+  input instead of being chosen inside the worker itself.
 
 Phase-One Goal
 

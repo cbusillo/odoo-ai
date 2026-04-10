@@ -33,6 +33,7 @@ from tools.platform.models import (
     LoadedEnvironment,
     LoadedStack,
     RuntimeSelection,
+    ResolvedDokployTarget,
     ShipBranchSyncPlan,
     StackDefinition,
 )
@@ -811,6 +812,10 @@ def _resolve_dokploy_runtime(
         target_definition=target_definition,
     )
     return host, token, resolved_target_type, resolved_target_id, resolved_target_name, environment_values
+
+
+def _emit_json_payload(payload: dict[str, object]) -> None:
+    click.echo(json.dumps(payload, indent=2, sort_keys=True))
 
 
 def _resolve_dokploy_source_file(repo_root: Path, source_file: Path | None) -> Path:
@@ -2922,6 +2927,9 @@ def ship(
 @click.option("--branch-sync-remote-branch-commit-before", default="")
 @click.option("--branch-sync-update-required/--no-branch-sync-update-required", default=False)
 @click.option("--branch-sync-applied/--no-branch-sync-applied", default=False)
+@click.option("--resolved-target-type", type=click.Choice(("compose", "application")), default=None)
+@click.option("--resolved-target-id", default="")
+@click.option("--resolved-target-name", default="")
 def compatibility_ship_worker(
     context_name: str,
     instance_name: str,
@@ -2941,6 +2949,9 @@ def compatibility_ship_worker(
     branch_sync_remote_branch_commit_before: str,
     branch_sync_update_required: bool,
     branch_sync_applied: bool,
+    resolved_target_type: str | None,
+    resolved_target_id: str,
+    resolved_target_name: str,
 ) -> None:
     precomputed_ship_branch_sync_plan = None
     if branch_sync_target_branch.strip():
@@ -2950,6 +2961,13 @@ def compatibility_ship_worker(
             target_branch=branch_sync_target_branch,
             remote_branch_commit_before=branch_sync_remote_branch_commit_before,
             branch_update_required=branch_sync_update_required,
+        )
+    precomputed_resolved_target = None
+    if resolved_target_type is not None:
+        precomputed_resolved_target = ResolvedDokployTarget(
+            target_type=resolved_target_type,
+            target_id=resolved_target_id,
+            target_name=resolved_target_name,
         )
 
     platform_commands_release.execute_ship(
@@ -2996,6 +3014,40 @@ def compatibility_ship_worker(
         check_dirty_working_tree_fn=_collect_dirty_tracked_files,
         precomputed_ship_branch_sync_plan=precomputed_ship_branch_sync_plan,
         precomputed_ship_branch_sync_applied=branch_sync_applied,
+        precomputed_resolved_target=precomputed_resolved_target,
+    )
+
+
+@main.command("compatibility-resolve-ship-target", hidden=True)
+@click.option("--context", "context_name", required=True)
+@click.option(
+    "--instance",
+    "instance_name",
+    type=click.Choice(("dev", "testing", "prod"), case_sensitive=False),
+    required=True,
+)
+@click.option("--env-file", type=click.Path(path_type=Path), default=None)
+@click.option("--target-type", type=click.Choice(("compose", "application")), required=True)
+def compatibility_resolve_ship_target(
+    context_name: str,
+    instance_name: str,
+    env_file: Path | None,
+    target_type: str,
+) -> None:
+    repo_root = _discover_repo_root(Path.cwd())
+    _host, _token, resolved_target_type, resolved_target_id, resolved_target_name, _environment_values = _resolve_dokploy_runtime(
+        repo_root=repo_root,
+        env_file=env_file,
+        context_name=context_name,
+        instance_name=instance_name,
+        target_type=target_type,
+    )
+    _emit_json_payload(
+        {
+            "target_type": resolved_target_type,
+            "target_id": resolved_target_id,
+            "target_name": resolved_target_name,
+        }
     )
 
 

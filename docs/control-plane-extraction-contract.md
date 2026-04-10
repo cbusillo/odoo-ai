@@ -102,12 +102,14 @@ Updated phase-5 progress:
 - Compatibility `ship` destination health verification now also runs from
   `odoo-control-plane`, so the internal worker only needs to complete the
   delegated deploy and Odoo-specific post-deploy update path.
-- Compatibility `ship` Dokploy target resolution now also runs before the
-  worker executes, with the resolved target handed into the worker as explicit
-  input instead of being chosen inside the worker itself.
-- The live delegated path is now split into a thin Dokploy execution worker and
-  a separate Odoo post-deploy update worker, instead of routing through one
-  monolithic compatibility ship worker for both concerns.
+- Compatibility `ship` Dokploy target resolution now also runs from
+  `odoo-control-plane`, so the control plane owns the exact target identity and
+  timeout used for deployment.
+- Compatibility `ship` now also executes Dokploy trigger/wait from
+  `odoo-control-plane`, including Dokploy credential loading.
+- The only remaining delegated runtime step is the Odoo-specific post-deploy
+  update worker. The thin Dokploy execution worker is no longer part of the
+  live control-plane path.
 
 Phase-One Goal
 

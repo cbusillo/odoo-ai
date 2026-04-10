@@ -391,6 +391,7 @@ def execute_delegate_ship(
     resolve_ship_health_timeout_seconds_fn: Callable[..., int],
     resolve_ship_healthcheck_urls_fn: Callable[..., tuple[str, ...]],
     resolve_dokploy_ship_mode_fn: Callable[[str, str, dict[str, str]], str],
+    run_required_gates_fn: Callable[..., None],
     build_compatibility_ship_request_fn: Callable[..., object],
     invoke_control_plane_ship_fn: Callable[..., None],
 ) -> None:
@@ -406,6 +407,14 @@ def execute_delegate_ship(
     )
     if target_definition is None:
         raise click.ClickException(f"No Dokploy target definition found for {context_name}/{instance_name}.")
+
+    if not dry_run:
+        run_required_gates_fn(
+            context_name=context_name,
+            target_definition=target_definition,
+            dry_run=False,
+            skip_gate=False,
+        )
 
     environment_values: dict[str, str] = {}
     try:

@@ -2860,6 +2860,7 @@ def ship(
         resolve_ship_health_timeout_seconds_fn=_resolve_ship_health_timeout_seconds,
         resolve_ship_healthcheck_urls_fn=_resolve_ship_healthcheck_urls,
         resolve_dokploy_ship_mode_fn=_resolve_dokploy_ship_mode,
+        run_required_gates_fn=_run_required_gates,
         build_compatibility_ship_request_fn=platform_release_contract.build_compatibility_ship_request,
         invoke_control_plane_ship_fn=_invoke_control_plane_ship,
     )

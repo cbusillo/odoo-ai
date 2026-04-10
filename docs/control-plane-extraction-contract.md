@@ -84,6 +84,14 @@ Updated phase-4 progress:
   the control plane can drive it without recursion while direct ownership is
   still being migrated.
 
+Updated phase-5 progress:
+
+- `odoo-control-plane` now persists first-class deployment records for
+  compatibility `ship` execution before and after delegation.
+- Live gate enforcement for public `platform ship` now runs in the thin
+  `odoo-ai` handoff wrapper before the request crosses into
+  `odoo-control-plane`.
+
 Phase-One Goal
 
 - Move the long-term release contract out of branch mutation and repo-local

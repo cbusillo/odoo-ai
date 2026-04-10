@@ -80,9 +80,8 @@ Updated phase-4 progress:
 
 - Public `platform ship` now delegates into `odoo-control-plane` as a
   fail-closed wrapper.
-- The old `ship` executor remains only as an internal compatibility worker so
-  the control plane can drive it without recursion while direct ownership is
-  still being migrated.
+- The old `ship` executor no longer owns the live path. Public `ship` now
+  hands off directly into `odoo-control-plane`.
 
 Updated phase-5 progress:
 
@@ -110,8 +109,8 @@ Updated phase-5 progress:
 - Dokploy credentials are now expected to live with `odoo-control-plane`
   instead of piggybacking on `odoo-ai` local env files.
 - The only remaining delegated runtime step is the Odoo-specific post-deploy
-  update worker. The thin Dokploy execution worker is no longer part of the
-  live control-plane path.
+  update, which now goes through the canonical `platform update` path rather
+  than a hidden compatibility worker.
 
 Phase-One Goal
 

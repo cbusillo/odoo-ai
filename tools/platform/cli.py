@@ -33,7 +33,6 @@ from tools.platform.models import (
     LoadedEnvironment,
     LoadedStack,
     RuntimeSelection,
-    ResolvedDokployTarget,
     ShipBranchSyncPlan,
     StackDefinition,
 )
@@ -812,10 +811,6 @@ def _resolve_dokploy_runtime(
         target_definition=target_definition,
     )
     return host, token, resolved_target_type, resolved_target_id, resolved_target_name, environment_values
-
-
-def _emit_json_payload(payload: dict[str, object]) -> None:
-    click.echo(json.dumps(payload, indent=2, sort_keys=True))
 
 
 def _resolve_dokploy_source_file(repo_root: Path, source_file: Path | None) -> Path:
@@ -2844,7 +2839,7 @@ def ship(
     if skip_gate:
         raise click.ClickException(
             "Public ship wrapper no longer accepts live --skip-gate execution. "
-            "Use the control-plane-owned path or the internal compatibility worker only through control-plane delegation."
+            "Use the control-plane-owned path instead."
         )
     platform_commands_release_contract.execute_delegate_ship(
         context_name=context_name,
@@ -2870,207 +2865,6 @@ def ship(
         run_required_gates_fn=_run_required_gates,
         build_compatibility_ship_request_fn=platform_release_contract.build_compatibility_ship_request,
         invoke_control_plane_ship_fn=_invoke_control_plane_ship,
-    )
-
-
-@main.command("compatibility-ship-worker", hidden=True)
-@click.option("--context", "context_name", required=True)
-@click.option(
-    "--instance",
-    "instance_name",
-    type=click.Choice(("dev", "testing", "prod"), case_sensitive=False),
-    required=True,
-)
-@click.option("--env-file", type=click.Path(path_type=Path), default=None)
-@click.option(
-    "--wait/--no-wait",
-    default=True,
-    help="Wait for deployment completion so the shared post-deploy update and health verification can run.",
-)
-@click.option(
-    "--timeout",
-    "timeout_override_seconds",
-    type=int,
-    default=None,
-    help="Deployment wait timeout in seconds. Defaults to platform/dokploy.toml per-target value or 600.",
-)
-@click.option(
-    "--verify-health/--no-verify-health",
-    default=True,
-    help="Verify /web/health endpoints after a successful deploy when --wait is enabled.",
-)
-@click.option(
-    "--health-timeout",
-    "health_timeout_override_seconds",
-    type=int,
-    default=None,
-    help="Health verification timeout in seconds per endpoint. Defaults to per-target value or 180.",
-)
-@click.option("--dry-run", is_flag=True, default=False)
-@click.option("--no-cache", is_flag=True, default=False, help="Request rebuild deployment on Dokploy target.")
-@click.option("--skip-gate", is_flag=True, default=False, help="Skip required test/prod gates from platform/dokploy.toml.")
-@click.option(
-    "--allow-dirty",
-    is_flag=True,
-    default=False,
-    help="Allow ship from a dirty tracked working tree (uncommitted changes). Prefer a clean worktree plus --source-ref for surgical tests.",
-)
-@click.option(
-    "--source-ref",
-    "source_git_ref",
-    default="",
-    help="Git reference used to sync the Dokploy target branch before deploy. Use this to test an exact commit or worktree HEAD. Defaults to target source_git_ref or origin/main.",
-)
-@click.option("--branch-sync-source-ref", default="")
-@click.option("--branch-sync-source-commit", default="")
-@click.option("--branch-sync-target-branch", default="")
-@click.option("--branch-sync-remote-branch-commit-before", default="")
-@click.option("--branch-sync-update-required/--no-branch-sync-update-required", default=False)
-@click.option("--branch-sync-applied/--no-branch-sync-applied", default=False)
-@click.option("--resolved-target-type", type=click.Choice(("compose", "application")), default=None)
-@click.option("--resolved-target-id", default="")
-@click.option("--resolved-target-name", default="")
-def compatibility_ship_worker(
-    context_name: str,
-    instance_name: str,
-    env_file: Path | None,
-    wait: bool,
-    timeout_override_seconds: int | None,
-    verify_health: bool,
-    health_timeout_override_seconds: int | None,
-    dry_run: bool,
-    no_cache: bool,
-    skip_gate: bool,
-    allow_dirty: bool,
-    source_git_ref: str,
-    branch_sync_source_ref: str,
-    branch_sync_source_commit: str,
-    branch_sync_target_branch: str,
-    branch_sync_remote_branch_commit_before: str,
-    branch_sync_update_required: bool,
-    branch_sync_applied: bool,
-    resolved_target_type: str | None,
-    resolved_target_id: str,
-    resolved_target_name: str,
-) -> None:
-    precomputed_ship_branch_sync_plan = None
-    if branch_sync_target_branch.strip():
-        precomputed_ship_branch_sync_plan = ShipBranchSyncPlan(
-            source_git_ref=branch_sync_source_ref,
-            source_commit=branch_sync_source_commit,
-            target_branch=branch_sync_target_branch,
-            remote_branch_commit_before=branch_sync_remote_branch_commit_before,
-            branch_update_required=branch_sync_update_required,
-        )
-    precomputed_resolved_target = None
-    if resolved_target_type is not None:
-        precomputed_resolved_target = ResolvedDokployTarget(
-            target_type=resolved_target_type,
-            target_id=resolved_target_id,
-            target_name=resolved_target_name,
-        )
-
-    platform_commands_release.execute_ship(
-        context_name=context_name,
-        instance_name=instance_name,
-        env_file=env_file,
-        wait=wait,
-        timeout_override_seconds=timeout_override_seconds,
-        verify_health=verify_health,
-        health_timeout_override_seconds=health_timeout_override_seconds,
-        dry_run=dry_run,
-        no_cache=no_cache,
-        skip_gate=skip_gate,
-        allow_dirty=allow_dirty,
-        source_git_ref=source_git_ref,
-        discover_repo_root_fn=_discover_repo_root,
-        load_environment_fn=_load_environment,
-        load_dokploy_source_of_truth_if_present_fn=_load_dokploy_source_of_truth_if_present,
-        find_dokploy_target_definition_fn=_find_dokploy_target_definition,
-        resolve_ship_timeout_seconds_fn=_resolve_ship_timeout_seconds,
-        resolve_ship_health_timeout_seconds_fn=_resolve_ship_health_timeout_seconds,
-        resolve_ship_healthcheck_urls_fn=_resolve_ship_healthcheck_urls,
-        prepare_ship_branch_sync_fn=_prepare_ship_branch_sync,
-        run_required_gates_fn=_run_required_gates,
-        resolve_dokploy_ship_mode_fn=_resolve_dokploy_ship_mode,
-        read_dokploy_config_fn=_read_dokploy_config,
-        resolve_dokploy_target_fn=_resolve_dokploy_target,
-        apply_ship_branch_sync_fn=_apply_ship_branch_sync,
-        dokploy_request_fn=_dokploy_request,
-        latest_deployment_for_compose_fn=_latest_deployment_for_compose,
-        deployment_key_fn=_deployment_key,
-        wait_for_dokploy_compose_deployment_fn=_wait_for_dokploy_compose_deployment,
-        verify_ship_healthchecks_fn=_verify_ship_healthchecks,
-        latest_deployment_for_application_fn=_latest_deployment_for_application,
-        wait_for_dokploy_deployment_fn=_wait_for_dokploy_deployment,
-        echo_fn=click.echo,
-        run_post_deploy_update_fn=lambda: _run_update_workflow(
-            stack_file=Path("platform/stack.toml"),
-            context_name=context_name,
-            instance_name=instance_name,
-            env_file=env_file,
-            dry_run=False,
-        ),
-        check_dirty_working_tree_fn=_collect_dirty_tracked_files,
-        precomputed_ship_branch_sync_plan=precomputed_ship_branch_sync_plan,
-        precomputed_ship_branch_sync_applied=branch_sync_applied,
-        precomputed_resolved_target=precomputed_resolved_target,
-    )
-
-
-@main.command("compatibility-post-deploy-update", hidden=True)
-@click.option("--context", "context_name", required=True)
-@click.option(
-    "--instance",
-    "instance_name",
-    type=click.Choice(("dev", "testing", "prod"), case_sensitive=False),
-    required=True,
-)
-@click.option("--env-file", type=click.Path(path_type=Path), default=None)
-def compatibility_post_deploy_update(
-    context_name: str,
-    instance_name: str,
-    env_file: Path | None,
-) -> None:
-    _run_update_workflow(
-        stack_file=Path("platform/stack.toml"),
-        context_name=context_name,
-        instance_name=instance_name,
-        env_file=env_file,
-        dry_run=False,
-    )
-
-
-@main.command("compatibility-resolve-ship-target", hidden=True)
-@click.option("--context", "context_name", required=True)
-@click.option(
-    "--instance",
-    "instance_name",
-    type=click.Choice(("dev", "testing", "prod"), case_sensitive=False),
-    required=True,
-)
-@click.option("--env-file", type=click.Path(path_type=Path), default=None)
-@click.option("--target-type", type=click.Choice(("compose", "application")), required=True)
-def compatibility_resolve_ship_target(
-    context_name: str,
-    instance_name: str,
-    env_file: Path | None,
-    target_type: str,
-) -> None:
-    repo_root = _discover_repo_root(Path.cwd())
-    _host, _token, resolved_target_type, resolved_target_id, resolved_target_name, _environment_values = _resolve_dokploy_runtime(
-        repo_root=repo_root,
-        env_file=env_file,
-        context_name=context_name,
-        instance_name=instance_name,
-        target_type=target_type,
-    )
-    _emit_json_payload(
-        {
-            "target_type": resolved_target_type,
-            "target_id": resolved_target_id,
-            "target_name": resolved_target_name,
-        }
     )
 
 

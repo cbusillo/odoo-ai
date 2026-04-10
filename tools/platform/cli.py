@@ -404,6 +404,7 @@ def _compose_runtime_env_file(runtime_env_file: Path) -> Path:
     compose_env_file = runtime_env_file.with_suffix(".compose.env")
     runtime_env_values = _parse_env_file(runtime_env_file)
     runtime_env_values.pop("DOCKER_IMAGE_REFERENCE", None)
+    runtime_env_values["PLATFORM_RUNTIME_ENV_FILE"] = str(compose_env_file)
     compose_env_file.write_text(_render_runtime_env(runtime_env_values), encoding="utf-8")
     return compose_env_file
 

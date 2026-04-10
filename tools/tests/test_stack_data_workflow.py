@@ -85,6 +85,7 @@ class StackDataWorkflowTests(unittest.TestCase):
         self.assertIn(str(compose_env_file), command)
         self.assertNotIn("DOCKER_IMAGE_REFERENCE=", compose_env_content)
         self.assertIn("DOCKER_IMAGE=odoo-ai", compose_env_content)
+        self.assertIn(f"PLATFORM_RUNTIME_ENV_FILE={compose_env_file}", compose_env_content)
 
     def test_local_compose_uses_latest_written_env_file_values(self) -> None:
         with TemporaryDirectory() as temporary_directory_name:
@@ -139,8 +140,10 @@ class StackDataWorkflowTests(unittest.TestCase):
         self.assertIn("DOCKER_IMAGE=odoo-ai-updated", compose_env_content)
         self.assertNotIn("DOCKER_IMAGE=odoo-ai-stale", compose_env_content)
         self.assertNotIn("DOCKER_IMAGE_REFERENCE=", compose_env_content)
+        self.assertIn(f"PLATFORM_RUNTIME_ENV_FILE={compose_env_file}", compose_env_content)
         self.assertEqual(compose_environment.get("DOCKER_IMAGE"), "odoo-ai-updated")
         self.assertNotIn("DOCKER_IMAGE_REFERENCE", compose_environment)
+        self.assertEqual(compose_environment.get("PLATFORM_RUNTIME_ENV_FILE"), str(compose_env_file))
 
     def test_data_workflow_script_environment_keeps_required_keys_and_prefixes(self) -> None:
         env_values = {

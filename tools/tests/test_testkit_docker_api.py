@@ -219,7 +219,13 @@ class TestkitDockerApiTests(unittest.TestCase):
                 with patch("tools.testkit.docker_api.Path.cwd", return_value=repo_root):
                     composed_environment = docker_api.compose_env()
 
-        self.assertNotIn("DOCKER_IMAGE_REFERENCE", composed_environment)
+            self.assertNotIn("DOCKER_IMAGE_REFERENCE", composed_environment)
+            self.assertNotIn("TESTKIT_ENV_FILE", composed_environment)
+            compose_env_file = env_file.resolve().with_suffix(".compose.env")
+            self.assertEqual(composed_environment.get("PLATFORM_RUNTIME_ENV_FILE"), str(compose_env_file))
+            compose_env_content = compose_env_file.read_text(encoding="utf-8")
+            self.assertNotIn("DOCKER_IMAGE_REFERENCE=", compose_env_content)
+            self.assertIn(f"PLATFORM_RUNTIME_ENV_FILE={compose_env_file}", compose_env_content)
 
 
 if __name__ == "__main__":

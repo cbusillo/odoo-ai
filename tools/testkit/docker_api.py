@@ -43,6 +43,18 @@ def _resolve_env_file(env: dict[str, str]) -> Path | None:
     return env_path
 
 
+def _write_sanitized_runtime_env_file(runtime_env_file: Path) -> Path:
+    compose_env_file = runtime_env_file.with_suffix(".compose.env")
+    compose_env_values = parse_env_file(runtime_env_file)
+    compose_env_values.pop("DOCKER_IMAGE_REFERENCE", None)
+    compose_env_values["PLATFORM_RUNTIME_ENV_FILE"] = str(compose_env_file)
+    compose_env_file.write_text(
+        "\n".join(f"{key}={value}" for key, value in sorted(compose_env_values.items())) + "\n",
+        encoding="utf-8",
+    )
+    return compose_env_file
+
+
 def _require_stack_context(env: dict[str, str]) -> None:
     stack_name = _blank_to_none(env.get("ODOO_STACK_NAME"))
     project_name = _blank_to_none(env.get("ODOO_PROJECT_NAME"))
@@ -79,6 +91,14 @@ def compose_env() -> dict[str, str]:
         env["ODOO_STACK_NAME"] = stack_override
 
     env.pop("DOCKER_IMAGE_REFERENCE", None)
+    runtime_env_file = _blank_to_none(env.get("PLATFORM_RUNTIME_ENV_FILE"))
+    if env_file_path is not None:
+        runtime_env_file = str(env_file_path)
+    if runtime_env_file:
+        resolved_runtime_env_file = Path(os.path.expandvars(os.path.expanduser(runtime_env_file))).resolve()
+        if resolved_runtime_env_file.exists():
+            env["PLATFORM_RUNTIME_ENV_FILE"] = str(_write_sanitized_runtime_env_file(resolved_runtime_env_file))
+    env.pop("TESTKIT_ENV_FILE", None)
 
     if _is_truthy(env.get("TESTKIT_DISABLE_DEV_MODE")):
         env.pop("ODOO_DEV_MODE", None)

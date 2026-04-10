@@ -199,6 +199,7 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
 
         self.assertIn(str(compose_env_file), compose_command)
         self.assertNotIn("DOCKER_IMAGE_REFERENCE=", compose_env_content)
+        self.assertIn(f"PLATFORM_RUNTIME_ENV_FILE={compose_env_file}", compose_env_content)
 
     def test_runtime_env_includes_admin_credential_keys_when_configured(self) -> None:
         runtime_values = _build_runtime_env_values(

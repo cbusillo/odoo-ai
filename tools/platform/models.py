@@ -241,6 +241,7 @@ class CompatibilityShipRequest(BaseModel):
     dry_run: bool = False
     no_cache: bool = False
     allow_dirty: bool = False
+    branch_sync: "BranchSyncEvidence | None" = None
     destination_health: HealthcheckEvidence = Field(default_factory=HealthcheckEvidence)
 
     @model_validator(mode="after")
@@ -251,6 +252,26 @@ class CompatibilityShipRequest(BaseModel):
             raise ValueError("ship request requires instance")
         if not self.source_git_ref.strip():
             raise ValueError("ship request requires source_git_ref")
+        return self
+
+
+class BranchSyncEvidence(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source_git_ref: str
+    source_commit: str
+    target_branch: str
+    remote_branch_commit_before: str = ""
+    branch_update_required: bool
+
+    @model_validator(mode="after")
+    def _validate_branch_sync(self) -> "BranchSyncEvidence":
+        if not self.source_git_ref.strip():
+            raise ValueError("branch sync evidence requires source_git_ref")
+        if not self.source_commit.strip():
+            raise ValueError("branch sync evidence requires source_commit")
+        if not self.target_branch.strip():
+            raise ValueError("branch sync evidence requires target_branch")
         return self
 
 

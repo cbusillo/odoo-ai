@@ -2762,6 +2762,7 @@ def export_ship_request(
         load_dokploy_source_of_truth_if_present_fn=_load_dokploy_source_of_truth_if_present,
         find_dokploy_target_definition_fn=_find_dokploy_target_definition,
         load_environment_fn=_load_environment,
+        prepare_ship_branch_sync_fn=_prepare_ship_branch_sync,
         resolve_ship_health_timeout_seconds_fn=_resolve_ship_health_timeout_seconds,
         resolve_ship_healthcheck_urls_fn=_resolve_ship_healthcheck_urls,
         resolve_dokploy_ship_mode_fn=_resolve_dokploy_ship_mode,
@@ -2857,6 +2858,7 @@ def ship(
         load_dokploy_source_of_truth_if_present_fn=_load_dokploy_source_of_truth_if_present,
         find_dokploy_target_definition_fn=_find_dokploy_target_definition,
         load_environment_fn=_load_environment,
+        prepare_ship_branch_sync_fn=_prepare_ship_branch_sync,
         resolve_ship_health_timeout_seconds_fn=_resolve_ship_health_timeout_seconds,
         resolve_ship_healthcheck_urls_fn=_resolve_ship_healthcheck_urls,
         resolve_dokploy_ship_mode_fn=_resolve_dokploy_ship_mode,
@@ -2914,6 +2916,11 @@ def ship(
     default="",
     help="Git reference used to sync the Dokploy target branch before deploy. Use this to test an exact commit or worktree HEAD. Defaults to target source_git_ref or origin/main.",
 )
+@click.option("--branch-sync-source-ref", default="")
+@click.option("--branch-sync-source-commit", default="")
+@click.option("--branch-sync-target-branch", default="")
+@click.option("--branch-sync-remote-branch-commit-before", default="")
+@click.option("--branch-sync-update-required/--no-branch-sync-update-required", default=False)
 def compatibility_ship_worker(
     context_name: str,
     instance_name: str,
@@ -2927,7 +2934,22 @@ def compatibility_ship_worker(
     skip_gate: bool,
     allow_dirty: bool,
     source_git_ref: str,
+    branch_sync_source_ref: str,
+    branch_sync_source_commit: str,
+    branch_sync_target_branch: str,
+    branch_sync_remote_branch_commit_before: str,
+    branch_sync_update_required: bool,
 ) -> None:
+    precomputed_ship_branch_sync_plan = None
+    if branch_sync_target_branch.strip():
+        precomputed_ship_branch_sync_plan = ShipBranchSyncPlan(
+            source_git_ref=branch_sync_source_ref,
+            source_commit=branch_sync_source_commit,
+            target_branch=branch_sync_target_branch,
+            remote_branch_commit_before=branch_sync_remote_branch_commit_before,
+            branch_update_required=branch_sync_update_required,
+        )
+
     platform_commands_release.execute_ship(
         context_name=context_name,
         instance_name=instance_name,
@@ -2970,6 +2992,7 @@ def compatibility_ship_worker(
             dry_run=False,
         ),
         check_dirty_working_tree_fn=_collect_dirty_tracked_files,
+        precomputed_ship_branch_sync_plan=precomputed_ship_branch_sync_plan,
     )
 
 

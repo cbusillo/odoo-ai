@@ -185,6 +185,7 @@ def execute_ship(
     run_post_deploy_update_fn: Callable[[], None] | None = None,
     allow_dirty: bool = False,
     check_dirty_working_tree_fn: Callable[[], tuple[str, ...]] | None = None,
+    precomputed_ship_branch_sync_plan: ShipBranchSyncPlan | None = None,
 ) -> None:
     _assert_release_context_supported(context_name=context_name, operation_name="Ship")
 
@@ -225,7 +226,9 @@ def execute_ship(
         environment_values=environment_values,
     )
     should_verify_health = verify_health and wait
-    ship_branch_sync_plan = prepare_ship_branch_sync_fn(source_git_ref, target_definition)
+    ship_branch_sync_plan = precomputed_ship_branch_sync_plan
+    if ship_branch_sync_plan is None:
+        ship_branch_sync_plan = prepare_ship_branch_sync_fn(source_git_ref, target_definition)
 
     if ship_branch_sync_plan is None:
         echo_fn("branch_sync=false")

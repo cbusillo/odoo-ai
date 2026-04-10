@@ -4,7 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from . import command_context
-from .models import JsonObject, LoadedStack, ReleaseStatus, RuntimeSelection, StackDefinition
+from .models import JsonObject, LoadedStack, ReleaseStatus, RuntimeSelection, ShipBranchSyncPlan, StackDefinition
 
 
 def execute_export_artifact_identity(
@@ -388,6 +388,7 @@ def execute_delegate_ship(
     load_dokploy_source_of_truth_if_present_fn: Callable[[Path], object | None],
     find_dokploy_target_definition_fn: Callable[..., object | None],
     load_environment_fn: Callable[..., tuple[Path, dict[str, str]]],
+    prepare_ship_branch_sync_fn: Callable[[str, object | None], ShipBranchSyncPlan | None],
     resolve_ship_health_timeout_seconds_fn: Callable[..., int],
     resolve_ship_healthcheck_urls_fn: Callable[..., tuple[str, ...]],
     resolve_dokploy_ship_mode_fn: Callable[[str, str, dict[str, str]], str],
@@ -415,6 +416,8 @@ def execute_delegate_ship(
             dry_run=False,
             skip_gate=False,
         )
+
+    branch_sync_plan = prepare_ship_branch_sync_fn(source_git_ref, target_definition)
 
     environment_values: dict[str, str] = {}
     try:
@@ -456,6 +459,15 @@ def execute_delegate_ship(
             target_name=target_definition.target_name.strip() or f"{context_name}-{instance_name}",
             target_type=target_definition.target_type,
             deploy_mode=deploy_mode,
+            branch_sync=None
+            if branch_sync_plan is None
+            else {
+                "source_git_ref": branch_sync_plan.source_git_ref,
+                "source_commit": branch_sync_plan.source_commit,
+                "target_branch": branch_sync_plan.target_branch,
+                "remote_branch_commit_before": branch_sync_plan.remote_branch_commit_before,
+                "branch_update_required": branch_sync_plan.branch_update_required,
+            },
             wait=wait,
             timeout_seconds=timeout_override_seconds,
             verify_health=verify_health,

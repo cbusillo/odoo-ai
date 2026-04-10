@@ -29,6 +29,7 @@ from tools.platform.models import (
     LoadedEnvironment,
     LoadedStack,
     RuntimeSelection,
+    ShipBranchSyncPlan,
     StackDefinition,
 )
 
@@ -1644,6 +1645,62 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
     @staticmethod
     def _source_of_truth(target_definition: DokployTargetDefinition) -> DokploySourceOfTruth:
         return DokploySourceOfTruth(schema_version=1, targets=(target_definition,))
+
+    def test_execute_ship_uses_precomputed_branch_sync_plan_when_present(self) -> None:
+        emitted_lines: list[str] = []
+        applied_branch_sync_plans: list[ShipBranchSyncPlan] = []
+        target_definition = self._target_definition().model_copy(update={"git_branch": "dev"})
+        source_of_truth = self._source_of_truth(target_definition)
+        precomputed_ship_branch_sync_plan = ShipBranchSyncPlan(
+            source_git_ref="origin/cm-dev",
+            source_commit="abc123",
+            target_branch="dev",
+            remote_branch_commit_before="def456",
+            branch_update_required=True,
+        )
+
+        commands_release.execute_ship(
+            context_name="cm",
+            instance_name="dev",
+            env_file=None,
+            wait=False,
+            timeout_override_seconds=None,
+            verify_health=False,
+            health_timeout_override_seconds=None,
+            dry_run=True,
+            no_cache=False,
+            skip_gate=False,
+            source_git_ref="main",
+            discover_repo_root_fn=lambda _path: Path("/tmp"),
+            load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+            load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+            find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+            resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
+            resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
+            resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
+            prepare_ship_branch_sync_fn=lambda _source_git_ref, _target_definition: self.fail(
+                "prepare_ship_branch_sync_fn should not run when a precomputed plan is supplied"
+            ),
+            run_required_gates_fn=lambda **_kwargs: None,
+            resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
+            read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+            resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
+            apply_ship_branch_sync_fn=lambda ship_branch_sync_plan: applied_branch_sync_plans.append(ship_branch_sync_plan),
+            dokploy_request_fn=lambda **_kwargs: {},
+            latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
+            deployment_key_fn=lambda _deployment: "",
+            wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: "",
+            verify_ship_healthchecks_fn=lambda **_kwargs: None,
+            latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
+            wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
+            echo_fn=emitted_lines.append,
+            precomputed_ship_branch_sync_plan=precomputed_ship_branch_sync_plan,
+        )
+
+        self.assertEqual(applied_branch_sync_plans, [])
+        self.assertIn("branch_sync_target_branch=dev", emitted_lines)
+        self.assertIn("branch_sync_source_commit=abc123", emitted_lines)
+        self.assertIn("branch_sync_update_required=true", emitted_lines)
 
     def test_execute_promote_passes_allow_dirty_through_to_ship(self) -> None:
         source_target_definition = self._target_definition(context_name="opw", instance_name="testing").model_copy(

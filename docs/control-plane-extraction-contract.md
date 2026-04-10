@@ -91,6 +91,10 @@ Updated phase-5 progress:
 - Live gate enforcement for public `platform ship` now runs in the thin
   `odoo-ai` handoff wrapper before the request crosses into
   `odoo-control-plane`.
+- Public `platform ship` now also computes branch-sync planning before the
+  handoff and includes that metadata in the request so the control plane owns
+  the deploy intent record even while the transitional worker still performs
+  the actual git push.
 
 Phase-One Goal
 

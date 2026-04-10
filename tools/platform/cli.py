@@ -2356,6 +2356,87 @@ def promote(
 
 
 @main.command(
+    "export-ship-request",
+    help="Render the typed artifact-backed ship request for control-plane handoff.",
+)
+@click.option("--context", "context_name", required=True)
+@click.option(
+    "--instance",
+    "instance_name",
+    type=click.Choice(("dev", "testing", "prod"), case_sensitive=False),
+    required=True,
+)
+@click.option("--artifact-id", required=True, help="Exact immutable artifact id to deploy.")
+@click.option("--env-file", type=click.Path(path_type=Path), default=None)
+@click.option(
+    "--source-ref",
+    "source_git_ref",
+    default="",
+    help="Recorded source git ref for the artifact-backed deploy. Defaults to target source_git_ref or origin/main.",
+)
+@click.option("--wait/--no-wait", default=True, show_default=True)
+@click.option(
+    "--timeout",
+    "timeout_override_seconds",
+    type=int,
+    default=None,
+    help="Deployment wait timeout in seconds.",
+)
+@click.option(
+    "--verify-health/--no-verify-health",
+    default=True,
+    help="Plan destination health verification for the ship request.",
+)
+@click.option(
+    "--health-timeout",
+    "health_timeout_override_seconds",
+    type=int,
+    default=None,
+    help="Health verification timeout in seconds per endpoint.",
+)
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--no-cache", is_flag=True, default=False)
+@click.option("--allow-dirty", is_flag=True, default=False)
+def export_ship_request(
+    context_name: str,
+    instance_name: str,
+    artifact_id: str,
+    env_file: Path | None,
+    source_git_ref: str,
+    wait: bool,
+    timeout_override_seconds: int | None,
+    verify_health: bool,
+    health_timeout_override_seconds: int | None,
+    dry_run: bool,
+    no_cache: bool,
+    allow_dirty: bool,
+) -> None:
+    platform_commands_release.execute_export_ship_request(
+        context_name=context_name,
+        instance_name=instance_name,
+        artifact_id=artifact_id,
+        env_file=env_file,
+        source_git_ref=source_git_ref,
+        wait=wait,
+        timeout_override_seconds=timeout_override_seconds,
+        verify_health=verify_health,
+        health_timeout_override_seconds=health_timeout_override_seconds,
+        dry_run=dry_run,
+        no_cache=no_cache,
+        allow_dirty=allow_dirty,
+        default_source_git_ref=DEFAULT_DOKPLOY_SHIP_SOURCE_GIT_REF,
+        discover_repo_root_fn=_discover_repo_root,
+        load_dokploy_source_of_truth_if_present_fn=_load_dokploy_source_of_truth_if_present,
+        find_dokploy_target_definition_fn=_find_dokploy_target_definition,
+        load_environment_fn=_load_environment,
+        resolve_ship_health_timeout_seconds_fn=_resolve_ship_health_timeout_seconds,
+        resolve_ship_healthcheck_urls_fn=_resolve_ship_healthcheck_urls,
+        resolve_dokploy_ship_mode_fn=_resolve_dokploy_ship_mode,
+        emit_payload_fn=lambda payload: click.echo(json.dumps(payload, indent=2, sort_keys=True)),
+    )
+
+
+@main.command(
     "ship",
     help=f"Deploy an exact git ref to a Dokploy-managed remote target. {REMOTE_RUNTIME_CONTRACT_HELP}",
 )

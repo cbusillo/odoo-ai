@@ -5,7 +5,7 @@ from pathlib import Path
 
 import click
 
-from .models import DokploySourceOfTruth, DokployTargetDefinition, JsonObject, ShipBranchSyncPlan
+from .models import DokploySourceOfTruth, DokployTargetDefinition, JsonObject, ShipBranchSyncPlan, ShipRequest
 
 SUPPORTED_RELEASE_CONTEXTS = frozenset({"cm", "opw"})
 
@@ -83,6 +83,11 @@ def _emit_deploy_plan(
         healthcheck_urls=healthcheck_urls,
         echo_fn=echo_fn,
     )
+
+
+def _resolve_deploy_mode(*, configured_ship_mode: str, target_type: str) -> str:
+    selected_mode = configured_ship_mode if configured_ship_mode != "auto" else target_type
+    return f"dokploy-{selected_mode}-api"
 
 
 def _run_post_deploy_steps(
@@ -407,6 +412,94 @@ def execute_ship(
         run_post_deploy_update_fn=post_deploy_update_fn,
         verify_ship_healthchecks_fn=verify_ship_healthchecks_fn,
     )
+
+
+def execute_export_ship_request(
+    *,
+    context_name: str,
+    instance_name: str,
+    artifact_id: str,
+    env_file: Path | None,
+    source_git_ref: str,
+    wait: bool,
+    timeout_override_seconds: int | None,
+    verify_health: bool,
+    health_timeout_override_seconds: int | None,
+    dry_run: bool,
+    no_cache: bool,
+    allow_dirty: bool,
+    default_source_git_ref: str,
+    discover_repo_root_fn: Callable[[Path], Path],
+    load_dokploy_source_of_truth_if_present_fn: Callable[[Path], DokploySourceOfTruth | None],
+    find_dokploy_target_definition_fn: Callable[..., DokployTargetDefinition | None],
+    load_environment_fn: Callable[..., tuple[Path, dict[str, str]]],
+    resolve_ship_health_timeout_seconds_fn: Callable[..., int],
+    resolve_ship_healthcheck_urls_fn: Callable[..., tuple[str, ...]],
+    resolve_dokploy_ship_mode_fn: Callable[[str, str, dict[str, str]], str],
+    emit_payload_fn: Callable[[JsonObject], None],
+) -> None:
+    _assert_release_context_supported(context_name=context_name, operation_name="Ship request export")
+
+    runtime_environment = _load_runtime_environment(
+        context_name=context_name,
+        instance_name=instance_name,
+        env_file=env_file,
+        discover_repo_root_fn=discover_repo_root_fn,
+        load_environment_fn=load_environment_fn,
+    )
+    environment_values = runtime_environment.environment_values
+    source_of_truth = load_dokploy_source_of_truth_if_present_fn(runtime_environment.repo_root)
+    if source_of_truth is None:
+        raise click.ClickException("Ship request export requires platform/dokploy.toml source of truth.")
+    target_definition = find_dokploy_target_definition_fn(
+        source_of_truth,
+        context_name=context_name,
+        instance_name=instance_name,
+    )
+    if target_definition is None:
+        raise click.ClickException(f"Ship target {context_name}/{instance_name} is missing from platform/dokploy.toml.")
+
+    resolved_source_git_ref = source_git_ref.strip() or target_definition.source_git_ref.strip() or default_source_git_ref
+    destination_health_timeout_seconds = resolve_ship_health_timeout_seconds_fn(
+        health_timeout_override_seconds=health_timeout_override_seconds,
+        target_definition=target_definition,
+    )
+    destination_healthcheck_urls = resolve_ship_healthcheck_urls_fn(
+        target_definition=target_definition,
+        environment_values=environment_values,
+    )
+    configured_ship_mode = resolve_dokploy_ship_mode_fn(context_name, instance_name, environment_values)
+    deploy_mode = _resolve_deploy_mode(
+        configured_ship_mode=configured_ship_mode,
+        target_type=target_definition.target_type,
+    )
+
+    try:
+        ship_request = ShipRequest(
+            artifact_id=artifact_id,
+            context=context_name,
+            instance=instance_name,
+            source_git_ref=resolved_source_git_ref,
+            target_name=target_definition.target_name.strip() or f"{context_name}-{instance_name}",
+            target_type=target_definition.target_type,
+            deploy_mode=deploy_mode,
+            wait=wait,
+            timeout_seconds=timeout_override_seconds,
+            verify_health=verify_health,
+            health_timeout_seconds=destination_health_timeout_seconds,
+            dry_run=dry_run,
+            no_cache=no_cache,
+            allow_dirty=allow_dirty,
+            destination_health={
+                "urls": destination_healthcheck_urls,
+                "timeout_seconds": destination_health_timeout_seconds,
+                "status": "pending" if verify_health and wait else "skipped",
+            },
+        )
+    except ValueError as error:
+        raise click.ClickException(str(error)) from error
+
+    emit_payload_fn(ship_request.model_dump(mode="json"))
 
 
 def execute_rollback(

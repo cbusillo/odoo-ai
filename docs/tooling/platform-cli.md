@@ -33,6 +33,8 @@ Operator Contract
   Use `platform ship`, `platform update`, `platform rollback`, `platform gate`,
   `platform promote`, `platform restore`, and `platform bootstrap` there.
 - `platform ship` is the non-destructive remote deploy/restart path.
+- `platform export-ship-request` renders the artifact-backed ship payload used
+  by the control plane handoff. It requires an explicit `--artifact-id`.
 - `platform rollback` currently supports Dokploy application targets only.
   Compose targets must use Dokploy UI rollback controls.
 - `platform restore` is the destructive upstream-data replacement path.
@@ -60,7 +62,7 @@ Command Families
 - Runtime workflows: `run`, `init`, `update`, `openupgrade`.
 - Validation scenarios: `validate ...`.
 - Remote release: `ship`, `rollback`, `gate`, `promote`, and
-  `platform dokploy ...` helpers.
+  `export-ship-request`, and `platform dokploy ...` helpers.
 - Dokploy inventory: `platform dokploy inventory` for project/server/target
   snapshots before teardown, recreation, or reconciliation work.
 - Secrets/env introspection: `platform secrets explain`.
@@ -80,6 +82,10 @@ Behavior Highlights
   from the control plane so deploy execution can use an exact immutable image
   while local workflows keep the existing `DOCKER_IMAGE` + `DOCKER_IMAGE_TAG`
   contract.
+- `platform export-ship-request` now emits an artifact-backed ship contract
+  with no branch-sync metadata. If the caller cannot provide an artifact id,
+  the handoff should fail closed rather than falling back to branch-oriented
+  deploy shaping.
 - When `platform ship` waits for deployment completion on compose-backed
   managed targets, it now runs the shared `platform update` workflow before
   final health verification so installed addon code/data changes are applied

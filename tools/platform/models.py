@@ -242,6 +242,67 @@ class ShipBranchSyncPlan:
     branch_update_required: bool
 
 
+ReleaseStatus = Literal["pending", "pass", "fail", "skipped"]
+
+
+class HealthcheckEvidence(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    verified: bool = False
+    urls: tuple[str, ...] = ()
+    timeout_seconds: int | None = Field(default=None, ge=1)
+    status: ReleaseStatus = "skipped"
+
+    @model_validator(mode="after")
+    def _validate_verified_healthcheck(self) -> "HealthcheckEvidence":
+        if not self.verified:
+            return self
+        if not self.urls:
+            raise ValueError("verified healthcheck evidence requires at least one URL")
+        if self.timeout_seconds is None:
+            raise ValueError("verified healthcheck evidence requires timeout_seconds")
+        if self.status not in {"pass", "fail"}:
+            raise ValueError("verified healthcheck evidence requires pass/fail status")
+        return self
+
+
+class ShipRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: int = Field(default=1, ge=1)
+    artifact_id: str
+    context: str
+    instance: str
+    source_git_ref: str
+    target_name: str
+    target_type: Literal["compose", "application"]
+    deploy_mode: str
+    wait: bool = True
+    timeout_seconds: int | None = Field(default=None, ge=1)
+    verify_health: bool = True
+    health_timeout_seconds: int | None = Field(default=None, ge=1)
+    dry_run: bool = False
+    no_cache: bool = False
+    allow_dirty: bool = False
+    destination_health: HealthcheckEvidence = Field(default_factory=HealthcheckEvidence)
+
+    @model_validator(mode="after")
+    def _validate_ship_request(self) -> "ShipRequest":
+        if not self.artifact_id.strip():
+            raise ValueError("ship request requires artifact_id")
+        if not self.context.strip():
+            raise ValueError("ship request requires context")
+        if not self.instance.strip():
+            raise ValueError("ship request requires instance")
+        if not self.source_git_ref.strip():
+            raise ValueError("ship request requires source_git_ref")
+        if not self.target_name.strip():
+            raise ValueError("ship request requires target_name")
+        if not self.deploy_mode.strip():
+            raise ValueError("ship request requires deploy_mode")
+        return self
+
+
 class PlatformSecretsInstanceDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

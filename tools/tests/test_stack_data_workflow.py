@@ -86,6 +86,62 @@ class StackDataWorkflowTests(unittest.TestCase):
         self.assertNotIn("DOCKER_IMAGE_REFERENCE=", compose_env_content)
         self.assertIn("DOCKER_IMAGE=odoo-ai", compose_env_content)
 
+    def test_local_compose_uses_latest_written_env_file_values(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            repo_root = Path(temporary_directory_name)
+            env_file = repo_root / ".platform" / "env" / "opw.local.env"
+            compose_env_file = env_file.with_suffix(".compose.env")
+            env_file.parent.mkdir(parents=True, exist_ok=True)
+            env_file.write_text(
+                "\n".join(
+                    (
+                        "DOCKER_IMAGE=odoo-ai-updated",
+                        "ODOO_DB_PASSWORD=database-password",
+                        "DOCKER_IMAGE_REFERENCE=odoo-ai@sha256:0123456789abcdef",
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            stack_settings = StackSettings(
+                name="opw-local",
+                repo_root=repo_root,
+                env_file=env_file,
+                source_env_file=env_file,
+                environment={
+                    "DOCKER_IMAGE": "odoo-ai-stale",
+                    "ODOO_DB_PASSWORD": "database-password",
+                    "DOCKER_IMAGE_REFERENCE": "odoo-ai@sha256:deadbeef",
+                },
+                state_root=repo_root / ".platform" / "state" / "opw-local",
+                data_dir=repo_root / ".platform" / "state" / "opw-local" / "data",
+                db_dir=repo_root / ".platform" / "state" / "opw-local" / "db",
+                log_dir=repo_root / ".platform" / "state" / "opw-local" / "logs",
+                compose_command=("docker", "compose"),
+                compose_project="odoo-opw-local",
+                compose_files=(repo_root / "docker-compose.yml",),
+                docker_context=repo_root,
+                registry_image="odoo-ai",
+                healthcheck_url="https://opw-local.example.com/web/health",
+                update_modules=("AUTO",),
+                services=("database", "web", "script-runner"),
+                script_runner_service="script-runner",
+                odoo_bin_path="/odoo/odoo-bin",
+                image_variable_name="DOCKER_IMAGE",
+                github_token=None,
+            )
+
+            command = stack_data_workflow.local_compose_command(stack_settings, ["build", "web"])
+            compose_environment = dict(stack_data_workflow.local_compose_env(stack_settings))
+            compose_env_content = compose_env_file.read_text(encoding="utf-8")
+
+        self.assertIn(str(compose_env_file), command)
+        self.assertIn("DOCKER_IMAGE=odoo-ai-updated", compose_env_content)
+        self.assertNotIn("DOCKER_IMAGE=odoo-ai-stale", compose_env_content)
+        self.assertNotIn("DOCKER_IMAGE_REFERENCE=", compose_env_content)
+        self.assertEqual(compose_environment.get("DOCKER_IMAGE"), "odoo-ai-updated")
+        self.assertNotIn("DOCKER_IMAGE_REFERENCE", compose_environment)
+
     def test_data_workflow_script_environment_keeps_required_keys_and_prefixes(self) -> None:
         env_values = {
             "ODOO_DB_PASSWORD": "secret",

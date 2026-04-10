@@ -86,6 +86,11 @@ def _emit_deploy_plan(
 
 
 def _resolve_deploy_mode(*, configured_ship_mode: str, target_type: str) -> str:
+    if configured_ship_mode != "auto" and configured_ship_mode != target_type:
+        raise click.ClickException(
+            "Configured Dokploy ship mode conflicts with the target definition: "
+            f"ship_mode={configured_ship_mode} target_type={target_type}."
+        )
     selected_mode = configured_ship_mode if configured_ship_mode != "auto" else target_type
     return f"dokploy-{selected_mode}-api"
 

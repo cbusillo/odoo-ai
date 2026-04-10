@@ -5,6 +5,7 @@ multi-ecosystem-groups:
   infrastructure:
     schedule:
       interval: weekly
+    open-pull-requests-limit: 2
 
 updates:
   - package-ecosystem: github-actions
@@ -12,7 +13,6 @@ updates:
     patterns:
       - "*"
     multi-ecosystem-group: infrastructure
-    open-pull-requests-limit: 2
     labels:
       - dependencies
       - github-actions
@@ -27,7 +27,6 @@ updates:
     patterns:
       - "*"
     multi-ecosystem-group: infrastructure
-    open-pull-requests-limit: 2
     labels:
       - dependencies
       - docker

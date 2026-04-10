@@ -34,7 +34,7 @@ Key sections for development:
 
 **Website**:
 [Shopify Admin GraphQL API](https://shopify.dev/docs/api/admin-graphql)
-**Local schema**: `addons/shopify_sync/graphql/schema/shopify_schema_2026-01.sdl`
+**Local schema**: `addons/shared/shopify_sync/graphql/schema/shopify_schema_2026-01.sdl`
 
 Use the local schema file for complete type definitions and the online docs for
 guides and best practices.

@@ -6,6 +6,8 @@ Purpose
 
 - Capture the steady-state runtime topology and the boundaries between local
   stacks and Dokploy-managed environments.
+- The long-term split between the public addon repo and the private operator
+  control plane lives in [@docs/control-plane-roadmap.md](control-plane-roadmap.md).
 
 When
 
@@ -71,8 +73,9 @@ Use explicit context/instance flags in command invocations (for example
   `ghcr.io/cbusillo/odoo-docker:19.0-runtime`
 - Public devtools foundation image:
   `ghcr.io/cbusillo/odoo-docker:19.0-devtools`
-- Custom addons: `/opt/project/addons` (project tree) and
-  `/opt/extra_addons`
+- Custom addons: `/opt/project/addons` for root wrapper addons plus discovered
+  nested addon buckets such as `/opt/project/addons/shared` and
+  `/opt/project/addons/cm`, alongside `/opt/extra_addons`
   (`ODOO_ADDON_REPOSITORIES` for non-enterprise extras).
 - Enterprise addons: `/opt/enterprise` from
   `ghcr.io/cbusillo/odoo-enterprise-docker`.
@@ -80,9 +83,11 @@ Use explicit context/instance flags in command invocations (for example
   devtools exposes `/odoo`, `/opt/project/addons`, and `/opt/extra_addons`,
   and `odoo-enterprise-docker` appends `/opt/enterprise`. `odoo-ai` keeps
   `/opt/project` as a real directory in the image. Both production and
-  development targets bake `/opt/project/addons` at build time; local workflows
-  that need live addon editing must override that path explicitly with a bind
-  mount.
+  development targets bake `/opt/project/addons` at build time; runtime env
+  generation expands nested addon grouping directories under that root so Odoo
+  sees wrapper addons and grouped tenant/shared addons without a flat top-level
+  addon tree. Local workflows that need live addon editing must override that
+  path explicitly with a bind mount.
   `/volumes/pyproject.toml` and `/volumes/uv.lock` point at the root lockfiles,
   and local devtools images link `/opt/project/tools` to the `/volumes/tools`
   bind mount used by testkit.
@@ -93,5 +98,6 @@ Use explicit context/instance flags in command invocations (for example
 - Docker usage – @docs/tooling/docker.md
 - Local stack layering – `platform/config/README.md`
 - Multi-project local config – @docs/workflows/multi-project.md
+- Long-term control-plane target state – @docs/control-plane-roadmap.md
 - Restore entry point –
   `uv run platform restore --context <target> --instance local`

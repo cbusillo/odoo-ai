@@ -12,16 +12,16 @@ def _resolve_pycharm_addons_paths(repo_root: Path, stack_definition: StackDefini
     project addons mount to the local workspace path so local addons stay editable.
     """
 
-    container_to_host_path = {
-        "/opt/project/addons": repo_root / "addons",
-    }
     resolved_paths: list[str] = []
     for addons_path in stack_definition.addons_path:
-        mapped_path = container_to_host_path.get(addons_path)
-        if mapped_path is None:
-            resolved_paths.append(addons_path)
+        if addons_path == "/opt/project/addons":
+            resolved_paths.append(str(repo_root / "addons"))
             continue
-        resolved_paths.append(str(mapped_path))
+        if addons_path.startswith("/opt/project/addons/"):
+            relative_path = addons_path.removeprefix("/opt/project/addons/")
+            resolved_paths.append(str(repo_root / "addons" / relative_path))
+            continue
+        resolved_paths.append(addons_path)
     return resolved_paths
 
 

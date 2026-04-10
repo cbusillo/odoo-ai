@@ -37,7 +37,7 @@ Test-Focused Cleanup Guidance
 - If the shared base attaches dynamic model aliases, add typed properties there
   when that cleanly teaches PyCharm the real model types.
 - Keep addon-specific typed test helpers local to that addon. Do not move model-
-  specific knowledge into `addons/test_support/` just to satisfy inspections.
+  specific knowledge into `addons/shared/test_support/` just to satisfy inspections.
 
 Scopes
 

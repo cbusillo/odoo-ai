@@ -36,6 +36,10 @@ Layer Model
     must not recreate it
   - downstream images use fixed project layout paths:
     `/opt/project`, `/opt/project/addons`, `/opt/extra_addons`
+  - downstream runtime env generation may append grouped addon roots under
+    `/opt/project/addons` (for example `/opt/project/addons/shared` or
+    `/opt/project/addons/cm`) when those directories organize non-wrapper
+    addons
   - `odoo-ai` keeps `/opt/project` as a real source tree while preserving the
     specific local workflow links still required for tooling: `/volumes/pyproject.toml`,
     `/volumes/uv.lock`, and local devtools images link `/opt/project/tools` to the `/volumes/tools`
@@ -84,8 +88,9 @@ Layer Model
     `script-runner` consume that same image tag to avoid service-level source
     skew
   - both production and local `development` targets bake project addons into
-    `/opt/project/addons`; live-edit workflows must override that path with a
-    bind mount when they need the mounted repo tree to win
+    `/opt/project/addons`; runtime env generation expands grouped addon roots
+    under that tree when present, and live-edit workflows must override that
+    path with a bind mount when they need the mounted repo tree to win
   - rebuild only when dependency/runtime layers change
   - call the inherited `odoo-python-sync.sh` helper instead of owning local
     dependency-install mechanics

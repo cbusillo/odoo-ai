@@ -1,0 +1,135 @@
+from odoo import api, fields, models
+
+TRANSPORT_ORDER_STATES = [
+    ("draft", "Draft"),
+    ("ready", "Ready"),
+    ("transit_out", "Transit Out"),
+    ("at_client", "At Client"),
+    ("transit_in", "Transit In"),
+    ("at_depot", "At Depot"),
+    ("intake_complete", "Intake Complete"),
+]
+
+LAT_LONG_DIGITS = (10, 7)
+
+
+class TransportOrder(models.Model):
+    _name = "service.transport.order"
+    _description = "Transport Order"
+    _inherit = ["mail.thread", "mail.activity.mixin", "external.id.mixin"]
+    _order = "arrival_date desc, id desc"
+
+    name = fields.Char()
+    state = fields.Selection(
+        TRANSPORT_ORDER_STATES,
+        default=TRANSPORT_ORDER_STATES[0][0],
+        tracking=True,
+        required=True,
+    )
+    stage_id = fields.Many2one(
+        "service.transport.order.stage",
+        compute="_compute_stage_id",
+        inverse="_inverse_stage_id",
+        store=True,
+        tracking=True,
+        readonly=False,
+        group_expand="_read_group_stage_ids",
+        ondelete="restrict",
+    )
+    arrival_date = fields.Datetime()
+    departure_date = fields.Datetime()
+    scheduled_date = fields.Datetime(tracking=True)
+    employee = fields.Many2one(
+        "res.partner",
+        required=True,
+        default=lambda self: self.env.user.partner_id,
+        ondelete="restrict",
+    )
+    vehicle_id = fields.Many2one(
+        "fleet.vehicle",
+        ondelete="set null",
+        groups="fleet.fleet_group_user",
+    )
+    driver_id = fields.Many2one(
+        "res.partner",
+        ondelete="set null",
+        tracking=True,
+        groups="fleet.fleet_group_user",
+    )
+    client = fields.Many2one(
+        "res.partner",
+        required=True,
+        ondelete="restrict",
+    )
+    contact = fields.Many2one(
+        "res.partner",
+        required=True,
+        ondelete="restrict",
+    )
+
+    quantity_in_counted = fields.Integer(tracking=True)
+    quantity_out = fields.Integer(tracking=True)  # TODO: change to count of devices on order
+    location_latitude = fields.Float(digits=LAT_LONG_DIGITS)
+    location_longitude = fields.Float(digits=LAT_LONG_DIGITS)
+    device_notes = fields.Text(tracking=True)
+    cm_data_status_raw = fields.Char()
+    cm_data_location_name = fields.Char()
+    cm_data_location_id = fields.Integer(
+        help="Raw CM delivery-log location identifier captured from the source row. This is kept as imported context, not as the transport order's canonical external identity.",
+    )
+    cm_data_units = fields.Integer()
+    cm_data_notes = fields.Text()
+    cm_data_edit_notes = fields.Text()
+    cm_data_ocr_notes = fields.Text()
+    cm_data_discord_name = fields.Char()
+    cm_data_discord_id = fields.Char(
+        help="Raw Discord user identifier copied from CM delivery-log data. This remains imported context for the order rather than an external identity binding for the transport order itself.",
+    )
+    devices = fields.One2many(
+        "service.transport.order.device",
+        "transport_order",
+    )
+
+    @api.onchange("vehicle_id")
+    def _onchange_vehicle_id(self) -> None:
+        if self.vehicle_id and not self.driver_id:
+            driver = self.vehicle_id.driver_id
+            if driver:
+                self.driver_id = driver
+
+    @api.depends("state")
+    def _compute_stage_id(self) -> None:
+        stage_model = self.env["service.transport.order.stage"]
+        stages_by_code = {stage.code: stage for stage in stage_model.search([])}
+        for order in self:
+            order.stage_id = stages_by_code.get(order.state)
+
+    def _inverse_stage_id(self) -> None:
+        for order in self:
+            if order.stage_id and order.stage_id.code and order.state != order.stage_id.code:
+                order.state = order.stage_id.code
+
+    @api.model
+    def _read_group_stage_ids(
+        self,
+        stages: models.Model,
+        _domain: fields.Domain,
+    ) -> models.Model:
+        return stages.search([], order=stages._order)
+
+
+class TransportOrderStage(models.Model):
+    _name = "service.transport.order.stage"
+    _description = "Transport Order Stage"
+    _order = "sequence, id"
+
+    name = fields.Char(required=True)
+    code = fields.Selection(TRANSPORT_ORDER_STATES, required=True, index=True)
+    sequence = fields.Integer(default=10)
+    fold = fields.Boolean(default=False)
+    active = fields.Boolean(default=True)
+
+    _code_unique = models.Constraint(
+        "unique(code)",
+        "Transport order stage code must be unique.",
+    )

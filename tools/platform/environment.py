@@ -240,10 +240,52 @@ def load_environment(
     return loaded_environment.env_file_path, loaded_environment.merged_values
 
 
+def _discover_project_addon_group_paths(repo_root: Path) -> tuple[str, ...]:
+    addons_root = repo_root / "addons"
+    if not addons_root.is_dir():
+        return ()
+
+    grouped_paths: list[str] = []
+    for child_path in sorted(addons_root.iterdir()):
+        if not child_path.is_dir():
+            continue
+        if child_path.name.startswith((".", "__")):
+            continue
+        if (child_path / "__manifest__.py").exists() or (child_path / "__openerp__.py").exists():
+            continue
+        grouped_paths.append(f"/opt/project/addons/{child_path.name}")
+    return tuple(grouped_paths)
+
+
+def _expand_project_addons_paths(stack_definition: StackDefinition, stack_file_path: Path) -> StackDefinition:
+    repo_root = stack_file_path.parent.parent
+    grouped_paths = _discover_project_addon_group_paths(repo_root)
+    if not grouped_paths:
+        return stack_definition
+
+    expanded_paths: list[str] = []
+    seen_paths: set[str] = set()
+
+    def append_path(addons_path: str) -> None:
+        if addons_path in seen_paths:
+            return
+        seen_paths.add(addons_path)
+        expanded_paths.append(addons_path)
+
+    for addons_path in stack_definition.addons_path:
+        append_path(addons_path)
+        if addons_path == "/opt/project/addons":
+            for grouped_path in grouped_paths:
+                append_path(grouped_path)
+
+    return stack_definition.model_copy(update={"addons_path": tuple(expanded_paths)})
+
+
 def load_stack(stack_file_path: Path) -> LoadedStack:
     try:
         payload = tomllib.loads(stack_file_path.read_text(encoding="utf-8"))
         stack_definition = StackDefinition.model_validate(payload)
+        stack_definition = _expand_project_addons_paths(stack_definition, stack_file_path)
     except (OSError, tomllib.TOMLDecodeError, ValidationError) as exc:
         raise click.ClickException(f"Invalid stack file {stack_file_path}: {exc}") from exc
     return LoadedStack(stack_definition=stack_definition, stack_file_path=stack_file_path)

@@ -1523,9 +1523,7 @@ with registry.cursor() as cr:
                     _extend_from_raw(match.group(1).strip())
 
         if not candidate_dirs:
-            candidate_dirs = [
-                "/opt/project/addons",
-            ]
+            candidate_dirs = ["/opt/project/addons", *(str(path) for path in self._project_addon_group_dirs())]
 
         discovered: dict[str, Path] = {}
         resolved_dirs: list[Path] = []
@@ -1616,6 +1614,23 @@ with registry.cursor() as cr:
         return False
 
     @staticmethod
+    def _project_addon_group_dirs() -> list[Path]:
+        addons_root = Path("/opt/project/addons")
+        if not addons_root.is_dir():
+            return []
+
+        grouped_dirs: list[Path] = []
+        for child_path in sorted(addons_root.iterdir()):
+            if not child_path.is_dir():
+                continue
+            if child_path.name.startswith((".", "__")):
+                continue
+            if (child_path / "__manifest__.py").exists() or (child_path / "__openerp__.py").exists():
+                continue
+            grouped_dirs.append(child_path)
+        return grouped_dirs
+
+    @staticmethod
     def _load_manifest_dependencies(addon_path: Path) -> list[str]:
         manifest_path = addon_path / "__manifest__.py"
         if not manifest_path.exists():
@@ -1668,6 +1683,7 @@ with registry.cursor() as cr:
         if not addons_paths:
             addons_paths = [
                 Path("/opt/project/addons"),
+                *self._project_addon_group_dirs(),
                 Path("/odoo/addons"),
                 Path("/opt/extra_addons"),
             ]

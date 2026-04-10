@@ -1,23 +1,36 @@
 # Addon Management Guide
 
-This directory contains Odoo addons managed directly in this repo (no submodules).
-This keeps shared code and deployment tooling in one place while still letting
-you isolate client-specific addons by directory.
+This directory contains Odoo addons managed directly in this repo (no
+submodules). The durable direction is to keep shared code here while moving
+deployment and operator concerns into a separate private control plane.
+
+## Ownership Layout
+
+- `addons/shared/` - reusable cross-client addons
+- `addons/<client>/` - client-specific supporting addons and exceptions
+- `addons/<client>_custom/` - thin tenant entrypoint addon kept visible at the
+  root
+
+Current examples:
+
+- `addons/opw_custom/` - OPW tenant entrypoint addon
+- `addons/cm_custom/` - CM tenant entrypoint addon
+- `addons/cm/` - CM-specific supporting addons and importers
+- `addons/shared/` - reusable shared addons
+
+Rules:
+
+- Shared addons must not depend on tenant-specific addons.
+- Tenant addons may depend on shared addons.
+- Wrapper addons should stay thin and primarily compose dependencies,
+  configuration, menus, and views.
+- If tenant logic becomes reusable, promote it into `addons/shared/`.
 
 ## Current Addons
 
-- **`opw_custom`** - OPW product workflows, multigraph analytics, inventory tools
-- **`shopify_sync`** - Shopify sync services and shipping analytics
-- **`marine_motors`** - Marine motor teardown workflows and reporting
-- **`product_metadata`** - Shared product reference models (types, conditions,
-  manufacturers)
-- **`transaction_utilities`** - Transaction safety helpers (commit/rollback,
-  advisory locks)
-- **`image_enhancements`** - Extended image metadata (dimensions, file size)
-- **`notification_center`** - Channel notifications and alert history
-- **`external_ids`** - External ID registry + URL templates
-- **`repairshopr_import`** - RepairShopr migration importer (customers,
-  tickets, estimates, invoices)
+- Root wrappers: `cm_custom`, `dm_custom`, `opw_custom`
+- CM supporting addons live under `addons/cm/`
+- Shared addons live under `addons/shared/`
 
 Private addons (not stored in this repo) are pulled during build using
 `ODOO_ADDON_REPOSITORIES`, which the inherited `odoo-fetch-addons.sh` helper
@@ -25,23 +38,23 @@ resolves into `/opt/extra_addons`.
 
 ## Adding Your Own Addon
 
-1. Create a new addon folder under `addons/`.
+1. Create a new addon folder under the correct ownership root.
 2. Add the standard Odoo structure (`__manifest__.py`, `models/`, `views/`, etc.).
 3. Commit the new files in this repo.
 
 ```bash
-mkdir -p addons/my_custom_addon
-touch addons/my_custom_addon/__init__.py addons/my_custom_addon/__manifest__.py
-git add addons/my_custom_addon
-git commit -m "Add my_custom_addon"
+mkdir -p addons/shared/my_shared_addon
+touch addons/shared/my_shared_addon/__init__.py addons/shared/my_shared_addon/__manifest__.py
+git add addons/shared/my_shared_addon
+git commit -m "Add my_shared_addon"
 ```
 
 ## Removing an Addon
 
 ```bash
-rm -rf addons/my_custom_addon
+rm -rf addons/shared/my_shared_addon
 git add -A
-git commit -m "Remove my_custom_addon"
+git commit -m "Remove my_shared_addon"
 ```
 
 ## Sharing Addons Externally

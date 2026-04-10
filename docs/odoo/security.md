@@ -18,7 +18,7 @@ Sources of Truth
 - `addons/*/security/*.xml` — record rules and security data.
 - `addons/*/models/*.py` — `_check_company_auto`, `check_company=True`, and
     field-level controls.
-- `addons/shopify_sync/controllers/shopify_webhook.py` — webhook signature
+- `addons/shared/shopify_sync/controllers/shopify_webhook.py` — webhook signature
     verification and system-user handoff.
 
 ## HTTP Controllers
@@ -26,7 +26,7 @@ Sources of Truth
 For controller security patterns, use the Shopify webhook controller as a
 reference implementation:
 
-- `addons/shopify_sync/controllers/shopify_webhook.py`
+- `addons/shared/shopify_sync/controllers/shopify_webhook.py`
 
 Related Guides
 

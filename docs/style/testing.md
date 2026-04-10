@@ -70,7 +70,7 @@ Basics
 
 `test_support`
 
-- Treat `addons/test_support/` as the shared test toolkit, not a dumping ground
+- Treat `addons/shared/test_support/` as the shared test toolkit, not a dumping ground
   for every fixture in the repo.
 - `test_support` may have a small baseline dependency set when that supports
   genuinely generic test helpers, but it must not accumulate domain or

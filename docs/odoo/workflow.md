@@ -50,8 +50,8 @@ Container Paths
 
 Generated Files (Do Not Modify)
 
-- `addons/shopify_sync/services/shopify/gql/*` — generated GraphQL client.
-- `addons/shopify_sync/graphql/schema/*` — Shopify schema snapshots.
+- `addons/shared/shopify_sync/services/shopify/gql/*` — generated GraphQL client.
+- `addons/shared/shopify_sync/graphql/schema/*` — Shopify schema snapshots.
 
 Views (Odoo 19)
 

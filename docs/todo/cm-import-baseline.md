@@ -20,9 +20,9 @@ Evidence sources
 - Live snapshot file: `tmp/cm_import_baseline_probe.json`
 - RepairShopr scheduled-run log: `tmp/repairshopr-scheduled-import-20260313-130928.log`
 - Importer entrypoints:
-  - `addons/cm_data_import/models/cm_data_importer.py`
-  - `addons/repairshopr_import/models/repairshopr_importer.py`
-  - `addons/fishbowl_import/models/fishbowl_importer.py`
+  - `addons/cm/cm_data_import/models/cm_data_importer.py`
+  - `addons/cm/repairshopr_import/models/repairshopr_importer.py`
+  - `addons/cm/fishbowl_import/models/fishbowl_importer.py`
 
 Completion contract proven from code
 

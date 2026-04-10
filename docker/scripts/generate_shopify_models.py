@@ -11,7 +11,7 @@ from graphql import IntrospectionQuery, build_client_schema, get_introspection_q
 from tools.platform import environment as platform_environment
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-ADDONS_PATH = REPOSITORY_ROOT / "addons" / "shopify_sync"
+ADDONS_PATH = REPOSITORY_ROOT / "addons" / "shared" / "shopify_sync"
 GRAPHQL_PATH = ADDONS_PATH / "graphql"
 GRAPHQL_ENV_FILE_NAMES = (".env", ".env.local")
 DEFAULT_CONTEXT_NAME = "opw"

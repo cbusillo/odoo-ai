@@ -13,9 +13,6 @@ updates:
     patterns:
       - "*"
     multi-ecosystem-group: infrastructure
-    labels:
-      - dependencies
-      - github-actions
     groups:
       all-security-updates:
         applies-to: security-updates
@@ -27,9 +24,6 @@ updates:
     patterns:
       - "*"
     multi-ecosystem-group: infrastructure
-    labels:
-      - dependencies
-      - docker
     groups:
       all-security-updates:
         applies-to: security-updates

@@ -1,3 +1,10 @@
+"""Transitional data-workflow runner for the repo-local `uv run platform` CLI.
+
+Manifest-driven runtime orchestration now lives in `odoo-devkit`. Keep this
+module focused on the `odoo-ai` platform surface until the remaining platform
+migration cleanup is complete.
+"""
+
 import logging
 import os
 import re

@@ -8,13 +8,16 @@ Purpose
 
 Status
 
-- Updated on 2026-04-08.
+- Updated on 2026-04-11.
 - Code/documentation migration is complete.
 - Platform/tooling validation is complete (acceptance gates, local health, and
   Dokploy reconcile are green).
 - No external blockers remain before final sign-off.
 - Dokploy non-prod workloads were moved off the Dokploy control-plane host onto
   `docker-shiny-nonprod` (`192.168.1.36`) on 2026-04-05.
+- Manifest-driven runtime ownership for restore/bootstrap/update now lives in
+  `odoo-devkit`; `odoo-ai` retains its repo-local platform CLI workflow path as
+  a transitional surface until the remaining migration cleanup lands.
 
 Completed State
 
@@ -46,17 +49,17 @@ Durable Tooling Follow-ups
       Current temporary state: `opw-dev`, `opw-testing`, `cm-dev`, and
       `cm-testing` were moved using transferred prebuilt `odoo-ai:latest` images
       plus no-build compose commands because authenticated pulls of
-      `ghcr.io/cbusillo/odoo-enterprise-docker:19.0-runtime` returned
+      the private Enterprise runtime image returned
       `manifest unknown` on the new host during redeploy.
 - [x] Repair upstream image publishing in `odoo-docker` and
-      `odoo-enterprise-docker` so stable Odoo base tags refresh normally again.
+      the private Enterprise layer so stable Odoo base tags refresh normally again.
       Repaired on 2026-04-07: `odoo-docker` push run `24046795441` and the next
       scheduled run `24065168743` both completed successfully after the publish
       timeout increase, serialized publish, pinned binfmt image, split
       `requirements.txt` copy, and registry-backed Buildx cache changes. The push
-      run triggered `odoo-enterprise-docker` run `24060171498`, which refreshed the
+      run triggered the private Enterprise publish run `24060171498`, which refreshed the
       stable `19.0-runtime` and `19.0-devtools` tags, and the scheduled run
-      triggered `odoo-enterprise-docker` nightly run `24078968346`. Further
+      triggered the private Enterprise nightly run `24078968346`. Further
       validation on 2026-04-08 confirmed the persistent per-runner Buildx path
       stayed healthy across additional real publishes: overnight scheduled run
       `24118708176` completed in about `40m 46s`, manual dispatch run

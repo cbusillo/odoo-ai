@@ -18,7 +18,7 @@ Sources of Truth
 - `tools/platform/environment.py` — env layering and stack/source loading.
 - `tools/platform/runtime.py` — runtime selection and env file rendering.
 - `tools/platform/dokploy.py` — Dokploy API and deploy-health orchestration.
-- `tools/platform/release_workflows.py` — release gate and promote logic.
+- `tools/platform/release_workflows.py` — release gate logic.
 - `platform/stack.toml` — context and instance contract.
 - `platform/dokploy.toml` — remote target branch/domain contract.
 - `platform/secrets.toml` (optional, local) — layered secret/env overrides.
@@ -31,10 +31,8 @@ Operator Contract
   `platform odoo-shell` only with `--instance local`.
 - Treat `dev`, `testing`, and `prod` as Dokploy-managed remote targets.
   Use `platform ship`, `platform update`, `platform rollback`, `platform gate`,
-  `platform promote`, `platform restore`, and `platform bootstrap` there.
+  `platform restore`, and `platform bootstrap` there.
 - `platform ship` is the non-destructive remote deploy/restart path.
-- `platform export-ship-request` renders the artifact-backed ship payload used
-  by the control plane handoff. It requires an explicit `--artifact-id`.
 - `platform rollback` currently supports Dokploy application targets only.
   Compose targets must use Dokploy UI rollback controls.
 - `platform restore` is the destructive upstream-data replacement path.
@@ -61,8 +59,8 @@ Command Families
 - Data workflows: `restore`, `bootstrap`.
 - Runtime workflows: `run`, `init`, `update`, `openupgrade`.
 - Validation scenarios: `validate ...`.
-- Remote release: `ship`, `rollback`, `gate`, `promote`, and
-  `export-ship-request`, and `platform dokploy ...` helpers.
+- Remote release: `ship`, `rollback`, `gate`, and `platform dokploy ...`
+  helpers.
 - Dokploy inventory: `platform dokploy inventory` for project/server/target
   snapshots before teardown, recreation, or reconciliation work.
 - Secrets/env introspection: `platform secrets explain`.
@@ -70,12 +68,14 @@ Command Families
 
 Behavior Highlights
 
+- Manifest-driven `platform runtime ...` ownership now lives in `odoo-devkit`.
+  This document remains the contract for the repo-local `uv run platform ...`
+  surface in `odoo-ai`, including the transitional remote restore/bootstrap/
+  update workflow path that still exists here.
 - `platform doctor` is read-only and spans both local runtime diagnostics and
   Dokploy target diagnostics.
 - `platform ship` fails closed on dirty tracked files. Prefer a clean worktree
-  plus `--source-ref HEAD` for surgical remote testing.
-- `platform promote` follows the same clean-tree policy as `platform ship` and
-  accepts `--allow-dirty` only as an explicit override.
+  for surgical remote testing.
 - `platform ship` is the only supported remote deployment trigger for managed
   Dokploy targets. Keep Dokploy auto deploy disabled for those targets.
 - Managed remote targets may receive `DOCKER_IMAGE_REFERENCE=<repo>@<digest>`
@@ -86,10 +86,8 @@ Behavior Highlights
   `docker compose` so local/testkit workflows keep using buildable image-name
   inputs even when shared runtime env files carry an immutable digest for
   remote execution.
-- `platform export-ship-request` now emits an artifact-backed ship contract
-  with no branch-sync metadata. If the caller cannot provide an artifact id,
-  the handoff should fail closed rather than falling back to branch-oriented
-  deploy shaping.
+- Native `odoo-control-plane` ship and promotion planning/execution no longer
+  depend on `odoo-ai` request-export steps or repo-path delegation.
 - When `platform ship` waits for deployment completion on compose-backed
   managed targets, it now runs the shared `platform update` workflow before
   final health verification so installed addon code/data changes are applied

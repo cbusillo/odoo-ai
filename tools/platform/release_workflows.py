@@ -281,7 +281,6 @@ def execute_promote(
     if not source_branch:
         raise click.ClickException(f"Source target {context_name}/{from_instance_name} is missing git_branch.")
 
-    run_command_fn(["git", "fetch", "origin", "--prune"])
     source_commit = resolve_remote_git_branch_commit_fn("origin", source_branch)
     if not source_commit:
         raise click.ClickException(f"Unable to resolve source commit from origin/{source_branch}.")

@@ -34,7 +34,9 @@ Status
   validation no longer needs raw `docker compose` commands. Later that same
   day, `odoo-devkit` also gained a native manifest-backed
   `runtime odoo-shell` helper, and the retired `odoo-ai` shell shim now points
-  at that command instead of treating shell access as homeless.
+  at that command instead of treating shell access as homeless. Later that same
+  day, `odoo-devkit` also gained a native manifest-backed `runtime down`
+  helper, and the retired `odoo-ai` down shim now points at that command too.
 - The extracted tenant proof now exists for both `odoo-tenant-opw` and
   `odoo-tenant-cm`: their tracked `workspace.toml` manifests drive
   `odoo-devkit` workspace/runtime commands, reusable shared addons now live in

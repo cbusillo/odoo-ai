@@ -15,6 +15,7 @@ class PlatformCliRetiredLocalRuntimeTests(unittest.TestCase):
         replacement_by_command = {
             "select": "uv --directory /path/to/odoo-devkit run platform runtime select --manifest /path/to/workspace.toml",
             "up": "uv --directory /path/to/odoo-devkit run platform runtime up --manifest /path/to/workspace.toml --build",
+            "down": "uv --directory /path/to/odoo-devkit run platform runtime down --manifest /path/to/workspace.toml --volumes",
             "inspect": "uv --directory /path/to/odoo-devkit run platform runtime inspect --manifest /path/to/workspace.toml",
             "logs": "uv --directory /path/to/odoo-devkit run platform runtime logs --manifest /path/to/workspace.toml --service web --no-follow",
             "odoo-shell": "uv --directory /path/to/odoo-devkit run platform runtime odoo-shell --manifest /path/to/workspace.toml --script /path/to/script.py",
@@ -48,7 +49,6 @@ class PlatformCliRetiredLocalRuntimeTests(unittest.TestCase):
         runner = CliRunner()
 
         for command_name, extra_args in (
-            ("down", []),
             ("build", ["--stack-file", "platform/stack.toml"]),
         ):
             with self.subTest(command_name=command_name):

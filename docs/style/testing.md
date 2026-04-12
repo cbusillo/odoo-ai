@@ -48,8 +48,10 @@ Recorded Tours
   (recorded via the UI recorder).
 - The repo-local `platform odoo-shell` helper in `odoo-ai` is retired. Export
   recorded tours through the owning manifest-backed runtime surface in
-  `odoo-devkit`; if that surface still lacks a dedicated helper, add it there
-  instead of reviving the retired repo-local command.
+  `odoo-devkit`, for example
+  `uv --directory /path/to/odoo-devkit run platform runtime odoo-shell --manifest /path/to/workspace.toml --script /path/to/script.py`;
+  if that surface still lacks a dedicated helper, add it there instead of
+  reviving the retired repo-local command.
 
 - Seed at test time by passing `RECORDED_TOURS_JSON` or
   `RECORDED_TOURS_PATH` (e.g., a temp file).

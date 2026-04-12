@@ -44,12 +44,28 @@ Quick Start
 - Local runtime lifecycle ownership now lives in `odoo-devkit`:
 
     ```bash
+    uv --directory ../odoo-devkit run platform runtime build \
+      --manifest ../odoo-tenant-cm/workspace.toml --no-cache
     uv --directory ../odoo-devkit run platform runtime up \
       --manifest ../odoo-tenant-cm/workspace.toml --build
+    uv --directory ../odoo-devkit run platform runtime down \
+      --manifest ../odoo-tenant-cm/workspace.toml --volumes
     ```
 
 - The repo-local `platform select|up|down|logs|build|inspect|odoo-shell`
-  commands in `odoo-ai` are retired compatibility shims and now fail closed.
+  commands in `odoo-ai` are retired compatibility shims that now hand off to
+  the manifest-backed `odoo-devkit` runtime surface.
+
+- Local debugging helpers now live there too:
+
+    ```bash
+    uv --directory ../odoo-devkit run platform runtime logs \
+      --manifest ../odoo-tenant-cm/workspace.toml --service web --no-follow
+    uv --directory ../odoo-devkit run platform runtime psql \
+      --manifest ../odoo-tenant-cm/workspace.toml -- -c 'select 1'
+    uv --directory ../odoo-devkit run platform runtime odoo-shell \
+      --manifest ../odoo-tenant-cm/workspace.toml --script tmp/scripts/example.py
+    ```
 
 - Run tracked environment validation scenarios through `platform validate`:
 

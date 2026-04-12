@@ -34,8 +34,10 @@ Notes
   easy.
 - The repo-local `uv run platform odoo-shell ...` helper is retired in
   `odoo-ai`. For extracted-tenant local runtime work, use the manifest-backed
-  runtime surface in `odoo-devkit` and add any replacement shell helper there
-  instead of reviving the repo-local path.
+  runtime surface in `odoo-devkit`, for example
+  `uv --directory /path/to/odoo-devkit run platform runtime odoo-shell --manifest /path/to/workspace.toml --script /path/to/script.py`,
+  and add any future shell-adjacent helper there instead of reviving the
+  repo-local path.
 - Use the built-in browser tools for UI validation; do not use Playwright in
   this repo.
 - When testing service logins, skip the marketing site by loading

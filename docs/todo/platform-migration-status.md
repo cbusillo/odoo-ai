@@ -15,7 +15,7 @@ Status
 - No external blockers remain before final sign-off.
 - Dokploy non-prod workloads were moved off the Dokploy control-plane host onto
   `docker-shiny-nonprod` (`192.168.1.36`) on 2026-04-05.
-- Manifest-driven runtime ownership for extracted-tenant local runtime now
+- Manifest-driven runtime ownership for extracted-tenant runtime now
   lives in `odoo-devkit`. On 2026-04-12, `odoo-ai` retired its repo-local
   local-runtime CLI lifecycle surface (`select`, `up`, `down`, `logs`,
   `build`, `odoo-shell`, and `inspect`) into explicit fail-closed migration
@@ -25,10 +25,10 @@ Status
   shims and narrowed `platform run` / `platform tui` so those local-only
   workflows are no longer reachable there either. Later on 2026-04-12,
   `odoo-ai` also retired repo-local local `restore`/`bootstrap` invocations
-  into matching manifest-backed handoff guidance, so the remaining
-  repo-local workflow surface in `odoo-ai` is now remote-only for
-  Dokploy-managed destructive workflows and should be treated as
-  retirement-stage cleanup only.
+  into matching manifest-backed handoff guidance. On 2026-04-12, the surviving
+  remote `restore`/`bootstrap` surface was retired as well, so those
+  destructive flows now hand off to `odoo-devkit` runtime commands with the
+  tenant manifest plus an explicit runtime `--instance` override.
 - The extracted tenant proof now exists for both `odoo-tenant-opw` and
   `odoo-tenant-cm`: their tracked `workspace.toml` manifests drive
   `odoo-devkit` workspace/runtime commands, reusable shared addons now live in

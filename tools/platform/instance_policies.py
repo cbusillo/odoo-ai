@@ -2,12 +2,20 @@ import click
 
 LOCAL_INSTANCE_NAME = "local"
 
-LOCAL_DESTRUCTIVE_WORKFLOW_REPLACEMENTS = {
-    "restore": "uv --directory /path/to/odoo-devkit run platform runtime restore --manifest /path/to/workspace.toml",
-    "bootstrap": (
-        "uv --directory /path/to/odoo-devkit run platform runtime workflow --manifest /path/to/workspace.toml --workflow bootstrap"
-    ),
-}
+
+def _destructive_workflow_replacement_command(*, workflow_name: str, instance_name: str) -> str | None:
+    normalized_instance = instance_name.strip().lower() or LOCAL_INSTANCE_NAME
+    if workflow_name == "restore":
+        return (
+            "uv --directory /path/to/odoo-devkit run platform runtime restore "
+            f"--manifest /path/to/workspace.toml --instance {normalized_instance}"
+        )
+    if workflow_name == "bootstrap":
+        return (
+            "uv --directory /path/to/odoo-devkit run platform runtime workflow "
+            f"--manifest /path/to/workspace.toml --workflow bootstrap --instance {normalized_instance}"
+        )
+    return None
 
 
 def is_local_instance(instance_name: str) -> bool:
@@ -24,13 +32,13 @@ def assert_local_instance_for_local_runtime(*, instance_name: str, operation_nam
 
 
 def assert_destructive_data_workflow_supported(*, instance_name: str, workflow_name: str) -> None:
-    if not is_local_instance(instance_name):
-        return
-
-    replacement_command = LOCAL_DESTRUCTIVE_WORKFLOW_REPLACEMENTS.get(workflow_name)
+    replacement_command = _destructive_workflow_replacement_command(
+        workflow_name=workflow_name,
+        instance_name=instance_name,
+    )
     message_lines = [
-        f"Local 'platform {workflow_name}' is retired in odoo-ai.",
-        "Local destructive runtime ownership moved to odoo-devkit plus tenant workspace.toml manifests.",
+        f"'platform {workflow_name}' is retired in odoo-ai.",
+        "Destructive runtime ownership moved to odoo-devkit plus tenant workspace.toml manifests.",
     ]
     if replacement_command is not None:
         message_lines.extend(
@@ -40,6 +48,6 @@ def assert_destructive_data_workflow_supported(*, instance_name: str, workflow_n
             )
         )
     message_lines.append(
-        "The surviving odoo-ai data-workflow surface is now remote-only for Dokploy-managed dev/testing/prod targets."
+        "Use the tenant's tracked workspace.toml and pass --instance explicitly when targeting dev/testing/prod."
     )
     raise click.ClickException("\n".join(message_lines))

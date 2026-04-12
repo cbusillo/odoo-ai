@@ -111,7 +111,25 @@ class PlatformCliRetiredLocalRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(result.exit_code, 1, msg=result.output)
-        self.assertIn("Local 'platform restore' is retired in odoo-ai.", result.output)
+        self.assertIn("'platform restore' is retired in odoo-ai.", result.output)
+        self.assertIn("--instance local", result.output)
+
+    def test_restore_and_bootstrap_retire_remote_instances_too(self) -> None:
+        runner = CliRunner()
+
+        command_arguments_by_name = {
+            "restore": ["restore", "--context", "cm", "--instance", "testing"],
+            "bootstrap": ["bootstrap", "--context", "cm", "--instance", "testing"],
+            "run": ["run", "--context", "cm", "--instance", "testing", "--workflow", "restore"],
+        }
+
+        for command_name, command_arguments in command_arguments_by_name.items():
+            with self.subTest(command_name=command_name):
+                result = runner.invoke(platform_cli_command, command_arguments)
+
+                self.assertEqual(result.exit_code, 1, msg=result.output)
+                self.assertIn("retired in odoo-ai", result.output)
+                self.assertIn("--instance testing", result.output)
 
 
 if __name__ == "__main__":

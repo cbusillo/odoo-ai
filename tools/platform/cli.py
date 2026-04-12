@@ -1153,8 +1153,8 @@ REMOTE_RUNTIME_CONTRACT_HELP = (
     "Use ship for non-destructive deploy/restart. Restore and bootstrap are explicit data workflows; init remains local-only."
 )
 DESTRUCTIVE_DATA_WORKFLOW_HELP = (
-    "Destructive data workflow. In odoo-ai this now survives only for remote dev/testing/prod targets. "
-    "Use odoo-devkit manifest-backed runtime restore/bootstrap for local work. "
+    "Retired repo-local destructive workflow shim. "
+    "Use odoo-devkit manifest-backed runtime restore/bootstrap instead, with --instance for dev/testing/prod. "
     "Use --allow-prod-data-workflow only for explicit prod break-glass operations."
 )
 
@@ -1599,8 +1599,8 @@ def gate(
 @main.command(
     "run",
     help=(
-        "Run remote platform data workflows such as restore or bootstrap. "
-        "Local restore/bootstrap ownership moved to odoo-devkit plus the tenant workspace.toml manifest."
+        "Retired repo-local destructive workflow shim. "
+        "Use odoo-devkit manifest-backed runtime restore/bootstrap with the tenant workspace.toml manifest instead."
     ),
 )
 @click.option(

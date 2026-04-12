@@ -40,8 +40,10 @@ Operator Contract
   and
   `uv --directory /path/to/odoo-devkit run platform runtime workflow --manifest /path/to/workspace.toml --workflow bootstrap`.
 - Treat `dev`, `testing`, and `prod` as Dokploy-managed remote targets.
-  Use `platform ship`, `platform rollback`, `platform gate`,
-  `platform restore`, and `platform bootstrap` there.
+  Use `platform ship`, `platform rollback`, and `platform gate` from `odoo-ai`.
+  For destructive remote data workflows, use the same manifest-backed
+  `odoo-devkit` commands with an explicit runtime `--instance`, for example
+  `uv --directory /path/to/odoo-devkit run platform runtime restore --manifest /path/to/workspace.toml --instance testing`.
 - `platform ship` is the non-destructive remote deploy/restart path.
 - `platform rollback` currently supports Dokploy application targets only.
   Compose targets must use Dokploy UI rollback controls.
@@ -63,9 +65,7 @@ Command Families
 - Local inspection: `info`, `status`, `doctor`.
 - Retired compatibility shims: `select`, `up`, `down`, `logs`, `build`,
   `inspect`, `odoo-shell`, `init`, `update`, `openupgrade`.
-- Data workflows: `restore`, `bootstrap` for remote Dokploy-managed targets.
-- Runtime workflows: `run` for the surviving remote `restore` and `bootstrap`
-  path only.
+- Retired compatibility shims: `restore`, `bootstrap`, `run`.
 - Validation scenarios: `validate ...`.
 - Remote release: `ship`, `rollback`, `gate`, and `platform dokploy ...`
   helpers.
@@ -78,9 +78,7 @@ Behavior Highlights
 
 - Manifest-driven `platform runtime ...` ownership now lives in `odoo-devkit`.
   This document remains the contract for the shrinking repo-local
-  `uv run platform ...` surface in `odoo-ai` during retirement, including the
-  transitional remote restore/bootstrap/update workflow path that still exists
-  here.
+  `uv run platform ...` surface in `odoo-ai` during retirement.
 - `odoo-ai` is not the durable final home for this platform surface. The
   remaining repo-local commands and docs should be treated as migration seams
   to be extracted into tenant repos, `odoo-devkit`, or `odoo-control-plane`.
@@ -91,15 +89,10 @@ Behavior Highlights
   exist only as explicit retirement shims. Use
   `uv --directory /path/to/odoo-devkit run platform runtime workflow --manifest /path/to/workspace.toml --workflow <name>`
   instead.
-- Local `platform restore` and `platform bootstrap` in `odoo-ai` are now
-  retired too. Use the manifest-backed `odoo-devkit` runtime restore/bootstrap
-  surface instead.
-- `platform run` in `odoo-ai` is now narrowed to the surviving remote
-  `restore` and `bootstrap` path only. Do not route local
-  `restore`/`bootstrap`/`init`/`update`/`openupgrade` through `run` or `tui`;
-  use the manifest-backed `odoo-devkit` runtime workflow surface. These
-  commands require an explicit remote `--instance` and must not fall back to
-  `local`.
+- `platform restore`, `platform bootstrap`, and `platform run` in `odoo-ai`
+  are now retired too. Use the manifest-backed `odoo-devkit` runtime
+  restore/bootstrap surface instead, and pass `--instance` explicitly when
+  targeting Dokploy-managed `dev`/`testing`/`prod`.
 - `platform doctor` is read-only and spans both local runtime diagnostics and
   Dokploy target diagnostics.
 - `platform ship` fails closed on dirty tracked files. Prefer a clean worktree
@@ -128,8 +121,9 @@ Behavior Highlights
 - For extracted tenants, manifest-backed local runtime env/config generation
   now lives in `odoo-devkit` via `platform runtime select --manifest ...` and
   `platform runtime inspect --manifest ...`.
-- Remote `restore`/`bootstrap` for Dokploy-managed targets (`dev`, `testing`,
-  `prod`) run through Dokploy schedule jobs triggered by the Dokploy API.
+- Manifest-backed remote `restore`/`bootstrap` for Dokploy-managed targets
+  (`dev`, `testing`, `prod`) run through Dokploy schedule jobs triggered by the
+  Dokploy API.
   Targets with deploy-server linkage use Dokploy `server` jobs; targets without
   linkage use Dokploy `dokploy-server` jobs. The platform no longer SSHes to
   Dokploy-managed targets. Before those schedule jobs run, platform syncs the

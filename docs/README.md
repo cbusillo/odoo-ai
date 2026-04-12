@@ -2,7 +2,6 @@
 title: Project Documentation
 ---
 
-
 Purpose
 
 - Provide the routing map for project documentation.
@@ -53,12 +52,13 @@ Routing
   [@docs/resources.md](resources.md)
 - Roles: [@docs/roles.md](roles.md)
 - Platform migration status: [@docs/todo/platform-migration-status.md](todo/platform-migration-status.md)
-- Odoo 19 OPW cutover: [@docs/todo/odoo-19-cutover-runbook.md](todo/odoo-19-cutover-runbook.md)
-- CM import baseline: [@docs/todo/cm-import-baseline.md](todo/cm-import-baseline.md)
-- Dokploy deploy follow-ups: [@docs/todo/dokploy-deploy-observability-and-branch-safety.md](todo/dokploy-deploy-observability-and-branch-safety.md)
 
 Notes
 
 - Keep docs small; prefer linking by handle to larger guides when needed.
+- Tenant-specific rollout notes should live in the tenant repo docs, not this
+  shared index.
+- The CM import baseline now lives in `odoo-tenant-cm/docs/todo/` rather than
+  this shared index.
 - `docs/internal/` is intentionally excluded from this index; it is a local,
   gitignored workspace for sensitive or instance-specific notes.

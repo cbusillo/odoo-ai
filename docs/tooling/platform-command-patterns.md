@@ -24,36 +24,39 @@ Quick Start
 
 - Validate platform config and list contexts:
 
-  ```bash
-  uv run platform validate-config
-  uv run platform list-contexts
-  ```
+    ```bash
+    uv run platform validate-config
+    uv run platform list-contexts
+    ```
 
-- Select and inspect a local runtime:
+- Select and inspect a local runtime through `odoo-devkit` and a tenant
+  manifest:
 
-  ```bash
-  uv run platform select --context cm --instance local
-  uv run platform info --context cm --instance local
-  uv run platform status --context cm --instance local
-  ```
+    ```bash
+    uv --directory ../odoo-devkit run platform runtime select \
+      --manifest ../odoo-tenant-cm/workspace.toml
+    uv --directory ../odoo-devkit run platform runtime inspect \
+      --manifest ../odoo-tenant-cm/workspace.toml
+    uv run platform info --context cm --instance local
+    uv run platform status --context cm --instance local
+    ```
 
-- Local runtime lifecycle:
+- Local runtime lifecycle ownership now lives in `odoo-devkit`:
 
-  ```bash
-  uv run platform up --context cm --instance local
-  uv run platform build --context cm --instance local --no-cache
-  uv run platform odoo-shell --context cm --instance local \
-    --script tmp/scripts/example.py
-  uv run platform logs --context cm --instance local --service web
-  uv run platform down --context cm --instance local
-  ```
+    ```bash
+    uv --directory ../odoo-devkit run platform runtime up \
+      --manifest ../odoo-tenant-cm/workspace.toml --build
+    ```
+
+- The repo-local `platform select|up|down|logs|build|inspect|odoo-shell`
+  commands in `odoo-ai` are retired compatibility shims and now fail closed.
 
 - Run tracked environment validation scenarios through `platform validate`:
 
-  ```bash
-  uv run platform validate shopify-roundtrip --context opw --instance testing \
-    --profile smoke --sample-size 5
-  ```
+    ```bash
+    uv run platform validate shopify-roundtrip --context opw --instance testing \
+      --profile smoke --sample-size 5
+    ```
 
 - Prefer explicit profiles for long-running scenarios. For Shopify validation,
   `--profile smoke` resets Shopify and re-exports a bounded sample before the
@@ -67,12 +70,12 @@ Local Workflow Patterns
 
 - Run destructive data workflows:
 
-  ```bash
-  uv run platform restore --context cm --instance local --dry-run
-  uv run platform bootstrap --context cm --instance local --dry-run
-  uv run platform restore --context cm --instance testing --dry-run
-  uv run platform openupgrade --context cm --instance local --dry-run
-  ```
+    ```bash
+    uv run platform restore --context cm --instance local --dry-run
+    uv run platform bootstrap --context cm --instance local --dry-run
+    uv run platform restore --context cm --instance testing --dry-run
+    uv run platform openupgrade --context cm --instance local --dry-run
+    ```
 
 - `platform restore` and `platform bootstrap` block prod data-mutation
   workflows by default.
@@ -97,42 +100,39 @@ Remote Release Patterns
 
 - Ship and rollback:
 
-  ```bash
-  uv run platform ship --context cm --instance testing
-  uv run platform ship --context cm --instance testing --skip-gate
-  uv run platform ship --context cm --instance testing --source-ref release/cm-hotfix
-  uv run platform ship --context cm --instance testing --source-ref HEAD
-  uv run platform ship --context cm --instance testing --dry-run
-  uv run platform rollback --context cm --instance testing --list
-  ```
+    ```bash
+    uv run platform ship --context cm --instance testing
+    uv run platform ship --context cm --instance testing --skip-gate
+    uv run platform ship --context cm --instance testing --dry-run
+    uv run platform rollback --context cm --instance testing --list
+    ```
 
 - `platform ship` fails closed when tracked files are dirty.
-  Prefer a clean worktree and `--source-ref HEAD`; use `--allow-dirty` only as
-  an explicit exception.
-- `platform ship` syncs the deployment branch before deploy/redeploy.
-  Default source refs come from `platform/dokploy.toml`.
+  Prefer a clean worktree; use `--allow-dirty` only as an explicit exception.
 - Managed Dokploy targets use `platform ship` as the only deployment trigger.
-  Leave Dokploy auto deploy disabled so branch sync does not race the
-  explicit deploy call.
+  Leave Dokploy auto deploy disabled so the explicit deploy call remains the
+  only release trigger.
 - `platform ship` verifies `/web/health` by default when `--wait` is enabled.
   `--no-verify-health` is for one-off troubleshooting.
-- Release-sensitive commands (`ship`, `rollback`, `gate`, `promote`, and
+- Release-sensitive commands (`ship`, `rollback`, `gate`, and
   `platform dokploy reconcile`) always resolve env layers with collision mode
   `error`.
 - `platform rollback` currently works only for Dokploy application targets.
   Compose targets must use Dokploy UI rollback controls.
 
-Release Gates and Promotion
+Release Gates and Handoff
 
 ```bash
 uv run platform gate --context cm --instance testing --phase all
-uv run platform promote --context cm --from-instance testing --to-instance prod
+uv run --project ../odoo-control-plane control-plane promote resolve \
+  --context cm --from-instance testing --to-instance prod \
+  --artifact-id <artifact-id> --backup-record-id <record-id>
 ```
 
 - `platform gate --phase code` runs the local test gate.
 - `platform gate --phase env` verifies live endpoint health.
-- `platform promote` is intentionally limited to `testing -> prod` and runs
-  `uv run prod-gate backup --target <context>` before deployment.
+- Native `odoo-control-plane` ship and promotion planning/execution no longer
+  require an `odoo-ai` request export or path-based runtime delegation.
 
 Dokploy Helpers
 
@@ -175,19 +175,18 @@ Secrets and Runtime Artifacts
 
 - Use `platform secrets explain` to inspect the env layering contract:
 
-  ```bash
-  uv run platform secrets explain --context cm --instance dev
-  uv run platform secrets explain --context cm --instance dev --json-output
-  ```
+    ```bash
+    uv run platform secrets explain --context cm --instance dev
+    uv run platform secrets explain --context cm --instance dev --json-output
+    ```
 
 - Env merge order is `.env` or `--env-file` -> `secrets.toml` shared ->
   context shared -> instance env.
 - Runtime tuning keys live under `runtime_env` in `platform/stack.toml` with
   merge order `stack -> context -> instance`.
-- `platform select --dry-run` shows the env diff before writing
-  `.platform/env/<context>.<instance>.env`.
-- `platform select` also writes `.platform/ide/<context>.<instance>.odoo.conf`
-  for JetBrains tooling.
+- For extracted tenants, `platform runtime select --manifest ...` in
+  `odoo-devkit` writes the runtime env and JetBrains-visible Odoo config for
+  the manifest-backed workspace.
 - Platform runtime control files (for example generated `platform.odoo.conf`)
   are written under `.platform/state/`.
 - Dokploy targets pin `ODOO_WEB_COMMAND` to

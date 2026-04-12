@@ -39,6 +39,8 @@ docker-compose.yml
 1. Copy the templates you need:
     - `cp .env.example .env`
     - Fill required secrets in `.env` or `platform/secrets.toml`.
+    - For local image builds, set private `ODOO_BASE_RUNTIME_IMAGE` and
+      `ODOO_BASE_DEVTOOLS_IMAGE` there before running `platform up --build`.
 
 2. Run the stack:
 

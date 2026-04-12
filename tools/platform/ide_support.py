@@ -8,8 +8,9 @@ from .models import RuntimeSelection, StackDefinition
 def _resolve_pycharm_addons_paths(repo_root: Path, stack_definition: StackDefinition) -> list[str]:
     """Render PyCharm addons_path values without mirroring Odoo sources into the repo.
 
-    The runtime stack uses container paths. Keep those values as-is, except map the
-    project addons mount to the local workspace path so local addons stay editable.
+    Keep this helper local until `odoo-ai` has a real, CI-safe way to consume
+    `odoo-devkit` as a dependency. The shared prototype also lives in
+    `odoo_devkit.ide_support`.
     """
 
     resolved_paths: list[str] = []
@@ -32,12 +33,7 @@ def write_pycharm_odoo_conf(
     stack_definition: StackDefinition,
     source_environment: dict[str, str],
 ) -> Path:
-    """Write an IDE-oriented Odoo config.
-
-    This intentionally avoids copying Odoo core/enterprise sources into the
-    repository. PyCharm remote interpreters should resolve those from remote
-    sources managed by the IDE itself.
-    """
+    """Write an IDE-oriented Odoo config for local tooling."""
 
     ide_directory = repo_root / ".platform" / "ide"
     ide_directory.mkdir(parents=True, exist_ok=True)

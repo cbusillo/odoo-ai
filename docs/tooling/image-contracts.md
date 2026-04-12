@@ -15,7 +15,7 @@ When
 Layer Model
 
 1. `odoo-docker` (public)
-2. `odoo-enterprise-docker` (private)
+2. private Enterprise layer image repo (private and intentionally unnamed in public docs)
 3. `odoo-ai` (project runtime + code mounts)
 
 `odoo-docker` contract
@@ -54,7 +54,7 @@ Layer Model
   - `runtime-devtools` may add dev-only source/addon path shaping, but runtime
     targets stay free of IDE-only `.pth` entries
 
-`odoo-enterprise-docker` contract
+Private Enterprise layer contract
 
 - Scope: private runtime layer that adds enterprise source and private runtime
   defaults.
@@ -111,7 +111,7 @@ Layer Model
 Promotion Rule
 
 1. `odoo-docker` publishes candidate tags after base smoke checks.
-2. `odoo-enterprise-docker` consumes candidate base and publishes private
+2. the private Enterprise layer consumes candidate base and publishes private
    candidate tags after enterprise smoke checks.
 3. `odoo-ai` integration gate validates restore/openupgrade/test flow against
    candidate enterprise image.

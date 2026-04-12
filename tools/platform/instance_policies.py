@@ -12,5 +12,5 @@ def assert_local_instance_for_local_runtime(*, instance_name: str, operation_nam
         return
     raise click.ClickException(
         f"{operation_name} manages local host runtime only and requires --instance {LOCAL_INSTANCE_NAME}. "
-        "Use Dokploy workflows (ship/rollback/gate/promote) for remote instances."
+        "Use Dokploy workflows (ship/rollback/gate) for remote instances."
     )

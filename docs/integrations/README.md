@@ -13,7 +13,7 @@ When
 ## Shopify
 
 - Canonical guide: @docs/integrations/shopify.md
-- Do not modify generated files: `addons/shared/shopify_sync/services/shopify/gql/*`
+- Do not modify generated files: `addons/opw/shopify_sync/services/shopify/gql/*`
 
 ## Authentik
 

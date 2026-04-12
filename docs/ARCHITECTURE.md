@@ -6,8 +6,9 @@ Purpose
 
 - Capture the steady-state runtime topology and the boundaries between local
   stacks and Dokploy-managed environments.
-- The long-term split between the public addon repo and the private operator
-  control plane lives in [@docs/control-plane-roadmap.md](control-plane-roadmap.md).
+- The long-term extraction of responsibilities out of `odoo-ai` into
+  `odoo-devkit`, tenant/shared repos, and the private operator control plane
+  lives in [@docs/control-plane-roadmap.md](control-plane-roadmap.md).
 
 When
 
@@ -15,14 +16,26 @@ When
 
 ## Runtime Topology
 
-| Environment     | Location   | Deployment command                                  |
-|-----------------|------------|-----------------------------------------------------|
-| OPW local       | dev laptop | `platform up --context opw --instance local`        |
-| CM local        | dev laptop | `platform up --context cm --instance local`         |
-| OPW dev/testing | Dokploy    | `platform ship --context opw --instance <instance>` |
-| CM dev/testing  | Dokploy    | `platform ship --context cm --instance <instance>`  |
-| OPW prod        | Dokploy    | `platform ship --context opw --instance prod`       |
-| CM prod         | Dokploy    | `platform ship --context cm --instance prod`        |
+- OPW local
+  Location: dev laptop
+  Deployment command:
+  `uv --directory ../odoo-devkit run platform runtime up --manifest ../odoo-tenant-opw/workspace.toml --build`
+- CM local
+  Location: dev laptop
+  Deployment command:
+  `uv --directory ../odoo-devkit run platform runtime up --manifest ../odoo-tenant-cm/workspace.toml --build`
+- OPW dev/testing
+  Location: Dokploy
+  Deployment command: `platform ship --context opw --instance <instance>`
+- CM dev/testing
+  Location: Dokploy
+  Deployment command: `platform ship --context cm --instance <instance>`
+- OPW prod
+  Location: Dokploy
+  Deployment command: `platform ship --context opw --instance prod`
+- CM prod
+  Location: Dokploy
+  Deployment command: `platform ship --context cm --instance prod`
 
 Use explicit context/instance flags in command invocations (for example
 `--context opw --instance local`).
@@ -33,12 +46,15 @@ Use explicit context/instance flags in command invocations (for example
   flows.
 - `platform/stack.toml` is the source of truth for valid contexts and
   instance names.
-- Local runtime lifecycle and mutating workflows (`select`, `up`, `down`,
-  `logs`, `build`, `run`, `init`, `update`, `openupgrade`, `inspect`) are
-  host-local operations and require `--instance local`.
+- Extracted-tenant local runtime ownership now lives in `odoo-devkit` via
+  manifest-backed `platform runtime ... --manifest <workspace.toml>` commands.
+- `odoo-ai` no longer owns repo-local local-runtime lifecycle commands such as
+  `select`, `up`, `down`, `logs`, `build`, `inspect`, or `odoo-shell`; those
+  names remain only as retirement shims that fail closed with migration
+  guidance.
 - `dev`, `testing`, and `prod` are Dokploy-managed remote instances and should
-  be managed with Dokploy release flows (`ship`, `rollback`, `gate`,
-  `promote`, and `platform dokploy ...` helpers).
+  be managed with Dokploy release flows (`ship`, `rollback`, `gate`, and
+  `platform dokploy ...` helpers).
 - Local stacks use platform-generated runtime env under `.platform/env/`
   on top of `docker-compose.yml` + `platform/compose/base.yaml` +
   `docker-compose.override.yml`.
@@ -60,15 +76,15 @@ Use explicit context/instance flags in command invocations (for example
 
 ## Local deploy/restore
 
-- Deploy: `uv run platform up --context <target> --instance local --build`
-- Restore: `uv run platform restore --context <target> --instance local`
+- Deploy: `uv --directory ../odoo-devkit run platform runtime up --manifest ../odoo-tenant-<target>/workspace.toml --build`
+- Restore: `uv --directory ../odoo-devkit run platform runtime restore --manifest ../odoo-tenant-<target>/workspace.toml`
 
 ## Application layers
 
 - Base runtime image consumed by `odoo-ai`:
-  `ghcr.io/cbusillo/odoo-enterprise-docker:19.0-runtime`
+  private Enterprise runtime image configured outside public repos
 - Base devtools image consumed by local `odoo-ai` builds:
-  `ghcr.io/cbusillo/odoo-enterprise-docker:19.0-devtools`
+  private Enterprise devtools image configured outside public repos
 - Public foundation image:
   `ghcr.io/cbusillo/odoo-docker:19.0-runtime`
 - Public devtools foundation image:
@@ -78,10 +94,10 @@ Use explicit context/instance flags in command invocations (for example
   `/opt/project/addons/cm`, alongside `/opt/extra_addons`
   (`ODOO_ADDON_REPOSITORIES` for non-enterprise extras).
 - Enterprise addons: `/opt/enterprise` from
-  `ghcr.io/cbusillo/odoo-enterprise-docker`.
+  the private Enterprise layer image.
 - Dev-only addon path shaping lives upstream in the image chain. `odoo-docker`
   devtools exposes `/odoo`, `/opt/project/addons`, and `/opt/extra_addons`,
-  and `odoo-enterprise-docker` appends `/opt/enterprise`. `odoo-ai` keeps
+  and the private Enterprise layer appends `/opt/enterprise`. `odoo-ai` keeps
   `/opt/project` as a real directory in the image. Both production and
   development targets bake `/opt/project/addons` at build time; runtime env
   generation expands nested addon grouping directories under that root so Odoo

@@ -6,8 +6,8 @@ Purpose
 
 Do Not Modify
 
-- `addons/shared/shopify_sync/services/shopify/gql/*` — generated GraphQL client files.
-- `addons/shared/shopify_sync/graphql/schema/*` — Shopify schema snapshots.
+- `addons/opw/shopify_sync/services/shopify/gql/*` — generated GraphQL client files.
+- `addons/opw/shopify_sync/graphql/schema/*` — Shopify schema snapshots.
 
 Key Points
 

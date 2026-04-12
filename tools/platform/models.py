@@ -233,15 +233,6 @@ class StackDefinition(BaseModel):
     contexts: dict[str, ContextDefinition]
 
 
-@dataclass(frozen=True)
-class ShipBranchSyncPlan:
-    source_git_ref: str
-    source_commit: str
-    target_branch: str
-    remote_branch_commit_before: str
-    branch_update_required: bool
-
-
 ReleaseStatus = Literal["pending", "pass", "fail", "skipped"]
 
 
@@ -300,6 +291,61 @@ class ShipRequest(BaseModel):
             raise ValueError("ship request requires target_name")
         if not self.deploy_mode.strip():
             raise ValueError("ship request requires deploy_mode")
+        return self
+
+
+class BackupGateEvidence(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    required: bool = True
+    status: ReleaseStatus = "pending"
+    evidence: dict[str, str] = Field(default_factory=dict)
+
+
+class PromotionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: int = Field(default=1, ge=1)
+    artifact_id: str
+    backup_record_id: str
+    source_git_ref: str
+    context: str
+    from_instance: str
+    to_instance: str
+    target_name: str
+    target_type: Literal["compose", "application"]
+    deploy_mode: str
+    wait: bool = True
+    timeout_seconds: int | None = Field(default=None, ge=1)
+    verify_health: bool = True
+    health_timeout_seconds: int | None = Field(default=None, ge=1)
+    dry_run: bool = False
+    no_cache: bool = False
+    allow_dirty: bool = False
+    source_health: HealthcheckEvidence = Field(default_factory=HealthcheckEvidence)
+    backup_gate: BackupGateEvidence = Field(default_factory=BackupGateEvidence)
+    destination_health: HealthcheckEvidence = Field(default_factory=HealthcheckEvidence)
+
+    @model_validator(mode="after")
+    def _validate_promotion_request(self) -> "PromotionRequest":
+        if not self.artifact_id.strip():
+            raise ValueError("promotion request requires artifact_id")
+        if not self.backup_record_id.strip():
+            raise ValueError("promotion request requires backup_record_id")
+        if not self.source_git_ref.strip():
+            raise ValueError("promotion request requires source_git_ref")
+        if not self.context.strip():
+            raise ValueError("promotion request requires context")
+        if not self.from_instance.strip():
+            raise ValueError("promotion request requires from_instance")
+        if not self.to_instance.strip():
+            raise ValueError("promotion request requires to_instance")
+        if self.from_instance == self.to_instance:
+            raise ValueError("promotion source and destination instances must differ")
+        if not self.target_name.strip():
+            raise ValueError("promotion request requires target_name")
+        if not self.deploy_mode.strip():
+            raise ValueError("promotion request requires deploy_mode")
         return self
 
 

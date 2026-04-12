@@ -17,7 +17,6 @@
         "phone_validation",
         "external_ids",
         "product_metadata",
-        "marine_motors",
         "notification_center",
         "transaction_utilities",
         "web_tour",

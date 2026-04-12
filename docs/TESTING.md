@@ -2,7 +2,6 @@
 title: Testing
 ---
 
-
 Purpose
 
 - Use the unified test CLI via `uv run`. Keep inner loops fast, then close with
@@ -30,8 +29,9 @@ Commands
   `--env-file .platform/env/<context>.<instance>.env`) to load the correct
   local stack env before running tests.
   Stack/env-file selection is required. Stack-based runs fail closed when the
-  runtime env file is missing; generate it first with
-  `uv run platform select --context <context> --instance <instance>`.
+  runtime env file is missing; for extracted-tenant local stacks, generate it
+  first through `odoo-devkit`, for example
+  `uv --directory /path/to/odoo-devkit run platform runtime select --manifest /path/to/workspace.toml`.
 - The canonical command list lives in
   [docs/tooling/testing-cli.md](tooling/testing-cli.md). Prefer those helpers
   over ad-hoc invocations.
@@ -94,7 +94,7 @@ Notes
   clone shards from it to avoid repeated module installs; template logs land
   under `tmp/test-logs/<session>/<phase>/template-*.log`.
 - Use detached mode (`uv run test run --detached`, then `uv run test wait
-  --json`) when long tours or integrations risk timeouts.
+--json`) when long tours or integrations risk timeouts.
 - The prod gate runs `uv run test run --json --stack <target>` so the correct
   local runtime env is applied. Platform code-gate commands automatically
   set `TESTKIT_PROFILE=gate`.

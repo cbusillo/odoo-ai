@@ -1,0 +1,119 @@
+from __future__ import annotations
+
+import os
+
+PLATFORM_RUNTIME_ENV_KEYS = (
+    "PLATFORM_CONTEXT",
+    "PLATFORM_INSTANCE",
+    "PLATFORM_RUNTIME_ENV_FILE",
+    "PYTHON_VERSION",
+    "ODOO_VERSION",
+    "ODOO_STACK_NAME",
+    "ODOO_PROJECT_NAME",
+    "ODOO_STATE_ROOT",
+    "ODOO_RUNTIME_CONF_HOST_PATH",
+    "DOCKER_IMAGE",
+    "DOCKER_IMAGE_TAG",
+    "DOCKER_IMAGE_REFERENCE",
+    "COMPOSE_BUILD_TARGET",
+    "ODOO_DATA_VOLUME",
+    "ODOO_LOG_VOLUME",
+    "ODOO_DB_VOLUME",
+    "ODOO_DB_NAME",
+    "ODOO_DB_USER",
+    "ODOO_DB_PASSWORD",
+    "ODOO_FILESTORE_PATH",
+    "ODOO_MASTER_PASSWORD",
+    "ODOO_ADMIN_LOGIN",
+    "ODOO_INSTALL_MODULES",
+    "ODOO_ADDON_REPOSITORIES",
+    "ODOO_UPDATE_MODULES",
+    "ODOO_ADDONS_PATH",
+    "ODOO_WEB_HOST_PORT",
+    "ODOO_LONGPOLL_HOST_PORT",
+    "ODOO_DB_HOST_PORT",
+    "ODOO_LIST_DB",
+    "ODOO_WEB_COMMAND",
+    "ODOO_DATA_WORKFLOW_LOCK_FILE",
+    "ODOO_DATA_WORKFLOW_LOCK_TIMEOUT_SECONDS",
+    "ODOO_DB_MAXCONN",
+    "ODOO_DB_MAXCONN_GEVENT",
+    "ODOO_WORKERS",
+    "ODOO_MAX_CRON_THREADS",
+    "ODOO_LIMIT_TIME_CPU",
+    "ODOO_LIMIT_TIME_REAL",
+    "ODOO_LIMIT_TIME_REAL_CRON",
+    "ODOO_LIMIT_TIME_WORKER_CRON",
+    "ODOO_LIMIT_MEMORY_SOFT",
+    "ODOO_LIMIT_MEMORY_HARD",
+    "ODOO_DEV_MODE",
+    "ODOO_LOGFILE",
+    "POSTGRES_MAX_CONNECTIONS",
+    "POSTGRES_SHARED_BUFFERS",
+    "POSTGRES_EFFECTIVE_CACHE_SIZE",
+    "POSTGRES_WORK_MEM",
+    "POSTGRES_MAINTENANCE_WORK_MEM",
+    "POSTGRES_MAX_WAL_SIZE",
+    "POSTGRES_MIN_WAL_SIZE",
+    "POSTGRES_CHECKPOINT_TIMEOUT",
+    "POSTGRES_RANDOM_PAGE_COST",
+    "POSTGRES_EFFECTIVE_IO_CONCURRENCY",
+    "DATA_WORKFLOW_SSH_DIR",
+    "DATA_WORKFLOW_SSH_KEY",
+    "ODOO_UPSTREAM_HOST",
+    "ODOO_UPSTREAM_USER",
+    "ODOO_UPSTREAM_DB_NAME",
+    "ODOO_UPSTREAM_DB_USER",
+    "ODOO_UPSTREAM_FILESTORE_PATH",
+    "OPENUPGRADE_ENABLED",
+    "OPENUPGRADE_ADDON_REPOSITORY",
+    "OPENUPGRADE_SCRIPTS_PATH",
+    "OPENUPGRADE_TARGET_VERSION",
+    "OPENUPGRADE_SKIP_UPDATE_ADDONS",
+    "OPENUPGRADELIB_INSTALL_SPEC",
+    "GITHUB_TOKEN",
+    "DOKPLOY_HOST",
+    "DOKPLOY_TOKEN",
+)
+
+PLATFORM_RUNTIME_PASSTHROUGH_PREFIXES = (
+    "ENV_OVERRIDE_",
+    "ODOO_UPSTREAM_",
+)
+
+PLATFORM_RUNTIME_PASSTHROUGH_KEYS = (
+    "ODOO_KEY",
+    "DATA_WORKFLOW_SSH_KEY",
+    "DOKPLOY_HOST",
+    "DOKPLOY_TOKEN",
+    "ODOO_BASE_RUNTIME_IMAGE",
+    "ODOO_BASE_DEVTOOLS_IMAGE",
+    "DOCKER_IMAGE_REFERENCE",
+)
+
+GIT_WRAPPER_ENV_KEYS = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_PREFIX",
+    "GIT_NAMESPACE",
+)
+
+
+def command_execution_env() -> dict[str, str]:
+    execution_env = dict(os.environ)
+    for runtime_key in PLATFORM_RUNTIME_ENV_KEYS:
+        execution_env.pop(runtime_key, None)
+    for passthrough_key in PLATFORM_RUNTIME_PASSTHROUGH_KEYS:
+        execution_env.pop(passthrough_key, None)
+    for environment_key in list(execution_env):
+        if any(environment_key.startswith(prefix) for prefix in PLATFORM_RUNTIME_PASSTHROUGH_PREFIXES):
+            execution_env.pop(environment_key, None)
+    return execution_env
+
+
+def git_command_execution_env() -> dict[str, str]:
+    execution_env = command_execution_env()
+    for git_key in GIT_WRAPPER_ENV_KEYS:
+        execution_env.pop(git_key, None)
+    return execution_env

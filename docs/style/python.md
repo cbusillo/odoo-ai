@@ -2,7 +2,6 @@
 title: Python Style
 ---
 
-
 Purpose
 
 - Define our house style for Python used in Odoo 19 projects and utilities.
@@ -40,6 +39,22 @@ Core Rules
   as clear nouns; avoid cryptic abbreviations. Prefer code that obviates
   comments.
 - DRY: extract helpers for repeated logic/queries; prefer composition over copy/paste.
+
+Addon Import Rule
+
+- Do not rely on `odoo.addons.<local_addon>` imports for normal local addon
+  code. Prefer local package imports or ORM access patterns that do not depend
+  on the Odoo addon namespace as a stable contract.
+- Shared-addon and Odoo/core addon imports via `odoo.addons.<addon>` are
+  acceptable when the addon is an explicit manifest dependency and the active
+  workspace exposes that addon path. Treat imports such as
+  `odoo.addons.external_ids`, `odoo.addons.phone_validation`, and
+  `odoo.addons.mail` as valid contract dependencies, not cleanup targets.
+- Exception: versioned migration scripts under `migrations/<version>/` are
+  loaded by Odoo via `load_script(..., module_name=<basename>)` as standalone
+  modules, so package-relative imports are not available there. Treat those
+  migration self-imports as a framework exception and verify loader behavior
+  before "cleaning them up".
 
 Odoo Plugin “Magic Types” (PyCharm)
 

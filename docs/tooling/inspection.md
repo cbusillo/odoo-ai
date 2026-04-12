@@ -48,9 +48,11 @@ Scopes
 Platform inspection context
 
 - Run `uv run platform validate-config` before inspection runs.
-- Run `uv run platform select --context <context> --instance local` before
-  opening JetBrains inspections; this writes the runtime env and generated
-  PyCharm Odoo config path for that context.
+- For extracted-tenant local stacks, run the manifest-backed devkit runtime
+  select command before opening JetBrains inspections; this writes the runtime
+  env and generated PyCharm Odoo config path for that tenant.
+  Example:
+  `uv --directory /path/to/odoo-devkit run platform runtime select --manifest /path/to/workspace.toml`.
 - The `odoo-ide` JetBrains plugin may not expose a dedicated config UI.
   Use the generated `pycharm_odoo_conf_file`
   (`.platform/ide/<context>.local.odoo.conf`) for run configurations or
@@ -58,5 +60,6 @@ Platform inspection context
 - Do not use `platform.odoo.conf` as a Docker Compose file; Compose targets
   should point at compose YAML files such as `docker-compose.yml` and
   `platform/compose/base.yaml`.
-- Use `uv run platform inspect --context <context> --instance local` for
-  JetBrains inspection runs.
+- Use the manifest-backed devkit inspect command for JetBrains inspection runs,
+  for example
+  `uv --directory /path/to/odoo-devkit run platform runtime inspect --manifest /path/to/workspace.toml`.

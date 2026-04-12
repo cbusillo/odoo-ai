@@ -203,7 +203,7 @@ class GenerateShopifyModelsEnvironmentTests(unittest.TestCase):
         generate_shopify_models = _load_generate_shopify_models_module()
 
         with TemporaryDirectory() as temporary_directory_name:
-            graphql_path = Path(temporary_directory_name) / "addons" / "shopify_sync" / "graphql"
+            graphql_path = Path(temporary_directory_name) / "addons" / "opw" / "shopify_sync" / "graphql"
             graphql_path.mkdir(parents=True, exist_ok=True)
             graphql_env_file = graphql_path / ".env"
             graphql_env_file.write_text(
@@ -241,7 +241,7 @@ class GenerateShopifyModelsEnvironmentTests(unittest.TestCase):
         generate_shopify_models = _load_generate_shopify_models_module()
 
         with TemporaryDirectory() as temporary_directory_name:
-            graphql_path = Path(temporary_directory_name) / "addons" / "shopify_sync" / "graphql"
+            graphql_path = Path(temporary_directory_name) / "addons" / "opw" / "shopify_sync" / "graphql"
             graphql_path.mkdir(parents=True, exist_ok=True)
             graphql_env_file = graphql_path / ".env.local"
             graphql_env_file.write_text(

@@ -18,9 +18,8 @@ Runner layout
     - `actions.runner.cbusillo-odoo-docker.chris-testing-odoo-docker.service`
     - `actions.runner.cbusillo-odoo-docker.chris-testing-odoo-docker-2.service`
     - `actions.runner.cbusillo-odoo-docker.chris-testing-odoo-docker-3.service`
-    - `actions.runner.cbusillo-odoo-enterprise-docker.chris-testing-odoo-enterprise-docker.service`
-    - `actions.runner.cbusillo-odoo-enterprise-docker.chris-testing-odoo-enterprise-docker-2.service`
-    - `actions.runner.cbusillo-odoo-enterprise-docker.chris-testing-odoo-enterprise-docker-3.service`
+    - three additional private Enterprise-layer runner services are present but
+      intentionally unnamed in this public doc
 
 Cache model
 

@@ -2,7 +2,6 @@
 title: Codex CLI
 ---
 
-
 Purpose
 
 - Run Codex sessions with explicit sandbox/approval and small, focused context.
@@ -33,11 +32,10 @@ Notes
   (gitignored) and run `uv run python tmp/scripts/<file>.py` instead of using
   heredocs; this keeps the `uv run` sandbox bypass active and makes reruns
   easy.
-- For stack-bound Odoo shell scripts against local runtimes, prefer
-  `uv run platform odoo-shell --context <context> --instance local`
-  `--script tmp/scripts/<file>.py` and add
-  `--log-file tmp/logs/<name>.log` when command output should stay off the
-  terminal.
+- The repo-local `uv run platform odoo-shell ...` helper is retired in
+  `odoo-ai`. For extracted-tenant local runtime work, use the manifest-backed
+  runtime surface in `odoo-devkit` and add any replacement shell helper there
+  instead of reviving the repo-local path.
 - Use the built-in browser tools for UI validation; do not use Playwright in
   this repo.
 - When testing service logins, skip the marketing site by loading

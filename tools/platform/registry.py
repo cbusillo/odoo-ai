@@ -4,8 +4,9 @@ import subprocess
 import click
 
 GHCR_HOST = "ghcr.io"
-DEFAULT_ODOO_BASE_RUNTIME_IMAGE = "ghcr.io/cbusillo/odoo-enterprise-docker:19.0-runtime"
-DEFAULT_ODOO_BASE_DEVTOOLS_IMAGE = "ghcr.io/cbusillo/odoo-enterprise-docker:19.0-devtools"
+PLACEHOLDER_REGISTRY_HOST = "registry.invalid"
+DEFAULT_ODOO_BASE_RUNTIME_IMAGE = "registry.invalid/private-enterprise-runtime:19.0-runtime"
+DEFAULT_ODOO_BASE_DEVTOOLS_IMAGE = "registry.invalid/private-enterprise-devtools:19.0-devtools"
 
 _REGISTRY_LOGINS_DONE: set[tuple[str, str]] = set()
 _VERIFIED_IMAGE_ACCESS: set[str] = set()
@@ -46,6 +47,16 @@ def extract_registry_owner(image_reference: str) -> str | None:
 
 
 def resolve_base_images_for_registry_auth(environment_values: dict[str, str]) -> list[str]:
+    resolved_images = resolve_base_images_for_build(environment_values)
+
+    images: list[str] = []
+    for image in resolved_images:
+        if image not in images:
+            images.append(image)
+    return images
+
+
+def resolve_base_images_for_build(environment_values: dict[str, str]) -> tuple[str, str]:
     runtime_image = clean_optional_value(environment_values.get("ODOO_BASE_RUNTIME_IMAGE"))
     devtools_image = clean_optional_value(environment_values.get("ODOO_BASE_DEVTOOLS_IMAGE"))
 
@@ -53,12 +64,30 @@ def resolve_base_images_for_registry_auth(environment_values: dict[str, str]) ->
         runtime_image = DEFAULT_ODOO_BASE_RUNTIME_IMAGE
     if devtools_image is None:
         devtools_image = DEFAULT_ODOO_BASE_DEVTOOLS_IMAGE
+    return runtime_image, devtools_image
 
-    images: list[str] = []
-    for image in (runtime_image, devtools_image):
-        if image and image not in images:
-            images.append(image)
-    return images
+
+def resolve_required_base_images_for_build(environment_values: dict[str, str]) -> tuple[tuple[str, str], ...]:
+    runtime_image, devtools_image = resolve_base_images_for_build(environment_values)
+    return (
+        ("ODOO_BASE_RUNTIME_IMAGE", runtime_image),
+        ("ODOO_BASE_DEVTOOLS_IMAGE", devtools_image),
+    )
+
+
+def require_configured_base_images_for_build(environment_values: dict[str, str]) -> list[str]:
+    required_images = resolve_required_base_images_for_build(environment_values)
+    unique_required_images: list[str] = []
+    for environment_key, image_reference in required_images:
+        registry_host = extract_registry_host(image_reference)
+        if registry_host == PLACEHOLDER_REGISTRY_HOST:
+            raise click.ClickException(
+                f"{environment_key} must be set to a real private base image before local builds run. "
+                "Set it in `.env` or `platform/secrets.toml`, not in checked-in public config."
+            )
+        if image_reference not in unique_required_images:
+            unique_required_images.append(image_reference)
+    return unique_required_images
 
 
 def resolve_ghcr_username(environment_values: dict[str, str], image_reference: str) -> str | None:
@@ -113,7 +142,7 @@ def verify_base_image_access(image_reference: str) -> None:
 
 
 def ensure_registry_auth_for_base_images(environment_values: dict[str, str]) -> None:
-    images = resolve_base_images_for_registry_auth(environment_values)
+    images = require_configured_base_images_for_build(environment_values)
     ghcr_images = [image for image in images if extract_registry_host(image) == GHCR_HOST]
     if not ghcr_images:
         return

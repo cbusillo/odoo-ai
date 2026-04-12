@@ -158,13 +158,29 @@ class PlatformEnvironmentTests(unittest.TestCase):
     def test_resolve_stack_env_file_raises_when_runtime_env_missing(self) -> None:
         with TemporaryDirectory() as temporary_directory_name:
             repo_root = Path(temporary_directory_name)
-            with self.assertRaises(click.ClickException):
+            with self.assertRaises(click.ClickException) as captured_error:
                 environment.resolve_stack_env_file(
                     repo_root=repo_root,
                     stack_name="opw-local",
                     explicit_env_file=None,
                     require_runtime_env=True,
                 )
+
+            self.assertIn("use odoo-devkit with the tenant workspace.toml manifest", captured_error.exception.message)
+
+    def test_resolve_stack_env_file_uses_remote_guidance_for_non_local_stack(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            repo_root = Path(temporary_directory_name)
+            with self.assertRaises(click.ClickException) as captured_error:
+                environment.resolve_stack_env_file(
+                    repo_root=repo_root,
+                    stack_name="cm-dev",
+                    explicit_env_file=None,
+                    require_runtime_env=True,
+                )
+
+            self.assertIn("Pass --env-file explicitly", captured_error.exception.message)
+            self.assertNotIn("odoo-devkit", captured_error.exception.message)
 
     def test_resolve_stack_env_file_prefers_runtime_env_when_available(self) -> None:
         with TemporaryDirectory() as temporary_directory_name:

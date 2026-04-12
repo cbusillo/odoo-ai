@@ -9,6 +9,8 @@ import click
 
 from tools.environment_files import discover_repo_root, parse_env_file
 
+VALID_BACKUP_MODES = {"both", "none", "snapshot", "vzdump"}
+
 
 @lru_cache(maxsize=1)
 def _repo_env_defaults() -> dict[str, str]:
@@ -21,13 +23,13 @@ def _repo_env_defaults() -> dict[str, str]:
 
 def _env(prefix: str, key: str, *, required: bool = False, default: str | None = None) -> str | None:
     environment_key = f"{prefix}_{key}"
-    repo_default = _repo_env_defaults().get(environment_key)
-    if repo_default is not None and repo_default.strip():
-        value = repo_default
-    else:
-        value = os.getenv(environment_key)
-        if value is not None and not value.strip():
-            value = None
+    value = os.getenv(environment_key)
+    if value is not None and not value.strip():
+        value = None
+    if value is None:
+        repo_default = _repo_env_defaults().get(environment_key)
+        if repo_default is not None and repo_default.strip():
+            value = repo_default
     if value is None:
         value = default
     if required and not value:
@@ -39,7 +41,15 @@ def _split_modes(raw: str | None) -> set[str]:
     if not raw:
         return set()
     tokens = raw.replace(":", ",").split(",")
-    return {token.strip().lower() for token in tokens if token.strip()}
+    modes = {token.strip().lower() for token in tokens if token.strip()}
+    invalid_modes = sorted(mode for mode in modes if mode not in VALID_BACKUP_MODES)
+    if invalid_modes:
+        valid_modes = ", ".join(sorted(VALID_BACKUP_MODES))
+        invalid_modes_text = ", ".join(invalid_modes)
+        raise click.ClickException(
+            f"Invalid PROD_BACKUP_MODE value(s): {invalid_modes_text}. Expected one or more of: {valid_modes}"
+        )
+    return modes
 
 
 def _run(cmd: list[str], *, cwd: Path | None = None, dry_run: bool = False) -> None:
@@ -126,6 +136,67 @@ def _load_target_env(prefix: str) -> tuple[str, str | None, str]:
     return host, user, ctid
 
 
+def _backup_gate_record_id(*, context_name: str, instance_name: str, created_at: datetime) -> str:
+    return f"backup-{context_name}-{instance_name}-{created_at.strftime('%Y%m%dT%H%M%SZ')}"
+
+
+def _build_backup_gate_record(
+    *,
+    context_name: str,
+    instance_name: str,
+    created_at: datetime,
+    source: str,
+    modes: set[str],
+    snapshot_name: str,
+    storage_name: str,
+    proxmox_host: str,
+    ctid: str,
+    optional_tag: str | None,
+) -> dict[str, object]:
+    evidence: dict[str, str] = {
+        "backup_modes": ",".join(sorted(modes)),
+        "ctid": ctid,
+        "proxmox_host": proxmox_host,
+    }
+    if snapshot_name:
+        evidence["snapshot"] = snapshot_name
+    if storage_name:
+        evidence["storage"] = storage_name
+    if optional_tag:
+        evidence["tag"] = optional_tag
+    return {
+        "schema_version": 1,
+        "record_id": _backup_gate_record_id(
+            context_name=context_name,
+            instance_name=instance_name,
+            created_at=created_at,
+        ),
+        "context": context_name,
+        "instance": instance_name,
+        "created_at": created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "source": source,
+        "required": True,
+        "status": "pass",
+        "evidence": evidence,
+    }
+
+
+def _resolve_record_directory(record_directory: Path) -> Path:
+    repo_root = discover_repo_root(Path.cwd())
+    if record_directory.is_absolute():
+        return record_directory
+    return repo_root / record_directory
+
+
+def _write_backup_gate_record(*, record_directory: Path, record_payload: dict[str, object]) -> Path:
+    resolved_record_directory = _resolve_record_directory(record_directory)
+    resolved_record_directory.mkdir(parents=True, exist_ok=True)
+    record_id = str(record_payload["record_id"])
+    record_path = resolved_record_directory / f"{record_id}.json"
+    record_path.write_text(json.dumps(record_payload, indent=2, sort_keys=True), encoding="utf-8")
+    return record_path
+
+
 @click.group()
 def main() -> None:
     """Prod deploy safety gates (backup + rollback)."""
@@ -135,8 +206,27 @@ def main() -> None:
 @click.option("--target", default="opw", show_default=True, help="Prefix for PROD_* env vars")
 @click.option("--tag", default=None, help="Optional label to append to snapshot name")
 @click.option("--run-tests", is_flag=True, help="Run uv test gate before backup")
+@click.option(
+    "--control-plane-record-dir",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Write a control-plane backup gate record JSON file into this directory after a successful backup.",
+)
+@click.option(
+    "--control-plane-instance",
+    default="prod",
+    show_default=True,
+    help="Destination instance name to record in the emitted control-plane backup gate payload.",
+)
 @click.option("--dry-run", is_flag=True)
-def backup_command(target: str, tag: str | None, run_tests: bool, dry_run: bool) -> None:
+def backup_command(
+    target: str,
+    tag: str | None,
+    run_tests: bool,
+    control_plane_record_dir: Path | None,
+    control_plane_instance: str,
+    dry_run: bool,
+) -> None:
     prefix = target.upper()
     storage = _env(prefix, "PROD_BACKUP_STORAGE")
     storage_value = storage or ""
@@ -164,12 +254,16 @@ def backup_command(target: str, tag: str | None, run_tests: bool, dry_run: bool)
     if run_tests:
         _run(["uv", "run", "test", "run", "--json", "--stack", target], dry_run=dry_run)
 
+    if not modes and control_plane_record_dir is not None:
+        click.echo("control_plane_record_skipped=no_backup_mode")
+        return
+
     if not modes:
         return
 
     host, user, ctid = _load_target_env(prefix)
-
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    created_at = datetime.utcnow()
+    timestamp = created_at.strftime("%Y%m%d-%H%M%S")
     tag_suffix = f"-{tag}" if tag else ""
     snapshot_name = f"{snapshot_prefix}-{timestamp}{tag_suffix}"
 
@@ -199,6 +293,32 @@ def backup_command(target: str, tag: str | None, run_tests: bool, dry_run: bool)
             ],
             dry_run=dry_run,
         )
+
+    if control_plane_record_dir is None:
+        return
+    if dry_run:
+        click.echo("control_plane_record_skipped=dry_run")
+        return
+
+    if not control_plane_instance.strip():
+        raise click.ClickException("--control-plane-instance requires a non-empty value")
+    record_payload = _build_backup_gate_record(
+        context_name=target,
+        instance_name=control_plane_instance.strip(),
+        created_at=created_at,
+        source="odoo-ai.prod-gate",
+        modes=modes,
+        snapshot_name=snapshot_name if "snapshot" in modes else "",
+        storage_name=storage_value if "vzdump" in modes else "",
+        proxmox_host=host,
+        ctid=ctid,
+        optional_tag=tag,
+    )
+    record_path = _write_backup_gate_record(
+        record_directory=control_plane_record_dir,
+        record_payload=record_payload,
+    )
+    click.echo(f"control_plane_record={record_path}")
 
 
 @main.command("rollback")

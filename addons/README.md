@@ -14,6 +14,7 @@ deployment and operator concerns into a separate private control plane.
 Current examples:
 
 - `addons/opw_custom/` - OPW tenant entrypoint addon
+- `addons/opw/` - OPW-specific supporting addons and temporary upgrade assets
 - `addons/cm_custom/` - CM tenant entrypoint addon
 - `addons/cm/` - CM-specific supporting addons and importers
 - `addons/shared/` - reusable shared addons
@@ -29,6 +30,7 @@ Rules:
 ## Current Addons
 
 - Root wrappers: `cm_custom`, `dm_custom`, `opw_custom`
+- OPW supporting addons live under `addons/opw/`
 - CM supporting addons live under `addons/cm/`
 - Shared addons live under `addons/shared/`
 

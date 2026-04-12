@@ -52,10 +52,11 @@ Tips
   auto-update search roots.
 - `ODOO_BASE_RUNTIME_IMAGE` and `ODOO_BASE_DEVTOOLS_IMAGE` set the runtime and
   devtools base images for `docker/Dockerfile`.
-  For the three-layer strategy, these should point to private enterprise image
-  tags (for example `ghcr.io/cbusillo/odoo-enterprise-docker:19.0-runtime` and
-  `ghcr.io/cbusillo/odoo-enterprise-docker:19.0-devtools`), ideally pinned by
-  digest in promoted environments.
+  For the three-layer strategy, these should point to private Enterprise-layer
+  image tags configured outside public repos, ideally pinned by digest in
+  promoted environments. Manifest-backed local runtime builds in `odoo-devkit`
+  intentionally fail fast if these remain unset or on checked-in placeholder
+  values.
 - Platform-generated local env files keep development builds on
   `DOCKER_IMAGE_TAG=latest` so PyCharm and other devtools flows keep a stable
   image, and default local production-target validation builds to

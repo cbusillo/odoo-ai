@@ -2,7 +2,6 @@
 title: CM Import Baseline
 ---
 
-
 Purpose
 
 - Freeze the current `cm-local` import baseline from live evidence before
@@ -11,18 +10,18 @@ Purpose
 When captured
 
 - Snapshot probe executed on March 13, 2026 against local database `cm`.
-- Runtime command path was proven with:
-  - `uv run platform up --context cm --instance local`
-  - `uv run platform odoo-shell --context cm --instance local --script tmp/scripts/cm_import_baseline_probe.py`
+- Runtime command path at capture time used the then-current repo-local local
+  runtime commands in `odoo-ai`. Those commands are now retired; reruns should
+  move to the manifest-backed local runtime in `odoo-devkit` instead.
 
 Evidence sources
 
 - Live snapshot file: `tmp/cm_import_baseline_probe.json`
 - RepairShopr scheduled-run log: `tmp/repairshopr-scheduled-import-20260313-130928.log`
 - Importer entrypoints:
-  - `addons/cm/cm_data_import/models/cm_data_importer.py`
-  - `addons/cm/repairshopr_import/models/repairshopr_importer.py`
-  - `addons/cm/fishbowl_import/models/fishbowl_importer.py`
+    - `addons/cm/cm_data_import/models/cm_data_importer.py`
+    - `addons/cm/repairshopr_import/models/repairshopr_importer.py`
+    - `addons/cm/fishbowl_import/models/fishbowl_importer.py`
 
 Completion contract proven from code
 
@@ -30,9 +29,9 @@ Completion contract proven from code
 - Scheduled runs use `transaction.cron_budget.mixin` and record terminal state in
   `ir.config_parameter` as `success`, `partial`, or `failed`.
 - Success/partial/failure keys:
-  - CM data: `cm_data.last_run_*`, `cm_data.last_sync_at`
-  - RepairShopr: `repairshopr.last_run_*`, `repairshopr.last_sync_at`
-  - Fishbowl: `fishbowl.last_run_*`, `fishbowl.last_sync_at`
+    - CM data: `cm_data.last_run_*`, `cm_data.last_sync_at`
+    - RepairShopr: `repairshopr.last_run_*`, `repairshopr.last_sync_at`
+    - Fishbowl: `fishbowl.last_run_*`, `fishbowl.last_sync_at`
 
 ## CM Data Baseline
 

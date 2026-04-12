@@ -391,9 +391,12 @@ def resolve_stack_env_file(
             )
         context_name, instance_name = runtime_scope
         expected_runtime_env_file = runtime_env_file_for_scope(repo_root, context_name, instance_name)
-        raise click.ClickException(
-            f"Runtime env file not found: {expected_runtime_env_file}. "
-            f"Run 'uv run platform select --context {context_name} --instance {instance_name}' first."
+        guidance = (
+            "Generate the owning runtime env first. For extracted-tenant local runtime, "
+            "use odoo-devkit with the tenant workspace.toml manifest."
+            if instance_name == "local"
+            else "Pass --env-file explicitly or restore the expected generated env file for this non-local stack."
         )
+        raise click.ClickException(f"Runtime env file not found: {expected_runtime_env_file}. {guidance}")
 
     return resolve_default_env_file(repo_root).resolve()

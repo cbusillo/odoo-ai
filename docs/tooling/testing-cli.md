@@ -2,7 +2,6 @@
 title: Test CLI (uv)
 ---
 
-
 Purpose
 
 - Provide the canonical test runner commands and flags.
@@ -45,8 +44,9 @@ Commands
 - `--stack opw|cm` (or `--env-file .platform/env/<context>.<instance>.env`) —
   load the matching local stack env before running.
 - Test runs require a resolved stack context. Stack-based runs fail closed when
-  `.platform/env/<context>.<instance>.env` is missing; generate it first with
-  `uv run platform select --context <context> --instance <instance>`.
+  `.platform/env/<context>.<instance>.env` is missing; for extracted-tenant
+  local stacks, generate it first with
+  `uv --directory /path/to/odoo-devkit run platform runtime select --manifest /path/to/workspace.toml`.
 
 Scoping Flags
 

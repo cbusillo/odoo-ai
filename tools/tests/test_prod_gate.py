@@ -279,6 +279,39 @@ class ProdGateBackupCommandTests(unittest.TestCase):
             run_mock.assert_not_called()
             self.assertFalse((repo_root / "tmp" / "prod-gates").exists())
 
+    def test_backup_command_rejects_unknown_backup_mode_before_running_backups_or_writing_record(self) -> None:
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as temporary_directory_name:
+            repo_root = Path(temporary_directory_name)
+            (repo_root / ".git").mkdir()
+
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "CM_PROD_BACKUP_MODE": "snapshot,invalid-mode",
+                    },
+                    clear=True,
+                ),
+                patch("pathlib.Path.cwd", return_value=repo_root),
+                patch("tools.prod_gate._run") as run_mock,
+            ):
+                result = runner.invoke(
+                    prod_gate.main,
+                    [
+                        "backup",
+                        "--target",
+                        "cm",
+                        "--control-plane-record-dir",
+                        "tmp/prod-gates",
+                    ],
+                )
+
+            self.assertNotEqual(result.exit_code, 0)
+            self.assertIn("Invalid PROD_BACKUP_MODE value(s): invalid-mode", result.output)
+            run_mock.assert_not_called()
+            self.assertFalse((repo_root / "tmp" / "prod-gates").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

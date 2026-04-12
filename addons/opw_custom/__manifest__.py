@@ -36,7 +36,7 @@
     "summary": "OPW-specific product workflows, processing analytics, and inventory tools",
     "description": """
 OPW customizations for product processing, inventory, and reporting.
-Builds on shared addons such as marine motors and Shopify sync.
+Builds on OPW-owned addons such as marine motors and Shopify sync.
     """,
     "data": [
         # Security first

@@ -8,7 +8,6 @@ import click
 
 from tools.platform.cli import (
     _assert_prod_data_workflow_allowed,
-    _assert_promote_path_allowed,
     _build_runtime_env_values,
     _collect_dirty_tracked_files,
     _collect_environment_gate_results,
@@ -23,8 +22,8 @@ from tools.platform.cli import (
     _run_code_gate,
     _run_production_backup_gate,
     _run_with_web_temporarily_stopped,
-    _write_runtime_env_file,
     _validate_target_gate_policy,
+    _write_runtime_env_file,
 )
 from tools.platform.models import (
     ContextDefinition,
@@ -256,6 +255,20 @@ class PlatformRuntimeEnvironmentTests(unittest.TestCase):
         self.assertNotIn("DOKPLOY_SSH_HOST", runtime_values)
         self.assertNotIn("DOKPLOY_REMOTE_STACK_PATH_OPW_TESTING", runtime_values)
         self.assertNotIn("DOKPLOY_COMPOSE_PROJECT_OPW_TESTING", runtime_values)
+
+    def test_runtime_env_includes_base_image_keys_when_configured(self) -> None:
+        runtime_values = self._build_runtime_values(
+            runtime_env_file="/tmp/opw.local.env",
+            source_environment={
+                "ODOO_DB_USER": "odoo",
+                "ODOO_DB_PASSWORD": "database-password",
+                "ODOO_BASE_RUNTIME_IMAGE": "ghcr.io/example/runtime:19.0",
+                "ODOO_BASE_DEVTOOLS_IMAGE": "ghcr.io/example/devtools:19.0",
+            },
+        )
+
+        self.assertEqual(runtime_values.get("ODOO_BASE_RUNTIME_IMAGE"), "ghcr.io/example/runtime:19.0")
+        self.assertEqual(runtime_values.get("ODOO_BASE_DEVTOOLS_IMAGE"), "ghcr.io/example/devtools:19.0")
 
     def test_runtime_env_sets_restore_defaults(self) -> None:
         runtime_values = self._build_runtime_values(runtime_env_file="/tmp/cm.local.env")
@@ -670,26 +683,21 @@ class PlatformGateHelpersTests(unittest.TestCase):
             _collect_environment_gate_results(urls=(), timeout_seconds=30)
 
     @staticmethod
-    def test_promote_path_allows_testing_to_prod_only() -> None:
-        _assert_promote_path_allowed(
-            from_instance_name="testing",
-            to_instance_name="prod",
-        )
-
-    def test_promote_path_blocks_non_release_path(self) -> None:
-        with self.assertRaises(click.ClickException):
-            _assert_promote_path_allowed(
-                from_instance_name="dev",
-                to_instance_name="testing",
-            )
-
-    @staticmethod
     def test_production_backup_gate_invokes_expected_command() -> None:
         with patch("tools.platform.cli._run_gate_command") as run_gate_command_mock:
             _run_production_backup_gate(context_name="cm", dry_run=False)
 
         run_gate_command_mock.assert_called_once_with(
-            ["uv", "run", "prod-gate", "backup", "--target", "cm"],
+            [
+                "uv",
+                "run",
+                "prod-gate",
+                "backup",
+                "--target",
+                "cm",
+                "--control-plane-record-dir",
+                "tmp/prod-gates",
+            ],
             dry_run=False,
         )
 

@@ -2,7 +2,6 @@
 title: Testing Style
 ---
 
-
 Purpose
 
 - Consolidate testing conventions and pointers to real test sources.
@@ -47,15 +46,10 @@ Recorded Tours
 
 - DB-recorded tours live in `web_tour.tour`/`web_tour.tour.step`
   (recorded via the UI recorder).
-- Export recorded tours with the managed local runtime:
-
-  ```bash
-  uv run platform odoo-shell --context opw --instance local \
-    --script tools/tour_recorder/export_recorded_tours.py
-  ```
-
-  Fall back to raw `docker compose exec` only when the managed platform
-  contract is unavailable.
+- The repo-local `platform odoo-shell` helper in `odoo-ai` is retired. Export
+  recorded tours through the owning manifest-backed runtime surface in
+  `odoo-devkit`; if that surface still lacks a dedicated helper, add it there
+  instead of reviving the retired repo-local command.
 
 - Seed at test time by passing `RECORDED_TOURS_JSON` or
   `RECORDED_TOURS_PATH` (e.g., a temp file).
@@ -109,8 +103,8 @@ Direct Imports vs Local Wrappers
 - Prefer exactly one addon-local shim at `tests/common_imports.py` when an
   addon wants a curated test API.
 - The default shape is:
-  - `from test_support.tests import build_common_imports`
-  - `common = build_common_imports(__package__, ...)`
+    - `from test_support.tests import build_common_imports`
+    - `common = build_common_imports(__package__, ...)`
 - Keep `tests/common_imports.py` declarative and tiny. In the normal case it
   should only build and export the shared `common` object.
 - In test files, prefer `@common.tagged(*common.UNIT_TAGS)` and similar access
@@ -143,9 +137,9 @@ Addon Test Bases
   composition.
 - It is acceptable for addon test bases to do small amounts of inspection-
   friendly shaping on top of `test_support`, such as:
-  - declaring `model_aliases` used by the shared unit base,
-  - exposing typed model properties backed by `self.env["..."]`,
-  - setting addon-local default test context or tags.
+    - declaring `model_aliases` used by the shared unit base,
+    - exposing typed model properties backed by `self.env["..."]`,
+    - setting addon-local default test context or tags.
 - Prefer fixing repeated inspection noise at the shared addon test-base layer
   before editing many individual test methods or adding suppressions.
 

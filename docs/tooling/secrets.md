@@ -31,8 +31,9 @@ Layers
 
 Notes
 
-- `platform select` writes runtime env to
-  `.platform/env/<context>.<instance>.env` and does not modify root `.env`.
+- For extracted-tenant local runtime work, `odoo-devkit` owns manifest-backed
+  runtime env generation via `platform runtime select --manifest ...` rather
+  than repo-local `odoo-ai` `platform select`.
 - Set `PLATFORM_ENV_COLLISION_MODE=warn|error|ignore` to control collision
   handling.
 - Dokploy remote targets are managed through `uv run platform dokploy ...`

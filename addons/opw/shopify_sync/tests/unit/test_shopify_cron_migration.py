@@ -8,7 +8,15 @@ from ..fixtures.base import UnitTestCase
 
 
 def _load_base_pre_migration_module() -> ModuleType:
-    module_path = Path(__file__).resolve().parents[3] / "openupgrade_scripts_custom" / "scripts" / "base" / "19.0.1.0" / "pre-migration.py"
+    module_path = (
+        Path(__file__).resolve().parents[4]
+        / "opw"
+        / "openupgrade_scripts_custom"
+        / "scripts"
+        / "base"
+        / "19.0.1.0"
+        / "pre-migration.py"
+    )
     spec = importlib.util.spec_from_file_location("openupgrade_base_pre_migration", module_path)
     if spec is None or spec.loader is None:
         raise AssertionError(f"Could not load migration module from {module_path}")

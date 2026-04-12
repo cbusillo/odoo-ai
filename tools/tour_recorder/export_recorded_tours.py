@@ -31,6 +31,7 @@ class TourModelLike(Protocol):
 class OdooEnvironmentLike(Protocol):
     def __getitem__(self, model_name: str) -> TourModelLike: ...
 
+
 TOUR_PREFIX = os.environ.get("RECORDED_TOURS_PREFIX", "test_")
 DEFAULT_OUTPUT = "-"
 
@@ -102,8 +103,6 @@ if "env" in globals():
 else:
     raise SystemExit(
         "Run via Odoo shell in script-runner, for example: "
-        "uv run platform select --context <target> --instance local; "
-        "docker compose --env-file .platform/env/<target>.local.env ... "
-        "exec -T script-runner /odoo/odoo-bin shell -d <target> "
-        "-c /tmp/platform.odoo.conf < tools/tour_recorder/export_recorded_tours.py"
+        "use the manifest-backed local runtime in odoo-devkit to render/select the tenant runtime first, "
+        "then execute this script inside script-runner for that manifest-backed stack."
     )

@@ -21,6 +21,7 @@ from tools.deployer.data_workflow_support import (
     write_env_file,
 )
 from tools.deployer.settings import StackSettings, load_stack_settings
+from tools.platform import registry as platform_registry
 from tools.platform.dokploy import (
     DEFAULT_DOKPLOY_DEPLOY_TIMEOUT_SECONDS,
     deployment_key,
@@ -180,10 +181,16 @@ def _run_local_compose(settings: StackSettings, extra: Sequence[str], *, check: 
     run_process(command, cwd=settings.repo_root, check=check, env=local_compose_env(settings))
 
 
+def _ensure_registry_auth_for_base_images(environment_values: dict[str, str]) -> None:
+    platform_registry.ensure_registry_auth_for_base_images(environment_values)
+
+
 def _normalize_local_filestore_permissions(settings: StackSettings, env_values: dict[str, str]) -> None:
     filestore_root = (env_values.get("ODOO_FILESTORE_PATH") or "/volumes/data/filestore").strip() or "/volumes/data/filestore"
     database_name = (env_values.get("ODOO_DB_NAME") or "").strip()
-    filestore_database_path = filestore_root if Path(filestore_root).name == database_name else f"{filestore_root.rstrip('/')}/{database_name}"
+    filestore_database_path = (
+        filestore_root if Path(filestore_root).name == database_name else f"{filestore_root.rstrip('/')}/{database_name}"
+    )
     quoted_filestore_root = shlex.quote(filestore_root)
     quoted_filestore_database_path = shlex.quote(filestore_database_path)
     permission_command = [
@@ -198,7 +205,7 @@ def _normalize_local_filestore_permissions(settings: StackSettings, env_values: 
             "set -euo pipefail; "
             "target_owner=$(stat -c '%u:%g' /volumes/data); "
             f"mkdir -p {quoted_filestore_root} {quoted_filestore_database_path}; "
-            f"chown -R \"$target_owner\" {quoted_filestore_database_path}; "
+            f'chown -R "$target_owner" {quoted_filestore_database_path}; '
             f"chmod -R ug+rwX {quoted_filestore_database_path}"
         ),
     ]
@@ -485,8 +492,7 @@ def _deployment_status_value(deployment: JsonObject) -> str:
 
 def _has_running_schedule_deployment(schedule: JsonObject | None) -> bool:
     return any(
-        _deployment_status_value(deployment) in DOKPLOY_RUNNING_DEPLOYMENT_STATUSES
-        for deployment in _schedule_deployments(schedule)
+        _deployment_status_value(deployment) in DOKPLOY_RUNNING_DEPLOYMENT_STATUSES for deployment in _schedule_deployments(schedule)
     )
 
 
@@ -746,6 +752,7 @@ def run_stack_data_workflow(
 
     ensure_local_bind_mounts(stack_settings)
     write_env_file(stack_settings.env_file, env_values)
+    _ensure_registry_auth_for_base_images(env_values)
     _run_local_compose(stack_settings, ["build", _local_image_build_service(stack_settings)])
 
     stack_started = False

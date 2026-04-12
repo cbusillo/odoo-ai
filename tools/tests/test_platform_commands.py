@@ -2529,7 +2529,7 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
         self.assertEqual(command_kwargs["allow_dirty"], True)
         self.assertEqual(command_kwargs["source_git_ref"], "abc123")
 
-    def test_execute_promote_skips_git_fetch_on_dry_run(self) -> None:
+    def test_execute_promote_fetches_git_on_dry_run(self) -> None:
         source_target_definition = self._target_definition(context_name="opw", instance_name="testing").model_copy(
             update={"git_branch": "opw-testing"}
         )
@@ -2578,7 +2578,7 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             echo_fn=lambda _line: None,
         )
 
-        self.assertEqual(captured_commands, [])
+        self.assertEqual(captured_commands, [["git", "fetch", "origin", "--prune"]])
 
     def _assert_execute_ship_wait_uses_predeploy_deployment_key(
         self,

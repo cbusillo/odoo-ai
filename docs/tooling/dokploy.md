@@ -31,8 +31,10 @@ Notes
   and `uv run platform dokploy ...` helpers.
 - Managed Dokploy targets keep auto deploy disabled and rely on
   `uv run platform ship` as the only supported deploy trigger.
-- Destructive remote data workflows (`platform restore`, `platform bootstrap`)
-  now execute through Dokploy schedule jobs triggered by the Dokploy API.
+- Destructive remote data workflows now start from the manifest-backed
+  `odoo-devkit` runtime surface (`platform runtime restore` and
+  `platform runtime workflow --workflow bootstrap`). Those remote workflows
+  execute through Dokploy schedule jobs triggered by the Dokploy API.
   Dokploy-managed targets are no longer mutated over SSH; only the upstream
   source host inside the restore script still uses SSH.
 - Use `uv run platform dokploy inventory` before destructive Dokploy cleanup to

@@ -57,8 +57,10 @@ Operator Contract
 - `platform ship` is the non-destructive remote deploy/restart path.
 - `platform rollback` currently supports Dokploy application targets only.
   Compose targets must use Dokploy UI rollback controls.
-- `platform restore` is the destructive upstream-data replacement path.
-- `platform bootstrap` is the destructive fresh-start rebuild path.
+- The destructive upstream-data replacement path now lives in
+  `odoo-devkit` as `platform runtime restore --manifest ... --instance ...`.
+- The destructive fresh-start rebuild path now lives in `odoo-devkit` as
+  `platform runtime workflow --manifest ... --workflow bootstrap --instance ...`.
 - `platform validate <scenario>` runs tracked environment validation scenarios
   against a selected stack or managed target.
 - `platform validate importer-health --context cm --instance local` snapshots

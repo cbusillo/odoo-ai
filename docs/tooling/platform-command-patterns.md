@@ -91,24 +91,22 @@ Local Workflow Patterns
       --manifest ../odoo-tenant-cm/workspace.toml
     uv --directory ../odoo-devkit run platform runtime workflow \
       --manifest ../odoo-tenant-cm/workspace.toml --workflow bootstrap
-    uv run platform restore --context cm --instance testing --dry-run
+    uv --directory ../odoo-devkit run platform runtime restore \
+      --manifest ../odoo-tenant-cm/workspace.toml --instance testing --dry-run
     uv --directory ../odoo-devkit run platform runtime workflow \
       --manifest ../odoo-tenant-cm/workspace.toml --workflow openupgrade
     ```
 
-- In `odoo-ai`, `platform restore` and `platform bootstrap` now survive only
-  for Dokploy-managed remote targets. Local restore/bootstrap hand off to the
-  manifest-backed `odoo-devkit` runtime surface.
+- In `odoo-ai`, `platform restore` and `platform bootstrap` are now retired for
+  every instance. Both local and Dokploy-managed destructive flows hand off to
+  the manifest-backed `odoo-devkit` runtime surface instead.
 
-- `platform restore` and `platform bootstrap` block prod data-mutation
-  workflows by default.
+- Manifest-backed `platform runtime restore` and `platform runtime workflow
+  --workflow bootstrap` block prod data-mutation workflows by default.
   Use `--allow-prod-data-workflow` only for explicit break-glass operations.
-- `platform restore` and `platform bootstrap` now generate and use
-  `.platform/env/<context>.<instance>.env` by default. Pass `--env-file ...`
-  only for explicit one-off overrides.
-- `platform restore` and `platform bootstrap` now require the remote target to
-  be pinned in `platform/dokploy.toml`; the workflow reads the target id from
-  source of truth instead of rediscovering it through env overrides.
+- Manifest-backed remote restore/bootstrap now resolve the tracked runtime
+  selection from the tenant manifest and the runtime repo, rather than through
+  repo-local `odoo-ai` command state.
 - Dokploy-managed restore/bootstrap now execute through Dokploy schedule jobs,
   not host SSH. The only remaining SSH hop in the restore path is the upstream
   source host accessed by `run_odoo_data_workflows.py`.

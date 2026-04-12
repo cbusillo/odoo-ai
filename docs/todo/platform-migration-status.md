@@ -28,7 +28,10 @@ Status
   into matching manifest-backed handoff guidance. On 2026-04-12, the surviving
   remote `restore`/`bootstrap` surface was retired as well, so those
   destructive flows now hand off to `odoo-devkit` runtime commands with the
-  tenant manifest plus an explicit runtime `--instance` override.
+  tenant manifest plus an explicit runtime `--instance` override. Later on
+  2026-04-12, `odoo-devkit` also grew native manifest-backed `runtime logs`
+  and `runtime psql` helpers for local debugging so common stack-bound
+  validation no longer needs raw `docker compose` commands.
 - The extracted tenant proof now exists for both `odoo-tenant-opw` and
   `odoo-tenant-cm`: their tracked `workspace.toml` manifests drive
   `odoo-devkit` workspace/runtime commands, reusable shared addons now live in
@@ -80,10 +83,12 @@ Durable Tooling Follow-ups
       tenant repos, or `odoo-control-plane`, then delete the obsolete
       compatibility docs/shims instead of preserving `odoo-ai` as a long-term
       host.
-- [ ] Expand the manifest-backed local operator helper surface in
+- [x] Expand the manifest-backed local operator helper surface in
       `odoo-devkit` to cover common stack-bound validation flows such as
       SQL/psql execution and structured log capture, so day-to-day debugging no
-      longer falls back to raw `docker compose exec` commands.
+      longer falls back to raw `docker compose` commands. Completed on
+      2026-04-12 with native `platform runtime logs` and
+      `platform runtime psql` commands in `odoo-devkit`.
 - [ ] Restore normal Odoo non-prod build behavior on `docker-shiny-nonprod`.
       Current temporary state: `opw-dev`, `opw-testing`, `cm-dev`, and
       `cm-testing` were moved using transferred prebuilt `odoo-ai:latest` images

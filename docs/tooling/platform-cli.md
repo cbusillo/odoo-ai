@@ -39,6 +39,8 @@ Operator Contract
   `uv --directory /path/to/odoo-devkit run platform runtime logs --manifest /path/to/workspace.toml --service web --no-follow`
   and
   `uv --directory /path/to/odoo-devkit run platform runtime psql --manifest /path/to/workspace.toml -- -c 'select 1'`.
+  Manifest-backed local shell access also lives there:
+  `uv --directory /path/to/odoo-devkit run platform runtime odoo-shell --manifest /path/to/workspace.toml --script /path/to/script.py`.
 - Local destructive runtime work also moved there:
   `uv --directory /path/to/odoo-devkit run platform runtime restore --manifest /path/to/workspace.toml`
   and
@@ -90,7 +92,9 @@ Behavior Highlights
   `odoo-shell` now exist only as explicit retirement shims so operators get a
   precise migration message instead of silently using the wrong repo.
 - `platform logs` now points at the manifest-backed `odoo-devkit` runtime logs
-  helper; `down`, `build`, and `odoo-shell` remain retired without a new home.
+  helper, and `platform odoo-shell` now points at the manifest-backed
+  `odoo-devkit` runtime shell helper; `down` and `build` remain retired
+  without a new home.
 - `platform init`, `platform update`, and `platform openupgrade` now also
   exist only as explicit retirement shims. Use
   `uv --directory /path/to/odoo-devkit run platform runtime workflow --manifest /path/to/workspace.toml --workflow <name>`

@@ -1174,6 +1174,7 @@ _DEVKIT_RUNTIME_REPLACEMENTS = {
     "up": "uv --directory /path/to/odoo-devkit run platform runtime up --manifest /path/to/workspace.toml --build",
     "inspect": "uv --directory /path/to/odoo-devkit run platform runtime inspect --manifest /path/to/workspace.toml",
     "logs": "uv --directory /path/to/odoo-devkit run platform runtime logs --manifest /path/to/workspace.toml --service web --no-follow",
+    "odoo-shell": "uv --directory /path/to/odoo-devkit run platform runtime odoo-shell --manifest /path/to/workspace.toml --script /path/to/script.py",
     "init": "uv --directory /path/to/odoo-devkit run platform runtime workflow --manifest /path/to/workspace.toml --workflow init",
     "update": "uv --directory /path/to/odoo-devkit run platform runtime workflow --manifest /path/to/workspace.toml --workflow update",
     "openupgrade": "uv --directory /path/to/odoo-devkit run platform runtime workflow --manifest /path/to/workspace.toml --workflow openupgrade",

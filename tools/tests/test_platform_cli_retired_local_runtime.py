@@ -17,6 +17,7 @@ class PlatformCliRetiredLocalRuntimeTests(unittest.TestCase):
             "up": "uv --directory /path/to/odoo-devkit run platform runtime up --manifest /path/to/workspace.toml --build",
             "inspect": "uv --directory /path/to/odoo-devkit run platform runtime inspect --manifest /path/to/workspace.toml",
             "logs": "uv --directory /path/to/odoo-devkit run platform runtime logs --manifest /path/to/workspace.toml --service web --no-follow",
+            "odoo-shell": "uv --directory /path/to/odoo-devkit run platform runtime odoo-shell --manifest /path/to/workspace.toml --script /path/to/script.py",
             "init": "uv --directory /path/to/odoo-devkit run platform runtime workflow --manifest /path/to/workspace.toml --workflow init",
             "update": "uv --directory /path/to/odoo-devkit run platform runtime workflow --manifest /path/to/workspace.toml --workflow update",
             "openupgrade": "uv --directory /path/to/odoo-devkit run platform runtime workflow --manifest /path/to/workspace.toml --workflow openupgrade",
@@ -49,22 +50,12 @@ class PlatformCliRetiredLocalRuntimeTests(unittest.TestCase):
         for command_name, extra_args in (
             ("down", []),
             ("build", ["--stack-file", "platform/stack.toml"]),
-            ("odoo-shell", ["--stack-file", "platform/stack.toml", "--script", "tmp/scripts/example.py"]),
         ):
             with self.subTest(command_name=command_name):
                 result = runner.invoke(platform_cli_command, [command_name, "--context", "cm", *extra_args])
                 self.assertEqual(result.exit_code, 1, msg=result.output)
                 self.assertIn(f"'platform {command_name}' is retired in odoo-ai.", result.output)
                 self.assertIn("no longer has a supported home in odoo-ai", result.output)
-
-    def test_retired_odoo_shell_shim_reaches_handoff_without_script_argument(self) -> None:
-        runner = CliRunner()
-
-        result = runner.invoke(platform_cli_command, ["odoo-shell", "--context", "cm"])
-
-        self.assertEqual(result.exit_code, 1, msg=result.output)
-        self.assertIn("'platform odoo-shell' is retired in odoo-ai.", result.output)
-        self.assertIn("no longer has a supported home in odoo-ai", result.output)
 
     def test_tui_does_not_advertise_retired_local_runtime_workflows(self) -> None:
         runner = CliRunner()

@@ -31,7 +31,10 @@ Status
   tenant manifest plus an explicit runtime `--instance` override. Later on
   2026-04-12, `odoo-devkit` also grew native manifest-backed `runtime logs`
   and `runtime psql` helpers for local debugging so common stack-bound
-  validation no longer needs raw `docker compose` commands.
+  validation no longer needs raw `docker compose` commands. Later that same
+  day, `odoo-devkit` also gained a native manifest-backed
+  `runtime odoo-shell` helper, and the retired `odoo-ai` shell shim now points
+  at that command instead of treating shell access as homeless.
 - The extracted tenant proof now exists for both `odoo-tenant-opw` and
   `odoo-tenant-cm`: their tracked `workspace.toml` manifests drive
   `odoo-devkit` workspace/runtime commands, reusable shared addons now live in

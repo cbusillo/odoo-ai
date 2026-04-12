@@ -70,8 +70,15 @@ the linked docs, then keep prompts lean.
   `.platform/env/*.env`, `platform/secrets.toml`). Tracked
   templates/defaults like `.env.example` and `platform/config/base.env` are
   intended to be committed and must stay non-secret.
-- Keep branch/worktree hygiene per @docs/roles.md (clean up Code-created
-  branches as you go).
+- For non-trivial work, prefer small checkpoint commits after each validated
+  logical slice. Use those checkpoints as the base for review work so isolated
+  follow-up fixes can be merged or `cherry-pick`-ed instead of manually
+  re-applied. Keep commits coherent rather than per-turn, do not amend unless
+  the operator explicitly asks, and fall back to manual porting when the
+  checkout is too dirty or the review diff overlaps unrelated changes.
+- Keep branch/worktree hygiene per @docs/roles.md: remove Code-created
+  branches and temporary worktrees once merged or abandoned, and prune stale
+  refs/worktrees as you go.
 
 ## Workflow Loop
 

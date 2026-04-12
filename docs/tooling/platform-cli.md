@@ -26,21 +26,23 @@ Sources of Truth
 Operator Contract
 
 - `local` is the only host runtime on this machine.
-- Use `platform init`, `platform build`, `platform up`,
-  `platform down`, `platform logs`, `platform inspect`, and
-  `platform odoo-shell` only with `--instance local`.
+- The repo-local local-runtime lifecycle commands `platform select`, `up`,
+  `down`, `logs`, `build`, `inspect`, and `odoo-shell` are retired in
+  `odoo-ai` and now fail closed.
+- The direct repo-local workflow commands `platform init`, `platform update`,
+  and `platform openupgrade` are also retired in `odoo-ai` and now hand off to
+  the manifest-backed `odoo-devkit` runtime workflow surface.
+- For extracted tenant local runtime work, use `odoo-devkit` with the tenant's
+  tracked `workspace.toml`, for example:
+  `uv --directory /path/to/odoo-devkit run platform runtime up --manifest /path/to/workspace.toml --build`.
 - Treat `dev`, `testing`, and `prod` as Dokploy-managed remote targets.
-  Use `platform ship`, `platform update`, `platform rollback`, `platform gate`,
+  Use `platform ship`, `platform rollback`, `platform gate`,
   `platform restore`, and `platform bootstrap` there.
 - `platform ship` is the non-destructive remote deploy/restart path.
 - `platform rollback` currently supports Dokploy application targets only.
   Compose targets must use Dokploy UI rollback controls.
 - `platform restore` is the destructive upstream-data replacement path.
 - `platform bootstrap` is the destructive fresh-start rebuild path.
-- `platform init` remains a local-only module initialization pass for an
-  existing database.
-- `platform update` applies module updates against the selected local runtime
-  or compose-backed managed runtime.
 - `platform validate <scenario>` runs tracked environment validation scenarios
   against a selected stack or managed target.
 - `platform validate importer-health --context cm --instance local` snapshots
@@ -54,10 +56,11 @@ Operator Contract
 
 Command Families
 
-- Local lifecycle: `select`, `info`, `status`, `doctor`, `build`, `up`,
-  `down`, `logs`, `inspect`, `odoo-shell`.
+- Local inspection: `info`, `status`, `doctor`.
+- Retired compatibility shims: `select`, `up`, `down`, `logs`, `build`,
+  `inspect`, `odoo-shell`, `init`, `update`, `openupgrade`.
 - Data workflows: `restore`, `bootstrap`.
-- Runtime workflows: `run`, `init`, `update`, `openupgrade`.
+- Runtime workflows: `run`.
 - Validation scenarios: `validate ...`.
 - Remote release: `ship`, `rollback`, `gate`, and `platform dokploy ...`
   helpers.
@@ -69,9 +72,20 @@ Command Families
 Behavior Highlights
 
 - Manifest-driven `platform runtime ...` ownership now lives in `odoo-devkit`.
-  This document remains the contract for the repo-local `uv run platform ...`
-  surface in `odoo-ai`, including the transitional remote restore/bootstrap/
-  update workflow path that still exists here.
+  This document remains the contract for the shrinking repo-local
+  `uv run platform ...` surface in `odoo-ai` during retirement, including the
+  transitional remote restore/bootstrap/update workflow path that still exists
+  here.
+- `odoo-ai` is not the durable final home for this platform surface. The
+  remaining repo-local commands and docs should be treated as migration seams
+  to be extracted into tenant repos, `odoo-devkit`, or `odoo-control-plane`.
+- `platform select`, `up`, `down`, `logs`, `build`, `inspect`, and
+  `odoo-shell` now exist only as explicit retirement shims so operators get a
+  precise migration message instead of silently using the wrong repo.
+- `platform init`, `platform update`, and `platform openupgrade` now also
+  exist only as explicit retirement shims. Use
+  `uv --directory /path/to/odoo-devkit run platform runtime workflow --manifest /path/to/workspace.toml --workflow <name>`
+  instead.
 - `platform doctor` is read-only and spans both local runtime diagnostics and
   Dokploy target diagnostics.
 - `platform ship` fails closed on dirty tracked files. Prefer a clean worktree
@@ -97,10 +111,9 @@ Behavior Highlights
 - Remote web startup uses `run_odoo_startup.py` to initialize missing modules
   when needed before launching the long-running server.
 - Release-sensitive commands resolve env layers with collision mode `error`.
-- `platform restore` and `platform bootstrap` use the same generated runtime env
-  contract as `platform select`.
-- `platform select` writes both `.platform/env/<context>.<instance>.env` and
-  `.platform/ide/<context>.<instance>.odoo.conf`.
+- For extracted tenants, manifest-backed local runtime env/config generation
+  now lives in `odoo-devkit` via `platform runtime select --manifest ...` and
+  `platform runtime inspect --manifest ...`.
 - Remote `restore`/`bootstrap` for Dokploy-managed targets (`dev`, `testing`,
   `prod`) run through Dokploy schedule jobs triggered by the Dokploy API.
   Targets with deploy-server linkage use Dokploy `server` jobs; targets without
@@ -137,4 +150,4 @@ Related Docs
   restore provisioning behavior.
 - [@docs/tooling/inspection.md](inspection.md) — JetBrains inspection setup.
 - [@docs/control-plane-roadmap.md](../control-plane-roadmap.md) — long-term
-  plan for moving deploy/control-plane concerns out of `odoo-ai`.
+  retirement plan for extracting responsibilities out of `odoo-ai`.

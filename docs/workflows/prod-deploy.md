@@ -38,18 +38,35 @@ Example for OPW (commented):
 Deploy flow (OPW example)
 
 1. Run tests + backup gate:
-    - `uv run prod-gate backup --target opw --run-tests`
+    - `uv run prod-gate backup --target opw --run-tests --control-plane-record-dir tmp/prod-gates`
 
-2. Promote testing to prod with platform:
-    - `uv run platform promote --context <target> --from-instance testing --to-instance prod`
-    - Add `--allow-dirty` only when you intentionally need to run from a dirty tracked worktree; the default remains fail-closed.
+1. Persist the emitted backup-gate record into the control plane:
+    - `uv run --project ../odoo-control-plane control-plane backup-gates write --input-file tmp/prod-gates/<record-id>.json`
 
-3. If rollback needed:
+1. Promote testing to prod with the control plane:
+
+```bash
+uv run --project ../odoo-control-plane control-plane promote resolve \
+  --context opw --from-instance testing --to-instance prod \
+  --artifact-id <artifact-id> --backup-record-id <record-id> > tmp/promotion-request.json
+uv run --project ../odoo-control-plane control-plane promote execute \
+  --input-file tmp/promotion-request.json
+```
+
+1. If rollback needed:
     - `uv run prod-gate list --target opw`
     - `uv run prod-gate rollback --target opw --snapshot <snapshot-name>`
 
 Notes
 
 - `vzdump` provides the full CT backup (PBS). `pct snapshot` gives fast rollback.
-- `PROD_BACKUP_MODE=none` skips the snapshot/vzdump steps (tests still run).
+- `PROD_BACKUP_MODE=none` skips the snapshot/vzdump steps (tests still run),
+  but it cannot emit a control-plane backup record because no backup evidence
+  exists to promote, so the gate skips record emission in that mode.
 - The gate intentionally does not auto-deploy; prod deploy stays manual.
+- `odoo-control-plane` now owns Dokploy target resolution and waited post-
+  deploy update execution natively, so promotion execution no longer needs an
+  `odoo-ai` repo path.
+- Explicit shell or workflow env values override repo `.env` defaults for
+  `prod-gate`; use that to avoid accidental local default leakage in
+  automation.

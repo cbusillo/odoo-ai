@@ -1,10 +1,11 @@
 import json
+import subprocess
 import unittest
 from collections.abc import Callable
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Literal, cast
-from unittest.mock import patch
+from typing import Literal
+from unittest.mock import Mock, patch
 
 import click
 
@@ -12,9 +13,7 @@ from tools.platform import (
     command_context,
     commands_core,
     commands_dokploy,
-    commands_lifecycle,
     commands_release,
-    commands_selection,
     commands_workflow,
     release_workflows,
 )
@@ -999,201 +998,6 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
         self.assertEqual(set(run_payload), {"context", "instance", "status", "detail"})
 
 
-class PlatformCommandsSelectionTests(unittest.TestCase):
-    def test_execute_select_dry_run_emits_payload(self) -> None:
-        with TemporaryDirectory() as temporary_directory_name:
-            repo_root = Path(temporary_directory_name)
-            stack_file_path = repo_root / "platform" / "stack.toml"
-            stack_file_path.parent.mkdir(parents=True, exist_ok=True)
-            stack_file_path.write_text("schema_version = 1\n", encoding="utf-8")
-
-            loaded_stack = LoadedStack(stack_file_path=stack_file_path, stack_definition=_sample_stack_definition())
-            loaded_environment = LoadedEnvironment(
-                env_file_path=repo_root / ".env",
-                merged_values={"REQUIRED_KEY": "1"},
-                source_by_key={"REQUIRED_KEY": ".env"},
-                collisions=(EnvironmentCollision(key="REQUIRED_KEY", previous_layer="root", incoming_layer="context"),),
-            )
-            captured_payload: dict[str, object] = {}
-
-            def emit_payload(payload_data: dict[str, object], *, json_output: bool) -> None:
-                captured_payload["payload"] = payload_data
-                captured_payload["json_output"] = json_output
-
-            commands_selection.execute_select(
-                stack_file=Path("platform/stack.toml"),
-                context_name="cm",
-                instance_name="local",
-                env_file=None,
-                dry_run=True,
-                discover_repo_root_fn=lambda _path: repo_root,
-                load_stack_fn=lambda _path: loaded_stack,
-                resolve_runtime_selection_fn=lambda _stack, _context, _instance: _sample_runtime_selection(),
-                load_environment_with_details_fn=lambda _repo_root, _env_file, **_kwargs: loaded_environment,
-                build_runtime_env_values_fn=lambda *_args, **_kwargs: {"REQUIRED_KEY": "1", "NEW_KEY": "value"},
-                parse_env_file_fn=lambda _path: {"REQUIRED_KEY": "1"},
-                runtime_env_diff_fn=lambda _current, _new: {"added": ["NEW_KEY"]},
-                emit_payload_fn=emit_payload,
-                write_runtime_odoo_conf_file_fn=lambda *_args, **_kwargs: Path("unused"),
-                write_runtime_env_file_fn=lambda *_args, **_kwargs: Path("unused"),
-                echo_fn=lambda _line: None,
-            )
-
-            payload = captured_payload["payload"]
-            assert isinstance(payload, dict)
-            self.assertTrue(payload.get("dry_run"))
-            self.assertEqual(payload.get("runtime_env_diff"), {"added": ["NEW_KEY"]})
-
-    def test_execute_select_rejects_non_local_instance(self) -> None:
-        with self.assertRaises(click.ClickException) as captured_error:
-            commands_selection.execute_select(
-                stack_file=Path("platform/stack.toml"),
-                context_name="cm",
-                instance_name="testing",
-                env_file=None,
-                dry_run=True,
-                discover_repo_root_fn=lambda _path: Path("/tmp"),
-                load_stack_fn=lambda _path: (_ for _ in ()).throw(AssertionError("should not run")),
-                resolve_runtime_selection_fn=lambda _stack, _context, _instance: _sample_runtime_selection(),
-                load_environment_with_details_fn=lambda _repo_root, _env_file, **_kwargs: (_ for _ in ()).throw(
-                    AssertionError("should not run")
-                ),
-                build_runtime_env_values_fn=lambda *_args, **_kwargs: {},
-                parse_env_file_fn=lambda _path: {},
-                runtime_env_diff_fn=lambda _current, _new: {},
-                emit_payload_fn=lambda _payload, **_kwargs: None,
-                write_runtime_odoo_conf_file_fn=lambda *_args, **_kwargs: Path("unused"),
-                write_runtime_env_file_fn=lambda *_args, **_kwargs: Path("unused"),
-                echo_fn=lambda _line: None,
-            )
-
-        self.assertIn("requires --instance local", captured_error.exception.message)
-
-    def test_execute_select_writes_pycharm_config_path(self) -> None:
-        with TemporaryDirectory() as temporary_directory_name:
-            repo_root_path = Path(temporary_directory_name)
-            stack_file_path = repo_root_path / "platform" / "stack.toml"
-            stack_file_path.parent.mkdir(parents=True, exist_ok=True)
-            stack_file_path.write_text("schema_version = 1\n", encoding="utf-8")
-
-            loaded_stack = LoadedStack(stack_file_path=stack_file_path, stack_definition=_sample_stack_definition())
-            loaded_environment = LoadedEnvironment(
-                env_file_path=repo_root_path / ".env",
-                merged_values={"REQUIRED_KEY": "1"},
-                source_by_key={"REQUIRED_KEY": ".env"},
-                collisions=(),
-            )
-            emitted_lines: list[str] = []
-            pycharm_conf_calls: list[dict[str, str]] = []
-
-            def write_pycharm_odoo_conf(
-                *,
-                repo_root: Path,
-                runtime_selection: RuntimeSelection,
-                stack_definition: StackDefinition,
-                source_environment: dict[str, str],
-            ) -> Path:
-                self.assertEqual(repo_root, repo_root_path)
-                self.assertEqual(runtime_selection.context_name, "cm")
-                self.assertEqual(stack_definition.schema_version, 1)
-                pycharm_conf_calls.append(source_environment)
-                return repo_root / ".platform" / "ide" / "cm.local.odoo.conf"
-
-            commands_selection.execute_select(
-                stack_file=Path("platform/stack.toml"),
-                context_name="cm",
-                instance_name="local",
-                env_file=None,
-                dry_run=False,
-                discover_repo_root_fn=lambda _path: repo_root_path,
-                load_stack_fn=lambda _path: loaded_stack,
-                resolve_runtime_selection_fn=lambda _stack, _context, _instance: _sample_runtime_selection(),
-                load_environment_with_details_fn=lambda _repo_root, _env_file, **_kwargs: loaded_environment,
-                build_runtime_env_values_fn=lambda *_args, **_kwargs: {
-                    "DOCKER_IMAGE": "odoo-ai",
-                    "DOCKER_IMAGE_TAG": "latest",
-                },
-                parse_env_file_fn=lambda _path: {},
-                runtime_env_diff_fn=lambda _current, _new: {},
-                emit_payload_fn=lambda _payload, **_kwargs: None,
-                write_runtime_odoo_conf_file_fn=lambda *_args, **_kwargs: Path("unused"),
-                write_runtime_env_file_fn=lambda *_args, **_kwargs: Path("unused"),
-                echo_fn=emitted_lines.append,
-                write_pycharm_odoo_conf_fn=write_pycharm_odoo_conf,
-            )
-
-            self.assertEqual(len(pycharm_conf_calls), 1)
-            self.assertIn("pycharm_odoo_conf_file=", "\n".join(emitted_lines))
-
-    def test_execute_inspect_reports_pycharm_config_path(self) -> None:
-        with TemporaryDirectory() as temporary_directory_name:
-            repo_root = Path(temporary_directory_name)
-            stack_file_path = repo_root / "platform" / "stack.toml"
-            stack_file_path.parent.mkdir(parents=True, exist_ok=True)
-            stack_file_path.write_text("schema_version = 1\n", encoding="utf-8")
-            loaded_stack = LoadedStack(stack_file_path=stack_file_path, stack_definition=_sample_stack_definition())
-
-            with patch("tools.platform.commands_selection.click.echo") as echo_mock:
-                commands_selection.execute_inspect(
-                    stack_file=Path("platform/stack.toml"),
-                    context_name="cm",
-                    instance_name="local",
-                    env_file=None,
-                    json_output=False,
-                    discover_repo_root_fn=lambda _path: repo_root,
-                    load_stack_fn=lambda _path: loaded_stack,
-                    resolve_runtime_selection_fn=lambda _stack, _context, _instance: _sample_runtime_selection(),
-                    load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (
-                        repo_root / ".env",
-                        {"ODOO_DB_USER": "odoo", "ODOO_DB_PASSWORD": "pw"},
-                    ),
-                    write_runtime_odoo_conf_file_fn=lambda *_args, **_kwargs: (
-                        repo_root / ".platform" / "state" / "cm-local" / "platform.odoo.conf"
-                    ),
-                    write_pycharm_odoo_conf_fn=lambda **_kwargs: repo_root / ".platform" / "ide" / "cm.local.odoo.conf",
-                )
-
-            emitted_lines = [call.args[0] for call in echo_mock.call_args_list]
-            self.assertIn(f"pycharm_odoo_conf_host={repo_root / '.platform' / 'ide' / 'cm.local.odoo.conf'}", emitted_lines)
-
-
-class PlatformCommandsLifecycleTests(unittest.TestCase):
-    def test_execute_down_requires_runtime_env_file(self) -> None:
-        with TemporaryDirectory() as temporary_directory_name:
-            repo_root = Path(temporary_directory_name)
-            with self.assertRaises(click.ClickException):
-                commands_lifecycle.execute_down(
-                    context_name="cm",
-                    instance_name="local",
-                    volumes=False,
-                    discover_repo_root_fn=lambda _path: repo_root,
-                    compose_base_command_fn=lambda _runtime_env_file: ["docker", "compose"],
-                    run_command_fn=lambda _command: None,
-                )
-
-    def test_execute_up_rejects_non_local_instance(self) -> None:
-        with self.assertRaises(click.ClickException) as captured_error:
-            commands_lifecycle.execute_up(
-                stack_file=Path("platform/stack.toml"),
-                context_name="cm",
-                instance_name="testing",
-                env_file=None,
-                build_images=True,
-                no_cache=False,
-                discover_repo_root_fn=lambda _path: Path("/tmp"),
-                load_stack_fn=lambda _path: (_ for _ in ()).throw(AssertionError("should not run")),
-                resolve_runtime_selection_fn=lambda _stack, _context, _instance: _sample_runtime_selection(),
-                load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
-                write_runtime_odoo_conf_file_fn=lambda *_args, **_kwargs: Path("unused"),
-                write_runtime_env_file_fn=lambda *_args, **_kwargs: Path("unused"),
-                ensure_registry_auth_for_base_images_fn=lambda _environment_values: None,
-                compose_base_command_fn=lambda _runtime_env_file: ["docker", "compose"],
-                run_command_fn=lambda _command: None,
-            )
-
-        self.assertIn("requires --instance local", captured_error.exception.message)
-
-
 class PlatformCommandsDokployTests(unittest.TestCase):
     def test_execute_reconcile_fails_when_target_missing_from_stack(self) -> None:
         with TemporaryDirectory() as temporary_directory_name:
@@ -1632,160 +1436,993 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
         context_name: str = "cm",
         instance_name: str = "dev",
         target_type: Literal["compose", "application"] = "compose",
+        git_branch: str | None = None,
     ) -> DokployTargetDefinition:
+        resolved_git_branch = git_branch
+        if resolved_git_branch is None:
+            resolved_git_branch = f"{context_name}-{instance_name}" if target_type == "compose" else ""
         return DokployTargetDefinition(
             context=context_name,
             instance=instance_name,
             target_type=target_type,
             target_id=f"{target_type}-id",
             target_name=f"{context_name}-{instance_name}-{target_type}",
+            git_branch=resolved_git_branch,
         )
 
     @staticmethod
     def _source_of_truth(target_definition: DokployTargetDefinition) -> DokploySourceOfTruth:
         return DokploySourceOfTruth(schema_version=1, targets=(target_definition,))
 
-    def test_execute_export_ship_request_emits_artifact_backed_payload(self) -> None:
-        target_definition = self._target_definition(context_name="opw", instance_name="prod").model_copy(
-            update={"domains": ("prod.example.com",), "source_git_ref": "origin/opw-prod"}
+    @staticmethod
+    def _commit_file(
+        *,
+        repository_directory: Path,
+        relative_path: str,
+        content: str,
+        message: str,
+    ) -> str:
+        file_path = repository_directory / relative_path
+        file_path.write_text(content, encoding="utf-8")
+        subprocess.run(["git", "add", relative_path], cwd=repository_directory, check=True, capture_output=True, text=True)
+        subprocess.run(["git", "commit", "-m", message], cwd=repository_directory, check=True, capture_output=True, text=True)
+        commit_result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repository_directory,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return commit_result.stdout.strip()
+
+    def test_apply_ship_branch_sync_uses_force_with_lease(self) -> None:
+        ship_branch_sync_plan = commands_release.ShipBranchSyncPlan(
+            source_git_ref="origin/main",
+            source_commit="abc123",
+            target_remote_name="origin",
+            target_branch="cm-dev",
+            remote_branch_commit_before="def456",
+            branch_update_required=True,
+        )
+        captured_commands: list[list[str]] = []
+
+        def run_command_capture(command: list[str], *, repo_root: Path) -> str:
+            self.assertEqual(repo_root, Path("/tmp/repo"))
+            captured_commands.append(command)
+            return ""
+
+        with patch.object(commands_release, "_run_command_capture", side_effect=run_command_capture):
+            commands_release._apply_ship_branch_sync(repo_root=Path("/tmp/repo"), ship_branch_sync_plan=ship_branch_sync_plan)
+
+        self.assertEqual(
+            captured_commands,
+            [
+                [
+                    "git",
+                    "push",
+                    "origin",
+                    "--force-with-lease=refs/heads/cm-dev:def456",
+                    "abc123:refs/heads/cm-dev",
+                ]
+            ],
+        )
+
+    def test_run_command_capture_sanitizes_git_wrapper_environment(self) -> None:
+        result = Mock(returncode=0, stdout="ok", stderr="")
+
+        with patch.dict(
+            "os.environ",
+            {
+                "PLATFORM_CONTEXT": "cm",
+                "GIT_DIR": "/tmp/other.git",
+                "GIT_WORK_TREE": "/tmp/worktree",
+                "KEEP_ME": "1",
+            },
+            clear=True,
+        ):
+            with patch.object(commands_release.subprocess, "run", return_value=result) as run_command:
+                output = commands_release._run_command_capture(["git", "status"], repo_root=Path("/tmp/repo"))
+
+        self.assertEqual(output, "ok")
+        self.assertEqual(run_command.call_count, 1)
+        run_kwargs = run_command.call_args.kwargs
+        execution_environment = run_kwargs["env"]
+        self.assertNotIn("PLATFORM_CONTEXT", execution_environment)
+        self.assertNotIn("GIT_DIR", execution_environment)
+        self.assertNotIn("GIT_WORK_TREE", execution_environment)
+        self.assertEqual(execution_environment.get("KEEP_ME"), "1")
+
+    def test_run_ship_branch_sync_fetches_source_remote(self) -> None:
+        target_definition = DokployTargetDefinition(
+            context="cm",
+            instance="dev",
+            target_type="compose",
+            target_id="compose-id",
+            target_name="cm-dev",
+            git_branch="cm-dev",
+            source_git_ref="upstream/main",
+        )
+        captured_commands: list[list[str]] = []
+
+        def run_command_capture(command: list[str], *, repo_root: Path) -> str:
+            self.assertEqual(repo_root, Path("/tmp/repo"))
+            captured_commands.append(command)
+            if command == ["git", "remote"]:
+                return "origin\nupstream\n"
+            if command == ["git", "fetch", "upstream", "--prune"]:
+                return ""
+            if command == ["git", "rev-parse", "--verify", "upstream/main^{commit}"]:
+                return "abc123\n"
+            if command == ["git", "ls-remote", "--heads", "origin", "refs/heads/cm-dev"]:
+                return "def456\trefs/heads/cm-dev\n"
+            if command == ["git", "push", "origin", "--force-with-lease=refs/heads/cm-dev:def456", "abc123:refs/heads/cm-dev"]:
+                return ""
+            raise AssertionError(f"unexpected command: {command}")
+
+        with patch.object(commands_release, "_run_command_capture", side_effect=run_command_capture):
+            with patch.object(
+                commands_release,
+                "_resolve_symbolic_full_git_reference",
+                return_value="refs/remotes/upstream/main",
+            ):
+                with patch.object(commands_release, "_git_reference_exists_locally", return_value=False):
+                    commands_release._run_ship_branch_sync(
+                        repo_root=Path("/tmp/repo"),
+                        source_git_ref_override="",
+                        target_definition=target_definition,
+                        echo_fn=lambda _line: None,
+                    )
+
+        self.assertEqual(
+            captured_commands,
+            [
+                ["git", "remote"],
+                ["git", "fetch", "upstream", "--prune"],
+                ["git", "rev-parse", "--verify", "upstream/main^{commit}"],
+                ["git", "ls-remote", "--heads", "origin", "refs/heads/cm-dev"],
+                ["git", "push", "origin", "--force-with-lease=refs/heads/cm-dev:def456", "abc123:refs/heads/cm-dev"],
+            ],
+        )
+
+    def test_run_ship_branch_sync_skips_fetch_for_local_branch_named_like_remote_ref(self) -> None:
+        target_definition = DokployTargetDefinition(
+            context="cm",
+            instance="dev",
+            target_type="compose",
+            target_id="compose-id",
+            target_name="cm-dev",
+            git_branch="cm-dev",
+            source_git_ref="upstream/main",
+        )
+        captured_commands: list[list[str]] = []
+
+        def run_command_capture(command: list[str], *, repo_root: Path) -> str:
+            self.assertEqual(repo_root, Path("/tmp/repo"))
+            captured_commands.append(command)
+            if command == ["git", "remote"]:
+                return "origin\nupstream\n"
+            if command == ["git", "rev-parse", "--verify", "upstream/main^{commit}"]:
+                return "abc123\n"
+            if command == ["git", "ls-remote", "--heads", "origin", "refs/heads/cm-dev"]:
+                return "def456\trefs/heads/cm-dev\n"
+            if command == ["git", "push", "origin", "--force-with-lease=refs/heads/cm-dev:def456", "abc123:refs/heads/cm-dev"]:
+                return ""
+            raise AssertionError(f"unexpected command: {command}")
+
+        with patch.object(commands_release, "_run_command_capture", side_effect=run_command_capture):
+            with patch.object(
+                commands_release,
+                "_resolve_symbolic_full_git_reference",
+                return_value="refs/heads/upstream/main",
+            ):
+                with patch.object(commands_release, "_git_reference_exists_locally", return_value=True):
+                    commands_release._run_ship_branch_sync(
+                        repo_root=Path("/tmp/repo"),
+                        source_git_ref_override="",
+                        target_definition=target_definition,
+                        echo_fn=lambda _line: None,
+                    )
+
+        self.assertEqual(
+            captured_commands,
+            [
+                ["git", "remote"],
+                ["git", "rev-parse", "--verify", "upstream/main^{commit}"],
+                ["git", "ls-remote", "--heads", "origin", "refs/heads/cm-dev"],
+                ["git", "push", "origin", "--force-with-lease=refs/heads/cm-dev:def456", "abc123:refs/heads/cm-dev"],
+            ],
+        )
+
+    def test_run_ship_branch_sync_refreshes_stale_remote_tracking_source_ref_even_when_local(self) -> None:
+        target_definition = DokployTargetDefinition(
+            context="cm",
+            instance="dev",
+            target_type="compose",
+            target_id="compose-id",
+            target_name="cm-dev",
+            git_branch="cm-dev",
+            source_git_ref="upstream/main",
+        )
+        captured_commands: list[list[str]] = []
+
+        def run_command_capture(command: list[str], *, repo_root: Path) -> str:
+            self.assertEqual(repo_root, Path("/tmp/repo"))
+            captured_commands.append(command)
+            if command == ["git", "remote"]:
+                return "origin\nupstream\n"
+            if command == ["git", "fetch", "upstream", "--prune"]:
+                return ""
+            if command == ["git", "rev-parse", "--verify", "upstream/main^{commit}"]:
+                return "abc123\n"
+            if command == ["git", "ls-remote", "--heads", "origin", "refs/heads/cm-dev"]:
+                return "def456\trefs/heads/cm-dev\n"
+            if command == ["git", "push", "origin", "--force-with-lease=refs/heads/cm-dev:def456", "abc123:refs/heads/cm-dev"]:
+                return ""
+            raise AssertionError(f"unexpected command: {command}")
+
+        with patch.object(commands_release, "_run_command_capture", side_effect=run_command_capture):
+            with patch.object(
+                commands_release,
+                "_resolve_symbolic_full_git_reference",
+                return_value="refs/remotes/upstream/main",
+            ):
+                with patch.object(commands_release, "_git_reference_exists_locally", return_value=True):
+                    commands_release._run_ship_branch_sync(
+                        repo_root=Path("/tmp/repo"),
+                        source_git_ref_override="",
+                        target_definition=target_definition,
+                        echo_fn=lambda _line: None,
+                    )
+
+        self.assertEqual(
+            captured_commands,
+            [
+                ["git", "remote"],
+                ["git", "fetch", "upstream", "--prune"],
+                ["git", "rev-parse", "--verify", "upstream/main^{commit}"],
+                ["git", "ls-remote", "--heads", "origin", "refs/heads/cm-dev"],
+                ["git", "push", "origin", "--force-with-lease=refs/heads/cm-dev:def456", "abc123:refs/heads/cm-dev"],
+            ],
+        )
+
+    def test_resolve_git_remote_for_reference_ignores_local_branch_named_like_remote_ref(self) -> None:
+        with patch.object(commands_release, "_resolve_symbolic_full_git_reference", return_value="refs/heads/upstream/main"):
+            remote_name = commands_release._resolve_git_remote_for_reference(
+                repo_root=Path("/tmp/repo"),
+                git_reference="upstream/main",
+                configured_remotes=("origin", "upstream"),
+            )
+
+        self.assertEqual(remote_name, "")
+
+    def test_resolve_git_remote_for_reference_accepts_explicit_remote_tracking_ref(self) -> None:
+        remote_name = commands_release._resolve_git_remote_for_reference(
+            repo_root=Path("/tmp/repo"),
+            git_reference="refs/remotes/upstream/main",
+            configured_remotes=("origin", "upstream"),
+        )
+
+        self.assertEqual(remote_name, "upstream")
+
+    def test_git_reference_is_remote_tracking_accepts_symbolic_remote_tracking_ref(self) -> None:
+        with patch.object(
+            commands_release,
+            "_resolve_symbolic_full_git_reference",
+            return_value="refs/remotes/upstream/main",
+        ):
+            is_remote_tracking = commands_release._git_reference_is_remote_tracking(
+                repo_root=Path("/tmp/repo"),
+                git_reference="upstream/main",
+            )
+
+        self.assertTrue(is_remote_tracking)
+
+    def test_resolve_ship_source_git_ref_defaults_to_single_remote_main_when_origin_missing(self) -> None:
+        source_git_ref = commands_release._resolve_ship_source_git_ref(
+            source_git_ref_override="",
+            target_definition=None,
+            configured_remotes=("upstream",),
+        )
+
+        self.assertEqual(source_git_ref, "upstream/main")
+
+    def test_infer_git_remote_from_reference_syntax_accepts_missing_remote_style_ref(self) -> None:
+        remote_name = commands_release._infer_git_remote_from_reference_syntax(
+            git_reference="upstream/main",
+            configured_remotes=("origin", "upstream"),
+        )
+
+        self.assertEqual(remote_name, "upstream")
+
+    def test_infer_git_remote_from_reference_syntax_rejects_explicit_refs_namespace(self) -> None:
+        remote_name = commands_release._infer_git_remote_from_reference_syntax(
+            git_reference="refs/heads/upstream/main",
+            configured_remotes=("origin", "upstream"),
+        )
+
+        self.assertEqual(remote_name, "")
+
+    def test_execute_ship_dry_run_skips_branch_sync_preflight(self) -> None:
+        target_definition = DokployTargetDefinition(
+            context="cm",
+            instance="dev",
+            target_type="compose",
+            target_id="compose-id",
+            target_name="cm-dev",
+            git_branch="cm-dev",
         )
         source_of_truth = self._source_of_truth(target_definition)
-        captured_payload: dict[str, object] = {}
 
-        commands_release.execute_export_ship_request(
-            context_name="opw",
-            instance_name="prod",
-            artifact_id="artifact-sha256-image456",
-            env_file=None,
-            source_git_ref="",
-            wait=True,
-            timeout_override_seconds=600,
-            verify_health=True,
-            health_timeout_override_seconds=None,
-            dry_run=False,
-            no_cache=False,
-            allow_dirty=False,
-            default_source_git_ref="origin/main",
-            discover_repo_root_fn=lambda _path: Path("/tmp"),
-            load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
-            find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
-            load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
-            resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 45,
-            resolve_ship_healthcheck_urls_fn=lambda **_kwargs: ("https://prod.example.com/web/health",),
-            resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "auto",
-            emit_payload_fn=lambda payload: captured_payload.update(payload),
-        )
-
-        self.assertEqual(captured_payload["artifact_id"], "artifact-sha256-image456")
-        self.assertEqual(captured_payload["context"], "opw")
-        self.assertEqual(captured_payload["instance"], "prod")
-        self.assertEqual(captured_payload["source_git_ref"], "origin/opw-prod")
-        self.assertEqual(captured_payload["deploy_mode"], "dokploy-compose-api")
-        self.assertNotIn("branch_sync", captured_payload)
-
-    def test_execute_export_ship_request_requires_artifact_id(self) -> None:
-        target_definition = self._target_definition(context_name="opw", instance_name="prod")
-        source_of_truth = self._source_of_truth(target_definition)
-
-        with self.assertRaises(click.ClickException) as captured_error:
-            commands_release.execute_export_ship_request(
-                context_name="opw",
-                instance_name="prod",
-                artifact_id="",
+        with patch.object(commands_release, "_run_ship_branch_sync") as run_ship_branch_sync:
+            commands_release.execute_ship(
+                context_name="cm",
+                instance_name="dev",
                 env_file=None,
-                source_git_ref="abc123",
-                wait=True,
-                timeout_override_seconds=600,
-                verify_health=True,
+                wait=False,
+                timeout_override_seconds=None,
+                verify_health=False,
+                health_timeout_override_seconds=None,
+                dry_run=True,
+                no_cache=False,
+                skip_gate=False,
+                discover_repo_root_fn=lambda _path: Path("/tmp"),
+                load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+                load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+                find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+                resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
+                resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
+                resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
+                run_required_gates_fn=lambda **_kwargs: None,
+                resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
+                read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+                resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
+                dokploy_request_fn=lambda **_kwargs: {},
+                latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
+                deployment_key_fn=lambda _deployment: "",
+                wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: "",
+                verify_ship_healthchecks_fn=lambda **_kwargs: None,
+                latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
+                wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
+                echo_fn=lambda _line: None,
+            )
+
+        run_ship_branch_sync.assert_not_called()
+
+    def test_execute_ship_syncs_compose_branch_before_deploying(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            temporary_directory = Path(temporary_directory_name)
+            remote_directory = temporary_directory / "origin.git"
+            repository_directory = temporary_directory / "repo"
+
+            subprocess.run(["git", "init", "--bare", str(remote_directory)], check=True, capture_output=True, text=True)
+            subprocess.run(["git", "init", str(repository_directory)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "config", "user.email", "ship-tests@example.com"],
+                cwd=repository_directory,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Ship Tests"],
+                cwd=repository_directory,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            first_commit = self._commit_file(
+                repository_directory=repository_directory,
+                relative_path="tracked.txt",
+                content="validated-commit-one\n",
+                message="Initial validated commit",
+            )
+            subprocess.run(["git", "branch", "-M", "main"], cwd=repository_directory, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "remote", "add", "origin", str(remote_directory)],
+                cwd=repository_directory,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(["git", "push", "origin", "main"], cwd=repository_directory, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "push", "origin", f"{first_commit}:refs/heads/cm-dev"],
+                cwd=repository_directory,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            second_commit = self._commit_file(
+                repository_directory=repository_directory,
+                relative_path="tracked.txt",
+                content="validated-commit-two\n",
+                message="Validated commit for shipping",
+            )
+            subprocess.run(["git", "push", "origin", "main"], cwd=repository_directory, check=True, capture_output=True, text=True)
+
+            target_definition = DokployTargetDefinition(
+                context="cm",
+                instance="dev",
+                target_type="compose",
+                target_id="compose-id",
+                target_name="cm-dev",
+                git_branch="cm-dev",
+            )
+            source_of_truth = self._source_of_truth(target_definition)
+            emitted_lines: list[str] = []
+            deployed_paths: list[str] = []
+
+            commands_release.execute_ship(
+                context_name="cm",
+                instance_name="dev",
+                env_file=None,
+                wait=False,
+                timeout_override_seconds=None,
+                verify_health=False,
                 health_timeout_override_seconds=None,
                 dry_run=False,
                 no_cache=False,
-                allow_dirty=False,
-                default_source_git_ref="origin/main",
-                discover_repo_root_fn=lambda _path: Path("/tmp"),
+                skip_gate=False,
+                discover_repo_root_fn=lambda _path: repository_directory,
+                load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (repository_directory / ".env", {}),
                 load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
                 find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
-                load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
-                resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 45,
+                resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
+                resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
                 resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
-                resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "auto",
-                emit_payload_fn=lambda _payload: None,
+                run_required_gates_fn=lambda **_kwargs: None,
+                resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
+                read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+                resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
+                dokploy_request_fn=lambda **kwargs: deployed_paths.append(str(kwargs.get("path", ""))) or {},
+                latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
+                deployment_key_fn=lambda _deployment: "",
+                wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: "",
+                verify_ship_healthchecks_fn=lambda **_kwargs: None,
+                latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
+                wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
+                echo_fn=emitted_lines.append,
             )
 
-        self.assertIn("artifact_id", captured_error.exception.message)
+            updated_remote_commit = subprocess.run(
+                ["git", "--git-dir", str(remote_directory), "rev-parse", "refs/heads/cm-dev"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
 
-    def test_execute_export_ship_request_requires_healthcheck_urls_when_verification_waits(self) -> None:
-        target_definition = self._target_definition(context_name="opw", instance_name="prod")
+            self.assertEqual(updated_remote_commit, second_commit)
+            self.assertEqual(deployed_paths, ["/api/compose.deploy"])
+            self.assertIn("branch_sync=true", emitted_lines)
+            self.assertIn("branch_sync_target_remote=origin", emitted_lines)
+            self.assertIn("branch_sync_source_ref=origin/main", emitted_lines)
+            self.assertIn("branch_sync_applied=true", emitted_lines)
+
+    def test_run_ship_branch_sync_uses_single_configured_remote_when_origin_is_missing(self) -> None:
+        target_definition = DokployTargetDefinition(
+            context="cm",
+            instance="dev",
+            target_type="compose",
+            target_id="compose-id",
+            target_name="cm-dev",
+            git_branch="cm-dev",
+            source_git_ref="upstream/main",
+        )
+        captured_commands: list[list[str]] = []
+
+        def run_command_capture(command: list[str], *, repo_root: Path) -> str:
+            self.assertEqual(repo_root, Path("/tmp/repo"))
+            captured_commands.append(command)
+            if command == ["git", "remote"]:
+                return "upstream\n"
+            if command == ["git", "fetch", "upstream", "--prune"]:
+                return ""
+            if command == ["git", "rev-parse", "--verify", "upstream/main^{commit}"]:
+                return "abc123\n"
+            if command == ["git", "ls-remote", "--heads", "upstream", "refs/heads/cm-dev"]:
+                return "def456\trefs/heads/cm-dev\n"
+            if command == ["git", "push", "upstream", "--force-with-lease=refs/heads/cm-dev:def456", "abc123:refs/heads/cm-dev"]:
+                return ""
+            raise AssertionError(f"unexpected command: {command}")
+
+        with patch.object(commands_release, "_run_command_capture", side_effect=run_command_capture):
+            with patch.object(
+                commands_release,
+                "_resolve_symbolic_full_git_reference",
+                return_value="refs/remotes/upstream/main",
+            ):
+                with patch.object(commands_release, "_git_reference_exists_locally", return_value=False):
+                    commands_release._run_ship_branch_sync(
+                        repo_root=Path("/tmp/repo"),
+                        source_git_ref_override="",
+                        target_definition=target_definition,
+                        echo_fn=lambda _line: None,
+                    )
+
+        self.assertEqual(
+            captured_commands,
+            [
+                ["git", "remote"],
+                ["git", "fetch", "upstream", "--prune"],
+                ["git", "rev-parse", "--verify", "upstream/main^{commit}"],
+                ["git", "ls-remote", "--heads", "upstream", "refs/heads/cm-dev"],
+                ["git", "push", "upstream", "--force-with-lease=refs/heads/cm-dev:def456", "abc123:refs/heads/cm-dev"],
+            ],
+        )
+
+    def test_run_ship_branch_sync_fetches_missing_remote_style_ref_even_without_local_tracking_ref(self) -> None:
+        target_definition = DokployTargetDefinition(
+            context="cm",
+            instance="dev",
+            target_type="compose",
+            target_id="compose-id",
+            target_name="cm-dev",
+            git_branch="cm-dev",
+            source_git_ref="upstream/main",
+        )
+        captured_commands: list[list[str]] = []
+
+        def run_command_capture(command: list[str], *, repo_root: Path) -> str:
+            self.assertEqual(repo_root, Path("/tmp/repo"))
+            captured_commands.append(command)
+            if command == ["git", "remote"]:
+                return "origin\nupstream\n"
+            if command == ["git", "fetch", "upstream", "--prune"]:
+                return ""
+            if command == ["git", "rev-parse", "--verify", "upstream/main^{commit}"]:
+                return "abc123\n"
+            if command == ["git", "ls-remote", "--heads", "origin", "refs/heads/cm-dev"]:
+                return "def456\trefs/heads/cm-dev\n"
+            if command == ["git", "push", "origin", "--force-with-lease=refs/heads/cm-dev:def456", "abc123:refs/heads/cm-dev"]:
+                return ""
+            raise AssertionError(f"unexpected command: {command}")
+
+        with patch.object(commands_release, "_run_command_capture", side_effect=run_command_capture):
+            with patch.object(commands_release, "_resolve_symbolic_full_git_reference", return_value=""):
+                with patch.object(commands_release, "_git_reference_exists_locally", return_value=False):
+                    commands_release._run_ship_branch_sync(
+                        repo_root=Path("/tmp/repo"),
+                        source_git_ref_override="",
+                        target_definition=target_definition,
+                        echo_fn=lambda _line: None,
+                    )
+
+        self.assertEqual(
+            captured_commands,
+            [
+                ["git", "remote"],
+                ["git", "fetch", "upstream", "--prune"],
+                ["git", "rev-parse", "--verify", "upstream/main^{commit}"],
+                ["git", "ls-remote", "--heads", "origin", "refs/heads/cm-dev"],
+                ["git", "push", "origin", "--force-with-lease=refs/heads/cm-dev:def456", "abc123:refs/heads/cm-dev"],
+            ],
+        )
+
+    def test_run_ship_branch_sync_defaults_to_single_remote_main_when_origin_missing(self) -> None:
+        target_definition = DokployTargetDefinition(
+            context="cm",
+            instance="dev",
+            target_type="compose",
+            target_id="compose-id",
+            target_name="cm-dev",
+            git_branch="cm-dev",
+            source_git_ref="",
+        )
+        captured_commands: list[list[str]] = []
+
+        def run_command_capture(command: list[str], *, repo_root: Path) -> str:
+            self.assertEqual(repo_root, Path("/tmp/repo"))
+            captured_commands.append(command)
+            if command == ["git", "remote"]:
+                return "upstream\n"
+            if command == ["git", "fetch", "upstream", "--prune"]:
+                return ""
+            if command == ["git", "rev-parse", "--verify", "upstream/main^{commit}"]:
+                return "abc123\n"
+            if command == ["git", "ls-remote", "--heads", "upstream", "refs/heads/cm-dev"]:
+                return "def456\trefs/heads/cm-dev\n"
+            if command == ["git", "push", "upstream", "--force-with-lease=refs/heads/cm-dev:def456", "abc123:refs/heads/cm-dev"]:
+                return ""
+            raise AssertionError(f"unexpected command: {command}")
+
+        with patch.object(commands_release, "_run_command_capture", side_effect=run_command_capture):
+            with patch.object(commands_release, "_resolve_symbolic_full_git_reference", return_value=""):
+                with patch.object(commands_release, "_git_reference_exists_locally", return_value=False):
+                    commands_release._run_ship_branch_sync(
+                        repo_root=Path("/tmp/repo"),
+                        source_git_ref_override="",
+                        target_definition=target_definition,
+                        echo_fn=lambda _line: None,
+                    )
+
+        self.assertEqual(
+            captured_commands,
+            [
+                ["git", "remote"],
+                ["git", "fetch", "upstream", "--prune"],
+                ["git", "rev-parse", "--verify", "upstream/main^{commit}"],
+                ["git", "ls-remote", "--heads", "upstream", "refs/heads/cm-dev"],
+                ["git", "push", "upstream", "--force-with-lease=refs/heads/cm-dev:def456", "abc123:refs/heads/cm-dev"],
+            ],
+        )
+
+    def test_execute_ship_requires_git_branch_for_compose_target(self) -> None:
+        target_definition = self._target_definition(git_branch="")
         source_of_truth = self._source_of_truth(target_definition)
 
         with self.assertRaises(click.ClickException) as captured_error:
-            commands_release.execute_export_ship_request(
-                context_name="opw",
-                instance_name="prod",
-                artifact_id="artifact-sha256-image456",
+            commands_release.execute_ship(
+                context_name="cm",
+                instance_name="dev",
                 env_file=None,
-                source_git_ref="abc123",
-                wait=True,
-                timeout_override_seconds=600,
-                verify_health=True,
+                wait=False,
+                timeout_override_seconds=None,
+                verify_health=False,
                 health_timeout_override_seconds=None,
                 dry_run=False,
                 no_cache=False,
-                allow_dirty=False,
-                default_source_git_ref="origin/main",
+                skip_gate=True,
                 discover_repo_root_fn=lambda _path: Path("/tmp"),
+                load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
                 load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
                 find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
-                load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
-                resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 45,
+                resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
+                resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
                 resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
-                resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "auto",
-                emit_payload_fn=lambda _payload: None,
+                run_required_gates_fn=lambda **_kwargs: None,
+                resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
+                read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+                resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
+                dokploy_request_fn=lambda **_kwargs: (_ for _ in ()).throw(AssertionError("deploy should not run")),
+                latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
+                deployment_key_fn=lambda _deployment: "",
+                wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: "",
+                verify_ship_healthchecks_fn=lambda **_kwargs: None,
+                latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
+                wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
+                echo_fn=lambda _line: None,
             )
 
-        self.assertIn("no target domain/URL was resolved", captured_error.exception.message)
+        self.assertIn("requires git_branch", captured_error.exception.message)
 
-    def test_execute_export_ship_request_disables_health_verification_when_not_waiting(self) -> None:
-        target_definition = self._target_definition(context_name="opw", instance_name="prod").model_copy(
+    def test_execute_ship_passes_source_ref_override_to_branch_sync(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            repo_root_path = Path(temporary_directory_name)
+            (repo_root_path / ".git").mkdir()
+            target_definition = self._target_definition(git_branch="cm-dev")
+            source_of_truth = self._source_of_truth(target_definition)
+            captured_source_refs: list[str] = []
+
+            def run_ship_branch_sync(
+                *,
+                repo_root: Path,
+                source_git_ref_override: str,
+                target_definition: DokployTargetDefinition | None,
+                echo_fn: Callable[[str], None],
+            ) -> None:
+                self.assertEqual(repo_root, repo_root_path)
+                self.assertIsNotNone(target_definition)
+                captured_source_refs.append(source_git_ref_override)
+                echo_fn("branch_sync=true")
+
+            with (
+                patch.object(commands_release, "_prepare_ship_branch_sync", return_value=None),
+                patch.object(commands_release, "_run_ship_branch_sync", side_effect=run_ship_branch_sync),
+            ):
+                commands_release.execute_ship(
+                    context_name="cm",
+                    instance_name="dev",
+                    env_file=None,
+                    wait=False,
+                    timeout_override_seconds=None,
+                    verify_health=False,
+                    health_timeout_override_seconds=None,
+                    dry_run=False,
+                    no_cache=False,
+                    skip_gate=True,
+                    discover_repo_root_fn=lambda _path: repo_root_path,
+                    load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (repo_root_path / ".env", {}),
+                    load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+                    find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+                    resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
+                    resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
+                    resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
+                    run_required_gates_fn=lambda **_kwargs: None,
+                    resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
+                    read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+                    resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
+                    dokploy_request_fn=lambda **_kwargs: {},
+                    latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
+                    deployment_key_fn=lambda _deployment: "",
+                    wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: "",
+                    verify_ship_healthchecks_fn=lambda **_kwargs: None,
+                    latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
+                    wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
+                    echo_fn=lambda _line: None,
+                    source_git_ref="feature-commit",
+                )
+
+            self.assertEqual(captured_source_refs, ["feature-commit"])
+
+    def test_execute_ship_application_target_uses_source_ref_override_for_branch_sync(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            repo_root_path = Path(temporary_directory_name)
+            (repo_root_path / ".git").mkdir()
+            target_definition = self._target_definition(target_type="application", git_branch="cm-app")
+            source_of_truth = self._source_of_truth(target_definition)
+            captured_source_refs: list[str] = []
+
+            def run_ship_branch_sync(
+                *,
+                repo_root: Path,
+                source_git_ref_override: str,
+                target_definition: DokployTargetDefinition | None,
+                echo_fn: Callable[[str], None],
+            ) -> None:
+                self.assertEqual(repo_root, repo_root_path)
+                self.assertIsNotNone(target_definition)
+                captured_source_refs.append(source_git_ref_override)
+                echo_fn("branch_sync=true")
+
+            with (
+                patch.object(commands_release, "_prepare_ship_branch_sync", return_value=None),
+                patch.object(commands_release, "_run_ship_branch_sync", side_effect=run_ship_branch_sync),
+            ):
+                commands_release.execute_ship(
+                    context_name="cm",
+                    instance_name="dev",
+                    env_file=None,
+                    wait=False,
+                    timeout_override_seconds=None,
+                    verify_health=False,
+                    health_timeout_override_seconds=None,
+                    dry_run=False,
+                    no_cache=False,
+                    skip_gate=True,
+                    discover_repo_root_fn=lambda _path: repo_root_path,
+                    load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (repo_root_path / ".env", {}),
+                    load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+                    find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+                    resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
+                    resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
+                    resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
+                    run_required_gates_fn=lambda **_kwargs: None,
+                    resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "application",
+                    read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+                    resolve_dokploy_target_fn=lambda **_kwargs: ("application", "application-id", "application-name", None, None),
+                    dokploy_request_fn=lambda **_kwargs: {},
+                    latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
+                    deployment_key_fn=lambda _deployment: "",
+                    wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: "",
+                    verify_ship_healthchecks_fn=lambda **_kwargs: None,
+                    latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
+                    wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
+                    echo_fn=lambda _line: None,
+                    source_git_ref="feature-commit",
+                )
+
+            self.assertEqual(captured_source_refs, ["feature-commit"])
+
+    def test_execute_ship_application_target_with_git_branch_runs_branch_sync_without_source_override(self) -> None:
+        target_definition = self._target_definition(target_type="application", git_branch="cm-app")
+        source_of_truth = self._source_of_truth(target_definition)
+        captured_source_refs: list[str] = []
+
+        def run_ship_branch_sync(
+            *,
+            repo_root: Path,
+            source_git_ref_override: str,
+            target_definition: DokployTargetDefinition | None,
+            echo_fn: Callable[[str], None],
+        ) -> None:
+            self.assertEqual(repo_root, Path("/tmp"))
+            self.assertIsNotNone(target_definition)
+            captured_source_refs.append(source_git_ref_override)
+            echo_fn("branch_sync=true")
+
+        with patch.object(commands_release, "_run_ship_branch_sync", side_effect=run_ship_branch_sync):
+            commands_release.execute_ship(
+                context_name="cm",
+                instance_name="dev",
+                env_file=None,
+                wait=False,
+                timeout_override_seconds=None,
+                verify_health=False,
+                health_timeout_override_seconds=None,
+                dry_run=False,
+                no_cache=False,
+                skip_gate=True,
+                discover_repo_root_fn=lambda _path: Path("/tmp"),
+                load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+                load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+                find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+                resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
+                resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
+                resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
+                run_required_gates_fn=lambda **_kwargs: None,
+                resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "application",
+                read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+                resolve_dokploy_target_fn=lambda **_kwargs: ("application", "application-id", "application-name", None, None),
+                dokploy_request_fn=lambda **_kwargs: {},
+                latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
+                deployment_key_fn=lambda _deployment: "",
+                wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: "",
+                verify_ship_healthchecks_fn=lambda **_kwargs: None,
+                latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
+                wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
+                echo_fn=lambda _line: None,
+            )
+
+        self.assertEqual(captured_source_refs, [""])
+
+    def test_execute_ship_runs_branch_sync_after_required_gates_for_source_ref_override(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            repo_root = Path(temporary_directory_name)
+            (repo_root / ".git").mkdir()
+
+            target_definition = self._target_definition(git_branch="cm-dev")
+            source_of_truth = self._source_of_truth(target_definition)
+            call_order: list[str] = []
+
+            pinned_plan = commands_release.ShipBranchSyncPlan(
+                source_git_ref="feature-commit",
+                source_commit="pinned-sha",
+                target_remote_name="origin",
+                target_branch="cm-dev",
+                remote_branch_commit_before="before-sha",
+                branch_update_required=True,
+            )
+
+            def run_required_gates(**_kwargs: object) -> None:
+                call_order.append("gates")
+
+            def dokploy_request(**_kwargs: object) -> JsonObject:
+                call_order.append("deploy")
+                return {}
+
+            with (
+                patch.object(
+                    commands_release,
+                    "_prepare_ship_branch_sync",
+                    side_effect=lambda **_kwargs: call_order.append("prepare") or pinned_plan,
+                ),
+                patch.object(
+                    commands_release,
+                    "_apply_ship_branch_sync",
+                    side_effect=lambda **_kwargs: call_order.append("branch_sync"),
+                ),
+            ):
+                commands_release.execute_ship(
+                    context_name="cm",
+                    instance_name="dev",
+                    env_file=None,
+                    wait=False,
+                    timeout_override_seconds=None,
+                    verify_health=False,
+                    health_timeout_override_seconds=None,
+                    dry_run=False,
+                    no_cache=False,
+                    skip_gate=False,
+                    discover_repo_root_fn=lambda _path: repo_root,
+                    load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (repo_root / ".env", {}),
+                    load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+                    find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+                    resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
+                    resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
+                    resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
+                    run_required_gates_fn=run_required_gates,
+                    resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
+                    read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+                    resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
+                    dokploy_request_fn=dokploy_request,
+                    latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
+                    deployment_key_fn=lambda _deployment: "",
+                    wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: "",
+                    verify_ship_healthchecks_fn=lambda **_kwargs: None,
+                    latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
+                    wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
+                    echo_fn=lambda _line: None,
+                    source_git_ref="feature-commit",
+                )
+
+            self.assertEqual(call_order, ["prepare", "gates", "branch_sync", "deploy"])
+
+    def test_execute_ship_does_not_run_branch_sync_when_required_gates_fail(self) -> None:
+        with TemporaryDirectory() as temporary_directory_name:
+            repo_root_path = Path(temporary_directory_name)
+            (repo_root_path / ".git").mkdir()
+            target_definition = self._target_definition(git_branch="cm-dev")
+            source_of_truth = self._source_of_truth(target_definition)
+
+            with (
+                patch.object(commands_release, "_prepare_ship_branch_sync", return_value=None),
+                patch.object(commands_release, "_run_ship_branch_sync") as run_ship_branch_sync,
+            ):
+                with self.assertRaises(click.ClickException) as captured_error:
+                    commands_release.execute_ship(
+                        context_name="cm",
+                        instance_name="dev",
+                        env_file=None,
+                        wait=False,
+                        timeout_override_seconds=None,
+                        verify_health=False,
+                        health_timeout_override_seconds=None,
+                        dry_run=False,
+                        no_cache=False,
+                        skip_gate=False,
+                        discover_repo_root_fn=lambda _path: repo_root_path,
+                        load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (repo_root_path / ".env", {}),
+                        load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+                        find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+                        resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
+                        resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
+                        resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
+                        run_required_gates_fn=lambda **_kwargs: (_ for _ in ()).throw(click.ClickException("gate failed")),
+                        resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
+                        read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+                        resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
+                        dokploy_request_fn=lambda **_kwargs: {},
+                        latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
+                        deployment_key_fn=lambda _deployment: "",
+                        wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: "",
+                        verify_ship_healthchecks_fn=lambda **_kwargs: None,
+                        latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
+                        wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
+                        echo_fn=lambda _line: None,
+                        source_git_ref="feature-commit",
+                    )
+
+            self.assertEqual(captured_error.exception.message, "gate failed")
+            run_ship_branch_sync.assert_not_called()
+
+    def test_execute_ship_requires_git_metadata_before_gates_when_explicit_source_ref_must_be_pinned(self) -> None:
+        target_definition = self._target_definition(git_branch="cm-dev")
+        source_of_truth = self._source_of_truth(target_definition)
+        gates_ran: list[str] = []
+
+        with self.assertRaises(click.ClickException) as captured_error:
+            commands_release.execute_ship(
+                context_name="cm",
+                instance_name="dev",
+                env_file=None,
+                wait=False,
+                timeout_override_seconds=None,
+                verify_health=False,
+                health_timeout_override_seconds=None,
+                dry_run=False,
+                no_cache=False,
+                skip_gate=False,
+                discover_repo_root_fn=lambda _path: Path("/tmp"),
+                load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+                load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+                find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+                resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
+                resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
+                resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
+                run_required_gates_fn=lambda **_kwargs: gates_ran.append("gate"),
+                resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
+                read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+                resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
+                dokploy_request_fn=lambda **_kwargs: {},
+                latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
+                deployment_key_fn=lambda _deployment: "",
+                wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: "",
+                verify_ship_healthchecks_fn=lambda **_kwargs: None,
+                latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
+                wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
+                echo_fn=lambda _line: None,
+                source_git_ref="feature-commit",
+            )
+
+        self.assertIn("requires git metadata", captured_error.exception.message)
+        self.assertEqual(gates_ran, [])
+
+    def test_execute_export_ship_request_rejects_ship_mode_target_mismatch(self) -> None:
+        target_definition = self._target_definition(context_name="opw", instance_name="prod", target_type="application").model_copy(
             update={"domains": ("prod.example.com",), "source_git_ref": "origin/opw-prod"}
         )
-        source_of_truth = self._source_of_truth(target_definition)
-        captured_payload: dict[str, object] = {}
-
-        commands_release.execute_export_ship_request(
-            context_name="opw",
-            instance_name="prod",
-            artifact_id="artifact-sha256-image456",
-            env_file=None,
-            source_git_ref="",
-            wait=False,
-            timeout_override_seconds=600,
-            verify_health=True,
-            health_timeout_override_seconds=None,
-            dry_run=False,
-            no_cache=False,
-            allow_dirty=False,
-            default_source_git_ref="origin/main",
-            discover_repo_root_fn=lambda _path: Path("/tmp"),
-            load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
-            find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
-            load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
-            resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 45,
-            resolve_ship_healthcheck_urls_fn=lambda **_kwargs: ("https://prod.example.com/web/health",),
-            resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "auto",
-            emit_payload_fn=lambda payload: captured_payload.update(payload),
-        )
-
-        self.assertEqual(captured_payload["verify_health"], False)
-        destination_health = cast(dict[str, object], captured_payload["destination_health"])
-        self.assertEqual(destination_health.get("status"), "skipped")
-
-    def test_execute_export_ship_request_rejects_conflicting_ship_mode_override(self) -> None:
-        target_definition = self._target_definition(
-            context_name="opw",
-            instance_name="prod",
-            target_type="application",
-        ).model_copy(update={"domains": ("prod.example.com",), "source_git_ref": "origin/opw-prod"})
         source_of_truth = self._source_of_truth(target_definition)
 
         with self.assertRaises(click.ClickException) as captured_error:
@@ -1892,6 +2529,57 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
         self.assertEqual(command_kwargs["allow_dirty"], True)
         self.assertEqual(command_kwargs["source_git_ref"], "abc123")
 
+    def test_execute_promote_skips_git_fetch_on_dry_run(self) -> None:
+        source_target_definition = self._target_definition(context_name="opw", instance_name="testing").model_copy(
+            update={"git_branch": "opw-testing"}
+        )
+        destination_target_definition = self._target_definition(context_name="opw", instance_name="prod").model_copy(
+            update={"git_branch": "opw-prod"}
+        )
+        source_of_truth = DokploySourceOfTruth(
+            schema_version=1,
+            targets=(source_target_definition, destination_target_definition),
+        )
+        captured_commands: list[list[str]] = []
+
+        release_workflows.execute_promote(
+            context_name="opw",
+            from_instance_name="testing",
+            to_instance_name="prod",
+            env_file=None,
+            wait=True,
+            timeout_override_seconds=600,
+            verify_health=True,
+            health_timeout_override_seconds=60,
+            verify_source_health=False,
+            source_health_timeout_override_seconds=None,
+            dry_run=True,
+            no_cache=False,
+            allow_dirty=False,
+            assert_promote_path_allowed_fn=lambda **_kwargs: None,
+            discover_repo_root_fn=lambda _path: Path("/tmp"),
+            load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+            find_dokploy_target_definition_fn=lambda dokploy_source_of_truth, **kwargs: next(
+                (
+                    target_definition
+                    for target_definition in dokploy_source_of_truth.targets
+                    if target_definition.context == kwargs["context_name"] and target_definition.instance == kwargs["instance_name"]
+                ),
+                None,
+            ),
+            run_command_fn=lambda command: captured_commands.append(command),
+            resolve_remote_git_branch_commit_fn=lambda _remote_name, _branch_name: "abc123",
+            load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+            resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
+            resolve_ship_healthcheck_urls_fn=lambda **_kwargs: ("https://opw-testing.example/web/health",),
+            collect_environment_gate_results_fn=lambda **_kwargs: [],
+            run_production_backup_gate_fn=lambda **_kwargs: None,
+            invoke_platform_command_fn=lambda _command_name, **_kwargs: None,
+            echo_fn=lambda _line: None,
+        )
+
+        self.assertEqual(captured_commands, [])
+
     def _assert_execute_ship_wait_uses_predeploy_deployment_key(
         self,
         *,
@@ -1917,50 +2605,53 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             self.assertEqual(kwargs.get("before_key"), "before")
             return "deployment=after status=done"
 
-        commands_release.execute_ship(
-            context_name="cm",
-            instance_name="dev",
-            env_file=None,
-            wait=True,
-            timeout_override_seconds=None,
-            verify_health=False,
-            health_timeout_override_seconds=None,
-            dry_run=False,
-            no_cache=False,
-            skip_gate=False,
-            source_git_ref="main",
-            discover_repo_root_fn=lambda _path: Path("/tmp"),
-            load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
-            load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
-            find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
-            resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
-            resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
-            resolve_ship_healthcheck_urls_fn=lambda **_kwargs: ("https://cm-dev.example/web/health",),
-            prepare_ship_branch_sync_fn=lambda _source_git_ref, _target_definition: None,
-            run_required_gates_fn=lambda **_kwargs: None,
-            resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: target_type,
-            read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
-            resolve_dokploy_target_fn=lambda **_kwargs: (
-                target_type,
-                f"{target_type}-id",
-                f"{target_type}-name",
-                None,
-                None,
-            ),
-            apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
-            dokploy_request_fn=dokploy_request,
-            latest_deployment_for_compose_fn=latest_deployment
-            if target_type == "compose"
-            else lambda _host, _token, _compose_id: None,
-            deployment_key_fn=lambda deployment: str(deployment.get("id", "")) if isinstance(deployment, dict) else "",
-            wait_for_dokploy_compose_deployment_fn=wait_for_deployment if target_type == "compose" else lambda **_kwargs: "",
-            verify_ship_healthchecks_fn=lambda **_kwargs: None,
-            latest_deployment_for_application_fn=latest_deployment
-            if target_type == "application"
-            else lambda _host, _token, _application_id: None,
-            wait_for_dokploy_deployment_fn=wait_for_deployment if target_type == "application" else lambda **_kwargs: "",
-            echo_fn=emitted_lines.append,
-        )
+        with patch.object(commands_release, "_run_ship_branch_sync") as run_ship_branch_sync:
+            commands_release.execute_ship(
+                context_name="cm",
+                instance_name="dev",
+                env_file=None,
+                wait=True,
+                timeout_override_seconds=None,
+                verify_health=False,
+                health_timeout_override_seconds=None,
+                dry_run=False,
+                no_cache=False,
+                skip_gate=False,
+                discover_repo_root_fn=lambda _path: Path("/tmp"),
+                load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+                load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+                find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+                resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
+                resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
+                resolve_ship_healthcheck_urls_fn=lambda **_kwargs: ("https://cm-dev.example/web/health",),
+                run_required_gates_fn=lambda **_kwargs: None,
+                resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: target_type,
+                read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+                resolve_dokploy_target_fn=lambda **_kwargs: (
+                    target_type,
+                    f"{target_type}-id",
+                    f"{target_type}-name",
+                    None,
+                    None,
+                ),
+                dokploy_request_fn=dokploy_request,
+                latest_deployment_for_compose_fn=latest_deployment
+                if target_type == "compose"
+                else lambda _host, _token, _compose_id: None,
+                deployment_key_fn=lambda deployment: str(deployment.get("id", "")) if isinstance(deployment, dict) else "",
+                wait_for_dokploy_compose_deployment_fn=wait_for_deployment if target_type == "compose" else lambda **_kwargs: "",
+                verify_ship_healthchecks_fn=lambda **_kwargs: None,
+                latest_deployment_for_application_fn=latest_deployment
+                if target_type == "application"
+                else lambda _host, _token, _application_id: None,
+                wait_for_dokploy_deployment_fn=wait_for_deployment if target_type == "application" else lambda **_kwargs: "",
+                echo_fn=emitted_lines.append,
+            )
+
+        if target_type == "compose":
+            run_ship_branch_sync.assert_called_once()
+        else:
+            run_ship_branch_sync.assert_not_called()
 
         self.assertEqual(call_order, ["latest_before", "deploy", "wait"])
         self.assertIn("deployment=after status=done", emitted_lines)
@@ -1992,7 +2683,6 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             dry_run=True,
             no_cache=False,
             skip_gate=False,
-            source_git_ref="main",
             discover_repo_root_fn=lambda _path: Path("/tmp"),
             load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
             load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
@@ -2000,12 +2690,10 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
             resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
             resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
-            prepare_ship_branch_sync_fn=lambda _source_git_ref, _target_definition: None,
             run_required_gates_fn=lambda **_kwargs: None,
             resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
             read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
             resolve_dokploy_target_fn=resolve_target,
-            apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
             dokploy_request_fn=lambda **_kwargs: {},
             latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
             deployment_key_fn=lambda _deployment: "",
@@ -2038,7 +2726,6 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             dry_run=True,
             no_cache=False,
             skip_gate=False,
-            source_git_ref="main",
             discover_repo_root_fn=lambda _path: Path("/tmp"),
             load_environment_fn=load_environment,
             load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
@@ -2046,12 +2733,10 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
             resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
             resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
-            prepare_ship_branch_sync_fn=lambda _source_git_ref, _target_definition: None,
             run_required_gates_fn=lambda **_kwargs: None,
             resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
             read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
             resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
-            apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
             dokploy_request_fn=lambda **_kwargs: {},
             latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
             deployment_key_fn=lambda _deployment: "",
@@ -2080,7 +2765,6 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
                 dry_run=False,
                 no_cache=False,
                 skip_gate=True,
-                source_git_ref="main",
                 discover_repo_root_fn=lambda _path: Path("/tmp"),
                 load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
                 load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
@@ -2088,12 +2772,10 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
                 resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
                 resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
                 resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
-                prepare_ship_branch_sync_fn=lambda _source_git_ref, _target_definition: None,
                 run_required_gates_fn=lambda **_kwargs: None,
                 resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
                 read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
                 resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
-                apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
                 dokploy_request_fn=lambda **_kwargs: {},
                 latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
                 deployment_key_fn=lambda _deployment: "",
@@ -2124,7 +2806,6 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
                 dry_run=True,
                 no_cache=False,
                 skip_gate=True,
-                source_git_ref="main",
                 discover_repo_root_fn=lambda _path: Path("/tmp"),
                 load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
                 load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
@@ -2132,12 +2813,10 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
                 resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
                 resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
                 resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
-                prepare_ship_branch_sync_fn=lambda _source_git_ref, _target_definition: None,
                 run_required_gates_fn=lambda **_kwargs: None,
                 resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
                 read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
                 resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
-                apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
                 dokploy_request_fn=lambda **_kwargs: {},
                 latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
                 deployment_key_fn=lambda _deployment: "",
@@ -2156,42 +2835,42 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
         target_definition = self._target_definition()
         source_of_truth = self._source_of_truth(target_definition)
 
-        commands_release.execute_ship(
-            context_name="cm",
-            instance_name="dev",
-            env_file=None,
-            wait=False,
-            timeout_override_seconds=None,
-            verify_health=False,
-            health_timeout_override_seconds=None,
-            dry_run=False,
-            no_cache=False,
-            skip_gate=True,
-            allow_dirty=True,
-            source_git_ref="main",
-            discover_repo_root_fn=lambda _path: Path("/tmp"),
-            load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
-            load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
-            find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
-            resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
-            resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
-            resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
-            prepare_ship_branch_sync_fn=lambda _source_git_ref, _target_definition: None,
-            run_required_gates_fn=lambda **_kwargs: None,
-            resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
-            read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
-            resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
-            apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
-            dokploy_request_fn=lambda **_kwargs: {},
-            latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
-            deployment_key_fn=lambda _deployment: "",
-            wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: "",
-            verify_ship_healthchecks_fn=lambda **_kwargs: None,
-            latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
-            wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
-            echo_fn=lambda _line: None,
-            check_dirty_working_tree_fn=lambda: ("M platform/dokploy.toml",),
-        )
+        with patch.object(commands_release, "_run_ship_branch_sync") as run_ship_branch_sync:
+            commands_release.execute_ship(
+                context_name="cm",
+                instance_name="dev",
+                env_file=None,
+                wait=False,
+                timeout_override_seconds=None,
+                verify_health=False,
+                health_timeout_override_seconds=None,
+                dry_run=False,
+                no_cache=False,
+                skip_gate=True,
+                allow_dirty=True,
+                discover_repo_root_fn=lambda _path: Path("/tmp"),
+                load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+                load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+                find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+                resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
+                resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
+                resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
+                run_required_gates_fn=lambda **_kwargs: None,
+                resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
+                read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+                resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
+                dokploy_request_fn=lambda **_kwargs: {},
+                latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
+                deployment_key_fn=lambda _deployment: "",
+                wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: "",
+                verify_ship_healthchecks_fn=lambda **_kwargs: None,
+                latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
+                wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
+                echo_fn=lambda _line: None,
+                check_dirty_working_tree_fn=lambda: ("M platform/dokploy.toml",),
+            )
+
+        run_ship_branch_sync.assert_called_once()
 
     def test_run_required_gates_warns_when_skip_gate_bypasses_required_policy(self) -> None:
         target_definition = self._target_definition(instance_name="testing")
@@ -2226,7 +2905,6 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
                 dry_run=False,
                 no_cache=False,
                 skip_gate=False,
-                source_git_ref="main",
                 discover_repo_root_fn=lambda _path: Path("/tmp"),
                 load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
                 load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: None,
@@ -2234,12 +2912,10 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
                 resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
                 resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
                 resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
-                prepare_ship_branch_sync_fn=lambda _source_git_ref, _target_definition: None,
                 run_required_gates_fn=lambda **_kwargs: None,
                 resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
                 read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
                 resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
-                apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
                 dokploy_request_fn=lambda **_kwargs: {},
                 latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
                 deployment_key_fn=lambda _deployment: "",
@@ -2267,7 +2943,6 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
                 dry_run=False,
                 no_cache=False,
                 skip_gate=False,
-                source_git_ref="main",
                 discover_repo_root_fn=lambda _path: Path("/tmp"),
                 load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
                 load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
@@ -2275,12 +2950,10 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
                 resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
                 resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
                 resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
-                prepare_ship_branch_sync_fn=lambda _source_git_ref, _target_definition: None,
                 run_required_gates_fn=lambda **_kwargs: None,
                 resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
                 read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
                 resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
-                apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
                 dokploy_request_fn=lambda **_kwargs: {},
                 latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
                 deployment_key_fn=lambda _deployment: "",
@@ -2304,41 +2977,41 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
         target_definition = self._target_definition()
         source_of_truth = self._source_of_truth(target_definition)
 
-        commands_release.execute_ship(
-            context_name="cm",
-            instance_name="testing",
-            env_file=None,
-            wait=True,
-            timeout_override_seconds=None,
-            verify_health=True,
-            health_timeout_override_seconds=None,
-            dry_run=False,
-            no_cache=False,
-            skip_gate=True,
-            source_git_ref="main",
-            discover_repo_root_fn=lambda _path: Path("/tmp"),
-            load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
-            load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
-            find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
-            resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
-            resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
-            resolve_ship_healthcheck_urls_fn=lambda **_kwargs: ("https://cm-testing.example/web/health",),
-            prepare_ship_branch_sync_fn=lambda _source_git_ref, _target_definition: None,
-            run_required_gates_fn=lambda **_kwargs: None,
-            resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
-            read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
-            resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
-            apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
-            dokploy_request_fn=lambda **_kwargs: call_order.append("deploy") or {},
-            latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: {"id": "before"},
-            deployment_key_fn=lambda deployment: str(deployment.get("id", "")) if isinstance(deployment, dict) else "",
-            wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: call_order.append("wait") or "deployment=after status=done",
-            verify_ship_healthchecks_fn=lambda **_kwargs: call_order.append("health"),
-            latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
-            wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
-            echo_fn=lambda _line: None,
-            run_post_deploy_update_fn=lambda: call_order.append("update"),
-        )
+        with patch.object(commands_release, "_run_ship_branch_sync") as run_ship_branch_sync:
+            commands_release.execute_ship(
+                context_name="cm",
+                instance_name="testing",
+                env_file=None,
+                wait=True,
+                timeout_override_seconds=None,
+                verify_health=True,
+                health_timeout_override_seconds=None,
+                dry_run=False,
+                no_cache=False,
+                skip_gate=True,
+                discover_repo_root_fn=lambda _path: Path("/tmp"),
+                load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+                load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+                find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+                resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
+                resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
+                resolve_ship_healthcheck_urls_fn=lambda **_kwargs: ("https://cm-testing.example/web/health",),
+                run_required_gates_fn=lambda **_kwargs: None,
+                resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
+                read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+                resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
+                dokploy_request_fn=lambda **_kwargs: call_order.append("deploy") or {},
+                latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: {"id": "before"},
+                deployment_key_fn=lambda deployment: str(deployment.get("id", "")) if isinstance(deployment, dict) else "",
+                wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: call_order.append("wait") or "deployment=after status=done",
+                verify_ship_healthchecks_fn=lambda **_kwargs: call_order.append("health"),
+                latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
+                wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
+                echo_fn=lambda _line: None,
+                run_post_deploy_update_fn=lambda: call_order.append("update"),
+            )
+
+        run_ship_branch_sync.assert_called_once()
 
         self.assertEqual(call_order, ["deploy", "wait", "update", "health"])
 
@@ -2347,41 +3020,43 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
         source_of_truth = self._source_of_truth(target_definition)
         post_deploy_updates: list[str] = []
 
-        commands_release.execute_ship(
-            context_name="cm",
-            instance_name="testing",
-            env_file=None,
-            wait=False,
-            timeout_override_seconds=None,
-            verify_health=True,
-            health_timeout_override_seconds=None,
-            dry_run=False,
-            no_cache=False,
-            skip_gate=True,
-            source_git_ref="main",
-            discover_repo_root_fn=lambda _path: Path("/tmp"),
-            load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
-            load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
-            find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
-            resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
-            resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
-            resolve_ship_healthcheck_urls_fn=lambda **_kwargs: ("https://cm-testing.example/web/health",),
-            prepare_ship_branch_sync_fn=lambda _source_git_ref, _target_definition: None,
-            run_required_gates_fn=lambda **_kwargs: None,
-            resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
-            read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
-            resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
-            apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
-            dokploy_request_fn=lambda **_kwargs: {},
-            latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
-            deployment_key_fn=lambda _deployment: "",
-            wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: (_ for _ in ()).throw(AssertionError("wait should not run")),
-            verify_ship_healthchecks_fn=lambda **_kwargs: (_ for _ in ()).throw(AssertionError("health should not run")),
-            latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
-            wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
-            echo_fn=lambda _line: None,
-            run_post_deploy_update_fn=lambda: post_deploy_updates.append("update"),
-        )
+        with patch.object(commands_release, "_run_ship_branch_sync") as run_ship_branch_sync:
+            commands_release.execute_ship(
+                context_name="cm",
+                instance_name="testing",
+                env_file=None,
+                wait=False,
+                timeout_override_seconds=None,
+                verify_health=True,
+                health_timeout_override_seconds=None,
+                dry_run=False,
+                no_cache=False,
+                skip_gate=True,
+                discover_repo_root_fn=lambda _path: Path("/tmp"),
+                load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+                load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+                find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+                resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
+                resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
+                resolve_ship_healthcheck_urls_fn=lambda **_kwargs: ("https://cm-testing.example/web/health",),
+                run_required_gates_fn=lambda **_kwargs: None,
+                resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
+                read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+                resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
+                dokploy_request_fn=lambda **_kwargs: {},
+                latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
+                deployment_key_fn=lambda _deployment: "",
+                wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: (_ for _ in ()).throw(
+                    AssertionError("wait should not run")
+                ),
+                verify_ship_healthchecks_fn=lambda **_kwargs: (_ for _ in ()).throw(AssertionError("health should not run")),
+                latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
+                wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
+                echo_fn=lambda _line: None,
+                run_post_deploy_update_fn=lambda: post_deploy_updates.append("update"),
+            )
+
+        run_ship_branch_sync.assert_called_once()
 
         self.assertEqual(post_deploy_updates, [])
 
@@ -2402,7 +3077,6 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             dry_run=False,
             no_cache=False,
             skip_gate=True,
-            source_git_ref="main",
             discover_repo_root_fn=lambda _path: Path("/tmp"),
             load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
             load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
@@ -2410,12 +3084,10 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
             resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
             resolve_ship_healthcheck_urls_fn=lambda **_kwargs: ("https://cm-testing.example/web/health",),
-            prepare_ship_branch_sync_fn=lambda _source_git_ref, _target_definition: None,
             run_required_gates_fn=lambda **_kwargs: None,
             resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "application",
             read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
             resolve_dokploy_target_fn=lambda **_kwargs: ("application", "application-id", "application-name", None, None),
-            apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
             dokploy_request_fn=lambda **_kwargs: call_order.append("deploy") or {},
             latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
             deployment_key_fn=lambda deployment: str(deployment.get("id", "")) if isinstance(deployment, dict) else "",
@@ -2446,7 +3118,6 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             dry_run=True,
             no_cache=False,
             skip_gate=False,
-            source_git_ref="main",
             discover_repo_root_fn=lambda _path: Path("/tmp"),
             load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
             load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
@@ -2454,12 +3125,10 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
             resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
             resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
             resolve_ship_healthcheck_urls_fn=lambda **_kwargs: ("https://cm-testing.example/web/health",),
-            prepare_ship_branch_sync_fn=lambda _source_git_ref, _target_definition: None,
             run_required_gates_fn=lambda **_kwargs: None,
             resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
             read_dokploy_config_fn=lambda _environment_values: (_ for _ in ()).throw(click.ClickException("missing dokploy config")),
             resolve_dokploy_target_fn=lambda **_kwargs: ("", "", "", None, None),
-            apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
             dokploy_request_fn=lambda **_kwargs: {},
             latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
             deployment_key_fn=lambda _deployment: "",
@@ -2478,42 +3147,42 @@ class PlatformCommandsReleaseTests(unittest.TestCase):
         source_of_truth = self._source_of_truth(target_definition)
         post_deploy_updates: list[str] = []
 
-        with self.assertRaises(click.ClickException):
-            commands_release.execute_ship(
-                context_name="cm",
-                instance_name="testing",
-                env_file=None,
-                wait=True,
-                timeout_override_seconds=None,
-                verify_health=True,
-                health_timeout_override_seconds=None,
-                dry_run=False,
-                no_cache=False,
-                skip_gate=True,
-                source_git_ref="main",
-                discover_repo_root_fn=lambda _path: Path("/tmp"),
-                load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
-                load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
-                find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
-                resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
-                resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
-                resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
-                prepare_ship_branch_sync_fn=lambda _source_git_ref, _target_definition: None,
-                run_required_gates_fn=lambda **_kwargs: None,
-                resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
-                read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
-                resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
-                apply_ship_branch_sync_fn=lambda _ship_branch_sync_plan: None,
-                dokploy_request_fn=lambda **_kwargs: {},
-                latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
-                deployment_key_fn=lambda _deployment: "",
-                wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: "deployment=after status=done",
-                verify_ship_healthchecks_fn=lambda **_kwargs: None,
-                latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
-                wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
-                echo_fn=emitted_lines.append,
-                run_post_deploy_update_fn=lambda: post_deploy_updates.append("update"),
-            )
+        with patch.object(commands_release, "_run_ship_branch_sync") as run_ship_branch_sync:
+            with self.assertRaises(click.ClickException):
+                commands_release.execute_ship(
+                    context_name="cm",
+                    instance_name="testing",
+                    env_file=None,
+                    wait=True,
+                    timeout_override_seconds=None,
+                    verify_health=True,
+                    health_timeout_override_seconds=None,
+                    dry_run=False,
+                    no_cache=False,
+                    skip_gate=True,
+                    discover_repo_root_fn=lambda _path: Path("/tmp"),
+                    load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (Path("/tmp/.env"), {}),
+                    load_dokploy_source_of_truth_if_present_fn=lambda _repo_root: source_of_truth,
+                    find_dokploy_target_definition_fn=lambda *_args, **_kwargs: target_definition,
+                    resolve_ship_timeout_seconds_fn=lambda **_kwargs: 600,
+                    resolve_ship_health_timeout_seconds_fn=lambda **_kwargs: 60,
+                    resolve_ship_healthcheck_urls_fn=lambda **_kwargs: (),
+                    run_required_gates_fn=lambda **_kwargs: None,
+                    resolve_dokploy_ship_mode_fn=lambda _context_name, _instance_name, _environment_values: "compose",
+                    read_dokploy_config_fn=lambda _environment_values: ("https://dokploy.example", "token"),
+                    resolve_dokploy_target_fn=lambda **_kwargs: ("compose", "compose-id", "compose-name", None, None),
+                    dokploy_request_fn=lambda **_kwargs: {},
+                    latest_deployment_for_compose_fn=lambda _host, _token, _compose_id: None,
+                    deployment_key_fn=lambda _deployment: "",
+                    wait_for_dokploy_compose_deployment_fn=lambda **_kwargs: "deployment=after status=done",
+                    verify_ship_healthchecks_fn=lambda **_kwargs: None,
+                    latest_deployment_for_application_fn=lambda _host, _token, _application_id: None,
+                    wait_for_dokploy_deployment_fn=lambda **_kwargs: "",
+                    echo_fn=emitted_lines.append,
+                    run_post_deploy_update_fn=lambda: post_deploy_updates.append("update"),
+                )
+
+        run_ship_branch_sync.assert_called_once()
 
         self.assertEqual(post_deploy_updates, [])
 

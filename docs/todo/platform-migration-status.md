@@ -8,16 +8,45 @@ Purpose
 
 Status
 
-- Updated on 2026-04-11.
+- Updated on 2026-04-12.
 - Code/documentation migration is complete.
 - Platform/tooling validation is complete (acceptance gates, local health, and
   Dokploy reconcile are green).
 - No external blockers remain before final sign-off.
 - Dokploy non-prod workloads were moved off the Dokploy control-plane host onto
   `docker-shiny-nonprod` (`192.168.1.36`) on 2026-04-05.
-- Manifest-driven runtime ownership for restore/bootstrap/update now lives in
-  `odoo-devkit`; `odoo-ai` retains its repo-local platform CLI workflow path as
-  a transitional surface until the remaining migration cleanup lands.
+- Manifest-driven runtime ownership for extracted-tenant local runtime now
+  lives in `odoo-devkit`. On 2026-04-12, `odoo-ai` retired its repo-local
+  local-runtime CLI lifecycle surface (`select`, `up`, `down`, `logs`,
+  `build`, `odoo-shell`, and `inspect`) into explicit fail-closed migration
+  shims that point operators at `odoo-devkit` plus tenant `workspace.toml`.
+  Later that same day, `odoo-ai` also retired its direct repo-local
+  `init`/`update`/`openupgrade` commands into matching manifest-backed handoff
+  shims. The remaining repo-local workflow surface in `odoo-ai` is now
+  narrower and should be treated as retirement-stage cleanup only.
+- The extracted tenant proof now exists for both `odoo-tenant-opw` and
+  `odoo-tenant-cm`: their tracked `workspace.toml` manifests drive
+  `odoo-devkit` workspace/runtime commands, reusable shared addons now live in
+  `odoo-shared-addons`, and the extracted tenant repos now target the flat
+  tenant addon root (`sources/tenant/addons`) plus `sources/shared-addons`.
+- Quarantine validation on 2026-04-12 proved that extracted tenant manifest
+  and workspace flows do not require a live `odoo-ai` checkout: after a
+  temporary local rename of the `odoo-ai` folder, both tenant manifests still
+  resolved cleanly through `odoo-devkit`, and tenant `workspace status` /
+  `runtime inspect` still worked. CM also passed a full quarantined
+  `platform runtime up`, which bound tenant addons plus `odoo-shared-addons`
+  without any `odoo-ai` mount. The one survivor was an old OPW materialized
+  workspace symlink that still pointed at `odoo-ai/addons/shared`; re-running
+  `platform workspace sync` rewired it to `odoo-shared-addons`.
+- `odoo-ai` no longer carries its old repo-local `workspace.toml` overlay for
+  the earlier OPW bucket layout. That migration seam was removed on 2026-04-12
+  after extracted tenant manifests, workspace flows, and quarantined runtime
+  validation proved the extracted repos no longer needed it.
+- The old repo-local local-runtime helper implementation layer in `odoo-ai`
+  was also removed on 2026-04-12 by deleting the now-dead
+  `tools/platform/commands_selection.py` and
+  `tools/platform/commands_lifecycle.py` modules after those commands were
+  converted into retirement shims.
 
 Completed State
 
@@ -41,8 +70,13 @@ Completed Launch Gates
 
 Durable Tooling Follow-ups
 
-- [ ] Expand platform-first local operator helpers beyond
-      `platform odoo-shell` to cover common stack-bound validation flows such as
+- [ ] Retire the remaining repo-local `uv run platform ...` workflow surfaces
+      from `odoo-ai` after their final ownership moves into `odoo-devkit`, the
+      tenant repos, or `odoo-control-plane`, then delete the obsolete
+      compatibility docs/shims instead of preserving `odoo-ai` as a long-term
+      host.
+- [ ] Expand the manifest-backed local operator helper surface in
+      `odoo-devkit` to cover common stack-bound validation flows such as
       SQL/psql execution and structured log capture, so day-to-day debugging no
       longer falls back to raw `docker compose exec` commands.
 - [ ] Restore normal Odoo non-prod build behavior on `docker-shiny-nonprod`.

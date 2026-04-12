@@ -33,7 +33,9 @@ def _ensure_runtime_env_file(repo_root: Path, context_name: str, instance_name: 
     runtime_env_file = repo_root / ".platform" / "env" / f"{context_name}.{instance_name}.env"
     if not runtime_env_file.exists():
         raise click.ClickException(
-            f"Runtime env file not found: {runtime_env_file}. Run 'uv run platform up --context {context_name} --instance {instance_name}' first."
+            f"Runtime env file not found: {runtime_env_file}. "
+            "The repo-local local-runtime lifecycle is retired in odoo-ai; for extracted-tenant local runtime, "
+            "use odoo-devkit plus the tenant workspace.toml manifest instead."
         )
     return runtime_env_file
 
@@ -464,14 +466,49 @@ def _load_command_runtime_context(
     loaded_stack = load_stack_fn(stack_file_path)
     stack_definition = loaded_stack.stack_definition
     runtime_selection = resolve_runtime_selection_fn(stack_definition, context_name, instance_name)
-    _env_file_path, loaded_environment = load_environment_fn(
+    resolved_env_file_path, loaded_environment = load_environment_fn(
         repo_root,
         env_file,
         context_name=context_name,
         instance_name=instance_name,
     )
-    runtime_env_file = _ensure_runtime_env_file(repo_root, context_name, instance_name)
+    runtime_env_file = _resolve_command_runtime_env_file(
+        repo_root=repo_root,
+        context_name=context_name,
+        instance_name=instance_name,
+        explicit_env_file=env_file,
+        resolved_env_file_path=resolved_env_file_path,
+        loaded_environment=loaded_environment,
+    )
     return stack_definition, runtime_selection, loaded_environment, runtime_env_file
+
+
+def _resolve_command_runtime_env_file(
+    *,
+    repo_root: Path,
+    context_name: str,
+    instance_name: str,
+    explicit_env_file: Path | None,
+    resolved_env_file_path: Path,
+    loaded_environment: dict[str, str],
+) -> Path:
+    if explicit_env_file is None:
+        return _ensure_runtime_env_file(repo_root, context_name, instance_name)
+
+    runtime_env_marker = str(loaded_environment.get("PLATFORM_RUNTIME_ENV_FILE", "")).strip()
+    canonical_runtime_env_file = resolved_env_file_path.resolve(strict=False)
+    canonical_runtime_env_marker = Path(runtime_env_marker).expanduser().resolve(strict=False) if runtime_env_marker else None
+    looks_like_runtime_env = (
+        loaded_environment.get("PLATFORM_CONTEXT") == context_name
+        and loaded_environment.get("PLATFORM_INSTANCE") == instance_name
+        and canonical_runtime_env_marker == canonical_runtime_env_file
+        and bool(str(loaded_environment.get("ODOO_PROJECT_NAME", "")).strip())
+        and bool(str(loaded_environment.get("ODOO_WEB_COMMAND", "")).strip())
+    )
+    if looks_like_runtime_env:
+        return resolved_env_file_path
+
+    return _ensure_runtime_env_file(repo_root, context_name, instance_name)
 
 
 def run_init_workflow(

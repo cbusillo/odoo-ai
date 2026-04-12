@@ -161,6 +161,129 @@ def _assert_restore_workflow_raises_click_exception(
 
 
 class PlatformWorkflowRuntimeTests(unittest.TestCase):
+    def test_load_command_runtime_context_uses_explicit_runtime_env_file_for_surviving_local_workflows(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            repo_root = Path(temporary_directory)
+            explicit_env_file = repo_root / "tmp" / "explicit.env"
+            explicit_env_file.parent.mkdir(parents=True, exist_ok=True)
+            explicit_env_file.write_text(
+                (
+                    f"PLATFORM_CONTEXT=cm\n"
+                    f"PLATFORM_INSTANCE=local\n"
+                    f"PLATFORM_RUNTIME_ENV_FILE={explicit_env_file}\n"
+                    "ODOO_PROJECT_NAME=odoo-cm-local\n"
+                    "ODOO_WEB_COMMAND=python3 /volumes/scripts/run_odoo_startup.py -c /tmp/platform.odoo.conf\n"
+                    "ODOO_DB_USER=odoo\n"
+                ),
+                encoding="utf-8",
+            )
+
+            stack_definition, runtime_selection, loaded_environment, runtime_env_file = (
+                workflow_runtime._load_command_runtime_context(
+                    stack_file=Path("platform/stack.toml"),
+                    context_name="cm",
+                    instance_name="local",
+                    env_file=explicit_env_file,
+                    discover_repo_root_fn=lambda _path: repo_root,
+                    load_stack_fn=_load_sample_stack,
+                    resolve_runtime_selection_fn=_resolve_sample_runtime_selection,
+                    load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (
+                        explicit_env_file,
+                        {
+                            "PLATFORM_CONTEXT": "cm",
+                            "PLATFORM_INSTANCE": "local",
+                            "PLATFORM_RUNTIME_ENV_FILE": str(explicit_env_file),
+                            "ODOO_PROJECT_NAME": "odoo-cm-local",
+                            "ODOO_WEB_COMMAND": "python3 /volumes/scripts/run_odoo_startup.py -c /tmp/platform.odoo.conf",
+                            "ODOO_DB_USER": "odoo",
+                        },
+                    ),
+                )
+            )
+
+        self.assertEqual(stack_definition.schema_version, 1)
+        self.assertEqual(runtime_selection.context_name, "cm")
+        self.assertEqual(
+            loaded_environment,
+            {
+                "PLATFORM_CONTEXT": "cm",
+                "PLATFORM_INSTANCE": "local",
+                "PLATFORM_RUNTIME_ENV_FILE": str(explicit_env_file),
+                "ODOO_PROJECT_NAME": "odoo-cm-local",
+                "ODOO_WEB_COMMAND": "python3 /volumes/scripts/run_odoo_startup.py -c /tmp/platform.odoo.conf",
+                "ODOO_DB_USER": "odoo",
+            },
+        )
+        self.assertEqual(runtime_env_file, explicit_env_file)
+
+    def test_load_command_runtime_context_accepts_noncanonical_explicit_runtime_env_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            repo_root = Path(temporary_directory)
+            runtime_env_file = repo_root / "tmp" / "explicit.env"
+            runtime_env_file.parent.mkdir(parents=True, exist_ok=True)
+            runtime_env_file.write_text(
+                (
+                    f"PLATFORM_CONTEXT=cm\n"
+                    f"PLATFORM_INSTANCE=local\n"
+                    f"PLATFORM_RUNTIME_ENV_FILE={runtime_env_file.resolve(strict=False)}\n"
+                    "ODOO_PROJECT_NAME=odoo-cm-local\n"
+                    "ODOO_WEB_COMMAND=python3 /volumes/scripts/run_odoo_startup.py -c /tmp/platform.odoo.conf\n"
+                ),
+                encoding="utf-8",
+            )
+            noncanonical_runtime_env_file = repo_root / "tmp" / "subdir" / ".." / "explicit.env"
+
+            _stack_definition, _runtime_selection, _loaded_environment, selected_runtime_env_file = (
+                workflow_runtime._load_command_runtime_context(
+                    stack_file=Path("platform/stack.toml"),
+                    context_name="cm",
+                    instance_name="local",
+                    env_file=noncanonical_runtime_env_file,
+                    discover_repo_root_fn=lambda _path: repo_root,
+                    load_stack_fn=_load_sample_stack,
+                    resolve_runtime_selection_fn=_resolve_sample_runtime_selection,
+                    load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (
+                        noncanonical_runtime_env_file,
+                        {
+                            "PLATFORM_CONTEXT": "cm",
+                            "PLATFORM_INSTANCE": "local",
+                            "PLATFORM_RUNTIME_ENV_FILE": str(runtime_env_file.resolve(strict=False)),
+                            "ODOO_PROJECT_NAME": "odoo-cm-local",
+                            "ODOO_WEB_COMMAND": "python3 /volumes/scripts/run_odoo_startup.py -c /tmp/platform.odoo.conf",
+                        },
+                    ),
+                )
+            )
+
+        self.assertEqual(selected_runtime_env_file.resolve(strict=False), runtime_env_file.resolve(strict=False))
+
+    def test_load_command_runtime_context_keeps_generated_runtime_env_for_plain_source_env_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            repo_root = Path(temporary_directory)
+            explicit_env_file = repo_root / ".env"
+            explicit_env_file.write_text("ODOO_DB_USER=odoo\n", encoding="utf-8")
+            generated_runtime_env = repo_root / ".platform" / "env" / "cm.local.env"
+            generated_runtime_env.parent.mkdir(parents=True, exist_ok=True)
+            generated_runtime_env.write_text("PLATFORM_CONTEXT=cm\nPLATFORM_INSTANCE=local\n", encoding="utf-8")
+
+            _stack_definition, _runtime_selection, _loaded_environment, runtime_env_file = (
+                workflow_runtime._load_command_runtime_context(
+                    stack_file=Path("platform/stack.toml"),
+                    context_name="cm",
+                    instance_name="local",
+                    env_file=explicit_env_file,
+                    discover_repo_root_fn=lambda _path: repo_root,
+                    load_stack_fn=_load_sample_stack,
+                    resolve_runtime_selection_fn=_resolve_sample_runtime_selection,
+                    load_environment_fn=lambda _repo_root, _env_file, **_kwargs: (
+                        explicit_env_file,
+                        {"ODOO_DB_USER": "odoo"},
+                    ),
+                )
+            )
+
+        self.assertEqual(runtime_env_file, generated_runtime_env)
+
     def test_apply_admin_password_defaults_login_to_admin(self) -> None:
         captured_input: dict[str, object] = {}
 

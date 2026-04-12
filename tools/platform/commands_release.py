@@ -1,11 +1,13 @@
 import json
+import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 import click
 
-from .models import DokploySourceOfTruth, DokployTargetDefinition, JsonObject, ShipBranchSyncPlan, ShipRequest
+from .models import DokploySourceOfTruth, DokployTargetDefinition, JsonObject, ShipRequest
+from .process_env import git_command_execution_env
 
 SUPPORTED_RELEASE_CONTEXTS = frozenset({"cm", "opw"})
 
@@ -14,6 +16,19 @@ SUPPORTED_RELEASE_CONTEXTS = frozenset({"cm", "opw"})
 class RuntimeEnvironment:
     repo_root: Path
     environment_values: dict[str, str]
+
+
+@dataclass(frozen=True)
+class ShipBranchSyncPlan:
+    source_git_ref: str
+    source_commit: str
+    target_remote_name: str
+    target_branch: str
+    remote_branch_commit_before: str
+    branch_update_required: bool
+
+
+DEFAULT_DOKPLOY_SHIP_SOURCE_GIT_REF = "origin/main"
 
 
 def _assert_release_context_supported(*, context_name: str, operation_name: str) -> None:
@@ -54,6 +69,284 @@ def _echo_healthcheck_plan(
     echo_fn(f"health_timeout_seconds={health_timeout_seconds}")
     for healthcheck_url in healthcheck_urls:
         echo_fn(f"healthcheck_url={healthcheck_url}")
+
+
+def _run_command_capture(command: list[str], *, repo_root: Path) -> str:
+    result = subprocess.run(command, capture_output=True, text=True, cwd=repo_root, env=git_command_execution_env())
+    if result.returncode != 0:
+        joined_command = " ".join(command)
+        stderr_text = result.stderr.strip()
+        message = f"Command failed ({result.returncode}): {joined_command}"
+        if stderr_text:
+            message = f"{message}\n{stderr_text}"
+        raise click.ClickException(message)
+    return result.stdout
+
+
+def _resolve_local_git_commit(*, repo_root: Path, git_reference: str) -> str:
+    raw_output = _run_command_capture(["git", "rev-parse", "--verify", f"{git_reference}^{{commit}}"], repo_root=repo_root)
+    return raw_output.strip()
+
+
+def _git_reference_exists_locally(*, repo_root: Path, git_reference: str) -> bool:
+    result = subprocess.run(
+        ["git", "rev-parse", "--verify", f"{git_reference}^{{commit}}"],
+        capture_output=True,
+        text=True,
+        cwd=repo_root,
+        env=git_command_execution_env(),
+    )
+    return result.returncode == 0
+
+
+def _resolve_remote_git_branch_commit(*, repo_root: Path, remote_name: str, branch_name: str) -> str:
+    raw_output = _run_command_capture(
+        ["git", "ls-remote", "--heads", remote_name, f"refs/heads/{branch_name}"],
+        repo_root=repo_root,
+    )
+    for raw_line in raw_output.splitlines():
+        cleaned_line = raw_line.strip()
+        if not cleaned_line:
+            continue
+        split_line = cleaned_line.split()
+        if split_line:
+            return split_line[0].strip()
+    return ""
+
+
+def _list_git_remotes(*, repo_root: Path) -> tuple[str, ...]:
+    raw_output = _run_command_capture(["git", "remote"], repo_root=repo_root)
+    remote_names: list[str] = []
+    for raw_line in raw_output.splitlines():
+        cleaned_line = raw_line.strip()
+        if cleaned_line:
+            remote_names.append(cleaned_line)
+    return tuple(remote_names)
+
+
+def _resolve_symbolic_full_git_reference(*, repo_root: Path, git_reference: str) -> str:
+    result = subprocess.run(
+        ["git", "rev-parse", "--symbolic-full-name", "--verify", git_reference],
+        capture_output=True,
+        text=True,
+        cwd=repo_root,
+        env=git_command_execution_env(),
+    )
+    if result.returncode != 0:
+        return ""
+    return result.stdout.strip()
+
+
+def _resolve_git_remote_for_reference(
+    *,
+    repo_root: Path,
+    git_reference: str,
+    configured_remotes: tuple[str, ...] | None = None,
+) -> str:
+    cleaned_reference = git_reference.strip()
+    if not cleaned_reference:
+        return ""
+
+    if cleaned_reference.startswith("refs/remotes/"):
+        remote_name = cleaned_reference.removeprefix("refs/remotes/").split("/", 1)[0].strip()
+        return remote_name
+
+    if cleaned_reference.startswith("refs/"):
+        return ""
+
+    symbolic_full_reference = _resolve_symbolic_full_git_reference(repo_root=repo_root, git_reference=cleaned_reference)
+    if not symbolic_full_reference.startswith("refs/remotes/"):
+        return ""
+
+    candidate_remote_name = symbolic_full_reference.removeprefix("refs/remotes/").split("/", 1)[0].strip()
+    resolved_remotes = configured_remotes if configured_remotes is not None else _list_git_remotes(repo_root=repo_root)
+    if candidate_remote_name in resolved_remotes:
+        return candidate_remote_name
+    return ""
+
+
+def _git_reference_is_remote_tracking(*, repo_root: Path, git_reference: str) -> bool:
+    cleaned_reference = git_reference.strip()
+    if not cleaned_reference:
+        return False
+    if cleaned_reference.startswith("refs/remotes/"):
+        return True
+    if cleaned_reference.startswith("refs/"):
+        return False
+    symbolic_full_reference = _resolve_symbolic_full_git_reference(repo_root=repo_root, git_reference=cleaned_reference)
+    return symbolic_full_reference.startswith("refs/remotes/")
+
+
+def _infer_git_remote_from_reference_syntax(
+    *,
+    git_reference: str,
+    configured_remotes: tuple[str, ...],
+) -> str:
+    cleaned_reference = git_reference.strip()
+    if not cleaned_reference or cleaned_reference.startswith("refs/") or "/" not in cleaned_reference:
+        return ""
+
+    candidate_remote_name = cleaned_reference.split("/", 1)[0].strip()
+    if candidate_remote_name in configured_remotes:
+        return candidate_remote_name
+    return ""
+
+
+def _resolve_ship_source_git_ref(
+    *,
+    source_git_ref_override: str,
+    target_definition: DokployTargetDefinition | None,
+    configured_remotes: tuple[str, ...],
+) -> str:
+    cleaned_override = source_git_ref_override.strip()
+    if cleaned_override:
+        return cleaned_override
+    if target_definition is not None:
+        cleaned_target_reference = target_definition.source_git_ref.strip()
+        if cleaned_target_reference:
+            return cleaned_target_reference
+    if "origin" in configured_remotes:
+        return DEFAULT_DOKPLOY_SHIP_SOURCE_GIT_REF
+    if len(configured_remotes) == 1:
+        return f"{configured_remotes[0]}/main"
+    return "main"
+
+
+def _resolve_ship_target_remote_name(
+    *,
+    configured_remotes: tuple[str, ...],
+    source_remote_name: str,
+) -> str:
+    if not configured_remotes:
+        raise click.ClickException("Compose ship target requires at least one configured git remote for branch sync.")
+
+    if "origin" in configured_remotes:
+        return "origin"
+
+    if source_remote_name and source_remote_name in configured_remotes:
+        return source_remote_name
+
+    if len(configured_remotes) == 1:
+        return configured_remotes[0]
+
+    remote_names = ", ".join(configured_remotes)
+    raise click.ClickException(
+        f"Compose ship target could not determine a target remote for branch sync. Configured remotes: {remote_names}."
+    )
+
+
+def _prepare_ship_branch_sync(
+    *,
+    repo_root: Path,
+    source_git_ref_override: str,
+    target_definition: DokployTargetDefinition | None,
+) -> ShipBranchSyncPlan | None:
+    if target_definition is None:
+        return None
+
+    target_branch = target_definition.git_branch.strip()
+    if not target_branch:
+        target_label = target_definition.target_name.strip() or f"{target_definition.context}/{target_definition.instance}"
+        raise click.ClickException(
+            "Compose ship target requires git_branch for branch sync before deploy: "
+            f"target={target_label} context={target_definition.context} instance={target_definition.instance}."
+        )
+
+    configured_remotes = _list_git_remotes(repo_root=repo_root)
+    source_git_ref = _resolve_ship_source_git_ref(
+        source_git_ref_override=source_git_ref_override,
+        target_definition=target_definition,
+        configured_remotes=configured_remotes,
+    )
+    source_ref_exists_locally = _git_reference_exists_locally(repo_root=repo_root, git_reference=source_git_ref)
+    source_ref_is_remote_tracking = _git_reference_is_remote_tracking(repo_root=repo_root, git_reference=source_git_ref)
+    source_remote_name = _resolve_git_remote_for_reference(
+        repo_root=repo_root,
+        git_reference=source_git_ref,
+        configured_remotes=configured_remotes,
+    )
+    if not source_remote_name and not source_ref_exists_locally:
+        source_remote_name = _infer_git_remote_from_reference_syntax(
+            git_reference=source_git_ref,
+            configured_remotes=configured_remotes,
+        )
+    target_remote_name = _resolve_ship_target_remote_name(
+        configured_remotes=configured_remotes,
+        source_remote_name=source_remote_name,
+    )
+    if source_remote_name and (not source_ref_exists_locally or source_ref_is_remote_tracking):
+        _run_command_capture(["git", "fetch", source_remote_name, "--prune"], repo_root=repo_root)
+    source_commit = _resolve_local_git_commit(repo_root=repo_root, git_reference=source_git_ref)
+    remote_branch_commit_before = _resolve_remote_git_branch_commit(
+        repo_root=repo_root,
+        remote_name=target_remote_name,
+        branch_name=target_branch,
+    )
+    branch_update_required = source_commit != remote_branch_commit_before
+    return ShipBranchSyncPlan(
+        source_git_ref=source_git_ref,
+        source_commit=source_commit,
+        target_remote_name=target_remote_name,
+        target_branch=target_branch,
+        remote_branch_commit_before=remote_branch_commit_before,
+        branch_update_required=branch_update_required,
+    )
+
+
+def _apply_ship_branch_sync(*, repo_root: Path, ship_branch_sync_plan: ShipBranchSyncPlan) -> None:
+    if not ship_branch_sync_plan.branch_update_required:
+        return
+
+    lease_reference = f"refs/heads/{ship_branch_sync_plan.target_branch}:{ship_branch_sync_plan.remote_branch_commit_before}"
+    _run_command_capture(
+        [
+            "git",
+            "push",
+            ship_branch_sync_plan.target_remote_name,
+            f"--force-with-lease={lease_reference}",
+            f"{ship_branch_sync_plan.source_commit}:refs/heads/{ship_branch_sync_plan.target_branch}",
+        ],
+        repo_root=repo_root,
+    )
+
+
+def _execute_prepared_ship_branch_sync(
+    *,
+    repo_root: Path,
+    ship_branch_sync_plan: ShipBranchSyncPlan,
+    echo_fn: Callable[[str], None],
+) -> None:
+    echo_fn("branch_sync=true")
+    echo_fn(f"branch_sync_target_remote={ship_branch_sync_plan.target_remote_name}")
+    echo_fn(f"branch_sync_target_branch={ship_branch_sync_plan.target_branch}")
+    echo_fn(f"branch_sync_source_ref={ship_branch_sync_plan.source_git_ref}")
+    echo_fn(f"branch_sync_source_commit={ship_branch_sync_plan.source_commit}")
+    echo_fn(f"branch_sync_remote_before={ship_branch_sync_plan.remote_branch_commit_before or 'missing'}")
+    echo_fn(f"branch_sync_update_required={str(ship_branch_sync_plan.branch_update_required).lower()}")
+    _apply_ship_branch_sync(repo_root=repo_root, ship_branch_sync_plan=ship_branch_sync_plan)
+    echo_fn(f"branch_sync_applied={str(ship_branch_sync_plan.branch_update_required).lower()}")
+
+
+def _run_ship_branch_sync(
+    *,
+    repo_root: Path,
+    source_git_ref_override: str,
+    target_definition: DokployTargetDefinition | None,
+    echo_fn: Callable[[str], None],
+) -> None:
+    ship_branch_sync_plan = _prepare_ship_branch_sync(
+        repo_root=repo_root,
+        source_git_ref_override=source_git_ref_override,
+        target_definition=target_definition,
+    )
+    if ship_branch_sync_plan is None:
+        echo_fn("branch_sync=false")
+        return
+    _execute_prepared_ship_branch_sync(
+        repo_root=repo_root,
+        ship_branch_sync_plan=ship_branch_sync_plan,
+        echo_fn=echo_fn,
+    )
 
 
 def _emit_deploy_plan(
@@ -170,7 +463,6 @@ def execute_ship(
     dry_run: bool,
     no_cache: bool,
     skip_gate: bool,
-    source_git_ref: str,
     discover_repo_root_fn: Callable[[Path], Path],
     load_environment_fn: Callable[..., tuple[Path, dict[str, str]]],
     load_dokploy_source_of_truth_if_present_fn: Callable[[Path], DokploySourceOfTruth | None],
@@ -178,12 +470,10 @@ def execute_ship(
     resolve_ship_timeout_seconds_fn: Callable[..., int],
     resolve_ship_health_timeout_seconds_fn: Callable[..., int],
     resolve_ship_healthcheck_urls_fn: Callable[..., tuple[str, ...]],
-    prepare_ship_branch_sync_fn: Callable[[str, DokployTargetDefinition | None], ShipBranchSyncPlan | None],
     run_required_gates_fn: Callable[..., None],
     resolve_dokploy_ship_mode_fn: Callable[[str, str, dict[str, str]], str],
     read_dokploy_config_fn: Callable[[dict[str, str]], tuple[str, str]],
     resolve_dokploy_target_fn: Callable[..., tuple[str, str, str, click.ClickException | None, click.ClickException | None]],
-    apply_ship_branch_sync_fn: Callable[[ShipBranchSyncPlan], None],
     dokploy_request_fn: Callable[..., JsonObject],
     latest_deployment_for_compose_fn: Callable[[str, str, str], JsonObject | None],
     deployment_key_fn: Callable[[JsonObject], str],
@@ -195,6 +485,7 @@ def execute_ship(
     run_post_deploy_update_fn: Callable[[], None] | None = None,
     allow_dirty: bool = False,
     check_dirty_working_tree_fn: Callable[[], tuple[str, ...]] | None = None,
+    source_git_ref: str = "",
 ) -> None:
     _assert_release_context_supported(context_name=context_name, operation_name="Ship")
 
@@ -235,24 +526,7 @@ def execute_ship(
         environment_values=environment_values,
     )
     should_verify_health = verify_health and wait
-    ship_branch_sync_plan = prepare_ship_branch_sync_fn(source_git_ref, target_definition)
 
-    if ship_branch_sync_plan is None:
-        echo_fn("branch_sync=false")
-    else:
-        echo_fn("branch_sync=true")
-        echo_fn(f"branch_sync_target_branch={ship_branch_sync_plan.target_branch}")
-        echo_fn(f"branch_sync_source_ref={ship_branch_sync_plan.source_git_ref}")
-        echo_fn(f"branch_sync_source_commit={ship_branch_sync_plan.source_commit}")
-        echo_fn(f"branch_sync_remote_before={ship_branch_sync_plan.remote_branch_commit_before or 'missing'}")
-        echo_fn(f"branch_sync_update_required={str(ship_branch_sync_plan.branch_update_required).lower()}")
-
-    run_required_gates_fn(
-        context_name=context_name,
-        target_definition=target_definition,
-        dry_run=dry_run,
-        skip_gate=skip_gate,
-    )
     ship_mode = resolve_dokploy_ship_mode_fn(context_name, instance_name, environment_values)
     try:
         host, token = read_dokploy_config_fn(environment_values)
@@ -264,8 +538,6 @@ def execute_ship(
             echo_fn(f"dry_run_note={error.message}")
             echo_fn(f"deploy_timeout_seconds={deploy_timeout_seconds}")
             echo_fn(f"verify_health={str(should_verify_health).lower()}")
-            if ship_branch_sync_plan is not None:
-                echo_fn("branch_sync_applied=false")
             _echo_healthcheck_plan(
                 should_verify_health=should_verify_health,
                 health_timeout_seconds=health_timeout_seconds,
@@ -305,12 +577,31 @@ def execute_ship(
         echo_fn=echo_fn,
     )
 
-    if ship_branch_sync_plan is not None:
-        if dry_run:
-            echo_fn("branch_sync_applied=false")
-        else:
-            apply_ship_branch_sync_fn(ship_branch_sync_plan)
-            echo_fn(f"branch_sync_applied={str(ship_branch_sync_plan.branch_update_required).lower()}")
+    should_run_branch_sync = selected_target_type == "compose" or bool(target_definition.git_branch.strip())
+    prepared_ship_branch_sync_plan: ShipBranchSyncPlan | None = None
+    repo_has_git_metadata = (runtime_environment.repo_root / ".git").exists()
+    explicit_source_ref_requested = bool(source_git_ref.strip()) or (
+        bool(target_definition.source_git_ref.strip())
+        and target_definition.source_git_ref.strip() != DEFAULT_DOKPLOY_SHIP_SOURCE_GIT_REF
+    )
+    if should_run_branch_sync and not dry_run and explicit_source_ref_requested and not repo_has_git_metadata:
+        raise click.ClickException(
+            "Ship requires git metadata in the runtime checkout when an explicit source ref must be pinned before gates."
+        )
+    if should_run_branch_sync and not dry_run and repo_has_git_metadata:
+        prepared_ship_branch_sync_plan = _prepare_ship_branch_sync(
+            repo_root=runtime_environment.repo_root,
+            source_git_ref_override=source_git_ref,
+            target_definition=target_definition,
+        )
+
+    run_required_gates_fn(
+        context_name=context_name,
+        target_definition=target_definition,
+        dry_run=dry_run,
+        skip_gate=skip_gate,
+    )
+    branch_sync_completed = False
 
     if selected_target_type == "compose":
         compose_endpoint = "/api/compose.redeploy" if no_cache else "/api/compose.deploy"
@@ -334,6 +625,22 @@ def execute_ship(
         )
         if dry_run:
             return
+
+        if should_run_branch_sync and not branch_sync_completed:
+            if prepared_ship_branch_sync_plan is not None:
+                _execute_prepared_ship_branch_sync(
+                    repo_root=runtime_environment.repo_root,
+                    ship_branch_sync_plan=prepared_ship_branch_sync_plan,
+                    echo_fn=echo_fn,
+                )
+            else:
+                _run_ship_branch_sync(
+                    repo_root=runtime_environment.repo_root,
+                    source_git_ref_override=source_git_ref,
+                    target_definition=target_definition,
+                    echo_fn=echo_fn,
+                )
+            branch_sync_completed = True
 
         if wait:
             latest_before = latest_deployment_for_compose_fn(host, token, selected_target_id)
@@ -387,6 +694,22 @@ def execute_ship(
     )
     if dry_run:
         return
+
+    if should_run_branch_sync and not branch_sync_completed:
+        if prepared_ship_branch_sync_plan is not None:
+            _execute_prepared_ship_branch_sync(
+                repo_root=runtime_environment.repo_root,
+                ship_branch_sync_plan=prepared_ship_branch_sync_plan,
+                echo_fn=echo_fn,
+            )
+        else:
+            _run_ship_branch_sync(
+                repo_root=runtime_environment.repo_root,
+                source_git_ref_override=source_git_ref,
+                target_definition=target_definition,
+                echo_fn=echo_fn,
+            )
+        branch_sync_completed = True
 
     if wait:
         latest_before = latest_deployment_for_application_fn(host, token, selected_target_id)

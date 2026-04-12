@@ -8,9 +8,7 @@ import click
 
 from tools.platform import commands_core as platform_commands_core
 from tools.platform import commands_dokploy as platform_commands_dokploy
-from tools.platform import commands_lifecycle as platform_commands_lifecycle
 from tools.platform import commands_release as platform_commands_release
-from tools.platform import commands_selection as platform_commands_selection
 from tools.platform import commands_workflow as platform_commands_workflow
 from tools.platform import dokploy as platform_dokploy
 from tools.platform import environment as platform_environment
@@ -30,7 +28,6 @@ from tools.platform.models import (
     LoadedEnvironment,
     LoadedStack,
     RuntimeSelection,
-    ShipBranchSyncPlan,
     StackDefinition,
 )
 from tools.stack_data_workflow import run_stack_data_workflow
@@ -121,6 +118,8 @@ PLATFORM_RUNTIME_PASSTHROUGH_KEYS = (
     "DATA_WORKFLOW_SSH_KEY",
     "DOKPLOY_HOST",
     "DOKPLOY_TOKEN",
+    "ODOO_BASE_RUNTIME_IMAGE",
+    "ODOO_BASE_DEVTOOLS_IMAGE",
     "DOCKER_IMAGE_REFERENCE",
 )
 
@@ -136,11 +135,8 @@ PLATFORM_RUN_WORKFLOWS = (
 )
 
 PLATFORM_TUI_WORKFLOWS = (
-    "select",
     "info",
     "status",
-    "up",
-    "build",
     "ship",
     *PLATFORM_RUN_WORKFLOWS,
 )
@@ -498,57 +494,6 @@ def _resolve_remote_git_branch_commit(remote_name: str, branch_name: str) -> str
     return ""
 
 
-def _resolve_ship_source_git_ref(
-    source_git_ref_override: str,
-    target_definition: DokployTargetDefinition | None,
-) -> str:
-    cleaned_override = source_git_ref_override.strip()
-    if cleaned_override:
-        return cleaned_override
-    if target_definition is not None:
-        cleaned_target_reference = target_definition.source_git_ref.strip()
-        if cleaned_target_reference:
-            return cleaned_target_reference
-    return DEFAULT_DOKPLOY_SHIP_SOURCE_GIT_REF
-
-
-def _prepare_ship_branch_sync(
-    source_git_ref_override: str,
-    target_definition: DokployTargetDefinition | None,
-) -> ShipBranchSyncPlan | None:
-    if target_definition is None:
-        return None
-    target_branch = target_definition.git_branch.strip()
-    if not target_branch:
-        return None
-
-    _run_command(["git", "fetch", "origin", "--prune"])
-    source_git_ref = _resolve_ship_source_git_ref(source_git_ref_override, target_definition)
-    source_commit = _resolve_local_git_commit(source_git_ref)
-    remote_branch_commit_before = _resolve_remote_git_branch_commit("origin", target_branch)
-    branch_update_required = source_commit != remote_branch_commit_before
-    return ShipBranchSyncPlan(
-        source_git_ref=source_git_ref,
-        source_commit=source_commit,
-        target_branch=target_branch,
-        remote_branch_commit_before=remote_branch_commit_before,
-        branch_update_required=branch_update_required,
-    )
-
-
-def _apply_ship_branch_sync(ship_branch_sync_plan: ShipBranchSyncPlan) -> None:
-    if not ship_branch_sync_plan.branch_update_required:
-        return
-    _run_command(
-        [
-            "git",
-            "push",
-            "origin",
-            f"+{ship_branch_sync_plan.source_commit}:refs/heads/{ship_branch_sync_plan.target_branch}",
-        ]
-    )
-
-
 def _local_runtime_status(runtime_env_file: Path) -> JsonObject:
     return platform_runtime_status.local_runtime_status(
         runtime_env_file,
@@ -749,7 +694,19 @@ def _run_code_gate(*, context_name: str, dry_run: bool) -> None:
 
 
 def _run_production_backup_gate(*, context_name: str, dry_run: bool) -> None:
-    _run_gate_command(["uv", "run", "prod-gate", "backup", "--target", context_name], dry_run=dry_run)
+    _run_gate_command(
+        [
+            "uv",
+            "run",
+            "prod-gate",
+            "backup",
+            "--target",
+            context_name,
+            "--control-plane-record-dir",
+            "tmp/prod-gates",
+        ],
+        dry_run=dry_run,
+    )
 
 
 def _assert_prod_data_workflow_allowed(*, instance_name: str, workflow: str, allow_prod_data_workflow: bool) -> None:
@@ -760,18 +717,18 @@ def _assert_prod_data_workflow_allowed(*, instance_name: str, workflow: str, all
     )
 
 
+def _assert_promote_path_allowed(*, from_instance_name: str, to_instance_name: str) -> None:
+    platform_release_workflows.assert_promote_path_allowed(
+        from_instance_name=from_instance_name,
+        to_instance_name=to_instance_name,
+    )
+
+
 def _collect_environment_gate_results(*, urls: tuple[str, ...], timeout_seconds: int) -> list[JsonObject]:
     return platform_release_workflows.collect_environment_gate_results(
         urls=urls,
         timeout_seconds=timeout_seconds,
         wait_for_ship_healthcheck=lambda url, timeout: _wait_for_ship_healthcheck(url=url, timeout_seconds=timeout),
-    )
-
-
-def _assert_promote_path_allowed(*, from_instance_name: str, to_instance_name: str) -> None:
-    platform_release_workflows.assert_promote_path_allowed(
-        from_instance_name=from_instance_name,
-        to_instance_name=to_instance_name,
     )
 
 
@@ -976,7 +933,6 @@ def _run_tui_ship_workflow(
         no_cache=no_cache,
         skip_gate=False,
         allow_dirty=allow_dirty,
-        source_git_ref="",
         discover_repo_root_fn=_discover_repo_root,
         load_environment_fn=_load_environment,
         load_dokploy_source_of_truth_if_present_fn=_load_dokploy_source_of_truth_if_present,
@@ -984,12 +940,10 @@ def _run_tui_ship_workflow(
         resolve_ship_timeout_seconds_fn=_resolve_ship_timeout_seconds,
         resolve_ship_health_timeout_seconds_fn=_resolve_ship_health_timeout_seconds,
         resolve_ship_healthcheck_urls_fn=_resolve_ship_healthcheck_urls,
-        prepare_ship_branch_sync_fn=_prepare_ship_branch_sync,
         run_required_gates_fn=_run_required_gates,
         resolve_dokploy_ship_mode_fn=_resolve_dokploy_ship_mode,
         read_dokploy_config_fn=_read_dokploy_config,
         resolve_dokploy_target_fn=_resolve_dokploy_target,
-        apply_ship_branch_sync_fn=_apply_ship_branch_sync,
         dokploy_request_fn=_dokploy_request,
         latest_deployment_for_compose_fn=_latest_deployment_for_compose,
         deployment_key_fn=_deployment_key,
@@ -1192,7 +1146,10 @@ def _render_odoo_config(
 
 LOCAL_RUNTIME_CONTRACT_HELP = (
     "Local host runtime only. Requires --instance local. "
-    "Remote dev/testing/prod instances use ship/rollback/gate/promote, plus separate restore and bootstrap data workflows."
+    "Remote dev/testing/prod instances use ship/rollback/gate, plus separate restore and bootstrap data workflows."
+)
+RETIRED_LOCAL_RUNTIME_HELP = (
+    "Retired repo-local local-runtime command. Use manifest-backed runtime ownership in odoo-devkit instead."
 )
 REMOTE_RUNTIME_CONTRACT_HELP = (
     "Dokploy-managed remote workflow for dev/testing/prod. "
@@ -1207,11 +1164,44 @@ DESTRUCTIVE_DATA_WORKFLOW_HELP = (
 @click.group(
     help=(
         "Platform operator CLI. Local runtime mutations use --instance local; "
-        "Dokploy-managed remote targets use ship/rollback/gate/promote, plus separate restore and bootstrap data workflows."
+        "Dokploy-managed remote targets use ship/rollback/gate, plus separate restore and bootstrap data workflows."
     )
 )
 def main() -> None:
     return None
+
+
+_DEVKIT_RUNTIME_REPLACEMENTS = {
+    "select": "uv --directory /path/to/odoo-devkit run platform runtime select --manifest /path/to/workspace.toml",
+    "up": "uv --directory /path/to/odoo-devkit run platform runtime up --manifest /path/to/workspace.toml --build",
+    "inspect": "uv --directory /path/to/odoo-devkit run platform runtime inspect --manifest /path/to/workspace.toml",
+    "init": "uv --directory /path/to/odoo-devkit run platform runtime workflow --manifest /path/to/workspace.toml --workflow init",
+    "update": "uv --directory /path/to/odoo-devkit run platform runtime workflow --manifest /path/to/workspace.toml --workflow update",
+    "openupgrade": "uv --directory /path/to/odoo-devkit run platform runtime workflow --manifest /path/to/workspace.toml --workflow openupgrade",
+}
+
+
+def _raise_retired_local_runtime_command(command_name: str) -> None:
+    replacement_command = _DEVKIT_RUNTIME_REPLACEMENTS.get(command_name)
+    message_lines = [
+        f"'platform {command_name}' is retired in odoo-ai.",
+        "Local runtime ownership moved to odoo-devkit plus tenant workspace.toml manifests.",
+    ]
+    if replacement_command is not None:
+        message_lines.extend(
+            (
+                "Run the manifest-backed replacement from your tenant repo or from odoo-devkit:",
+                replacement_command,
+            )
+        )
+    else:
+        message_lines.extend(
+            (
+                "This repo-local helper no longer has a supported home in odoo-ai.",
+                "Use the manifest-backed runtime surface in odoo-devkit, and add any missing helper there instead of reviving the repo-local path.",
+            )
+        )
+    raise click.ClickException("\n".join(message_lines))
 
 
 @main.command("validate-config")
@@ -2015,7 +2005,7 @@ def dokploy_reconcile(
     )
 
 
-@main.command("select", help=f"Render and select local runtime artifacts. {LOCAL_RUNTIME_CONTRACT_HELP}")
+@main.command("select", help=f"Retired local runtime shim. {RETIRED_LOCAL_RUNTIME_HELP}")
 @click.option(
     "--stack-file",
     type=click.Path(path_type=Path),
@@ -2033,28 +2023,10 @@ def select(
     env_file: Path | None,
     dry_run: bool,
 ) -> None:
-    platform_commands_selection.execute_select(
-        stack_file=stack_file,
-        context_name=context_name,
-        instance_name=instance_name,
-        env_file=env_file,
-        dry_run=dry_run,
-        discover_repo_root_fn=_discover_repo_root,
-        load_stack_fn=_load_stack,
-        resolve_runtime_selection_fn=_resolve_runtime_selection,
-        load_environment_with_details_fn=_load_environment_with_details,
-        build_runtime_env_values_fn=_build_runtime_env_values,
-        parse_env_file_fn=_parse_env_file,
-        runtime_env_diff_fn=_runtime_env_diff,
-        emit_payload_fn=_emit_payload,
-        write_runtime_odoo_conf_file_fn=_write_runtime_odoo_conf_file,
-        write_runtime_env_file_fn=_write_runtime_env_file,
-        write_pycharm_odoo_conf_fn=_write_pycharm_odoo_conf,
-        echo_fn=click.echo,
-    )
+    _raise_retired_local_runtime_command("select")
 
 
-@main.command("up", help=f"Start the local compose runtime. {LOCAL_RUNTIME_CONTRACT_HELP}")
+@main.command("up", help=f"Retired local runtime shim. {RETIRED_LOCAL_RUNTIME_HELP}")
 @click.option(
     "--stack-file",
     type=click.Path(path_type=Path),
@@ -2074,57 +2046,25 @@ def up(
     build_images: bool,
     no_cache: bool,
 ) -> None:
-    platform_commands_lifecycle.execute_up(
-        stack_file=stack_file,
-        context_name=context_name,
-        instance_name=instance_name,
-        env_file=env_file,
-        build_images=build_images,
-        no_cache=no_cache,
-        discover_repo_root_fn=_discover_repo_root,
-        load_stack_fn=_load_stack,
-        resolve_runtime_selection_fn=_resolve_runtime_selection,
-        load_environment_fn=_load_environment,
-        write_runtime_odoo_conf_file_fn=_write_runtime_odoo_conf_file,
-        write_runtime_env_file_fn=_write_runtime_env_file,
-        ensure_registry_auth_for_base_images_fn=_ensure_registry_auth_for_base_images,
-        compose_base_command_fn=_compose_base_command,
-        run_command_fn=_run_command,
-    )
+    _raise_retired_local_runtime_command("up")
 
 
-@main.command("down", help=f"Stop the local compose runtime. {LOCAL_RUNTIME_CONTRACT_HELP}")
+@main.command("down", help=f"Retired local runtime shim. {RETIRED_LOCAL_RUNTIME_HELP}")
 @click.option("--context", "context_name", required=True)
 @click.option("--instance", "instance_name", default="local", show_default=True)
 @click.option("--volumes", is_flag=True, default=False)
 def down(context_name: str, instance_name: str, volumes: bool) -> None:
-    platform_commands_lifecycle.execute_down(
-        context_name=context_name,
-        instance_name=instance_name,
-        volumes=volumes,
-        discover_repo_root_fn=_discover_repo_root,
-        compose_base_command_fn=_compose_base_command,
-        run_command_fn=_run_command,
-    )
+    _raise_retired_local_runtime_command("down")
 
 
-@main.command("logs", help=f"Read logs from the local compose runtime. {LOCAL_RUNTIME_CONTRACT_HELP}")
+@main.command("logs", help=f"Retired local runtime shim. {RETIRED_LOCAL_RUNTIME_HELP}")
 @click.option("--context", "context_name", required=True)
 @click.option("--instance", "instance_name", default="local", show_default=True)
 @click.option("--service", default="web", show_default=True)
 @click.option("--follow/--no-follow", default=True)
 @click.option("--lines", default=200, show_default=True)
 def logs(context_name: str, instance_name: str, service: str, follow: bool, lines: int) -> None:
-    platform_commands_lifecycle.execute_logs(
-        context_name=context_name,
-        instance_name=instance_name,
-        service=service,
-        follow=follow,
-        lines=lines,
-        discover_repo_root_fn=_discover_repo_root,
-        compose_base_command_fn=_compose_base_command,
-        run_command_fn=_run_command,
-    )
+    _raise_retired_local_runtime_command("logs")
 
 
 def _run_with_web_temporarily_stopped(
@@ -2145,7 +2085,7 @@ def _run_with_web_temporarily_stopped(
     )
 
 
-@main.command("build", help=f"Build local compose images. {LOCAL_RUNTIME_CONTRACT_HELP}")
+@main.command("build", help=f"Retired local runtime shim. {RETIRED_LOCAL_RUNTIME_HELP}")
 @click.option(
     "--stack-file",
     type=click.Path(path_type=Path),
@@ -2163,25 +2103,10 @@ def build(
     env_file: Path | None,
     no_cache: bool,
 ) -> None:
-    platform_commands_lifecycle.execute_build(
-        stack_file=stack_file,
-        context_name=context_name,
-        instance_name=instance_name,
-        env_file=env_file,
-        no_cache=no_cache,
-        discover_repo_root_fn=_discover_repo_root,
-        load_stack_fn=_load_stack,
-        resolve_runtime_selection_fn=_resolve_runtime_selection,
-        load_environment_fn=_load_environment,
-        write_runtime_odoo_conf_file_fn=_write_runtime_odoo_conf_file,
-        write_runtime_env_file_fn=_write_runtime_env_file,
-        ensure_registry_auth_for_base_images_fn=_ensure_registry_auth_for_base_images,
-        compose_base_command_fn=_compose_base_command,
-        run_command_fn=_run_command,
-    )
+    _raise_retired_local_runtime_command("build")
 
 
-@main.command("odoo-shell", help=f"Run an Odoo shell script against the local runtime. {LOCAL_RUNTIME_CONTRACT_HELP}")
+@main.command("odoo-shell", help=f"Retired local runtime shim. {RETIRED_LOCAL_RUNTIME_HELP}")
 @click.option(
     "--stack-file",
     type=click.Path(path_type=Path),
@@ -2191,7 +2116,7 @@ def build(
 @click.option("--context", "context_name", required=True)
 @click.option("--instance", "instance_name", default="local", show_default=True)
 @click.option("--env-file", type=click.Path(path_type=Path), default=None)
-@click.option("--script", "script_path", type=click.Path(path_type=Path), required=True)
+@click.option("--script", "script_path", type=click.Path(path_type=Path), default=None)
 @click.option("--service", default="script-runner", show_default=True)
 @click.option("--database", "database_name", default=None)
 @click.option("--log-file", type=click.Path(path_type=Path), default=None)
@@ -2201,36 +2126,16 @@ def odoo_shell(
     context_name: str,
     instance_name: str,
     env_file: Path | None,
-    script_path: Path,
+    script_path: Path | None,
     service: str,
     database_name: str | None,
     log_file: Path | None,
     dry_run: bool,
 ) -> None:
-    platform_commands_lifecycle.execute_odoo_shell(
-        stack_file=stack_file,
-        context_name=context_name,
-        instance_name=instance_name,
-        env_file=env_file,
-        script_path=script_path,
-        service=service,
-        database_name=database_name,
-        log_file=log_file,
-        dry_run=dry_run,
-        discover_repo_root_fn=_discover_repo_root,
-        load_stack_fn=_load_stack,
-        resolve_runtime_selection_fn=_resolve_runtime_selection,
-        load_environment_fn=_load_environment,
-        write_runtime_odoo_conf_file_fn=_write_runtime_odoo_conf_file,
-        write_runtime_env_file_fn=_write_runtime_env_file,
-        compose_base_command_fn=_compose_base_command,
-        run_command_with_input_fn=_run_command_with_input,
-        run_command_with_input_to_log_fn=_run_command_with_input_to_log,
-        echo_fn=click.echo,
-    )
+    _raise_retired_local_runtime_command("odoo-shell")
 
 
-@main.command("inspect", help=f"Inspect rendered local runtime configuration. {LOCAL_RUNTIME_CONTRACT_HELP}")
+@main.command("inspect", help=f"Retired local runtime shim. {RETIRED_LOCAL_RUNTIME_HELP}")
 @click.option(
     "--stack-file",
     type=click.Path(path_type=Path),
@@ -2248,19 +2153,7 @@ def inspect_context(
     env_file: Path | None,
     json_output: bool,
 ) -> None:
-    platform_commands_selection.execute_inspect(
-        stack_file=stack_file,
-        context_name=context_name,
-        instance_name=instance_name,
-        env_file=env_file,
-        json_output=json_output,
-        discover_repo_root_fn=_discover_repo_root,
-        load_stack_fn=_load_stack,
-        resolve_runtime_selection_fn=_resolve_runtime_selection,
-        load_environment_fn=_load_environment,
-        write_runtime_odoo_conf_file_fn=_write_runtime_odoo_conf_file,
-        write_pycharm_odoo_conf_fn=_write_pycharm_odoo_conf,
-    )
+    _raise_retired_local_runtime_command("inspect")
 
 
 @main.command(
@@ -2450,7 +2343,7 @@ def export_ship_request(
 
 @main.command(
     "ship",
-    help=f"Deploy an exact git ref to a Dokploy-managed remote target. {REMOTE_RUNTIME_CONTRACT_HELP}",
+    help=f"Trigger a Dokploy-managed deploy/redeploy for the configured remote target. {REMOTE_RUNTIME_CONTRACT_HELP}",
 )
 @click.option("--context", "context_name", required=True)
 @click.option(
@@ -2491,7 +2384,7 @@ def export_ship_request(
     "--allow-dirty",
     is_flag=True,
     default=False,
-    help="Allow ship from a dirty tracked working tree (uncommitted changes). Prefer a clean worktree plus --source-ref for surgical tests.",
+    help="Allow ship from a dirty tracked working tree (uncommitted changes). Prefer a clean worktree when possible.",
 )
 @click.option(
     "--source-ref",
@@ -2524,8 +2417,8 @@ def ship(
         dry_run=dry_run,
         no_cache=no_cache,
         skip_gate=skip_gate,
-        allow_dirty=allow_dirty,
         source_git_ref=source_git_ref,
+        allow_dirty=allow_dirty,
         discover_repo_root_fn=_discover_repo_root,
         load_environment_fn=_load_environment,
         load_dokploy_source_of_truth_if_present_fn=_load_dokploy_source_of_truth_if_present,
@@ -2533,12 +2426,10 @@ def ship(
         resolve_ship_timeout_seconds_fn=_resolve_ship_timeout_seconds,
         resolve_ship_health_timeout_seconds_fn=_resolve_ship_health_timeout_seconds,
         resolve_ship_healthcheck_urls_fn=_resolve_ship_healthcheck_urls,
-        prepare_ship_branch_sync_fn=_prepare_ship_branch_sync,
         run_required_gates_fn=_run_required_gates,
         resolve_dokploy_ship_mode_fn=_resolve_dokploy_ship_mode,
         read_dokploy_config_fn=_read_dokploy_config,
         resolve_dokploy_target_fn=_resolve_dokploy_target,
-        apply_ship_branch_sync_fn=_apply_ship_branch_sync,
         dokploy_request_fn=_dokploy_request,
         latest_deployment_for_compose_fn=_latest_deployment_for_compose,
         deployment_key_fn=_deployment_key,
@@ -2726,16 +2617,7 @@ def init(
     dry_run: bool,
     allow_prod_data_workflow: bool,
 ) -> None:
-    platform_commands_workflow.execute_init_command(
-        stack_file=stack_file,
-        context_name=context_name,
-        instance_name=instance_name,
-        env_file=env_file,
-        dry_run=dry_run,
-        allow_prod_data_workflow=allow_prod_data_workflow,
-        assert_prod_data_workflow_allowed_fn=_assert_prod_data_workflow_allowed,
-        run_init_workflow_fn=_run_init_workflow,
-    )
+    _raise_retired_local_runtime_command("init")
 
 
 @main.command(
@@ -2763,21 +2645,12 @@ def openupgrade(
     reset_versions: bool,
     dry_run: bool,
 ) -> None:
-    platform_commands_workflow.execute_openupgrade_command(
-        stack_file=stack_file,
-        context_name=context_name,
-        instance_name=instance_name,
-        env_file=env_file,
-        force=force,
-        reset_versions=reset_versions,
-        dry_run=dry_run,
-        run_openupgrade_command_fn=_run_openupgrade_command,
-    )
+    _raise_retired_local_runtime_command("openupgrade")
 
 
 @main.command(
     "update",
-    help="Apply module updates against the selected local or remote runtime.",
+    help="Retired repo-local workflow shim. Use manifest-backed runtime workflow ownership in odoo-devkit instead.",
 )
 @click.option(
     "--stack-file",
@@ -2790,14 +2663,7 @@ def openupgrade(
 @click.option("--env-file", type=click.Path(path_type=Path), default=None)
 @click.option("--dry-run", is_flag=True, default=False)
 def update(stack_file: Path, context_name: str, instance_name: str, env_file: Path | None, dry_run: bool) -> None:
-    platform_commands_workflow.execute_update_command(
-        stack_file=stack_file,
-        context_name=context_name,
-        instance_name=instance_name,
-        env_file=env_file,
-        dry_run=dry_run,
-        run_update_workflow_fn=_run_update_workflow,
-    )
+    _raise_retired_local_runtime_command("update")
 
 
 if __name__ == "__main__":

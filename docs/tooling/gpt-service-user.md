@@ -42,7 +42,7 @@ Operational Notes
 
 - Provisioning is skipped if `ODOO_KEY` is blank or unset.
 - To rotate credentials, update `ODOO_KEY` and rerun
-  `uv run platform restore --context <target> --instance local`.
+  `uv --directory /path/to/odoo-devkit run platform runtime restore --manifest /path/to/workspace.toml`.
   The script regenerates both passwords and API keys.
 - Clearing `ODOO_KEY` prevents future GPT user provisioning, but does not
   automatically revoke previously created GPT users or API keys.
@@ -51,4 +51,4 @@ Operational Notes
 
 Related Commands
 
-- `uv run platform restore --context <target> --instance local`
+- `uv --directory /path/to/odoo-devkit run platform runtime restore --manifest /path/to/workspace.toml`

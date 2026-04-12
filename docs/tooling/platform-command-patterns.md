@@ -71,11 +71,18 @@ Local Workflow Patterns
 - Run destructive data workflows:
 
     ```bash
-    uv run platform restore --context cm --instance local --dry-run
-    uv run platform bootstrap --context cm --instance local --dry-run
+    uv --directory ../odoo-devkit run platform runtime restore \
+      --manifest ../odoo-tenant-cm/workspace.toml
+    uv --directory ../odoo-devkit run platform runtime workflow \
+      --manifest ../odoo-tenant-cm/workspace.toml --workflow bootstrap
     uv run platform restore --context cm --instance testing --dry-run
-    uv run platform openupgrade --context cm --instance local --dry-run
+    uv --directory ../odoo-devkit run platform runtime workflow \
+      --manifest ../odoo-tenant-cm/workspace.toml --workflow openupgrade
     ```
+
+- In `odoo-ai`, `platform restore` and `platform bootstrap` now survive only
+  for Dokploy-managed remote targets. Local restore/bootstrap hand off to the
+  manifest-backed `odoo-devkit` runtime surface.
 
 - `platform restore` and `platform bootstrap` block prod data-mutation
   workflows by default.

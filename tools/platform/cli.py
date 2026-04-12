@@ -1143,7 +1143,7 @@ def _render_odoo_config(
 
 LOCAL_RUNTIME_CONTRACT_HELP = (
     "Local host runtime only. Requires --instance local. "
-    "Remote dev/testing/prod instances use ship/rollback/gate, plus separate restore and bootstrap data workflows."
+    "Remote dev/testing/prod instances use ship/rollback/gate, and local restore/bootstrap now live in odoo-devkit."
 )
 RETIRED_LOCAL_RUNTIME_HELP = (
     "Retired repo-local local-runtime command. Use manifest-backed runtime ownership in odoo-devkit instead."
@@ -1153,7 +1153,8 @@ REMOTE_RUNTIME_CONTRACT_HELP = (
     "Use ship for non-destructive deploy/restart. Restore and bootstrap are explicit data workflows; init remains local-only."
 )
 DESTRUCTIVE_DATA_WORKFLOW_HELP = (
-    "Destructive data workflow. Supports local runtime plus remote dev/testing/prod targets. "
+    "Destructive data workflow. In odoo-ai this now survives only for remote dev/testing/prod targets. "
+    "Use odoo-devkit manifest-backed runtime restore/bootstrap for local work. "
     "Use --allow-prod-data-workflow only for explicit prod break-glass operations."
 )
 
@@ -1598,8 +1599,8 @@ def gate(
 @main.command(
     "run",
     help=(
-        "Run platform data workflows such as restore or bootstrap. "
-        "For extracted-tenant runtime workflow ownership, use odoo-devkit plus the tenant workspace.toml manifest."
+        "Run remote platform data workflows such as restore or bootstrap. "
+        "Local restore/bootstrap ownership moved to odoo-devkit plus the tenant workspace.toml manifest."
     ),
 )
 @click.option(
@@ -1609,7 +1610,7 @@ def gate(
     show_default=True,
 )
 @click.option("--context", "context_name", required=True)
-@click.option("--instance", "instance_name", default="local", show_default=True)
+@click.option("--instance", "instance_name", required=True)
 @click.option("--env-file", type=click.Path(path_type=Path), default=None)
 @click.option("--workflow", required=True, type=click.Choice(PLATFORM_RUN_WORKFLOWS, case_sensitive=False))
 @click.option("--dry-run", is_flag=True, default=False)
@@ -2513,7 +2514,7 @@ def rollback(
     show_default=True,
 )
 @click.option("--context", "context_name", required=True)
-@click.option("--instance", "instance_name", default="local", show_default=True)
+@click.option("--instance", "instance_name", required=True)
 @click.option("--env-file", type=click.Path(path_type=Path), default=None)
 @click.option("--dry-run", is_flag=True, default=False)
 @click.option("--no-sanitize", is_flag=True, default=False)
@@ -2555,7 +2556,7 @@ def restore(
     show_default=True,
 )
 @click.option("--context", "context_name", required=True)
-@click.option("--instance", "instance_name", default="local", show_default=True)
+@click.option("--instance", "instance_name", required=True)
 @click.option("--env-file", type=click.Path(path_type=Path), default=None)
 @click.option("--dry-run", is_flag=True, default=False)
 @click.option("--no-sanitize", is_flag=True, default=False)

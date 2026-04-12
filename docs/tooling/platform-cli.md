@@ -35,6 +35,10 @@ Operator Contract
 - For extracted tenant local runtime work, use `odoo-devkit` with the tenant's
   tracked `workspace.toml`, for example:
   `uv --directory /path/to/odoo-devkit run platform runtime up --manifest /path/to/workspace.toml --build`.
+- Local destructive runtime work also moved there:
+  `uv --directory /path/to/odoo-devkit run platform runtime restore --manifest /path/to/workspace.toml`
+  and
+  `uv --directory /path/to/odoo-devkit run platform runtime workflow --manifest /path/to/workspace.toml --workflow bootstrap`.
 - Treat `dev`, `testing`, and `prod` as Dokploy-managed remote targets.
   Use `platform ship`, `platform rollback`, `platform gate`,
   `platform restore`, and `platform bootstrap` there.
@@ -59,8 +63,9 @@ Command Families
 - Local inspection: `info`, `status`, `doctor`.
 - Retired compatibility shims: `select`, `up`, `down`, `logs`, `build`,
   `inspect`, `odoo-shell`, `init`, `update`, `openupgrade`.
-- Data workflows: `restore`, `bootstrap`.
-- Runtime workflows: `run` for `restore` and `bootstrap` only.
+- Data workflows: `restore`, `bootstrap` for remote Dokploy-managed targets.
+- Runtime workflows: `run` for the surviving remote `restore` and `bootstrap`
+  path only.
 - Validation scenarios: `validate ...`.
 - Remote release: `ship`, `rollback`, `gate`, and `platform dokploy ...`
   helpers.
@@ -86,9 +91,15 @@ Behavior Highlights
   exist only as explicit retirement shims. Use
   `uv --directory /path/to/odoo-devkit run platform runtime workflow --manifest /path/to/workspace.toml --workflow <name>`
   instead.
-- `platform run` in `odoo-ai` is now narrowed to `restore` and `bootstrap`
-  only. Do not route local `init`/`update`/`openupgrade` through `run` or
-  `tui`; use the manifest-backed `odoo-devkit` runtime workflow surface.
+- Local `platform restore` and `platform bootstrap` in `odoo-ai` are now
+  retired too. Use the manifest-backed `odoo-devkit` runtime restore/bootstrap
+  surface instead.
+- `platform run` in `odoo-ai` is now narrowed to the surviving remote
+  `restore` and `bootstrap` path only. Do not route local
+  `restore`/`bootstrap`/`init`/`update`/`openupgrade` through `run` or `tui`;
+  use the manifest-backed `odoo-devkit` runtime workflow surface. These
+  commands require an explicit remote `--instance` and must not fall back to
+  `local`.
 - `platform doctor` is read-only and spans both local runtime diagnostics and
   Dokploy target diagnostics.
 - `platform ship` fails closed on dirty tracked files. Prefer a clean worktree

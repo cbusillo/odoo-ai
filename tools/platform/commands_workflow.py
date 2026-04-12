@@ -13,7 +13,11 @@ try:
 except ImportError:  # pragma: no cover - optional interactive dependency
     questionary = None
 
-from .instance_policies import LOCAL_INSTANCE_NAME, assert_local_instance_for_local_runtime
+from .instance_policies import (
+    LOCAL_INSTANCE_NAME,
+    assert_destructive_data_workflow_supported,
+    assert_local_instance_for_local_runtime,
+)
 from .models import ContextDefinition, LoadedStack
 
 WILDCARD_TOKENS = frozenset({"all", "*"})
@@ -76,11 +80,18 @@ def _workflow_requires_local_instance(workflow_name: str) -> bool:
 
 
 def _assert_workflow_target_allowed(*, workflow_name: str, instance_name: str) -> None:
+    normalized_workflow_name = workflow_name.strip().lower()
+    if normalized_workflow_name in {"restore", "bootstrap"}:
+        assert_destructive_data_workflow_supported(
+            instance_name=instance_name,
+            workflow_name=normalized_workflow_name,
+        )
+
     if not _workflow_requires_local_instance(workflow_name):
         return
     assert_local_instance_for_local_runtime(
         instance_name=instance_name,
-        operation_name=f"platform {workflow_name.strip().lower()}",
+        operation_name=f"platform {normalized_workflow_name}",
     )
 
 

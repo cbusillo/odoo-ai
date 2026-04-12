@@ -764,6 +764,22 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
         self.assertEqual(captured_kwargs["workflow"], "restore")
         self.assertEqual(captured_kwargs["instance_name"], "testing")
 
+    def test_execute_restore_command_retires_local_instance(self) -> None:
+        with self.assertRaises(click.ClickException) as captured_error:
+            commands_workflow.execute_restore_command(
+                stack_file=Path("platform/stack.toml"),
+                context_name="cm",
+                instance_name="local",
+                env_file=None,
+                dry_run=True,
+                no_sanitize=False,
+                allow_prod_data_workflow=False,
+                run_workflow_fn=lambda **_kwargs: None,
+            )
+
+        self.assertIn("Local 'platform restore' is retired in odoo-ai.", captured_error.exception.message)
+        self.assertIn("platform runtime restore --manifest /path/to/workspace.toml", captured_error.exception.message)
+
     def test_execute_bootstrap_command_allows_remote_instance(self) -> None:
         captured_kwargs: dict[str, object] = {}
 
@@ -784,6 +800,22 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
         self.assertEqual(captured_kwargs["workflow"], "bootstrap")
         self.assertEqual(captured_kwargs["instance_name"], "testing")
 
+    def test_execute_bootstrap_command_retires_local_instance(self) -> None:
+        with self.assertRaises(click.ClickException) as captured_error:
+            commands_workflow.execute_bootstrap_command(
+                stack_file=Path("platform/stack.toml"),
+                context_name="cm",
+                instance_name="local",
+                env_file=None,
+                dry_run=True,
+                no_sanitize=False,
+                allow_prod_data_workflow=False,
+                run_workflow_fn=lambda **_kwargs: None,
+            )
+
+        self.assertIn("Local 'platform bootstrap' is retired in odoo-ai.", captured_error.exception.message)
+        self.assertIn("--workflow bootstrap", captured_error.exception.message)
+
     def test_execute_run_workflow_command_rejects_remote_local_only_workflow(self) -> None:
         with self.assertRaises(click.ClickException) as captured_error:
             commands_workflow.execute_run_workflow_command(
@@ -802,6 +834,25 @@ class PlatformCommandsWorkflowTests(unittest.TestCase):
             )
 
         self.assertIn("requires --instance local", captured_error.exception.message)
+
+    def test_execute_run_workflow_command_retires_local_restore(self) -> None:
+        with self.assertRaises(click.ClickException) as captured_error:
+            commands_workflow.execute_run_workflow_command(
+                stack_file=Path("platform/stack.toml"),
+                context_name="cm",
+                instance_name="local",
+                env_file=None,
+                workflow="restore",
+                dry_run=True,
+                no_cache=False,
+                no_sanitize=False,
+                force=False,
+                reset_versions=False,
+                allow_prod_data_workflow=False,
+                run_workflow_fn=lambda **_kwargs: None,
+            )
+
+        self.assertIn("Local 'platform restore' is retired in odoo-ai.", captured_error.exception.message)
 
     def test_run_workflow_for_targets_marks_remote_local_runtime_target_failed(self) -> None:
         emitted_lines: list[str] = []

@@ -70,7 +70,7 @@ Use explicit context/instance flags in command invocations (for example
   operators do not call the install scripts directly.
 - Data workflows rely on `DATA_WORKFLOW_SSH_DIR` so the base compose mounts
   the SSH directory for upstream access during
-  `uv run platform restore --context <target> --instance local`.
+  `uv --directory ../odoo-devkit run platform runtime restore --manifest ../odoo-tenant-<target>/workspace.toml`.
 - That SSH directory must include both the private key and trusted
   `known_hosts` entries needed for upstream access.
 
@@ -115,5 +115,5 @@ Use explicit context/instance flags in command invocations (for example
 - Local stack layering – `platform/config/README.md`
 - Multi-project local config – @docs/workflows/multi-project.md
 - Long-term control-plane target state – @docs/control-plane-roadmap.md
-- Restore entry point –
-  `uv run platform restore --context <target> --instance local`
+- Restore entry point -
+  `uv --directory ../odoo-devkit run platform runtime restore --manifest ../odoo-tenant-<target>/workspace.toml`

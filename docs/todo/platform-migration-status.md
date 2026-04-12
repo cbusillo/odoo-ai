@@ -23,8 +23,11 @@ Status
   Later that same day, `odoo-ai` also retired its direct repo-local
   `init`/`update`/`openupgrade` commands into matching manifest-backed handoff
   shims and narrowed `platform run` / `platform tui` so those local-only
-  workflows are no longer reachable there either. The remaining repo-local
-  workflow surface in `odoo-ai` is now narrower and should be treated as
+  workflows are no longer reachable there either. Later on 2026-04-12,
+  `odoo-ai` also retired repo-local local `restore`/`bootstrap` invocations
+  into matching manifest-backed handoff guidance, so the remaining
+  repo-local workflow surface in `odoo-ai` is now remote-only for
+  Dokploy-managed destructive workflows and should be treated as
   retirement-stage cleanup only.
 - The extracted tenant proof now exists for both `odoo-tenant-opw` and
   `odoo-tenant-cm`: their tracked `workspace.toml` manifests drive

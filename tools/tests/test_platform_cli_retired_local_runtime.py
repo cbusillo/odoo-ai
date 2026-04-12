@@ -28,6 +28,20 @@ class PlatformCliRetiredLocalRuntimeTests(unittest.TestCase):
                 self.assertIn(f"'platform {command_name}' is retired in odoo-ai.", result.output)
                 self.assertIn(replacement_command, result.output)
 
+    def test_local_destructive_data_workflows_require_explicit_instance(self) -> None:
+        runner = CliRunner()
+
+        command_arguments_by_name = {
+            "restore": ["restore", "--context", "cm"],
+            "bootstrap": ["bootstrap", "--context", "cm"],
+        }
+
+        for command_name, command_arguments in command_arguments_by_name.items():
+            with self.subTest(command_name=command_name):
+                result = runner.invoke(platform_cli_command, command_arguments)
+                self.assertEqual(result.exit_code, 2, msg=result.output)
+                self.assertIn("Missing option '--instance'", result.output)
+
     def test_repo_local_helpers_fail_closed_without_replacement_claims(self) -> None:
         runner = CliRunner()
 
@@ -71,6 +85,33 @@ class PlatformCliRetiredLocalRuntimeTests(unittest.TestCase):
 
                 self.assertEqual(result.exit_code, 2, msg=result.output)
                 self.assertIn("Invalid value for '--workflow'", result.output)
+
+    def test_run_restore_and_bootstrap_require_explicit_instance(self) -> None:
+        runner = CliRunner()
+
+        command_arguments_by_name = {
+            "run": ["run", "--context", "cm", "--workflow", "restore"],
+            "restore": ["restore", "--context", "cm"],
+            "bootstrap": ["bootstrap", "--context", "cm"],
+        }
+
+        for command_name, command_arguments in command_arguments_by_name.items():
+            with self.subTest(command_name=command_name):
+                result = runner.invoke(platform_cli_command, command_arguments)
+
+                self.assertEqual(result.exit_code, 2, msg=result.output)
+                self.assertIn("Missing option '--instance'", result.output)
+
+    def test_tui_retires_local_restore_target(self) -> None:
+        runner = CliRunner()
+
+        result = runner.invoke(
+            platform_cli_command,
+            ["tui", "--context", "cm", "--instance", "local", "--workflow", "restore", "--json"],
+        )
+
+        self.assertEqual(result.exit_code, 1, msg=result.output)
+        self.assertIn("Local 'platform restore' is retired in odoo-ai.", result.output)
 
 
 if __name__ == "__main__":

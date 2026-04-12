@@ -25,13 +25,13 @@ Odoo-specific
 - Update module:
   `docker exec ${ODOO_PROJECT_NAME}-script-runner-1 /odoo/odoo-bin -u <module> --stop-after-init`
 - Restore data:
-  `uv run platform restore --context <target> --instance local`
+  `uv --directory ../odoo-devkit run platform runtime restore --manifest ../odoo-tenant-<target>/workspace.toml`
   Targets: `opw`, `cm`.
   Ensure `DATA_WORKFLOW_SSH_DIR` points at a host SSH directory so the base compose
   mounts it into the container for upstream access. That directory should include
   both the private key and the trusted `known_hosts` entry for the upstream host.
   When an upstream dump is unavailable, bootstrap with
-  `uv run platform bootstrap --context <target> --instance local`.
+  `uv --directory ../odoo-devkit run platform runtime workflow --manifest ../odoo-tenant-<target>/workspace.toml --workflow bootstrap`.
 
 Tips
 

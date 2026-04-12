@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
 
 [project]
 name = "openupgrade_scripts_custom"
@@ -11,8 +11,11 @@ dependencies = [
     "openupgradelib @ git+https://github.com/OCA/openupgradelib.git@46d66ff5ed6a99481f84d3c79fc6e50835da7286",
 ]
 
-[tool.setuptools]
-packages = []
+[tool.hatch.build.targets.wheel]
+bypass-selection = true
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.uv]
 managed = false

@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
 
 [project]
 name = "marine_motors"
@@ -12,8 +12,11 @@ dependencies = [
     "simple_zpl2 @ git+https://github.com/sacherjj/simple_zpl2@master",
 ]
 
-[tool.setuptools]
-packages = []
+[tool.hatch.build.targets.wheel]
+bypass-selection = true
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.uv]
 managed = false

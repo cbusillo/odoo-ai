@@ -55,10 +55,22 @@ class PlatformCliRetiredLocalRuntimeTests(unittest.TestCase):
     def test_tui_does_not_advertise_retired_local_runtime_workflows(self) -> None:
         runner = CliRunner()
 
-        result = runner.invoke(platform_cli_command, ["tui", "--workflow", "up"])
+        for retired_workflow in ("up", "init", "update", "openupgrade"):
+            with self.subTest(retired_workflow=retired_workflow):
+                result = runner.invoke(platform_cli_command, ["tui", "--workflow", retired_workflow])
 
-        self.assertEqual(result.exit_code, 2, msg=result.output)
-        self.assertIn("Invalid value for '--workflow'", result.output)
+                self.assertEqual(result.exit_code, 2, msg=result.output)
+                self.assertIn("Invalid value for '--workflow'", result.output)
+
+    def test_run_does_not_accept_retired_repo_local_workflows(self) -> None:
+        runner = CliRunner()
+
+        for retired_workflow in ("init", "update", "openupgrade"):
+            with self.subTest(retired_workflow=retired_workflow):
+                result = runner.invoke(platform_cli_command, ["run", "--context", "cm", "--workflow", retired_workflow])
+
+                self.assertEqual(result.exit_code, 2, msg=result.output)
+                self.assertIn("Invalid value for '--workflow'", result.output)
 
 
 if __name__ == "__main__":

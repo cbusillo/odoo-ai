@@ -129,9 +129,6 @@ VALID_ENV_COLLISION_MODES = platform_environment.VALID_ENV_COLLISION_MODES
 PLATFORM_RUN_WORKFLOWS = (
     "restore",
     "bootstrap",
-    "init",
-    "update",
-    "openupgrade",
 )
 
 PLATFORM_TUI_WORKFLOWS = (
@@ -1601,8 +1598,8 @@ def gate(
 @main.command(
     "run",
     help=(
-        "Run platform workflows such as restore, bootstrap, init, update, or openupgrade. "
-        "Restore and bootstrap support remote targets; init/update/openupgrade remain local-only."
+        "Run platform data workflows such as restore or bootstrap. "
+        "For extracted-tenant runtime workflow ownership, use odoo-devkit plus the tenant workspace.toml manifest."
     ),
 )
 @click.option(

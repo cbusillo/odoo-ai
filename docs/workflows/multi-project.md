@@ -16,7 +16,7 @@ When
 Local stacks
 
 | Stack       | Purpose      | Ports           | Config source   |
-|-------------|--------------|-----------------|-----------------|
+| ----------- | ------------ | --------------- | --------------- |
 | `opw-local` | OPW dev      | 8069/8072/15432 | platform config |
 | `cm-local`  | CM isolation | 9069/9072/25432 | platform config |
 
@@ -26,23 +26,28 @@ Quick flow
 
 1. Set context/instance values in `platform/secrets.toml` and/or `.env`.
 
-2. Select and inspect the runtime env for the stack:
+2. Select and inspect the runtime env for the stack through `odoo-devkit` and
+   the tenant manifest:
 
     ```bash
-    uv run platform select --context opw --instance local --dry-run
-    uv run platform select --context opw --instance local
+    uv --directory ../odoo-devkit run platform runtime select \
+      --manifest ../odoo-tenant-opw/workspace.toml
+    uv --directory ../odoo-devkit run platform runtime inspect \
+      --manifest ../odoo-tenant-opw/workspace.toml
     ```
 
 3. Start the stack (add `--build` if you need a rebuild):
 
     ```bash
-    uv run platform up --context opw --instance local --build
+    uv --directory ../odoo-devkit run platform runtime up \
+      --manifest ../odoo-tenant-opw/workspace.toml --build
     ```
 
 4. (Optional) Restore upstream data:
 
     ```bash
-    uv run platform restore --context opw --instance local
+    uv --directory ../odoo-devkit run platform runtime restore \
+      --manifest ../odoo-tenant-opw/workspace.toml
     ```
 
 Notes
@@ -64,11 +69,11 @@ Notes
     - Optional: enable “Suspend after connect” if you want to pause on startup
 - The Debug Server starts listening before “Before launch” tasks run, so it is
   safe to keep
-  `uv run platform run --context <target> --instance local --workflow update`
+  `uv --directory ../odoo-devkit run platform runtime workflow --manifest ../odoo-tenant-<target>/workspace.toml --workflow update`
   as a pre-step; Odoo will reconnect to the debugger after the restart.
 - For “always up to date” local debugging, keep the upgrade‑restart pre-step
   enabled so modules are upgraded on every Debug run.
 - If you disable the update pre-step for faster runs, use
-  `uv run platform run --context <target> --instance local --workflow update`
+  `uv --directory ../odoo-devkit run platform runtime workflow --manifest ../odoo-tenant-<target>/workspace.toml --workflow update`
   when you change module schema/data
   (new fields, views, migrations).

@@ -22,8 +22,10 @@ Status
   shims that point operators at `odoo-devkit` plus tenant `workspace.toml`.
   Later that same day, `odoo-ai` also retired its direct repo-local
   `init`/`update`/`openupgrade` commands into matching manifest-backed handoff
-  shims. The remaining repo-local workflow surface in `odoo-ai` is now
-  narrower and should be treated as retirement-stage cleanup only.
+  shims and narrowed `platform run` / `platform tui` so those local-only
+  workflows are no longer reachable there either. The remaining repo-local
+  workflow surface in `odoo-ai` is now narrower and should be treated as
+  retirement-stage cleanup only.
 - The extracted tenant proof now exists for both `odoo-tenant-opw` and
   `odoo-tenant-cm`: their tracked `workspace.toml` manifests drive
   `odoo-devkit` workspace/runtime commands, reusable shared addons now live in

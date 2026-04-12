@@ -60,7 +60,7 @@ Command Families
 - Retired compatibility shims: `select`, `up`, `down`, `logs`, `build`,
   `inspect`, `odoo-shell`, `init`, `update`, `openupgrade`.
 - Data workflows: `restore`, `bootstrap`.
-- Runtime workflows: `run`.
+- Runtime workflows: `run` for `restore` and `bootstrap` only.
 - Validation scenarios: `validate ...`.
 - Remote release: `ship`, `rollback`, `gate`, and `platform dokploy ...`
   helpers.
@@ -86,6 +86,9 @@ Behavior Highlights
   exist only as explicit retirement shims. Use
   `uv --directory /path/to/odoo-devkit run platform runtime workflow --manifest /path/to/workspace.toml --workflow <name>`
   instead.
+- `platform run` in `odoo-ai` is now narrowed to `restore` and `bootstrap`
+  only. Do not route local `init`/`update`/`openupgrade` through `run` or
+  `tui`; use the manifest-backed `odoo-devkit` runtime workflow surface.
 - `platform doctor` is read-only and spans both local runtime diagnostics and
   Dokploy target diagnostics.
 - `platform ship` fails closed on dirty tracked files. Prefer a clean worktree

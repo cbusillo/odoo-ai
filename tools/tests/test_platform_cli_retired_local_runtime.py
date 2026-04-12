@@ -14,6 +14,7 @@ class PlatformCliRetiredLocalRuntimeTests(unittest.TestCase):
 
         replacement_by_command = {
             "select": "uv --directory /path/to/odoo-devkit run platform runtime select --manifest /path/to/workspace.toml",
+            "build": "uv --directory /path/to/odoo-devkit run platform runtime build --manifest /path/to/workspace.toml --no-cache",
             "up": "uv --directory /path/to/odoo-devkit run platform runtime up --manifest /path/to/workspace.toml --build",
             "down": "uv --directory /path/to/odoo-devkit run platform runtime down --manifest /path/to/workspace.toml --volumes",
             "inspect": "uv --directory /path/to/odoo-devkit run platform runtime inspect --manifest /path/to/workspace.toml",
@@ -44,18 +45,6 @@ class PlatformCliRetiredLocalRuntimeTests(unittest.TestCase):
                 result = runner.invoke(platform_cli_command, command_arguments)
                 self.assertEqual(result.exit_code, 2, msg=result.output)
                 self.assertIn("Missing option '--instance'", result.output)
-
-    def test_repo_local_helpers_fail_closed_without_replacement_claims(self) -> None:
-        runner = CliRunner()
-
-        for command_name, extra_args in (
-            ("build", ["--stack-file", "platform/stack.toml"]),
-        ):
-            with self.subTest(command_name=command_name):
-                result = runner.invoke(platform_cli_command, [command_name, "--context", "cm", *extra_args])
-                self.assertEqual(result.exit_code, 1, msg=result.output)
-                self.assertIn(f"'platform {command_name}' is retired in odoo-ai.", result.output)
-                self.assertIn("no longer has a supported home in odoo-ai", result.output)
 
     def test_tui_does_not_advertise_retired_local_runtime_workflows(self) -> None:
         runner = CliRunner()

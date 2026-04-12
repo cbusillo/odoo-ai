@@ -1171,6 +1171,7 @@ def main() -> None:
 
 _DEVKIT_RUNTIME_REPLACEMENTS = {
     "select": "uv --directory /path/to/odoo-devkit run platform runtime select --manifest /path/to/workspace.toml",
+    "build": "uv --directory /path/to/odoo-devkit run platform runtime build --manifest /path/to/workspace.toml --no-cache",
     "up": "uv --directory /path/to/odoo-devkit run platform runtime up --manifest /path/to/workspace.toml --build",
     "down": "uv --directory /path/to/odoo-devkit run platform runtime down --manifest /path/to/workspace.toml --volumes",
     "inspect": "uv --directory /path/to/odoo-devkit run platform runtime inspect --manifest /path/to/workspace.toml",

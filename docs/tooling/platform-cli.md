@@ -34,6 +34,8 @@ Operator Contract
   the manifest-backed `odoo-devkit` runtime workflow surface.
 - For extracted tenant local runtime work, use `odoo-devkit` with the tenant's
   tracked `workspace.toml`, for example:
+  `uv --directory /path/to/odoo-devkit run platform runtime build --manifest /path/to/workspace.toml --no-cache`.
+  Or build plus start the stack with:
   `uv --directory /path/to/odoo-devkit run platform runtime up --manifest /path/to/workspace.toml --build`.
   Stopping that local runtime now lives there too:
   `uv --directory /path/to/odoo-devkit run platform runtime down --manifest /path/to/workspace.toml --volumes`.
@@ -96,8 +98,8 @@ Behavior Highlights
 - `platform logs` now points at the manifest-backed `odoo-devkit` runtime logs
   helper, and `platform odoo-shell` now points at the manifest-backed
   `odoo-devkit` runtime shell helper. `platform down` now points at the
-  manifest-backed `odoo-devkit` runtime down helper; `build` remains retired
-  without a new home.
+  manifest-backed `odoo-devkit` runtime down helper, and `platform build` now
+  points at the manifest-backed `odoo-devkit` runtime build helper.
 - `platform init`, `platform update`, and `platform openupgrade` now also
   exist only as explicit retirement shims. Use
   `uv --directory /path/to/odoo-devkit run platform runtime workflow --manifest /path/to/workspace.toml --workflow <name>`

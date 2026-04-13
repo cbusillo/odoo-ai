@@ -20,6 +20,10 @@ Runner layout
     - `actions.runner.cbusillo-odoo-docker.chris-testing-odoo-docker-3.service`
     - three additional private Enterprise-layer runner services are present but
       intentionally unnamed in this public doc
+- Public lane split:
+    - `odoo-docker` verify jobs use `chris-testing-build`
+    - `odoo-docker` publish and runner-health use
+      `chris-testing-publish-cache`
 
 Cache model
 
@@ -73,6 +77,25 @@ ssh chris-testing 'journalctl -u chris-testing-docker-hygiene.service \
 -n 100 --no-pager'
 ssh chris-testing 'systemctl start chris-testing-docker-hygiene.service'
 ```
+
+Runner recovery policy
+
+- `odoo-docker` runner services now use systemd drop-ins with:
+    - `Restart=on-failure`
+    - `RestartSec=15s`
+    - `OOMPolicy=kill`
+- This keeps transient OOMs from leaving the repo permanently offline and makes
+  systemd tear down the rest of the runner cgroup instead of leaving stray
+  `Runner.Worker` / `docker-buildx` processes behind.
+- Check the effective policy with:
+
+    ```bash
+    ssh chris-testing 'systemctl show \
+      actions.runner.cbusillo-odoo-docker.chris-testing-odoo-docker.service \
+      actions.runner.cbusillo-odoo-docker.chris-testing-odoo-docker-2.service \
+      actions.runner.cbusillo-odoo-docker.chris-testing-odoo-docker-3.service \
+      -p Restart -p OOMPolicy -p DropInPaths'
+    ```
 
 Emergency cleanup
 

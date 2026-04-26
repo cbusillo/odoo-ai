@@ -8,7 +8,7 @@ version = "0.0.0"  # Real version in __manifest__.py
 description = "Motor teardown and parts workflows for marine inventory"
 requires-python = ">=3.13"
 dependencies = [
-    "printnode_community>=0.3.0",
+    "printnodeapi @ git+https://github.com/cbusillo/PrintNode-Python@master",
     "simple_zpl2 @ git+https://github.com/sacherjj/simple_zpl2@master",
 ]
 

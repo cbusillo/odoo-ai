@@ -1,8 +1,8 @@
 import logging
 
 from odoo import api, fields, models
-from printnodeapi import Gateway
-from printnodeapi.model import PrintJob, Printer
+from printnode_community import Gateway
+from printnode_community.model import PrintJob, Printer
 
 _logger = logging.getLogger(__name__)
 

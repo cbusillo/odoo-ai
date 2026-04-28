@@ -1,4 +1,13 @@
-# AGENTS.md — Codex CLI Operating Guide (Read Me First)
+# AGENTS.md — Retired Odoo Runtime Guide
+
+This repo is retired for live Odoo runtime work. Keep it available for archival
+reference only, and use `odoo-devkit`, tenant repos, and generated Odoo
+workspaces for current runtime/build/deploy work unless the user explicitly asks
+to inspect retired `odoo-ai` history.
+
+---
+
+## Historical Codex CLI Operating Guide
 
 Treat this file as the launch checklist for every Codex session. Skim it, open
 the linked docs, then keep prompts lean.

@@ -1,3 +1,6 @@
+# ARCHIVAL SNAPSHOT ONLY.
+# Do not use this retired odoo-ai file as current Dokploy or runtime authority.
+# Launchplane owns live shared/testing/prod target records and mutations.
 schema_version = 2
 
 [defaults]

@@ -1,10 +1,15 @@
 # Platform Config Layering (Local Dev)
 
-This directory holds shared platform runtime defaults used by `uv run platform
-...` and ad-hoc `docker compose` commands. Dokploy remote deployments use
-Dokploy target settings (`composePath`) instead of these local overlays.
+Retired authority notice: this config surface is archival. Do not use files in
+this repo to mutate live shared/testing/prod Odoo environments or to source
+current secrets. Launchplane owns live runtime records and mutations;
+`odoo-devkit` owns manifest-backed local runtime generation.
 
-## Layer order
+This directory holds historical platform runtime defaults that were used by
+`uv run platform ...` and ad-hoc `docker compose` commands. It is retained only
+to explain old local layering behavior.
+
+## Historical Layer Order
 
 Platform runtime generation (`uv run platform ...`):
 
@@ -29,16 +34,20 @@ docker-compose.yml
 → docker-compose.override.yml (local-only)
 ```
 
-## Local stacks
+## Historical Local Stacks
 
 - `opw-local`
 - `cm-local`
 
-## Quick start
+## Historical Quick Start
+
+These commands are not current runtime guidance. Use `odoo-devkit` for local
+runtime generation and Launchplane for live target mutation.
 
 1. Copy the templates you need:
     - `cp .env.example .env`
-    - Fill required secrets in `.env` or `platform/secrets.toml`.
+    - Fill required secrets in an untracked local file if inspecting the old
+      flow. Do not commit real values.
     - For local image builds, set private `ODOO_BASE_RUNTIME_IMAGE` and
       `ODOO_BASE_DEVTOOLS_IMAGE` there before running `platform up --build`.
 
@@ -50,7 +59,8 @@ docker-compose.yml
 
 ## Notes
 
-- Keep secrets in `.env` (untracked) or `platform/secrets.toml` (untracked).
+- Keep secrets out of git. The historical `platform/secrets.toml` shape is not
+  current live authority.
 - `ODOO_MASTER_PASSWORD` is required for all stacks; set it in `.env`.
 - `ODOO_LIST_DB` must be `False` to disable the database manager UI.
 - `platform/config/base.env` is fallback-only for platform runtime generation
@@ -63,8 +73,7 @@ docker-compose.yml
   `./addons:/opt/project/addons` in the shared section so `web` and
   `script-runner` execute the same addon source tree (see
   `docs/workflows/multi-project.md`).
-- Restore runs (`uv run platform restore --context <target> --instance local`)
-  rely on `DATA_WORKFLOW_SSH_DIR` being set so the base compose mounts the SSH
-  directory for upstream access. Ensure that directory includes both the
-  private key and a trusted `known_hosts` entry for the upstream host when
-  strict host checking is enabled.
+- Historical restore runs relied on `DATA_WORKFLOW_SSH_DIR` so the base compose
+  could mount the SSH directory for upstream access. Current restore/bootstrap
+  authority belongs in Launchplane for live targets and `odoo-devkit` for local
+  manifest-backed work.

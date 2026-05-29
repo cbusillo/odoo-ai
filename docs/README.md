@@ -6,6 +6,18 @@ Purpose
 
 - Provide the routing map for project documentation.
 
+Retirement Notice
+
+- This repo is retired for live Odoo runtime, deploy, restore, bootstrap,
+  promotion, rollback, preview, and secret-management work.
+- Use Launchplane for shared/testing/prod mutations and durable runtime
+  authority, tenant repos for tenant addon/workflow ownership, `odoo-devkit`
+  for manifest-backed local runtime DX and artifact handoff, and Odoo image
+  repos for runtime image construction.
+- Docs below this index are historical unless they explicitly point to one of
+  those current owners. Do not treat repo-local `uv run platform` examples here
+  as current production guidance.
+
 When
 
 - At the start of any task to pick the right handles.
@@ -35,10 +47,7 @@ Routing
 - Data sources: [@docs/data-sources/README.md](data-sources/README.md)
 - Tooling: [@docs/tooling/codex-cli.md](tooling/codex-cli.md),
   [@docs/tooling/odoo-intelligence.md](tooling/odoo-intelligence.md),
-  [@docs/tooling/platform-cli.md](tooling/platform-cli.md),
-  [@docs/tooling/platform-command-patterns.md](tooling/platform-command-patterns.md),
   [@docs/tooling/secrets.md](tooling/secrets.md),
-  [@docs/tooling/dokploy.md](tooling/dokploy.md),
   [@docs/tooling/gpt-service-user.md](tooling/gpt-service-user.md),
   [@docs/tooling/runtime-baselines.md](tooling/runtime-baselines.md),
   [@docs/tooling/db-tuning.md](tooling/db-tuning.md),
@@ -52,6 +61,15 @@ Routing
   [@docs/resources.md](resources.md)
 - Roles: [@docs/roles.md](roles.md)
 - Platform migration status: [@docs/todo/platform-migration-status.md](todo/platform-migration-status.md)
+
+Archived Platform Docs
+
+- [@docs/tooling/platform-cli.md](tooling/platform-cli.md),
+  [@docs/tooling/platform-command-patterns.md](tooling/platform-command-patterns.md),
+  and [@docs/tooling/dokploy.md](tooling/dokploy.md) describe retired
+  `odoo-ai` platform behavior. They are retained for historical reference only;
+  current live authority belongs to Launchplane, tenant repos, image repos, and
+  `odoo-devkit`.
 
 Notes
 

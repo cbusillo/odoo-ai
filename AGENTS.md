@@ -5,6 +5,20 @@ reference only, and use `odoo-devkit`, tenant repos, and generated Odoo
 workspaces for current runtime/build/deploy work unless the user explicitly asks
 to inspect retired `odoo-ai` history.
 
+Current ownership lives outside this repo:
+
+- Launchplane owns shared/testing/prod mutations, deploy orchestration,
+  promotion, rollback, preview lifecycle, managed runtime records, and secret
+  authority.
+- Tenant repos own tenant addon code and thin Launchplane workflow calls.
+- `odoo-devkit` owns manifest-backed local runtime DX and artifact handoff.
+- Odoo image repos own base/runtime image construction.
+
+Do not run repo-local `uv run platform` commands from this checkout for live
+remote changes. Historical platform docs/config under `platform/`,
+`docs/tooling/`, and `tools/platform/` are retained only so old decisions can be
+understood.
+
 ---
 
 ## Historical Codex CLI Operating Guide
@@ -16,9 +30,9 @@ the linked docs, then keep prompts lean.
 
 - Use the documentation table of contents (`docs/README.md`) to grab handles
   instead of copying long excerpts.
-- Platform entrypoint: `uv run platform` for up/down/init/restore/build/ship/
-  gate workflows (docs `docs/tooling/platform-cli.md`; implementation
-  `tools/platform/cli.py`).
+- Historical platform entrypoint: `uv run platform` remains for archive
+  inspection and compatibility errors only. Do not use it for live remote
+  changes from this checkout.
 - Before changing code, open the matching style page (`docs/style/python.md`, `docs/style/javascript.md`,
   `docs/style/testing.md`).
 - Clarify your role expectations with @docs/roles.md (analyst, engineer,
@@ -35,8 +49,8 @@ the linked docs, then keep prompts lean.
 - Never call the system Python directly; use `uv run python ...` (or the
   scripted helpers) so the managed env stays in sync.
 - Common helper entry points are defined in `[project.scripts]` inside
-  `pyproject.toml` (examples: `test`, `platform`). Prefer them over ad-hoc
-  commands and suggest additions when a useful script is missing.
+  `pyproject.toml`. The `platform` script is retired compatibility surface, not
+  current runtime authority.
 - GPT service users seed automatically during restores when `.env` defines
   `ODOO_KEY`; see `docs/tooling/gpt-service-user.md` for provisioning details
   and API key usage.
@@ -145,8 +159,8 @@ the linked docs, then keep prompts lean.
 - Use Codex built-ins for routine file reads/searches and `apply_patch`; reserve
   JetBrains automation for IDE-only tasks.
 - Sandbox/approval profiles are documented in `docs/tooling/codex-cli.md`.
-- Dokploy env edits should go through `uv run platform dokploy env-set` /
-  `env-get` / `env-unset` instead of ad-hoc scripts.
+- Dokploy env edits for live targets belong in Launchplane-owned workflows or
+  operator surfaces, not this retired checkout.
 
 ## Domain Notes
 
@@ -194,9 +208,9 @@ the linked docs, then keep prompts lean.
   `docs/TESTING.md`
 - Performance & bulk operations: `docs/odoo/performance.md`, `docs/odoo/orm.md`
 - Planning & estimation: `docs/workflows/codex-workflow.md`
-- Environment utilities: restore helpers in `tools/`
-  (use `uv run platform restore --context <ctx> --instance <instance>` or
-  `uv run platform bootstrap --context <ctx> --instance <instance>`)
+- Historical environment utilities: restore/bootstrap helpers in `tools/` are
+  archive context only. Use Launchplane for live non-local data operations and
+  `odoo-devkit` for local manifest-backed runtime work.
 
 Keep AGENTS.md thin: route deeper guidance to the linked pages so we maintain a
 single, accurate source of truth.

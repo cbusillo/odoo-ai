@@ -7,6 +7,14 @@ Purpose
 - Provide the common `uv run platform ...` command patterns without mixing
   them into the stable operator contract.
 
+Retirement Notice
+
+- These command patterns are archival for `odoo-ai` history. Do not use this
+  repo's `uv run platform` commands as live production guidance.
+- Current live mutation authority is Launchplane. Current local runtime DX and
+  artifact handoff are in `odoo-devkit`. Tenant repos own thin Launchplane
+  workflow calls and tenant addon code.
+
 When
 
 - When you know you need the platform CLI and want concrete invocation

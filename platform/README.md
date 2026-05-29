@@ -1,5 +1,12 @@
 # Platform
 
+Retired authority notice: this directory is archival. It is not live Odoo
+runtime, deploy, restore, bootstrap, promotion, rollback, preview, Dokploy, or
+secret-management authority. Use Launchplane for shared/testing/prod mutations
+and durable runtime records, tenant repos for thin Launchplane workflows and
+tenant addons, `odoo-devkit` for manifest-backed local runtime DX and artifact
+handoff, and Odoo image repos for runtime image construction.
+
 This directory holds the platform configuration and local secrets contract for
 `uv run platform ...` workflows.
 
@@ -14,11 +21,12 @@ Start Here
 - Runtime topology and environment roles:
   [@docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)
 
-Files
+Archived Files
 
-- `stack.toml`: source of truth for contexts, instances, runtime tuning, and
-  local runtime mapping.
-- `dokploy.toml`: source of truth for remote Dokploy targets, branches,
+- `ARCHIVE.md`: current quarantine note for this retired directory.
+- `stack.toml`: historical snapshot of old contexts, instances, runtime tuning,
+  and local runtime mapping.
+- `dokploy.toml`: historical snapshot of old remote Dokploy targets, branches,
   domains, and release policy.
 - `compose/base.yaml`: shared local compose overlay between
   `docker-compose.yml` and `docker-compose.override.yml`.
@@ -36,7 +44,11 @@ Generated Files
 - root `.env`: local file plus the managed block used for PyCharm Compose
   compatibility.
 
-Operator Contract Summary
+Historical Operator Contract Summary
+
+These notes describe retired behavior and are not live operation guidance.
+Use Launchplane for live shared/testing/prod mutation and `odoo-devkit` for
+manifest-backed local runtime work.
 
 - `local` is the only host runtime on this machine.
 - Use `platform init`, `platform run`, `platform build`,
@@ -57,9 +69,13 @@ Operator Contract Summary
 - `platform update` applies module updates against the selected local or
   compose-backed managed runtime.
 
-Secrets and Env Notes
+Historical Secrets and Env Notes
 
-- Create `platform/secrets.toml` from the template when needed:
+Do not recreate real secret files in this repo. Use Launchplane-owned secret
+records for live targets and `odoo-devkit`/tenant-local non-secret manifests for
+local runtime work.
+
+- Historical template shape, for archive inspection only:
 
   ```bash
   cp platform/secrets.toml.example platform/secrets.toml
@@ -71,7 +87,9 @@ Secrets and Env Notes
 - Deploy commands read Dokploy credentials from root `.env`
   (`DOKPLOY_HOST`, `DOKPLOY_TOKEN`).
 
-Working Pattern
+Historical Working Pattern
+
+This pattern is retained to understand old flows only.
 
 - Use `platform select` to render `.platform/env/<context>.<instance>.env` for
   local stacks.

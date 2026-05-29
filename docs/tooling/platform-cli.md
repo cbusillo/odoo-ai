@@ -4,14 +4,25 @@ title: Platform CLI
 
 Purpose
 
-- Define the canonical operator contract for `uv run platform ...` and the
-  boundary between local runtime workflows and Dokploy-managed remote targets.
+- Preserve the historical `uv run platform ...` operator contract so retired
+  `odoo-ai` behavior can be understood without treating it as current
+  authority.
+
+Retirement Notice
+
+- This document is historical. The repo-local `uv run platform` surface in
+  `odoo-ai` is not current authority for live Odoo runtime work.
+- Use Launchplane for shared/testing/prod mutation, promotion, rollback,
+  preview lifecycle, durable runtime records, and managed secrets.
+- Use tenant repos for tenant addon code and thin Launchplane workflow calls.
+- Use `odoo-devkit` for manifest-backed local runtime DX and artifact handoff.
+- Use Odoo image repos for base/runtime image construction.
 
 When
 
 - Use before changing platform workflows, docs, or run configurations.
 
-Sources of Truth
+Historical Sources
 
 - `tools/platform/cli.py` — Click entrypoint and command implementation.
 - `tools/platform/models.py` — typed platform data contracts.
@@ -23,7 +34,7 @@ Sources of Truth
 - `platform/dokploy.toml` — remote target branch/domain contract.
 - `platform/secrets.toml` (optional, local) — layered secret/env overrides.
 
-Operator Contract
+Historical Operator Contract
 
 - `local` is the only host runtime on this machine.
 - The repo-local local-runtime lifecycle commands `platform select`, `up`,

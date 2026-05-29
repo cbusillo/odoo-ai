@@ -53,6 +53,7 @@ test = "tools.testkit.cli:main"  # example: uv run test unit --json
 test-validate = "tools.testkit.validate:main"
 gate-benchmark = "tools.gate_benchmark:main"
 prod-gate = "tools.prod_gate:main"
+# Retired compatibility surface. Do not use as current live Odoo ops authority.
 platform = "tools.platform.cli:main"
 
 [tool.uv]
